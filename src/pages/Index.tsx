@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ClipboardList, LayoutDashboard, Loader2 } from "lucide-react";
+import { ClipboardList, LayoutDashboard, Loader2, BarChart3 } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -9,6 +9,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { SummaryCard } from "@/components/SummaryCard";
 import { EntriesTable } from "@/components/EntriesTable";
 import { PaymentRequestGenerator } from "@/components/PaymentRequestGenerator";
+import { FinancialCharts } from "@/components/FinancialCharts";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { FilterState } from "@/types/freelancer";
@@ -89,7 +90,7 @@ const Index = () => {
       
       <main className="container py-6">
         <Tabs defaultValue="lancamentos" className="space-y-6">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="lancamentos" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Lançamentos
@@ -97,6 +98,10 @@ const Index = () => {
             <TabsTrigger value="gestao" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Gestão
+            </TabsTrigger>
+            <TabsTrigger value="analises" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Análises
             </TabsTrigger>
           </TabsList>
 
@@ -139,6 +144,28 @@ const Index = () => {
 
             {/* Data Table */}
             <EntriesTable entries={filteredEntries} />
+          </TabsContent>
+
+          {/* Análises Tab */}
+          <TabsContent value="analises" className="space-y-6">
+            {/* Filters */}
+            <FilterBar
+              filters={filters}
+              onFiltersChange={setFilters}
+              uniqueSetores={uniqueSetores}
+              uniqueGerencias={uniqueGerencias}
+              uniqueLojas={uniqueLojas}
+            />
+
+            {/* Summary */}
+            <SummaryCard
+              totalValue={totalValue}
+              totalEntries={filteredEntries.length}
+              uniqueFreelancers={uniqueFreelancers}
+            />
+
+            {/* Charts */}
+            <FinancialCharts entries={filteredEntries} />
           </TabsContent>
         </Tabs>
       </main>

@@ -23,14 +23,18 @@ interface FinancialChartsProps {
 }
 
 const CHART_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent))",
-  "hsl(var(--secondary))",
-  "hsl(var(--muted-foreground))",
-  "hsl(var(--destructive))",
-  "hsl(24, 70%, 50%)",
-  "hsl(180, 60%, 45%)",
-  "hsl(280, 55%, 55%)",
+  "hsl(12, 76%, 61%)",    // Coral/Terracotta
+  "hsl(173, 58%, 39%)",   // Teal
+  "hsl(43, 96%, 56%)",    // Amber
+  "hsl(215, 72%, 52%)",   // Blue
+  "hsl(330, 72%, 55%)",   // Pink
+  "hsl(142, 71%, 45%)",   // Green
+  "hsl(271, 76%, 53%)",   // Purple
+  "hsl(24, 85%, 55%)",    // Orange
+  "hsl(197, 71%, 52%)",   // Cyan
+  "hsl(350, 65%, 52%)",   // Red
+  "hsl(88, 55%, 50%)",    // Lime
+  "hsl(262, 52%, 47%)",   // Indigo
 ];
 
 export const FinancialCharts = ({ entries }: FinancialChartsProps) => {

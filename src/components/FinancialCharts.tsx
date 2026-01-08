@@ -188,7 +188,14 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                   }
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {dataByGerencia.map((_, index) => (
+                    <Cell
+                      key={`cell-gerencia-${index}`}
+                      fill={CHART_COLORS[index % CHART_COLORS.length]}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

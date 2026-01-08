@@ -10,6 +10,8 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { EntriesTable } from "@/components/EntriesTable";
 import { PaymentRequestGenerator } from "@/components/PaymentRequestGenerator";
 import { FinancialCharts } from "@/components/FinancialCharts";
+import { ImportSpreadsheetModal } from "@/components/ImportSpreadsheetModal";
+import { ExportReportButton } from "@/components/ExportReportButton";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { FilterState } from "@/types/freelancer";
@@ -107,7 +109,12 @@ const Index = () => {
 
           {/* Lançamentos Tab */}
           <TabsContent value="lancamentos" className="space-y-6">
-            <FreelancerForm />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <FreelancerForm />
+              <div className="flex justify-end sm:pt-0">
+                <ImportSpreadsheetModal />
+              </div>
+            </div>
             
             <div className="rounded-xl bg-muted/50 p-4">
               <h3 className="mb-4 text-sm font-medium text-muted-foreground">
@@ -134,13 +141,20 @@ const Index = () => {
             </div>
 
             {/* Filters */}
-            <FilterBar
-              filters={filters}
-              onFiltersChange={setFilters}
-              uniqueSetores={uniqueSetores}
-              uniqueGerencias={uniqueGerencias}
-              uniqueLojas={uniqueLojas}
-            />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex-1">
+                <FilterBar
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  uniqueSetores={uniqueSetores}
+                  uniqueGerencias={uniqueGerencias}
+                  uniqueLojas={uniqueLojas}
+                />
+              </div>
+              <div className="flex justify-end">
+                <ExportReportButton entries={filteredEntries} />
+              </div>
+            </div>
 
             {/* Data Table */}
             <EntriesTable entries={filteredEntries} />

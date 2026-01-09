@@ -21,6 +21,13 @@ export function useFreelancerEntries() {
 
   const createEntry = useMutation({
     mutationFn: async (formData: FreelancerFormData) => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
       const { data, error } = await supabase
         .from("freelancer_entries")
         .insert({
@@ -32,6 +39,7 @@ export function useFreelancerEntries() {
           valor: formData.valor,
           cpf: formData.cpf,
           chave_pix: formData.chave_pix,
+          created_by: user.id,
         })
         .select()
         .single();

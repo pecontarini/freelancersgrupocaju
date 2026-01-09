@@ -116,7 +116,20 @@ export function ImportSpreadsheetModal() {
     setIsProcessing(true);
 
     try {
-      const { error } = await supabase.from("freelancer_entries").insert(parsedEntries);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Add created_by to each entry
+      const entriesWithUser = parsedEntries.map(entry => ({
+        ...entry,
+        created_by: user.id,
+      }));
+
+      const { error } = await supabase.from("freelancer_entries").insert(entriesWithUser);
 
       if (error) throw error;
 

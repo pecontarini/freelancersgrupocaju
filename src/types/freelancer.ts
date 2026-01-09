@@ -9,6 +9,7 @@ export interface FreelancerEntry {
   cpf: string;
   chave_pix: string;
   created_at: string;
+  created_by: string | null;
 }
 
 export interface FreelancerFormData {

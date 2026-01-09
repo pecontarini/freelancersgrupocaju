@@ -73,6 +73,7 @@ export type Database = {
           chave_pix: string
           cpf: string
           created_at: string
+          created_by: string | null
           data_pop: string
           gerencia: string
           id: string
@@ -85,6 +86,7 @@ export type Database = {
           chave_pix: string
           cpf: string
           created_at?: string
+          created_by?: string | null
           data_pop: string
           gerencia: string
           id?: string
@@ -97,6 +99,7 @@ export type Database = {
           chave_pix?: string
           cpf?: string
           created_at?: string
+          created_by?: string | null
           data_pop?: string
           gerencia?: string
           id?: string

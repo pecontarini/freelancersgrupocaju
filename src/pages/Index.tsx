@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ClipboardList, LayoutDashboard, Loader2, BarChart3 } from "lucide-react";
+import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -12,6 +12,7 @@ import { PaymentRequestGenerator } from "@/components/PaymentRequestGenerator";
 import { FinancialCharts } from "@/components/FinancialCharts";
 import { ImportSpreadsheetModal } from "@/components/ImportSpreadsheetModal";
 import { ExportReportButton } from "@/components/ExportReportButton";
+import { ConfigurationsTab } from "@/components/ConfigurationsTab";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { FilterState } from "@/types/freelancer";
@@ -92,7 +93,7 @@ const Index = () => {
       
       <main className="container py-6">
         <Tabs defaultValue="lancamentos" className="space-y-6">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="lancamentos" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Lançamentos
@@ -104,6 +105,10 @@ const Index = () => {
             <TabsTrigger value="analises" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               Análises
+            </TabsTrigger>
+            <TabsTrigger value="configuracoes" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Configurações
             </TabsTrigger>
           </TabsList>
 
@@ -180,6 +185,11 @@ const Index = () => {
 
             {/* Charts */}
             <FinancialCharts entries={filteredEntries} />
+          </TabsContent>
+
+          {/* Configurações Tab */}
+          <TabsContent value="configuracoes">
+            <ConfigurationsTab />
           </TabsContent>
         </Tabs>
       </main>

@@ -26,6 +26,7 @@ import {
 
 import { formatCPF, formatCurrencyInput, isValidCPF } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
+import { useConfigLojas, useConfigSetores, useConfigGerencias } from "@/hooks/useConfigOptions";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -41,30 +42,15 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-const LOJAS = [
-  "MULT 14 - CPASS",
-  "MULT 15 - CPASS",
-  "MULT 16 - CPASS",
-];
-
-const SETORES = [
-  "VIGILANTE",
-  "BRINQUEDOTECA",
-  "CUMIM",
-  "BAR",
-  "COZINHA",
-  "PARRILLA",
-  "HOSTESS",
-  "ASG",
-];
-
-const GERENCIAS = ["FRONT", "BACK"];
-
 export function FreelancerForm() {
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
   const { createEntry } = useFreelancerEntries();
-
+  
+  // Fetch dynamic options from config tables
+  const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
+  const { options: setores, isLoading: isLoadingSetores } = useConfigSetores();
+  const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -122,14 +108,14 @@ export function FreelancerForm() {
             {/* Loja */}
             <div className="space-y-2">
               <Label htmlFor="loja">Loja</Label>
-              <Select onValueChange={(val) => form.setValue("loja", val)}>
+              <Select onValueChange={(val) => form.setValue("loja", val)} disabled={isLoadingLojas}>
                 <SelectTrigger className="input-focus-ring">
-                  <SelectValue placeholder="Selecione a loja" />
+                  <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {LOJAS.map((loja) => (
-                    <SelectItem key={loja} value={loja}>
-                      {loja}
+                  {lojas.map((loja) => (
+                    <SelectItem key={loja.id} value={loja.nome}>
+                      {loja.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -156,14 +142,14 @@ export function FreelancerForm() {
             {/* Setor */}
             <div className="space-y-2">
               <Label htmlFor="setor">Setor</Label>
-              <Select onValueChange={(val) => form.setValue("setor", val)}>
+              <Select onValueChange={(val) => form.setValue("setor", val)} disabled={isLoadingSetores}>
                 <SelectTrigger className="input-focus-ring">
-                  <SelectValue placeholder="Selecione o setor" />
+                  <SelectValue placeholder={isLoadingSetores ? "Carregando..." : "Selecione o setor"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {SETORES.map((setor) => (
-                    <SelectItem key={setor} value={setor}>
-                      {setor}
+                  {setores.map((setor) => (
+                    <SelectItem key={setor.id} value={setor.nome}>
+                      {setor.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -176,14 +162,14 @@ export function FreelancerForm() {
             {/* Gerência */}
             <div className="space-y-2">
               <Label htmlFor="gerencia">Gerência</Label>
-              <Select onValueChange={(val) => form.setValue("gerencia", val)}>
+              <Select onValueChange={(val) => form.setValue("gerencia", val)} disabled={isLoadingGerencias}>
                 <SelectTrigger className="input-focus-ring">
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder={isLoadingGerencias ? "Carregando..." : "Selecione"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {GERENCIAS.map((gerencia) => (
-                    <SelectItem key={gerencia} value={gerencia}>
-                      {gerencia}
+                  {gerencias.map((gerencia) => (
+                    <SelectItem key={gerencia.id} value={gerencia.nome}>
+                      {gerencia.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

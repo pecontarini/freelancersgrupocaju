@@ -12,19 +12,24 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
 import { validateAndParseFile, generateTemplate, ParsedEntry, ValidationError } from "@/lib/excelUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
+const CHUNK_SIZE = 50;
+
 export function ImportSpreadsheetModal() {
   const [open, setOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [parsedEntries, setParsedEntries] = useState<ParsedEntry[]>([]);
   const [fileName, setFileName] = useState<string>("");
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
 
   const queryClient = useQueryClient();
 
@@ -33,13 +38,17 @@ export function ImportSpreadsheetModal() {
     setParsedEntries([]);
     setFileName("");
     setIsProcessing(false);
+    setIsImporting(false);
+    setImportProgress({ current: 0, total: 0 });
   };
 
   const handleClose = (isOpen: boolean) => {
-    if (!isOpen) {
+    if (!isOpen && !isImporting) {
       resetState();
     }
-    setOpen(isOpen);
+    if (!isImporting) {
+      setOpen(isOpen);
+    }
   };
 
   const processFile = async (file: File) => {
@@ -106,42 +115,79 @@ export function ImportSpreadsheetModal() {
     if (file) {
       processFile(file);
     }
-    // Reset input so same file can be selected again
     e.target.value = "";
   };
 
   const handleImport = async () => {
     if (parsedEntries.length === 0) return;
 
-    setIsProcessing(true);
+    setIsImporting(true);
+    setImportProgress({ current: 0, total: parsedEntries.length });
 
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
         throw new Error("Usuário não autenticado");
       }
 
-      // Add created_by to each entry
       const entriesWithUser = parsedEntries.map(entry => ({
         ...entry,
         created_by: user.id,
       }));
 
-      const { error } = await supabase.from("freelancer_entries").insert(entriesWithUser);
+      // Chunk the entries for bulk insert
+      const chunks: typeof entriesWithUser[] = [];
+      for (let i = 0; i < entriesWithUser.length; i += CHUNK_SIZE) {
+        chunks.push(entriesWithUser.slice(i, i + CHUNK_SIZE));
+      }
 
-      if (error) throw error;
+      let processedCount = 0;
+      const failedChunks: { chunkIndex: number; error: string }[] = [];
+
+      // Process chunks sequentially for progress feedback
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        
+        const { error } = await supabase
+          .from("freelancer_entries")
+          .insert(chunk);
+
+        if (error) {
+          failedChunks.push({ 
+            chunkIndex: i, 
+            error: error.message 
+          });
+          console.error(`Chunk ${i + 1} failed:`, error);
+        } else {
+          processedCount += chunk.length;
+        }
+
+        setImportProgress({ 
+          current: Math.min((i + 1) * CHUNK_SIZE, parsedEntries.length), 
+          total: parsedEntries.length 
+        });
+      }
 
       await queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
-      
-      toast.success(`${parsedEntries.length} registros importados com sucesso!`);
+
+      if (failedChunks.length > 0) {
+        const failedRecords = failedChunks.length * CHUNK_SIZE;
+        toast.warning(
+          `${processedCount} registros importados. ${failedRecords} registros falharam.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success(`${parsedEntries.length} registros importados com sucesso!`);
+      }
+
       handleClose(false);
     } catch (error) {
       console.error("Import error:", error);
       toast.error("Erro ao salvar registros. Tente novamente.");
     } finally {
-      setIsProcessing(false);
+      setIsImporting(false);
+      setImportProgress({ current: 0, total: 0 });
     }
   };
 
@@ -149,6 +195,10 @@ export function ImportSpreadsheetModal() {
     generateTemplate();
     toast.success("Modelo baixado com sucesso!");
   };
+
+  const progressPercentage = importProgress.total > 0 
+    ? Math.round((importProgress.current / importProgress.total) * 100)
+    : 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -186,70 +236,88 @@ export function ImportSpreadsheetModal() {
             </Button>
           </div>
 
+          {/* Import Progress */}
+          {isImporting && (
+            <div className="space-y-2 rounded-lg border bg-primary/5 p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Processando registros...</span>
+                <span className="text-muted-foreground">
+                  {importProgress.current} de {importProgress.total}
+                </span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+              <p className="text-xs text-muted-foreground text-center">
+                {progressPercentage}% concluído
+              </p>
+            </div>
+          )}
+
           {/* Upload Area */}
-          <div
-            className={`relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => document.getElementById("file-upload")?.click()}
-          >
-            <input
-              id="file-upload"
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            
-            {isProcessing ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Processando arquivo...</p>
-              </div>
-            ) : fileName ? (
-              <div className="flex flex-col items-center gap-3">
-                <CheckCircle2 className="h-10 w-10 text-green-500" />
-                <div className="text-center">
-                  <p className="text-sm font-medium">{fileName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Clique para selecionar outro arquivo
-                  </p>
+          {!isImporting && (
+            <div
+              className={`relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+                isDragging
+                  ? "border-primary bg-primary/5"
+                  : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
+              }`}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => document.getElementById("file-upload")?.click()}
+            >
+              <input
+                id="file-upload"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              
+              {isProcessing ? (
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Validando arquivo...</p>
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <Upload className="h-10 w-10 text-muted-foreground" />
-                <div className="text-center">
-                  <p className="text-sm font-medium">Arraste o arquivo aqui</p>
-                  <p className="text-xs text-muted-foreground">
-                    ou clique para selecionar (.xlsx, .xls, .csv)
-                  </p>
+              ) : fileName ? (
+                <div className="flex flex-col items-center gap-3">
+                  <CheckCircle2 className="h-10 w-10 text-green-500" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">{fileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Clique para selecionar outro arquivo
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                  <Upload className="h-10 w-10 text-muted-foreground" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">Arraste o arquivo aqui</p>
+                    <p className="text-xs text-muted-foreground">
+                      ou clique para selecionar (.xlsx, .xls, .csv)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Validation Errors */}
-          {validationErrors.length > 0 && (
+          {validationErrors.length > 0 && !isImporting && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Erros encontrados ({validationErrors.length})</AlertTitle>
               <AlertDescription>
                 <ScrollArea className="mt-2 h-[120px]">
                   <ul className="space-y-1 text-xs">
-                    {validationErrors.slice(0, 20).map((error, idx) => (
+                    {validationErrors.slice(0, 50).map((error, idx) => (
                       <li key={idx}>
                         <strong>Linha {error.row}</strong> - {error.field}: {error.message}
                       </li>
                     ))}
-                    {validationErrors.length > 20 && (
+                    {validationErrors.length > 50 && (
                       <li className="text-muted-foreground">
-                        ... e mais {validationErrors.length - 20} erros
+                        ... e mais {validationErrors.length - 50} erros
                       </li>
                     )}
                   </ul>
@@ -259,27 +327,36 @@ export function ImportSpreadsheetModal() {
           )}
 
           {/* Success Preview */}
-          {parsedEntries.length > 0 && (
+          {parsedEntries.length > 0 && !isImporting && (
             <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Pronto para importar</AlertTitle>
               <AlertDescription>
                 {parsedEntries.length} registro(s) válido(s) encontrado(s).
+                {parsedEntries.length > CHUNK_SIZE && (
+                  <span className="block mt-1 text-xs opacity-80">
+                    Serão processados em lotes de {CHUNK_SIZE} registros.
+                  </span>
+                )}
               </AlertDescription>
             </Alert>
           )}
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={() => handleClose(false)} disabled={isProcessing}>
+            <Button 
+              variant="outline" 
+              onClick={() => handleClose(false)} 
+              disabled={isImporting}
+            >
               Cancelar
             </Button>
             <Button
               onClick={handleImport}
-              disabled={parsedEntries.length === 0 || isProcessing}
+              disabled={parsedEntries.length === 0 || isProcessing || isImporting}
               className="gap-2"
             >
-              {isProcessing ? (
+              {isImporting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Importando...

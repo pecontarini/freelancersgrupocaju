@@ -21,7 +21,6 @@ export function useFreelancerEntries() {
 
   const createEntry = useMutation({
     mutationFn: async (formData: FreelancerFormData) => {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -64,15 +63,45 @@ export function useFreelancerEntries() {
         .delete()
         .eq("id", id);
       
-      if (error) throw error;
+      if (error) {
+        // Check for RLS policy violation
+        if (error.code === "42501" || error.message.includes("policy")) {
+          throw new Error("Você não tem permissão para excluir este lançamento. Apenas o criador pode excluí-lo.");
+        }
+        throw error;
+      }
+    },
+    // Optimistic update - remove item from UI immediately
+    onMutate: async (id: string) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["freelancer-entries"] });
+
+      // Snapshot the previous value
+      const previousEntries = queryClient.getQueryData<FreelancerEntry[]>(["freelancer-entries"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData<FreelancerEntry[]>(
+        ["freelancer-entries"],
+        (old) => old?.filter((entry) => entry.id !== id) ?? []
+      );
+
+      // Return a context object with the snapshotted value
+      return { previousEntries };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
       toast.success("Lançamento excluído com sucesso!");
     },
-    onError: (error) => {
+    onError: (error, id, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousEntries) {
+        queryClient.setQueryData(["freelancer-entries"], context.previousEntries);
+      }
       console.error("Error deleting entry:", error);
-      toast.error("Erro ao excluir lançamento.");
+      toast.error(error instanceof Error ? error.message : "Erro ao excluir lançamento.");
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure cache is in sync
+      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
     },
   });
 

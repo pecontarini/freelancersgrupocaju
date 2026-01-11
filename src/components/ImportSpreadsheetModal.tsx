@@ -13,11 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 
 import { validateAndParseFile, generateTemplate, ParsedEntry, ValidationError } from "@/lib/excelUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 const CHUNK_SIZE = 50;
 
@@ -30,8 +40,17 @@ export function ImportSpreadsheetModal() {
   const [parsedEntries, setParsedEntries] = useState<ParsedEntry[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [selectedLojaId, setSelectedLojaId] = useState<string>("");
 
   const queryClient = useQueryClient();
+  const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
+  const { isAdmin, unidade, isGerenteUnidade } = useUserProfile();
+
+  // Set default loja for gerente_unidade
+  const effectiveLojaId = isGerenteUnidade && !isAdmin && unidade ? unidade.id : selectedLojaId;
+  const effectiveLojaName = isGerenteUnidade && !isAdmin && unidade 
+    ? unidade.nome 
+    : lojas.find(l => l.id === selectedLojaId)?.nome || "";
 
   const resetState = () => {
     setValidationErrors([]);
@@ -40,6 +59,9 @@ export function ImportSpreadsheetModal() {
     setIsProcessing(false);
     setIsImporting(false);
     setImportProgress({ current: 0, total: 0 });
+    if (isAdmin) {
+      setSelectedLojaId("");
+    }
   };
 
   const handleClose = (isOpen: boolean) => {
@@ -120,6 +142,11 @@ export function ImportSpreadsheetModal() {
 
   const handleImport = async () => {
     if (parsedEntries.length === 0) return;
+    
+    if (!effectiveLojaId) {
+      toast.error("Selecione uma loja para importar os registros.");
+      return;
+    }
 
     setIsImporting(true);
     setImportProgress({ current: 0, total: parsedEntries.length });
@@ -134,6 +161,8 @@ export function ImportSpreadsheetModal() {
       const entriesWithUser = parsedEntries.map(entry => ({
         ...entry,
         created_by: user.id,
+        loja_id: effectiveLojaId,
+        loja: effectiveLojaName || entry.loja,
       }));
 
       // Chunk the entries for bulk insert
@@ -235,6 +264,41 @@ export function ImportSpreadsheetModal() {
               Baixar
             </Button>
           </div>
+
+          {/* Loja Selection - Admin only */}
+          {isAdmin && !isImporting && (
+            <div className="space-y-2">
+              <Label>Loja para importação</Label>
+              <Select 
+                value={selectedLojaId} 
+                onValueChange={setSelectedLojaId}
+                disabled={isLoadingLojas}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {lojas.map((loja) => (
+                    <SelectItem key={loja.id} value={loja.id}>
+                      {loja.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Todos os registros serão vinculados a esta loja.
+              </p>
+            </div>
+          )}
+
+          {/* Show selected unidade for gerente */}
+          {isGerenteUnidade && !isAdmin && unidade && !isImporting && (
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-sm text-muted-foreground">
+                Importando para: <span className="font-medium text-foreground">{unidade.nome}</span>
+              </p>
+            </div>
+          )}
 
           {/* Import Progress */}
           {isImporting && (

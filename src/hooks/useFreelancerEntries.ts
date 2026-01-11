@@ -39,6 +39,7 @@ export function useFreelancerEntries() {
           cpf: formData.cpf,
           chave_pix: formData.chave_pix,
           created_by: user.id,
+          loja_id: formData.loja_id,
         })
         .select()
         .single();
@@ -66,7 +67,7 @@ export function useFreelancerEntries() {
       if (error) {
         // Check for RLS policy violation
         if (error.code === "42501" || error.message.includes("policy")) {
-          throw new Error("Você não tem permissão para excluir este lançamento. Apenas o criador pode excluí-lo.");
+          throw new Error("Você não tem permissão para excluir este lançamento.");
         }
         throw error;
       }

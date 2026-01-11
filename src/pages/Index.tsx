@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings } from "lucide-react";
+import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings, Users, Building2 } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -13,8 +13,12 @@ import { FinancialCharts } from "@/components/FinancialCharts";
 import { ImportSpreadsheetModal } from "@/components/ImportSpreadsheetModal";
 import { ExportReportButton } from "@/components/ExportReportButton";
 import { ConfigurationsTab } from "@/components/ConfigurationsTab";
+import { UnidadeSelector } from "@/components/UnidadeSelector";
+import { NetworkSummary } from "@/components/NetworkSummary";
+import { UserManagement } from "@/components/UserManagement";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { FilterState } from "@/types/freelancer";
 
 const Index = () => {
@@ -26,6 +30,9 @@ const Index = () => {
     uniqueLojas,
   } = useFreelancerEntries();
 
+  const { isAdmin, isGerenteUnidade, unidade, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
+  const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
+
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: undefined,
     dateTo: undefined,
@@ -35,9 +42,16 @@ const Index = () => {
     loja: "",
   });
 
-  // Filter entries based on current filter state
+  // Filter entries based on current filter state and unidade
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
+      // Unidade filter (multi-tenant)
+      if (isGerenteUnidade && !isAdmin && unidade) {
+        if (entry.loja_id !== unidade.id) return false;
+      } else if (isAdmin && selectedUnidadeId) {
+        if (entry.loja_id !== selectedUnidadeId) return false;
+      }
+
       // Date range filter
       if (filters.dateFrom) {
         const entryDate = new Date(entry.data_pop);
@@ -73,16 +87,35 @@ const Index = () => {
 
       return true;
     });
-  }, [entries, filters]);
+  }, [entries, filters, isAdmin, isGerenteUnidade, unidade, selectedUnidadeId]);
 
   // Calculate summary stats
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
   const uniqueFreelancers = new Set(filteredEntries.map((e) => e.cpf)).size;
 
-  if (isLoading) {
+  if (isLoading || isLoadingProfile) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show message if user has no role assigned
+  if (hasNoRole) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader />
+        <main className="container py-6">
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Users className="h-16 w-16 text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Aguardando Permissão</h2>
+            <p className="text-muted-foreground max-w-md">
+              Sua conta foi criada, mas você ainda não tem permissão de acesso.
+              Entre em contato com o administrador para receber acesso ao sistema.
+            </p>
+          </div>
+        </main>
       </div>
     );
   }
@@ -92,8 +125,24 @@ const Index = () => {
       <AppHeader />
       
       <main className="container py-6">
-        <Tabs defaultValue="lancamentos" className="space-y-6">
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        {/* Global Unidade Selector for Admin */}
+        {isAdmin && (
+          <div className="mb-6">
+            <UnidadeSelector
+              selectedUnidadeId={selectedUnidadeId}
+              onUnidadeChange={setSelectedUnidadeId}
+            />
+          </div>
+        )}
+
+        <Tabs defaultValue={isAdmin ? "rede" : "lancamentos"} className="space-y-6">
+          <TabsList className={`grid w-full max-w-3xl ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
+            {isAdmin && (
+              <TabsTrigger value="rede" className="gap-2">
+                <Building2 className="h-4 w-4" />
+                Rede
+              </TabsTrigger>
+            )}
             <TabsTrigger value="lancamentos" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Lançamentos
@@ -106,11 +155,20 @@ const Index = () => {
               <BarChart3 className="h-4 w-4" />
               Análises
             </TabsTrigger>
-            <TabsTrigger value="configuracoes" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Configurações
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="configuracoes" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Configurações
+              </TabsTrigger>
+            )}
           </TabsList>
+
+          {/* Rede Tab - Admin Only */}
+          {isAdmin && (
+            <TabsContent value="rede" className="space-y-6">
+              <NetworkSummary entries={entries} />
+            </TabsContent>
+          )}
 
           {/* Lançamentos Tab */}
           <TabsContent value="lancamentos" className="space-y-6">
@@ -187,10 +245,13 @@ const Index = () => {
             <FinancialCharts entries={filteredEntries} />
           </TabsContent>
 
-          {/* Configurações Tab */}
-          <TabsContent value="configuracoes">
-            <ConfigurationsTab />
-          </TabsContent>
+          {/* Configurações Tab - Admin Only */}
+          {isAdmin && (
+            <TabsContent value="configuracoes" className="space-y-6">
+              <ConfigurationsTab />
+              <UserManagement />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>

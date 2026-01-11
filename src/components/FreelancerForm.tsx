@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -27,10 +27,12 @@ import {
 import { formatCPF, formatCurrencyInput, isValidCPF } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useConfigLojas, useConfigSetores, useConfigGerencias } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
+  loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
   setor: z.string().min(1, "Setor é obrigatório"),
   gerencia: z.string().min(1, "Gerência é obrigatória"),
@@ -46,15 +48,18 @@ export function FreelancerForm() {
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
   const { createEntry } = useFreelancerEntries();
+  const { isAdmin, unidade, isGerenteUnidade } = useUserProfile();
   
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
   const { options: setores, isLoading: isLoadingSetores } = useConfigSetores();
   const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
+  
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       loja: "",
+      loja_id: "",
       nome_completo: "",
       setor: "",
       gerencia: "",
@@ -63,6 +68,14 @@ export function FreelancerForm() {
       valor: 0,
     },
   });
+
+  // Pre-select unidade for gerente_unidade
+  useEffect(() => {
+    if (isGerenteUnidade && unidade && !isAdmin) {
+      form.setValue("loja", unidade.nome);
+      form.setValue("loja_id", unidade.id);
+    }
+  }, [isGerenteUnidade, unidade, isAdmin, form]);
 
   const onSubmit = async (data: FormData) => {
     await createEntry.mutateAsync({
@@ -74,10 +87,25 @@ export function FreelancerForm() {
       valor: data.valor,
       cpf: data.cpf,
       chave_pix: data.chave_pix,
+      loja_id: data.loja_id,
     });
     form.reset();
     setCpfValue("");
     setValorValue("");
+    
+    // Re-apply unidade for gerente
+    if (isGerenteUnidade && unidade && !isAdmin) {
+      form.setValue("loja", unidade.nome);
+      form.setValue("loja_id", unidade.id);
+    }
+  };
+
+  const handleLojaChange = (lojaId: string) => {
+    const selectedLoja = lojas.find((l) => l.id === lojaId);
+    if (selectedLoja) {
+      form.setValue("loja", selectedLoja.nome);
+      form.setValue("loja_id", selectedLoja.id);
+    }
   };
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,18 +136,30 @@ export function FreelancerForm() {
             {/* Loja */}
             <div className="space-y-2">
               <Label htmlFor="loja">Loja</Label>
-              <Select onValueChange={(val) => form.setValue("loja", val)} disabled={isLoadingLojas}>
-                <SelectTrigger className="input-focus-ring">
-                  <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {lojas.map((loja) => (
-                    <SelectItem key={loja.id} value={loja.nome}>
-                      {loja.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isGerenteUnidade && !isAdmin && unidade ? (
+                <Input
+                  value={unidade.nome}
+                  disabled
+                  className="input-focus-ring bg-muted"
+                />
+              ) : (
+                <Select 
+                  onValueChange={handleLojaChange} 
+                  disabled={isLoadingLojas}
+                  value={form.watch("loja_id") || undefined}
+                >
+                  <SelectTrigger className="input-focus-ring">
+                    <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {lojas.map((loja) => (
+                      <SelectItem key={loja.id} value={loja.id}>
+                        {loja.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {form.formState.errors.loja && (
                 <p className="text-sm text-destructive">{form.formState.errors.loja.message}</p>
               )}

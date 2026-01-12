@@ -35,10 +35,37 @@ export function formatCurrencyInput(value: string): string {
   }).format(amount);
 }
 
-// Format date for display: DD/MM/YYYY
+// Format date for display: DD/MM/YYYY (timezone-safe)
 export function formatDate(date: string | Date): string {
+  if (typeof date === "string") {
+    // If it's a YYYY-MM-DD string, parse it without timezone conversion
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${day}/${month}/${year}`;
+    }
+  }
+  // Fallback for Date objects - use UTC to avoid timezone shift
   const d = new Date(date);
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
+// Format a Date object to YYYY-MM-DD string using local date (timezone-safe for saving)
+export function formatDateForDatabase(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+// Parse a YYYY-MM-DD string to a Date object without timezone shift
+export function parseDateString(dateStr: string): Date {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  return new Date(dateStr);
 }
 
 // Validate CPF format

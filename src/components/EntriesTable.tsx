@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 import { FreelancerEntry } from "@/types/freelancer";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, parseDateString } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 
 interface EntriesTableProps {
@@ -54,7 +54,7 @@ export function EntriesTable({ entries }: EntriesTableProps) {
     
     switch (sortField) {
       case "data_pop":
-        comparison = new Date(a.data_pop).getTime() - new Date(b.data_pop).getTime();
+        comparison = parseDateString(a.data_pop).getTime() - parseDateString(b.data_pop).getTime();
         break;
       case "valor":
         comparison = a.valor - b.valor;

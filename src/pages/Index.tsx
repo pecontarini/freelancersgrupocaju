@@ -20,6 +20,7 @@ import { UserManagement } from "@/components/UserManagement";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FilterState } from "@/types/freelancer";
+import { parseDateString } from "@/lib/formatters";
 
 const Index = () => {
   const {
@@ -61,11 +62,11 @@ const Index = () => {
 
       // Date range filter
       if (filters.dateFrom) {
-        const entryDate = new Date(entry.data_pop);
+        const entryDate = parseDateString(entry.data_pop);
         if (entryDate < filters.dateFrom) return false;
       }
       if (filters.dateTo) {
-        const entryDate = new Date(entry.data_pop);
+        const entryDate = parseDateString(entry.data_pop);
         if (entryDate > filters.dateTo) return false;
       }
 

@@ -1,5 +1,7 @@
 import { Store, Briefcase, Users } from "lucide-react";
 import { ConfigSection } from "@/components/ConfigSection";
+import { ClearEntriesModal } from "@/components/ClearEntriesModal";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useConfigLojas,
   useConfigFuncoes,
@@ -10,14 +12,18 @@ export function ConfigurationsTab() {
   const lojas = useConfigLojas();
   const funcoes = useConfigFuncoes();
   const gerencias = useConfigGerencias();
+  const { isAdmin } = useUserProfile();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Configurações</h2>
-        <p className="text-muted-foreground">
-          Gerencie as opções disponíveis nos formulários de lançamento.
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Configurações</h2>
+          <p className="text-muted-foreground">
+            Gerencie as opções disponíveis nos formulários de lançamento.
+          </p>
+        </div>
+        {isAdmin && <ClearEntriesModal />}
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

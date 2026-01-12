@@ -32,6 +32,13 @@ interface GroupedData {
   };
 }
 
+interface FuncaoTotals {
+  [funcao: string]: {
+    total: number;
+    count: number;
+  };
+}
+
 export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProps) {
   const [copied, setCopied] = useState(false);
 
@@ -54,6 +61,16 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
     return acc;
   }, {});
 
+  // Calculate totals by funcao
+  const funcaoTotals = entries.reduce<FuncaoTotals>((acc, entry) => {
+    if (!acc[entry.funcao]) {
+      acc[entry.funcao] = { total: 0, count: 0 };
+    }
+    acc[entry.funcao].total += entry.valor;
+    acc[entry.funcao].count += 1;
+    return acc;
+  }, {});
+
   const generateRequestText = () => {
     const groups = Object.values(groupedData).sort((a, b) => {
       const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
@@ -73,13 +90,10 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
       text += `${"─".repeat(40)}\n\n`;
 
       group.entries.forEach((entry, index) => {
-        text += `${index + 1}. *${entry.nome_completo}*\n`;
-        text += `   CPF: ${entry.cpf}\n`;
-        text += `   PIX: ${entry.chave_pix}\n`;
-        text += `   Valor: ${formatCurrency(entry.valor)}\n\n`;
+        text += `${index + 1}. ${entry.nome_completo} | Função: ${entry.funcao} | CPF: ${entry.cpf} | PIX: ${entry.chave_pix} | Valor: ${formatCurrency(entry.valor)}\n`;
       });
 
-      text += `${"─".repeat(40)}\n`;
+      text += `\n${"─".repeat(40)}\n`;
       text += `💰 *Subtotal: ${formatCurrency(group.total)}*\n\n`;
       
       grandTotal += group.total;
@@ -89,10 +103,21 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
       }
     });
 
-    if (groups.length > 1) {
+    // Add totals by funcao
+    if (Object.keys(funcaoTotals).length > 0) {
       text += `${"═".repeat(40)}\n`;
-      text += `💵 *TOTAL GERAL: ${formatCurrency(grandTotal)}*\n`;
+      text += `📊 *Subtotal por Função:*\n`;
+      
+      Object.entries(funcaoTotals)
+        .sort((a, b) => b[1].total - a[1].total)
+        .forEach(([funcao, data]) => {
+          text += `  • ${funcao}: ${formatCurrency(data.total)} (${data.count} lançamento${data.count > 1 ? 's' : ''})\n`;
+        });
+      
+      text += `${"═".repeat(40)}\n`;
     }
+
+    text += `💵 *TOTAL GERAL: ${formatCurrency(grandTotal)}*\n`;
 
     return text;
   };
@@ -141,7 +166,7 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
             </CardHeader>
             <CardContent className="py-0 pb-3">
               <div className="text-xs text-muted-foreground">
-                {entries.length} lançamento(s) • {Object.keys(groupedData).length} grupo(s)
+                {entries.length} lançamento(s) • {Object.keys(groupedData).length} grupo(s) • {Object.keys(funcaoTotals).length} função(ões)
               </div>
             </CardContent>
           </Card>

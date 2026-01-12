@@ -2,13 +2,13 @@ import { Store, Briefcase, Users } from "lucide-react";
 import { ConfigSection } from "@/components/ConfigSection";
 import {
   useConfigLojas,
-  useConfigSetores,
+  useConfigFuncoes,
   useConfigGerencias,
 } from "@/hooks/useConfigOptions";
 
 export function ConfigurationsTab() {
   const lojas = useConfigLojas();
-  const setores = useConfigSetores();
+  const funcoes = useConfigFuncoes();
   const gerencias = useConfigGerencias();
 
   return (
@@ -41,22 +41,22 @@ export function ConfigurationsTab() {
         />
 
         <ConfigSection
-          title="Setores"
+          title="Funções"
           icon={<Briefcase className="h-5 w-5 text-primary" />}
-          options={setores.options}
-          isLoading={setores.isLoading}
+          options={funcoes.options}
+          isLoading={funcoes.isLoading}
           onAdd={async (nome) => {
-            await setores.addOption.mutateAsync(nome);
+            await funcoes.addOption.mutateAsync(nome);
           }}
           onUpdate={async (id, nome) => {
-            await setores.updateOption.mutateAsync({ id, nome });
+            await funcoes.updateOption.mutateAsync({ id, nome });
           }}
           onDelete={async (id) => {
-            await setores.deleteOption.mutateAsync(id);
+            await funcoes.deleteOption.mutateAsync(id);
           }}
-          isAdding={setores.addOption.isPending}
-          isUpdating={setores.updateOption.isPending}
-          isDeleting={setores.deleteOption.isPending}
+          isAdding={funcoes.addOption.isPending}
+          isUpdating={funcoes.updateOption.isPending}
+          isDeleting={funcoes.deleteOption.isPending}
         />
 
         <ConfigSection

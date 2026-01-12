@@ -44,13 +44,18 @@ export function ImportSpreadsheetModal() {
 
   const queryClient = useQueryClient();
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
-  const { isAdmin, unidade, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
 
-  // Set default loja for gerente_unidade
-  const effectiveLojaId = isGerenteUnidade && !isAdmin && unidade ? unidade.id : selectedLojaId;
-  const effectiveLojaName = isGerenteUnidade && !isAdmin && unidade 
-    ? unidade.nome 
-    : lojas.find(l => l.id === selectedLojaId)?.nome || "";
+  // For gerente with single store, use that store
+  const singleUnidade = isGerenteUnidade && !isAdmin && unidades.length === 1 ? unidades[0] : null;
+  // Available lojas for selection
+  const availableLojas = isAdmin ? lojas : (isGerenteUnidade ? unidades : []);
+
+  // Set default loja for gerente_unidade with single store
+  const effectiveLojaId = singleUnidade ? singleUnidade.id : selectedLojaId;
+  const effectiveLojaName = singleUnidade 
+    ? singleUnidade.nome 
+    : availableLojas.find(l => l.id === selectedLojaId)?.nome || "";
 
   const resetState = () => {
     setValidationErrors([]);
@@ -59,7 +64,7 @@ export function ImportSpreadsheetModal() {
     setIsProcessing(false);
     setIsImporting(false);
     setImportProgress({ current: 0, total: 0 });
-    if (isAdmin) {
+    if (!singleUnidade) {
       setSelectedLojaId("");
     }
   };
@@ -265,8 +270,8 @@ export function ImportSpreadsheetModal() {
             </Button>
           </div>
 
-          {/* Loja Selection - Admin only */}
-          {isAdmin && !isImporting && (
+          {/* Loja Selection - Admin or gerente with multiple stores */}
+          {!singleUnidade && !isImporting && (
             <div className="space-y-2">
               <Label>Loja para importação</Label>
               <Select 
@@ -278,7 +283,7 @@ export function ImportSpreadsheetModal() {
                   <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {lojas.map((loja) => (
+                  {availableLojas.map((loja) => (
                     <SelectItem key={loja.id} value={loja.id}>
                       {loja.nome}
                     </SelectItem>
@@ -291,11 +296,11 @@ export function ImportSpreadsheetModal() {
             </div>
           )}
 
-          {/* Show selected unidade for gerente */}
-          {isGerenteUnidade && !isAdmin && unidade && !isImporting && (
+          {/* Show selected unidade for gerente with single store */}
+          {singleUnidade && !isImporting && (
             <div className="rounded-lg border bg-muted/50 p-3">
               <p className="text-sm text-muted-foreground">
-                Importando para: <span className="font-medium text-foreground">{unidade.nome}</span>
+                Importando para: <span className="font-medium text-foreground">{singleUnidade.nome}</span>
               </p>
             </div>
           )}

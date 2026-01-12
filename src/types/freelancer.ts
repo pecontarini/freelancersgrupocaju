@@ -2,7 +2,7 @@ export interface FreelancerEntry {
   id: string;
   loja: string;
   nome_completo: string;
-  setor: string;
+  funcao: string;
   gerencia: string;
   data_pop: string;
   valor: number;
@@ -16,7 +16,7 @@ export interface FreelancerEntry {
 export interface FreelancerFormData {
   loja: string;
   nome_completo: string;
-  setor: string;
+  funcao: string;
   gerencia: string;
   data_pop: Date;
   valor: number;
@@ -28,7 +28,7 @@ export interface FreelancerFormData {
 export interface FilterState {
   dateFrom: Date | undefined;
   dateTo: Date | undefined;
-  setor: string;
+  funcao: string;
   gerencia: string;
   nome: string;
   loja: string;
@@ -55,5 +55,12 @@ export interface UserRole {
 export interface ConfigOption {
   id: string;
   nome: string;
+  created_at: string;
+}
+
+export interface UserStore {
+  id: string;
+  user_id: string;
+  loja_id: string;
   created_at: string;
 }

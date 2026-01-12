@@ -32,7 +32,7 @@ export function useFreelancerEntries() {
         .insert({
           loja: formData.loja,
           nome_completo: formData.nome_completo,
-          setor: formData.setor,
+          funcao: formData.funcao,
           gerencia: formData.gerencia,
           data_pop: formData.data_pop.toISOString().split("T")[0],
           valor: formData.valor,
@@ -107,7 +107,7 @@ export function useFreelancerEntries() {
   });
 
   // Get unique values for filters
-  const uniqueSetores = [...new Set(entries.map((e) => e.setor))].sort();
+  const uniqueFuncoes = [...new Set(entries.map((e) => e.funcao))].sort();
   const uniqueGerencias = [...new Set(entries.map((e) => e.gerencia))].sort();
   const uniqueLojas = [...new Set(entries.map((e) => e.loja))].sort();
 
@@ -117,7 +117,7 @@ export function useFreelancerEntries() {
     error,
     createEntry,
     deleteEntry,
-    uniqueSetores,
+    uniqueFuncoes,
     uniqueGerencias,
     uniqueLojas,
   };

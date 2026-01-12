@@ -38,10 +38,10 @@ const CHART_COLORS = [
 ];
 
 export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
-  // Data by Setor
-  const dataBySetor = useMemo(() => {
+  // Data by Função
+  const dataByFuncao = useMemo(() => {
     const grouped = entries.reduce((acc, entry) => {
-      const key = entry.setor || "Sem Setor";
+      const key = entry.funcao || "Sem Função";
       acc[key] = (acc[key] || 0) + entry.valor;
       return acc;
     }, {} as Record<string, number>);
@@ -127,14 +127,14 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
       {/* Costs by Setor - Pie Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Custos por Setor</CardTitle>
+          <CardTitle className="text-lg">Custos por Função</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={dataBySetor}
+                  data={dataByFuncao}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -142,7 +142,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                   paddingAngle={2}
                   dataKey="value"
                 >
-                  {dataBySetor.map((_, index) => (
+                  {dataByFuncao.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={CHART_COLORS[index % CHART_COLORS.length]}

@@ -36,7 +36,7 @@ const formSchema = z.object({
   nome_completo: z.string().min(2, "Nome é obrigatório"),
   funcao: z.string().min(1, "Função é obrigatória"),
   gerencia: z.string().min(1, "Gerência é obrigatória"),
-  data_pop: z.date({ required_error: "Data é obrigatória" }),
+  data_pop: z.string().min(1, "Data é obrigatória"), // String no formato YYYY-MM-DD
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
   cpf: z.string().refine((val) => isValidCPF(val), "CPF inválido"),
   chave_pix: z.string().min(1, "Chave PIX é obrigatória"),
@@ -68,6 +68,7 @@ export function FreelancerForm() {
       nome_completo: "",
       funcao: "",
       gerencia: "",
+      data_pop: "", // String vazia como default
       cpf: "",
       chave_pix: "",
       valor: 0,
@@ -238,7 +239,11 @@ export function FreelancerForm() {
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {form.watch("data_pop") ? (
-                      format(form.watch("data_pop"), "dd/MM/yyyy", { locale: ptBR })
+                      (() => {
+                        // Exibe a data no formato DD/MM/YYYY usando split (sem timezone)
+                        const [year, month, day] = form.watch("data_pop").split('-');
+                        return `${day}/${month}/${year}`;
+                      })()
                     ) : (
                       <span>Selecione a data</span>
                     )}
@@ -247,8 +252,14 @@ export function FreelancerForm() {
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
-                    selected={form.watch("data_pop")}
-                    onSelect={(date) => date && form.setValue("data_pop", date)}
+                    selected={form.watch("data_pop") ? new Date(form.watch("data_pop") + "T12:00:00") : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        // Converte IMEDIATAMENTE para string YYYY-MM-DD usando data local
+                        const dateString = format(date, 'yyyy-MM-dd');
+                        form.setValue("data_pop", dateString);
+                      }
+                    }}
                     locale={ptBR}
                     initialFocus
                   />

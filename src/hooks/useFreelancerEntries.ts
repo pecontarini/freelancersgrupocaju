@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { FreelancerEntry, FreelancerFormData } from "@/types/freelancer";
 import { toast } from "sonner";
-import { formatDateForDatabase } from "@/lib/formatters";
 
 export function useFreelancerEntries() {
   const queryClient = useQueryClient();
@@ -35,7 +34,7 @@ export function useFreelancerEntries() {
           nome_completo: formData.nome_completo,
           funcao: formData.funcao,
           gerencia: formData.gerencia,
-          data_pop: formatDateForDatabase(formData.data_pop),
+          data_pop: formData.data_pop, // Já é string YYYY-MM-DD
           valor: formData.valor,
           cpf: formData.cpf,
           chave_pix: formData.chave_pix,

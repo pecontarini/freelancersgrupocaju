@@ -18,7 +18,7 @@ export interface FreelancerFormData {
   nome_completo: string;
   funcao: string;
   gerencia: string;
-  data_pop: Date;
+  data_pop: string; // String no formato YYYY-MM-DD
   valor: number;
   cpf: string;
   chave_pix: string;

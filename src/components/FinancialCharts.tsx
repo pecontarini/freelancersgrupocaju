@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FreelancerEntry } from "@/types/freelancer";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, parseDateString } from "@/lib/formatters";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface FinancialChartsProps {
@@ -77,7 +77,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
   // Data by Period (monthly)
   const dataByPeriod = useMemo(() => {
     const grouped = entries.reduce((acc, entry) => {
-      const date = new Date(entry.data_pop);
+      const date = parseDateString(entry.data_pop);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       acc[monthKey] = (acc[monthKey] || 0) + entry.valor;
       return acc;

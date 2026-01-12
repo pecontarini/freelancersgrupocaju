@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { Copy, FileText, Check } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
 import { FreelancerEntry } from "@/types/freelancer";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate, parseDateString } from "@/lib/formatters";
 
 interface PaymentRequestGeneratorProps {
   entries: FreelancerEntry[];
@@ -73,7 +71,7 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
 
   const generateRequestText = () => {
     const groups = Object.values(groupedData).sort((a, b) => {
-      const dateCompare = new Date(b.date).getTime() - new Date(a.date).getTime();
+      const dateCompare = parseDateString(b.date).getTime() - parseDateString(a.date).getTime();
       if (dateCompare !== 0) return dateCompare;
       return a.loja.localeCompare(b.loja);
     });
@@ -82,7 +80,7 @@ export function PaymentRequestGenerator({ entries }: PaymentRequestGeneratorProp
     let grandTotal = 0;
 
     groups.forEach((group, groupIndex) => {
-      const formattedDate = format(new Date(group.date), "dd/MM/yyyy", { locale: ptBR });
+      const formattedDate = formatDate(group.date);
       
       text += `📋 *Requisição de Pagamento*\n`;
       text += `📍 Loja: ${group.loja}\n`;

@@ -48,6 +48,16 @@ function formatCPF(cpf: string): string {
   return cleanCPF.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 }
 
+// Format date string YYYY-MM-DD to DD/MM/YYYY (timezone-safe)
+function formatDateFromString(dateStr: string): string {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  return dateStr;
+}
+
 // Parse Brazilian date format DD/MM/YYYY
 function parseDate(dateStr: string): string | null {
   // Handle Excel serial date number
@@ -265,9 +275,9 @@ export function generateTemplate(): void {
 }
 
 export function exportToExcel(entries: FreelancerEntry[], filename: string): void {
-  // Prepare data with formatted columns
+  // Prepare data with formatted columns - using timezone-safe date formatting
   const exportData = entries.map((entry) => ({
-    Data: format(new Date(entry.data_pop), "dd/MM/yyyy"),
+    Data: formatDateFromString(entry.data_pop),
     Loja: entry.loja,
     "Nome Completo": entry.nome_completo,
     Função: entry.funcao,

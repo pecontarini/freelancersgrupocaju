@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 interface FilterBarProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
-  uniqueSetores: string[];
+  uniqueFuncoes: string[];
   uniqueGerencias: string[];
   uniqueLojas: string[];
 }
@@ -34,7 +34,7 @@ interface FilterBarProps {
 export function FilterBar({
   filters,
   onFiltersChange,
-  uniqueSetores,
+  uniqueFuncoes,
   uniqueGerencias,
   uniqueLojas,
 }: FilterBarProps) {
@@ -49,7 +49,7 @@ export function FilterBar({
     onFiltersChange({
       dateFrom: undefined,
       dateTo: undefined,
-      setor: "",
+      funcao: "",
       gerencia: "",
       nome: "",
       loja: "",
@@ -59,7 +59,7 @@ export function FilterBar({
   const hasActiveFilters =
     filters.dateFrom ||
     filters.dateTo ||
-    filters.setor ||
+    filters.funcao ||
     filters.gerencia ||
     filters.nome ||
     filters.loja;
@@ -171,21 +171,21 @@ export function FilterBar({
             </Select>
           </div>
 
-          {/* Setor */}
+          {/* Função */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Setor</Label>
+            <Label className="text-xs text-muted-foreground">Função</Label>
             <Select
-              value={filters.setor}
-              onValueChange={(val) => updateFilter("setor", val)}
+              value={filters.funcao}
+              onValueChange={(val) => updateFilter("funcao", val)}
             >
               <SelectTrigger className="input-focus-ring h-9">
-                <SelectValue placeholder="Todos" />
+                <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {uniqueSetores.map((setor) => (
-                  <SelectItem key={setor} value={setor}>
-                    {setor}
+                <SelectItem value="all">Todas</SelectItem>
+                {uniqueFuncoes.map((funcao) => (
+                  <SelectItem key={funcao} value={funcao}>
+                    {funcao}
                   </SelectItem>
                 ))}
               </SelectContent>

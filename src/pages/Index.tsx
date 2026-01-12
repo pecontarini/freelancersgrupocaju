@@ -25,18 +25,18 @@ const Index = () => {
   const {
     entries,
     isLoading,
-    uniqueSetores,
+    uniqueFuncoes,
     uniqueGerencias,
     uniqueLojas,
   } = useFreelancerEntries();
 
-  const { isAdmin, isGerenteUnidade, unidade, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
+  const { isAdmin, isGerenteUnidade, unidades, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: undefined,
     dateTo: undefined,
-    setor: "",
+    funcao: "",
     gerencia: "",
     nome: "",
     loja: "",
@@ -46,8 +46,15 @@ const Index = () => {
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       // Unidade filter (multi-tenant)
-      if (isGerenteUnidade && !isAdmin && unidade) {
-        if (entry.loja_id !== unidade.id) return false;
+      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+        // If gerente has selected a specific unidade, filter by that
+        if (selectedUnidadeId) {
+          if (entry.loja_id !== selectedUnidadeId) return false;
+        } else {
+          // Otherwise show all entries for their unidades
+          const unidadeIds = unidades.map(u => u.id);
+          if (!unidadeIds.includes(entry.loja_id || "")) return false;
+        }
       } else if (isAdmin && selectedUnidadeId) {
         if (entry.loja_id !== selectedUnidadeId) return false;
       }
@@ -62,8 +69,8 @@ const Index = () => {
         if (entryDate > filters.dateTo) return false;
       }
 
-      // Setor filter
-      if (filters.setor && filters.setor !== "all" && entry.setor !== filters.setor) {
+      // Funcao filter
+      if (filters.funcao && filters.funcao !== "all" && entry.funcao !== filters.funcao) {
         return false;
       }
 
@@ -87,7 +94,7 @@ const Index = () => {
 
       return true;
     });
-  }, [entries, filters, isAdmin, isGerenteUnidade, unidade, selectedUnidadeId]);
+  }, [entries, filters, isAdmin, isGerenteUnidade, unidades, selectedUnidadeId]);
 
   // Calculate summary stats
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
@@ -120,17 +127,30 @@ const Index = () => {
     );
   }
 
+  // Show unidade selector for gerente with multiple stores or admin
+  const showUnidadeSelector = isAdmin || (isGerenteUnidade && unidades.length > 1);
+
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
       
       <main className="container py-6">
-        {/* Global Unidade Selector for Admin */}
-        {isAdmin && (
+        {/* Global Unidade Selector */}
+        {showUnidadeSelector && (
           <div className="mb-6">
             <UnidadeSelector
               selectedUnidadeId={selectedUnidadeId}
               onUnidadeChange={setSelectedUnidadeId}
+            />
+          </div>
+        )}
+
+        {/* Single store indicator for gerente */}
+        {isGerenteUnidade && !isAdmin && unidades.length === 1 && (
+          <div className="mb-6">
+            <UnidadeSelector
+              selectedUnidadeId={null}
+              onUnidadeChange={() => {}}
             />
           </div>
         )}
@@ -209,7 +229,7 @@ const Index = () => {
                 <FilterBar
                   filters={filters}
                   onFiltersChange={setFilters}
-                  uniqueSetores={uniqueSetores}
+                  uniqueFuncoes={uniqueFuncoes}
                   uniqueGerencias={uniqueGerencias}
                   uniqueLojas={uniqueLojas}
                 />
@@ -229,7 +249,7 @@ const Index = () => {
             <FilterBar
               filters={filters}
               onFiltersChange={setFilters}
-              uniqueSetores={uniqueSetores}
+              uniqueFuncoes={uniqueFuncoes}
               uniqueGerencias={uniqueGerencias}
               uniqueLojas={uniqueLojas}
             />

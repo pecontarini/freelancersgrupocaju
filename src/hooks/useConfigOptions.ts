@@ -8,7 +8,7 @@ export interface ConfigOption {
   created_at: string;
 }
 
-type ConfigTable = "config_lojas" | "config_setores" | "config_gerencias";
+type ConfigTable = "config_lojas" | "config_funcoes" | "config_gerencias";
 
 function useConfigTable(table: ConfigTable) {
   const queryClient = useQueryClient();
@@ -107,8 +107,8 @@ export function useConfigLojas() {
   return useConfigTable("config_lojas");
 }
 
-export function useConfigSetores() {
-  return useConfigTable("config_setores");
+export function useConfigFuncoes() {
+  return useConfigTable("config_funcoes");
 }
 
 export function useConfigGerencias() {

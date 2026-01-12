@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, UserPlus, Edit2, Trash2, Store, Shield, Loader2 } from "lucide-react";
+import { Users, Edit2, Store, Shield, Loader2, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -32,17 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
@@ -57,21 +45,19 @@ interface UserWithProfile {
     unidade_id: string | null;
   } | null;
   roles: AppRole[];
-  unidade_name: string | null;
+  stores: { id: string; nome: string }[];
 }
 
 export function UserManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithProfile | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole>("gerente_unidade");
-  const [selectedUnidadeId, setSelectedUnidadeId] = useState<string>("");
-  const [newUserEmail, setNewUserEmail] = useState("");
-  const [newUserName, setNewUserName] = useState("");
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>([]);
 
   const queryClient = useQueryClient();
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
 
-  // Fetch all users with their profiles and roles
+  // Fetch all users with their profiles, roles and stores
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
@@ -89,6 +75,13 @@ export function UserManagement() {
 
       if (rolesError) throw rolesError;
 
+      // Get all user_stores
+      const { data: userStores, error: userStoresError } = await supabase
+        .from("user_stores")
+        .select("*");
+
+      if (userStoresError) throw userStoresError;
+
       // Get all lojas for name lookup
       const { data: lojasData } = await supabase
         .from("config_lojas")
@@ -102,6 +95,13 @@ export function UserManagement() {
           .filter((r) => r.user_id === profile.user_id)
           .map((r) => r.role as AppRole);
 
+        const userStoresList = userStores
+          .filter((us) => us.user_id === profile.user_id)
+          .map((us) => ({
+            id: us.loja_id,
+            nome: lojasMap.get(us.loja_id) || "Loja desconhecida",
+          }));
+
         return {
           id: profile.user_id,
           email: profile.full_name || "Email não disponível",
@@ -111,7 +111,7 @@ export function UserManagement() {
             unidade_id: profile.unidade_id,
           },
           roles: userRoles,
-          unidade_name: profile.unidade_id ? lojasMap.get(profile.unidade_id) || null : null,
+          stores: userStoresList,
         };
       });
 
@@ -119,16 +119,16 @@ export function UserManagement() {
     },
   });
 
-  // Update user role
+  // Update user role and stores
   const updateUserRole = useMutation({
     mutationFn: async ({
       userId,
       role,
-      unidadeId,
+      storeIds,
     }: {
       userId: string;
       role: AppRole;
-      unidadeId: string | null;
+      storeIds: string[];
     }) => {
       // First, remove existing roles
       await supabase.from("user_roles").delete().eq("user_id", userId);
@@ -141,22 +141,21 @@ export function UserManagement() {
 
       if (roleError) throw roleError;
 
-      // Update profile with unidade_id if gerente_unidade
-      if (role === "gerente_unidade" && unidadeId) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ unidade_id: unidadeId })
-          .eq("user_id", userId);
+      // Remove existing user_stores
+      await supabase.from("user_stores").delete().eq("user_id", userId);
 
-        if (profileError) throw profileError;
-      } else if (role === "admin") {
-        // Admins don't need unidade_id
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ unidade_id: null })
-          .eq("user_id", userId);
+      // Add new stores if gerente_unidade
+      if (role === "gerente_unidade" && storeIds.length > 0) {
+        const storeInserts = storeIds.map((storeId) => ({
+          user_id: userId,
+          loja_id: storeId,
+        }));
 
-        if (profileError) throw profileError;
+        const { error: storesError } = await supabase
+          .from("user_stores")
+          .insert(storeInserts);
+
+        if (storesError) throw storesError;
       }
     },
     onSuccess: () => {
@@ -174,23 +173,33 @@ export function UserManagement() {
   const handleEditUser = (user: UserWithProfile) => {
     setEditingUser(user);
     setSelectedRole(user.roles[0] || "gerente_unidade");
-    setSelectedUnidadeId(user.profile?.unidade_id || "");
+    setSelectedStoreIds(user.stores.map((s) => s.id));
     setIsDialogOpen(true);
   };
 
   const handleSaveUser = () => {
     if (!editingUser) return;
 
-    if (selectedRole === "gerente_unidade" && !selectedUnidadeId) {
-      toast.error("Selecione uma unidade para o gerente.");
+    if (selectedRole === "gerente_unidade" && selectedStoreIds.length === 0) {
+      toast.error("Selecione pelo menos uma loja para o gerente.");
       return;
     }
 
     updateUserRole.mutate({
       userId: editingUser.id,
       role: selectedRole,
-      unidadeId: selectedRole === "gerente_unidade" ? selectedUnidadeId : null,
+      storeIds: selectedRole === "gerente_unidade" ? selectedStoreIds : [],
     });
+  };
+
+  const addStore = (storeId: string) => {
+    if (!selectedStoreIds.includes(storeId)) {
+      setSelectedStoreIds([...selectedStoreIds, storeId]);
+    }
+  };
+
+  const removeStore = (storeId: string) => {
+    setSelectedStoreIds(selectedStoreIds.filter((id) => id !== storeId));
   };
 
   const getRoleBadge = (roles: AppRole[]) => {
@@ -223,6 +232,8 @@ export function UserManagement() {
     );
   }
 
+  const availableStores = lojas.filter((l) => !selectedStoreIds.includes(l.id));
+
   return (
     <Card>
       <CardHeader>
@@ -252,7 +263,7 @@ export function UserManagement() {
                   <TableRow>
                     <TableHead>Usuário</TableHead>
                     <TableHead>Permissão</TableHead>
-                    <TableHead>Unidade</TableHead>
+                    <TableHead>Lojas</TableHead>
                     <TableHead className="w-[100px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -267,8 +278,14 @@ export function UserManagement() {
                       </TableCell>
                       <TableCell>{getRoleBadge(user.roles)}</TableCell>
                       <TableCell>
-                        {user.unidade_name ? (
-                          <Badge variant="outline">{user.unidade_name}</Badge>
+                        {user.stores.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {user.stores.map((store) => (
+                              <Badge key={store.id} variant="outline" className="text-xs">
+                                {store.nome}
+                              </Badge>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -292,11 +309,11 @@ export function UserManagement() {
 
         {/* Edit User Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Editar Permissões</DialogTitle>
               <DialogDescription>
-                Configure a permissão e unidade do usuário.
+                Configure a permissão e lojas do usuário.
               </DialogDescription>
             </DialogHeader>
 
@@ -337,23 +354,61 @@ export function UserManagement() {
 
               {selectedRole === "gerente_unidade" && (
                 <div className="space-y-2">
-                  <Label>Unidade</Label>
-                  <Select
-                    value={selectedUnidadeId}
-                    onValueChange={setSelectedUnidadeId}
-                    disabled={isLoadingLojas}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a unidade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {lojas.map((loja) => (
-                        <SelectItem key={loja.id} value={loja.id}>
-                          {loja.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Lojas Atribuídas</Label>
+                  
+                  {/* Selected stores */}
+                  {selectedStoreIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {selectedStoreIds.map((storeId) => {
+                        const store = lojas.find((l) => l.id === storeId);
+                        return (
+                          <Badge
+                            key={storeId}
+                            variant="secondary"
+                            className="flex items-center gap-1"
+                          >
+                            {store?.nome || "Loja"}
+                            <button
+                              type="button"
+                              onClick={() => removeStore(storeId)}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Add store dropdown */}
+                  {availableStores.length > 0 && (
+                    <Select
+                      value=""
+                      onValueChange={addStore}
+                      disabled={isLoadingLojas}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Adicionar loja..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableStores.map((loja) => (
+                          <SelectItem key={loja.id} value={loja.id}>
+                            <span className="flex items-center gap-2">
+                              <Plus className="h-3 w-3" />
+                              {loja.nome}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {selectedStoreIds.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Selecione pelo menos uma loja.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

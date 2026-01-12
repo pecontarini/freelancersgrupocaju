@@ -8,7 +8,7 @@ export interface UserProfileData {
   roles: AppRole[];
   isAdmin: boolean;
   isGerenteUnidade: boolean;
-  unidade: ConfigOption | null;
+  unidades: ConfigOption[];
 }
 
 export function useUserProfile() {
@@ -23,7 +23,7 @@ export function useUserProfile() {
           roles: [],
           isAdmin: false,
           isGerenteUnidade: false,
-          unidade: null,
+          unidades: [],
         };
       }
 
@@ -54,17 +54,22 @@ export function useUserProfile() {
       const isAdmin = roles.includes("admin");
       const isGerenteUnidade = roles.includes("gerente_unidade");
 
-      // Fetch unidade if user has one
-      let unidade: ConfigOption | null = null;
-      if (profileData?.unidade_id) {
-        const { data: unidadeData, error: unidadeError } = await supabase
+      // Fetch user stores (multi-loja support)
+      let unidades: ConfigOption[] = [];
+      const { data: userStoresData, error: userStoresError } = await supabase
+        .from("user_stores")
+        .select("loja_id")
+        .eq("user_id", user.id);
+
+      if (!userStoresError && userStoresData && userStoresData.length > 0) {
+        const lojaIds = userStoresData.map((us) => us.loja_id);
+        const { data: lojasData, error: lojasError } = await supabase
           .from("config_lojas")
           .select("*")
-          .eq("id", profileData.unidade_id)
-          .maybeSingle();
+          .in("id", lojaIds);
 
-        if (!unidadeError && unidadeData) {
-          unidade = unidadeData;
+        if (!lojasError && lojasData) {
+          unidades = lojasData;
         }
       }
 
@@ -73,7 +78,7 @@ export function useUserProfile() {
         roles,
         isAdmin,
         isGerenteUnidade,
-        unidade,
+        unidades,
       };
     },
     enabled: !!user,
@@ -85,7 +90,9 @@ export function useUserProfile() {
     roles: data?.roles || [],
     isAdmin: data?.isAdmin || false,
     isGerenteUnidade: data?.isGerenteUnidade || false,
-    unidade: data?.unidade || null,
+    unidades: data?.unidades || [],
+    // Backwards compatibility - first unidade
+    unidade: data?.unidades?.[0] || null,
     isLoading,
     error,
     hasNoRole: !isLoading && data?.roles.length === 0,

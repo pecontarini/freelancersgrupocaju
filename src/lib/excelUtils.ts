@@ -5,7 +5,7 @@ import { format, parse } from "date-fns";
 export interface ImportRow {
   Loja: string;
   "Nome Completo": string;
-  Setor: string;
+  Funcao: string;
   Gerencia: string;
   Data: string;
   Valor: number | string;
@@ -22,7 +22,7 @@ export interface ValidationError {
 export interface ParsedEntry {
   loja: string;
   nome_completo: string;
-  setor: string;
+  funcao: string;
   gerencia: string;
   data_pop: string;
   valor: number;
@@ -33,7 +33,7 @@ export interface ParsedEntry {
 const REQUIRED_COLUMNS = [
   "Loja",
   "Nome Completo",
-  "Setor",
+  "Funcao",
   "Gerencia",
   "Data",
   "Valor",
@@ -157,8 +157,8 @@ export function validateAndParseFile(
           if (!row["Nome Completo"]?.toString().trim()) {
             errors.push({ row: rowNum, field: "Nome Completo", message: "Campo obrigatório" });
           }
-          if (!row.Setor?.toString().trim()) {
-            errors.push({ row: rowNum, field: "Setor", message: "Campo obrigatório" });
+          if (!row.Funcao?.toString().trim()) {
+            errors.push({ row: rowNum, field: "Funcao", message: "Campo obrigatório" });
           }
           if (!row.Gerencia?.toString().trim()) {
             errors.push({ row: rowNum, field: "Gerencia", message: "Campo obrigatório" });
@@ -206,7 +206,7 @@ export function validateAndParseFile(
             entries.push({
               loja: row.Loja.toString().trim(),
               nome_completo: row["Nome Completo"].toString().trim(),
-              setor: row.Setor.toString().trim(),
+              funcao: row.Funcao.toString().trim(),
               gerencia: row.Gerencia.toString().trim(),
               data_pop: parsedDate,
               valor: parsedValue,
@@ -235,8 +235,8 @@ export function generateTemplate(): void {
     {
       Loja: "Loja Exemplo",
       "Nome Completo": "João da Silva",
-      Setor: "Marketing",
-      Gerencia: "Comercial",
+      Funcao: "Garçom",
+      Gerencia: "FRONT",
       Data: "15/01/2025",
       Valor: 1500.00,
       CPF: "123.456.789-00",
@@ -250,7 +250,7 @@ export function generateTemplate(): void {
   worksheet["!cols"] = [
     { wch: 15 }, // Loja
     { wch: 25 }, // Nome Completo
-    { wch: 15 }, // Setor
+    { wch: 15 }, // Funcao
     { wch: 15 }, // Gerencia
     { wch: 12 }, // Data
     { wch: 12 }, // Valor
@@ -270,7 +270,7 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     Data: format(new Date(entry.data_pop), "dd/MM/yyyy"),
     Loja: entry.loja,
     "Nome Completo": entry.nome_completo,
-    Setor: entry.setor,
+    Função: entry.funcao,
     Gerência: entry.gerencia,
     CPF: entry.cpf,
     "Chave PIX": entry.chave_pix,
@@ -285,7 +285,7 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     Data: "",
     Loja: "",
     "Nome Completo": "",
-    Setor: "",
+    Função: "",
     Gerência: "",
     CPF: "",
     "Chave PIX": "TOTAL GERAL:",
@@ -299,7 +299,7 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     { wch: 12 }, // Data
     { wch: 18 }, // Loja
     { wch: 28 }, // Nome Completo
-    { wch: 15 }, // Setor
+    { wch: 15 }, // Função
     { wch: 15 }, // Gerência
     { wch: 15 }, // CPF
     { wch: 28 }, // Chave PIX

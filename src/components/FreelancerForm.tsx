@@ -26,7 +26,7 @@ import {
 
 import { formatCPF, formatCurrencyInput, isValidCPF } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
-import { useConfigLojas, useConfigSetores, useConfigGerencias } from "@/hooks/useConfigOptions";
+import { useConfigLojas, useConfigFuncoes, useConfigGerencias } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +34,7 @@ const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
   loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
-  setor: z.string().min(1, "Setor é obrigatório"),
+  funcao: z.string().min(1, "Função é obrigatória"),
   gerencia: z.string().min(1, "Gerência é obrigatória"),
   data_pop: z.date({ required_error: "Data é obrigatória" }),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
@@ -48,12 +48,17 @@ export function FreelancerForm() {
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
   const { createEntry } = useFreelancerEntries();
-  const { isAdmin, unidade, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
   
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
-  const { options: setores, isLoading: isLoadingSetores } = useConfigSetores();
+  const { options: funcoes, isLoading: isLoadingFuncoes } = useConfigFuncoes();
   const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
+  
+  // For gerente with single store, use that store
+  const singleUnidade = isGerenteUnidade && !isAdmin && unidades.length === 1 ? unidades[0] : null;
+  // For gerente with multiple stores, they can select
+  const availableLojas = isAdmin ? lojas : (isGerenteUnidade ? unidades : []);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -61,7 +66,7 @@ export function FreelancerForm() {
       loja: "",
       loja_id: "",
       nome_completo: "",
-      setor: "",
+      funcao: "",
       gerencia: "",
       cpf: "",
       chave_pix: "",
@@ -69,19 +74,19 @@ export function FreelancerForm() {
     },
   });
 
-  // Pre-select unidade for gerente_unidade
+  // Pre-select unidade for gerente_unidade with single store
   useEffect(() => {
-    if (isGerenteUnidade && unidade && !isAdmin) {
-      form.setValue("loja", unidade.nome);
-      form.setValue("loja_id", unidade.id);
+    if (singleUnidade) {
+      form.setValue("loja", singleUnidade.nome);
+      form.setValue("loja_id", singleUnidade.id);
     }
-  }, [isGerenteUnidade, unidade, isAdmin, form]);
+  }, [singleUnidade, form]);
 
   const onSubmit = async (data: FormData) => {
     await createEntry.mutateAsync({
       loja: data.loja,
       nome_completo: data.nome_completo,
-      setor: data.setor,
+      funcao: data.funcao,
       gerencia: data.gerencia,
       data_pop: data.data_pop,
       valor: data.valor,
@@ -93,15 +98,15 @@ export function FreelancerForm() {
     setCpfValue("");
     setValorValue("");
     
-    // Re-apply unidade for gerente
-    if (isGerenteUnidade && unidade && !isAdmin) {
-      form.setValue("loja", unidade.nome);
-      form.setValue("loja_id", unidade.id);
+    // Re-apply unidade for gerente with single store
+    if (singleUnidade) {
+      form.setValue("loja", singleUnidade.nome);
+      form.setValue("loja_id", singleUnidade.id);
     }
   };
 
   const handleLojaChange = (lojaId: string) => {
-    const selectedLoja = lojas.find((l) => l.id === lojaId);
+    const selectedLoja = availableLojas.find((l) => l.id === lojaId);
     if (selectedLoja) {
       form.setValue("loja", selectedLoja.nome);
       form.setValue("loja_id", selectedLoja.id);
@@ -136,9 +141,9 @@ export function FreelancerForm() {
             {/* Loja */}
             <div className="space-y-2">
               <Label htmlFor="loja">Loja</Label>
-              {isGerenteUnidade && !isAdmin && unidade ? (
+              {singleUnidade ? (
                 <Input
-                  value={unidade.nome}
+                  value={singleUnidade.nome}
                   disabled
                   className="input-focus-ring bg-muted"
                 />
@@ -152,7 +157,7 @@ export function FreelancerForm() {
                     <SelectValue placeholder={isLoadingLojas ? "Carregando..." : "Selecione a loja"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {lojas.map((loja) => (
+                    {availableLojas.map((loja) => (
                       <SelectItem key={loja.id} value={loja.id}>
                         {loja.nome}
                       </SelectItem>
@@ -179,23 +184,23 @@ export function FreelancerForm() {
               )}
             </div>
 
-            {/* Setor */}
+            {/* Função */}
             <div className="space-y-2">
-              <Label htmlFor="setor">Setor</Label>
-              <Select onValueChange={(val) => form.setValue("setor", val)} disabled={isLoadingSetores}>
+              <Label htmlFor="funcao">Função</Label>
+              <Select onValueChange={(val) => form.setValue("funcao", val)} disabled={isLoadingFuncoes}>
                 <SelectTrigger className="input-focus-ring">
-                  <SelectValue placeholder={isLoadingSetores ? "Carregando..." : "Selecione o setor"} />
+                  <SelectValue placeholder={isLoadingFuncoes ? "Carregando..." : "Selecione a função"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {setores.map((setor) => (
-                    <SelectItem key={setor.id} value={setor.nome}>
-                      {setor.nome}
+                  {funcoes.map((funcao) => (
+                    <SelectItem key={funcao.id} value={funcao.nome}>
+                      {funcao.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.setor && (
-                <p className="text-sm text-destructive">{form.formState.errors.setor.message}</p>
+              {form.formState.errors.funcao && (
+                <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
               )}
             </div>
 

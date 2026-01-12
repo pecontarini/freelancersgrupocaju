@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      config_funcoes: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       config_gerencias: {
         Row: {
           created_at: string
@@ -50,24 +68,6 @@ export type Database = {
         }
         Relationships: []
       }
-      config_setores: {
-        Row: {
-          created_at: string
-          id: string
-          nome: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          nome: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          nome?: string
-        }
-        Relationships: []
-      }
       freelancer_entries: {
         Row: {
           chave_pix: string
@@ -75,12 +75,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_pop: string
+          funcao: string
           gerencia: string
           id: string
           loja: string
           loja_id: string | null
           nome_completo: string
-          setor: string
           valor: number
         }
         Insert: {
@@ -89,12 +89,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_pop: string
+          funcao: string
           gerencia: string
           id?: string
           loja: string
           loja_id?: string | null
           nome_completo: string
-          setor: string
           valor: number
         }
         Update: {
@@ -103,12 +103,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_pop?: string
+          funcao?: string
           gerencia?: string
           id?: string
           loja?: string
           loja_id?: string | null
           nome_completo?: string
-          setor?: string
           valor?: number
         }
         Relationships: [
@@ -177,6 +177,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_stores: {
+        Row: {
+          created_at: string
+          id: string
+          loja_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          loja_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          loja_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_stores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -191,6 +220,10 @@ export type Database = {
         Returns: boolean
       }
       is_first_user: { Args: never; Returns: boolean }
+      user_has_access_to_loja: {
+        Args: { _loja_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "gerente_unidade"

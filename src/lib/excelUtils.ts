@@ -240,12 +240,12 @@ export function validateAndParseFile(
   });
 }
 
-export function generateTemplate(): void {
+export function generateTemplate(officialFuncoes: string[] = [], officialGerencias: string[] = []): void {
   const templateData = [
     {
       Loja: "Loja Exemplo",
       "Nome Completo": "João da Silva",
-      Funcao: "Garçom",
+      Funcao: "GARÇOM",
       Gerencia: "FRONT",
       Data: "15/01/2025",
       Valor: 1500.00,
@@ -260,7 +260,7 @@ export function generateTemplate(): void {
   worksheet["!cols"] = [
     { wch: 15 }, // Loja
     { wch: 25 }, // Nome Completo
-    { wch: 15 }, // Funcao
+    { wch: 20 }, // Funcao
     { wch: 15 }, // Gerencia
     { wch: 12 }, // Data
     { wch: 12 }, // Valor
@@ -268,10 +268,41 @@ export function generateTemplate(): void {
     { wch: 25 }, // Chave Pix
   ];
 
+  // Create instructions sheet
+  const instructionsData = [
+    { Instrução: "INSTRUÇÕES PARA PREENCHIMENTO" },
+    { Instrução: "" },
+    { Instrução: "1. Preencha todos os campos obrigatórios." },
+    { Instrução: "2. Use o formato DD/MM/AAAA para datas (ex: 15/01/2025)." },
+    { Instrução: "3. O valor pode ser preenchido com ou sem 'R$'." },
+    { Instrução: "4. O CPF pode ser preenchido com ou sem formatação." },
+    { Instrução: "" },
+    { Instrução: "FUNÇÕES OFICIAIS CADASTRADAS:" },
+    ...officialFuncoes.map((f, i) => ({ Instrução: `   ${i + 1}. ${f}` })),
+    { Instrução: "" },
+    { Instrução: "GERÊNCIAS OFICIAIS CADASTRADAS:" },
+    ...officialGerencias.map((g, i) => ({ Instrução: `   ${i + 1}. ${g}` })),
+    { Instrução: "" },
+    { Instrução: "IMPORTANTE: Use exatamente os nomes listados acima para evitar erros." },
+    { Instrução: "O sistema tentará corrigir pequenas variações automaticamente." },
+  ];
+
+  const instructionsSheet = XLSX.utils.json_to_sheet(instructionsData);
+  instructionsSheet["!cols"] = [{ wch: 60 }];
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
+  XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instruções");
   
   XLSX.writeFile(workbook, "modelo_importacao.xlsx");
+}
+
+/**
+ * Normalize a value for database storage
+ * Converts to uppercase and trims whitespace
+ */
+export function normalizeForDatabase(value: string): string {
+  return value.trim().toUpperCase();
 }
 
 export function exportToExcel(entries: FreelancerEntry[], filename: string): void {

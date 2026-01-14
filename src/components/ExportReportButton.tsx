@@ -20,14 +20,46 @@ interface ExportReportButtonProps {
   entries: FreelancerEntry[];
 }
 
-// Colors for PDF styling
-const PRIMARY_COLOR: [number, number, number] = [0, 82, 147]; // Dark blue
+// Colors for PDF styling - Using Grupo Caju brand colors (Coral/Terracotta: HSL 14, 70%, 48%)
+// Converted to RGB: hsl(14, 70%, 48%) ≈ rgb(208, 89, 55)
+const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta brand color
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
-const ACCENT_COLOR: [number, number, number] = [0, 120, 180]; // Light blue
+const ACCENT_COLOR: [number, number, number] = [180, 70, 45]; // Darker coral accent
 
 // Placeholder for letterhead background - can be replaced with actual base64 image
 // The image should be a full-page background (A4: 210mm x 297mm)
 const BACKGROUND_IMAGE_BASE64 = ""; // To be configured with actual letterhead
+
+// Helper to sanitize filename (remove special chars and spaces)
+const sanitizeFilename = (text: string): string => {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // Remove diacritics
+    .replace(/[^a-zA-Z0-9]/g, "_") // Replace special chars with underscore
+    .replace(/_+/g, "_") // Collapse multiple underscores
+    .replace(/^_|_$/g, "") // Remove leading/trailing underscores
+    .toUpperCase();
+};
+
+// Helper to get POP date from entries (the date the payment refers to)
+const getPopDateString = (entries: FreelancerEntry[]): string => {
+  if (entries.length === 0) return format(new Date(), "dd-MM-yyyy");
+  
+  // Get unique dates from entries
+  const uniqueDates = [...new Set(entries.map((e) => e.data_pop))];
+  
+  if (uniqueDates.length === 1) {
+    // Single date - format as DD-MM-YYYY
+    const [year, month, day] = uniqueDates[0].split("-");
+    return `${day}-${month}-${year}`;
+  } else {
+    // Multiple dates - use range or first date
+    const sortedDates = uniqueDates.sort();
+    const [firstYear, firstMonth, firstDay] = sortedDates[0].split("-");
+    const [lastYear, lastMonth, lastDay] = sortedDates[sortedDates.length - 1].split("-");
+    return `${firstDay}-${firstMonth}-${firstYear}_a_${lastDay}-${lastMonth}-${lastYear}`;
+  }
+};
 
 export function ExportReportButton({ entries }: ExportReportButtonProps) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -85,11 +117,10 @@ export function ExportReportButton({ entries }: ExportReportButtonProps) {
 
       // Get unique loja for filename
       const lojas = [...new Set(entries.map((e) => e.loja))];
-      const unidadeName = lojas.length === 1 ? lojas[0] : "MULTIPLAS";
+      const unidadeName = lojas.length === 1 ? lojas[0] : "MULTIPLAS_LOJAS";
 
-      // Current date for filename
-      const today = new Date();
-      const dateStr = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+      // Get POP date for filename (the date the payment refers to, not generation date)
+      const popDateStr = getPopDateString(entries);
 
       // Function to add background to each page
       const addBackground = () => {
@@ -117,16 +148,16 @@ export function ExportReportButton({ entries }: ExportReportButtonProps) {
         doc.setFillColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
         doc.rect(0, 0, pageWidth, 35, "F");
 
-        // Company name
+        // Company name - GRUPO CAJU
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(22);
-        doc.text("Empresas Mult", margin, 18);
+        doc.text("GRUPO CAJU", margin, 18);
 
         // Document title
         doc.setFontSize(12);
         doc.setFont("helvetica", "normal");
-        doc.text("REQUISIÇÃO DE PAGAMENTO", margin, 28);
+        doc.text("ORDEM DE PAGAMENTO", margin, 28);
 
         // Page number
         doc.setFontSize(9);
@@ -318,11 +349,9 @@ export function ExportReportButton({ entries }: ExportReportButtonProps) {
         { align: "center" }
       );
 
-      // Generate filename
-      const sanitizedUnidade = unidadeName
-        .replace(/[^a-zA-Z0-9]/g, "_")
-        .toUpperCase();
-      const filename = `ORDEM_DE_PAGAMENTO_${sanitizedUnidade}_${dateStr}.pdf`;
+      // Generate filename with sanitized store name and POP date
+      const sanitizedUnidade = sanitizeFilename(unidadeName);
+      const filename = `ORDEM_DE_PAGAMENTO_${sanitizedUnidade}_${popDateStr}.pdf`;
 
       // Download PDF
       doc.save(filename);

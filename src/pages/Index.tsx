@@ -20,7 +20,7 @@ import { UserManagement } from "@/components/UserManagement";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FilterState } from "@/types/freelancer";
-import { parseDateString } from "@/lib/formatters";
+import { parseDateString, formatCurrency } from "@/lib/formatters";
 
 const Index = () => {
   const {
@@ -210,6 +210,19 @@ const Index = () => {
 
           {/* Gestão Tab */}
           <TabsContent value="gestao" className="space-y-6">
+            {/* PDF Button - Prominent placement */}
+            {filteredEntries.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div>
+                  <h3 className="font-semibold text-primary">Ordem de Pagamento</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {filteredEntries.length} lançamento(s) • {formatCurrency(totalValue)}
+                  </p>
+                </div>
+                <ExportReportButton entries={filteredEntries} variant="button" />
+              </div>
+            )}
+
             {/* Summary Card */}
             <div className="grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">

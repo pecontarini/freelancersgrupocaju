@@ -69,6 +69,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       const tableData = selectedEntries.map((entry) => [
         formatDate(entry.data_servico),
         entry.fornecedor,
+        entry.cpf_cnpj || "-",
         entry.numero_nf,
         entry.descricao || "-",
         formatCurrency(entry.valor),
@@ -76,7 +77,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
 
       autoTable(doc, {
         startY: 45,
-        head: [["Data", "Fornecedor", "NF", "Descrição", "Valor"]],
+        head: [["Data", "Fornecedor", "CPF/CNPJ", "NF", "Descrição", "Valor"]],
         body: tableData,
         headStyles: {
           fillColor: [PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]],
@@ -87,15 +88,16 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
           fillColor: [250, 250, 250],
         },
         styles: {
-          fontSize: 9,
-          cellPadding: 3,
+          fontSize: 8,
+          cellPadding: 2,
         },
         columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 45 },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 50 },
-          4: { cellWidth: 30, halign: "right" },
+          0: { cellWidth: 22 },
+          1: { cellWidth: 35 },
+          2: { cellWidth: 32 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 40 },
+          5: { cellWidth: 28, halign: "right" },
         },
         didDrawPage: (data) => {
           // Add clean background on new pages
@@ -105,29 +107,80 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
         },
       });
 
-      // Summary
-      const finalY = (doc as any).lastAutoTable.finalY + 10;
+      // Summary after table
+      let summaryY = (doc as any).lastAutoTable.finalY + 10;
       const totalValue = selectedEntries.reduce((sum, e) => sum + e.valor, 0);
 
       doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.setLineWidth(0.5);
-      doc.line(14, finalY, pageWidth - 14, finalY);
+      doc.line(14, summaryY, pageWidth - 14, summaryY);
 
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text(`Total de Registros: ${selectedEntries.length}`, 14, finalY + 8);
-      doc.text(`VALOR TOTAL: ${formatCurrency(totalValue)}`, 14, finalY + 16);
+      doc.text(`Total de Registros: ${selectedEntries.length}`, 14, summaryY + 8);
+      doc.text(`VALOR TOTAL: ${formatCurrency(totalValue)}`, 14, summaryY + 16);
+
+      // Payment Details Section - Chave PIX
+      const entriesWithPix = selectedEntries.filter((e) => e.chave_pix);
+      if (entriesWithPix.length > 0) {
+        let pixY = summaryY + 30;
+        
+        if (pixY > pageHeight - 60) {
+          doc.addPage();
+          addCleanBackground();
+          pixY = 20;
+        }
+        
+        doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.text("DADOS PARA PAGAMENTO (PIX)", 14, pixY);
+        
+        pixY += 8;
+        
+        entriesWithPix.forEach((entry) => {
+          if (pixY > pageHeight - 40) {
+            doc.addPage();
+            addCleanBackground();
+            pixY = 20;
+          }
+          
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(60, 60, 60);
+          doc.text(`${entry.fornecedor}`, 14, pixY);
+          
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(80, 80, 80);
+          
+          const cpfCnpjText = entry.cpf_cnpj ? `CPF/CNPJ: ${entry.cpf_cnpj} | ` : "";
+          doc.text(`${cpfCnpjText}Chave PIX: ${entry.chave_pix} | Valor: ${formatCurrency(entry.valor)}`, 14, pixY + 5);
+          
+          pixY += 14;
+        });
+      }
 
       // Attachments note
       const entriesWithAttachments = selectedEntries.filter((e) => e.anexo_url);
       if (entriesWithAttachments.length > 0) {
+        let attachmentY = entriesWithPix.length > 0 
+          ? summaryY + 30 + (entriesWithPix.length * 14) + 10
+          : summaryY + 26;
+        
+        if (attachmentY > pageHeight - 40) {
+          doc.addPage();
+          addCleanBackground();
+          attachmentY = 20;
+        }
+        
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
-        doc.text(`* ${entriesWithAttachments.length} anexo(s) disponível(is) para conferência`, 14, finalY + 26);
+        doc.setTextColor(60, 60, 60);
+        doc.text(`* ${entriesWithAttachments.length} anexo(s) disponível(is) para conferência`, 14, attachmentY);
         
         // List attachment URLs
-        let attachmentY = finalY + 34;
+        attachmentY += 8;
         entriesWithAttachments.forEach((entry, index) => {
           if (attachmentY > pageHeight - 20) {
             doc.addPage();

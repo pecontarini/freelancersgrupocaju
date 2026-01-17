@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -12,12 +12,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  Legend,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FreelancerEntry } from "@/types/freelancer";
 import { formatCurrency, parseDateString } from "@/lib/formatters";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, ChevronLeft, ChevronRight, BarChart3, PieChartIcon, TrendingUpIcon } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
+import { Button } from "@/components/ui/button";
 
 interface FinancialChartsProps {
   entries: FreelancerEntry[];
@@ -39,6 +40,29 @@ const CHART_COLORS = [
 ];
 
 export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return;
+    setSelectedIndex(emblaApi.selectedScrollSnap());
+  }, [emblaApi]);
+
+  // Set up the onSelect callback
+  useMemo(() => {
+    if (!emblaApi) return;
+    emblaApi.on("select", onSelect);
+    onSelect();
+  }, [emblaApi, onSelect]);
+
   // Calculate total for percentages
   const totalValue = useMemo(() => {
     return entries.reduce((acc, entry) => acc + entry.valor, 0);
@@ -139,9 +163,205 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
   // Top 5 functions for ranking
   const topFuncoes = dataByFuncao.slice(0, 5);
 
+  const chartSlides = [
+    { id: "funcao", title: "Por Função", icon: PieChartIcon },
+    { id: "gerencia", title: "Por Gerência", icon: BarChart3 },
+    { id: "periodo", title: "Por Período", icon: TrendingUpIcon },
+  ];
+
+  // Donut Chart Component
+  const DonutChartContent = () => (
+    <div className="flex flex-col items-center">
+      <div className="w-full h-[200px] sm:h-[280px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={dataByFuncao.slice(0, 6)}
+              cx="50%"
+              cy="50%"
+              innerRadius="40%"
+              outerRadius="75%"
+              paddingAngle={2}
+              dataKey="value"
+              label={false}
+            >
+              {dataByFuncao.slice(0, 6).map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={CHART_COLORS[index % CHART_COLORS.length]}
+                />
+              ))}
+            </Pie>
+            <Tooltip content={<PieTooltipWithPercent />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Legend as list below chart */}
+      <div className="w-full mt-4 grid grid-cols-2 gap-2">
+        {dataByFuncao.slice(0, 6).map((funcao, index) => (
+          <div key={funcao.name} className="flex items-center gap-2 text-xs">
+            <div
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+            />
+            <span className="truncate text-foreground">{funcao.name}</span>
+            <span className="text-muted-foreground ml-auto">{funcao.percentage}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Bar Chart Component
+  const BarChartContent = () => (
+    <div className="h-[280px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={dataByGerencia.slice(0, 5)} layout="vertical">
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis
+            type="number"
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={11}
+          />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={80}
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={10}
+            tickFormatter={(value) =>
+              value.length > 10 ? `${value.slice(0, 10)}...` : value
+            }
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+            {dataByGerencia.slice(0, 5).map((_, index) => (
+              <Cell
+                key={`cell-gerencia-${index}`}
+                fill={CHART_COLORS[index % CHART_COLORS.length]}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  // Line Chart Component
+  const LineChartContent = () => (
+    <div className="h-[280px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={dataByPeriod}>
+          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+          <XAxis
+            dataKey="name"
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={11}
+          />
+          <YAxis
+            tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+            stroke="hsl(var(--muted-foreground))"
+            fontSize={11}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Line
+            type="monotone"
+            dataKey="value"
+            stroke="hsl(var(--primary))"
+            strokeWidth={3}
+            dot={{ fill: "hsl(var(--primary))", strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, fill: "hsl(var(--accent))" }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Mobile Carousel */}
+      <div className="sm:hidden">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Análise Financeira
+              </CardTitle>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={scrollPrev}
+                  disabled={selectedIndex === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={scrollNext}
+                  disabled={selectedIndex === chartSlides.length - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Total: {formatCurrency(totalValue)}
+            </p>
+          </CardHeader>
+          
+          {/* Slide indicators */}
+          <div className="flex justify-center gap-2 px-4 pb-2">
+            {chartSlides.map((slide, index) => {
+              const Icon = slide.icon;
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => emblaApi?.scrollTo(index)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                    selectedIndex === index
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3 w-3" />
+                  <span className="hidden xs:inline">{slide.title}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <CardContent className="px-2 pb-4">
+            <div className="overflow-hidden" ref={emblaRef}>
+              <div className="flex">
+                {/* Slide 1: Donut Chart */}
+                <div className="flex-none w-full min-w-0 px-2">
+                  <DonutChartContent />
+                </div>
+                
+                {/* Slide 2: Bar Chart */}
+                <div className="flex-none w-full min-w-0 px-2">
+                  <BarChartContent />
+                </div>
+                
+                {/* Slide 3: Line Chart */}
+                <div className="flex-none w-full min-w-0 px-2">
+                  <LineChartContent />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Desktop Grid Layout */}
+      <div className="hidden sm:grid gap-6 md:grid-cols-2">
         {/* Distribution by Função - Donut Chart */}
         <Card className="md:col-span-2">
           <CardHeader>
@@ -153,15 +373,15 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
               Total do período: {formatCurrency(totalValue)}
             </p>
           </CardHeader>
-          <CardContent className="px-2 sm:px-6">
+          <CardContent className="px-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* Donut Chart - Optimized for mobile */}
+              {/* Donut Chart */}
               <div className="flex flex-col items-center">
-                <div className="w-full h-[200px] sm:h-[280px]">
+                <div className="w-full h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={dataByFuncao.slice(0, 6)}
+                        data={dataByFuncao}
                         cx="50%"
                         cy="50%"
                         innerRadius="40%"
@@ -170,7 +390,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                         dataKey="value"
                         label={false}
                       >
-                        {dataByFuncao.slice(0, 6).map((_, index) => (
+                        {dataByFuncao.map((_, index) => (
                           <Cell
                             key={`cell-${index}`}
                             fill={CHART_COLORS[index % CHART_COLORS.length]}
@@ -181,23 +401,9 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                
-                {/* Mobile-optimized Legend as list below chart */}
-                <div className="w-full mt-4 grid grid-cols-2 gap-2 sm:hidden">
-                  {dataByFuncao.slice(0, 6).map((funcao, index) => (
-                    <div key={funcao.name} className="flex items-center gap-2 text-xs">
-                      <div
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                      />
-                      <span className="truncate text-foreground">{funcao.name}</span>
-                      <span className="text-muted-foreground ml-auto">{funcao.percentage}%</span>
-                    </div>
-                  ))}
-                </div>
 
-                {/* Desktop Legend - shown only on larger screens */}
-                <div className="hidden sm:grid w-full mt-4 grid-cols-2 lg:grid-cols-3 gap-2">
+                {/* Desktop Legend */}
+                <div className="w-full mt-4 grid grid-cols-2 lg:grid-cols-3 gap-2">
                   {dataByFuncao.map((funcao, index) => (
                     <div key={funcao.name} className="flex items-center gap-2 text-sm">
                       <div
@@ -211,7 +417,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                 </div>
               </div>
 
-              {/* Ranking Cards - Hidden on mobile */}
+              {/* Ranking Cards */}
               <div className="hidden lg:block space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">
                   Ranking de Custos por Função
@@ -250,8 +456,8 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
           </CardContent>
         </Card>
 
-        {/* Costs by Gerência - Bar Chart - Hidden on mobile */}
-        <Card className="hidden sm:block">
+        {/* Costs by Gerência - Bar Chart */}
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Custos por Gerência</CardTitle>
           </CardHeader>
@@ -291,8 +497,8 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
           </CardContent>
         </Card>
 
-        {/* Costs by Period - Line Chart - Hidden on mobile */}
-        <Card className="hidden sm:block">
+        {/* Costs by Period - Line Chart */}
+        <Card>
           <CardHeader>
             <CardTitle className="text-lg">Evolução de Custos por Período</CardTitle>
           </CardHeader>

@@ -156,6 +156,7 @@ export type Database = {
       maintenance_entries: {
         Row: {
           anexo_url: string | null
+          cpf_cnpj: string | null
           created_at: string
           created_by: string | null
           data_servico: string
@@ -169,6 +170,7 @@ export type Database = {
         }
         Insert: {
           anexo_url?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           created_by?: string | null
           data_servico: string
@@ -182,6 +184,7 @@ export type Database = {
         }
         Update: {
           anexo_url?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
           created_by?: string | null
           data_servico?: string

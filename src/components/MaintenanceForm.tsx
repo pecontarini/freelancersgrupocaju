@@ -3,7 +3,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, parse } from "date-fns";
-import { CalendarIcon, Loader2, Upload, X, FileText, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Loader2, Upload, X, FileText, Sparkles, AlertTriangle, CheckCircle2, Camera } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +93,7 @@ export function MaintenanceForm() {
   const [anexoUrl, setAnexoUrl] = useState<string | null>(null);
   const [anexoName, setAnexoName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [extractedFields, setExtractedFields] = useState<ExtractedFields>({});
   const [showExtractionAlert, setShowExtractionAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,8 +143,20 @@ export function MaintenanceForm() {
     }
 
     setIsUploading(true);
+    setUploadProgress(0);
     setExtractedFields({});
     setShowExtractionAlert(false);
+    
+    // Simulate progress for better UX on mobile
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
     
     try {
       const fileExt = file.name.split(".").pop();
@@ -229,8 +243,10 @@ export function MaintenanceForm() {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Erro ao enviar arquivo");
+      toast.error("Erro ao enviar arquivo. Verifique sua conexão.");
     } finally {
+      setUploadProgress(100);
+      setTimeout(() => setUploadProgress(0), 500);
       setIsUploading(false);
     }
   };
@@ -322,51 +338,87 @@ export function MaintenanceForm() {
                   </span>
                 )}
               </FormLabel>
-              <div className="space-y-2">
+              <div className="space-y-3">
+                {/* Hidden file input - no capture attribute to allow user choice */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf"
-                  capture="environment"
+                  accept="image/*,application/pdf,.pdf"
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload"
                 />
+                
                 {!anexoUrl ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-dashed border-2 h-20 hover:bg-primary/5"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading || isExtracting}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : isExtracting ? (
-                      <Sparkles className="mr-2 h-5 w-5 animate-pulse text-primary" />
-                    ) : (
-                      <Upload className="mr-2 h-5 w-5" />
+                  <div className="space-y-3">
+                    {/* Upload Button - Mobile optimized with min touch target */}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-dashed border-2 min-h-[56px] h-auto py-4 hover:bg-primary/5 active:scale-[0.98] transition-all touch-manipulation"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading || isExtracting}
+                    >
+                      <div className="flex items-center justify-center gap-3 w-full">
+                        {isUploading ? (
+                          <Loader2 className="h-6 w-6 animate-spin text-primary flex-shrink-0" />
+                        ) : isExtracting ? (
+                          <Sparkles className="h-6 w-6 animate-pulse text-primary flex-shrink-0" />
+                        ) : (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Camera className="h-5 w-5 text-primary" />
+                            <span className="text-muted-foreground">/</span>
+                            <Upload className="h-5 w-5 text-primary" />
+                          </div>
+                        )}
+                        <div className="flex flex-col items-start text-left">
+                          <span className="font-medium text-sm sm:text-base">
+                            {isUploading 
+                              ? "Enviando arquivo..." 
+                              : isExtracting 
+                                ? "Extraindo dados..." 
+                                : "Câmera ou Galeria/Arquivos"
+                            }
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {isUploading 
+                              ? "Aguarde o envio" 
+                              : "A IA irá preencher os campos automaticamente"
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </Button>
+                    
+                    {/* Upload Progress Bar */}
+                    {isUploading && uploadProgress > 0 && (
+                      <div className="space-y-1">
+                        <Progress value={uploadProgress} className="h-2" />
+                        <p className="text-xs text-muted-foreground text-center">
+                          {uploadProgress < 100 ? `${uploadProgress}% enviado` : "Concluído!"}
+                        </p>
+                      </div>
                     )}
-                    <div className="flex flex-col items-center">
-                      <span className="font-medium">
-                        {isUploading ? "Enviando..." : isExtracting ? "Extraindo dados..." : "Tirar Foto ou Anexar NF"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        A IA irá preencher os campos automaticamente
-                      </span>
-                    </div>
-                  </Button>
+                  </div>
                 ) : (
-                  <div className="flex items-center gap-2 rounded-md border p-2 bg-primary/5">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <span className="flex-1 truncate text-sm font-medium">{anexoName}</span>
+                  <div className="flex items-center gap-3 rounded-lg border p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate text-green-800 dark:text-green-200">
+                        Arquivo anexado com sucesso
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400 truncate">
+                        {anexoName}
+                      </p>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-10 w-10 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-900/20"
                       onClick={removeAttachment}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-5 w-5 text-red-500" />
                     </Button>
                   </div>
                 )}

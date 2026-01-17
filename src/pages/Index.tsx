@@ -160,31 +160,31 @@ const Index = () => {
         <Tabs defaultValue={isAdmin ? "rede" : "lancamentos"} className="space-y-6">
           <TabsList className={`grid w-full max-w-4xl ${isAdmin ? "grid-cols-6" : "grid-cols-5"}`}>
             {isAdmin && (
-              <TabsTrigger value="rede" className="gap-2">
-                <Building2 className="h-4 w-4" />
-                Rede
+              <TabsTrigger value="rede" className="gap-1.5 px-2 sm:px-3">
+                <Building2 className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Rede</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="lancamentos" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Lançamentos
+            <TabsTrigger value="lancamentos" className="gap-1.5 px-2 sm:px-3">
+              <ClipboardList className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Lançamentos</span>
             </TabsTrigger>
-            <TabsTrigger value="gestao" className="gap-2">
-              <LayoutDashboard className="h-4 w-4" />
-              Gestão
+            <TabsTrigger value="gestao" className="gap-1.5 px-2 sm:px-3">
+              <LayoutDashboard className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Gestão</span>
             </TabsTrigger>
-            <TabsTrigger value="manutencao" className="gap-2">
-              <Wrench className="h-4 w-4" />
-              Manutenção
+            <TabsTrigger value="manutencao" className="gap-1.5 px-2 sm:px-3">
+              <Wrench className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Manutenção</span>
             </TabsTrigger>
-            <TabsTrigger value="analises" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Análises
+            <TabsTrigger value="analises" className="gap-1.5 px-2 sm:px-3">
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Análises</span>
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="configuracoes" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Configurações
+              <TabsTrigger value="configuracoes" className="gap-1.5 px-2 sm:px-3">
+                <Settings className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Configurações</span>
               </TabsTrigger>
             )}
           </TabsList>

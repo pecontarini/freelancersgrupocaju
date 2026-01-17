@@ -23,7 +23,9 @@ export interface MaintenanceBudget {
 export interface MaintenanceFormData {
   loja: string;
   loja_id: string;
+  cpf_cnpj: string | null;
   fornecedor: string;
+  chave_pix: string | null;
   data_servico: string;
   numero_nf: string;
   valor: number;

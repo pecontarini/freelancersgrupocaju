@@ -10,6 +10,7 @@ interface FreelancerLookupResult {
 
 interface SupplierLookupResult {
   fornecedor: string;
+  chave_pix: string | null;
 }
 
 export function useCpfLookup() {
@@ -65,27 +66,36 @@ export function useCpfLookup() {
     const cleanValue = cpfCnpj.replace(/\D/g, "");
     
     // Only lookup if we have enough digits (11 for CPF, 14 for CNPJ)
-    if (cleanValue.length < 11) {
+    if (cleanValue.length !== 11 && cleanValue.length !== 14) {
       return null;
     }
 
     setIsLookingUp(true);
     try {
-      // Query for the most recent entry with this supplier (using numero_nf as a proxy since we don't have CPF/CNPJ in maintenance)
-      // Actually, let's search by fornecedor name containing the CPF/CNPJ or by the numero_nf
+      // Query for the most recent entry with this CPF/CNPJ
       const { data, error } = await supabase
         .from("maintenance_entries")
-        .select("fornecedor, created_at")
+        .select("fornecedor, chave_pix, created_at")
+        .eq("cpf_cnpj", cpfCnpj)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         console.error("Error looking up supplier:", error);
         return null;
       }
 
-      // The maintenance table doesn't have CPF/CNPJ field, so this lookup 
-      // won't work unless we add that field. For now, return null.
+      if (data) {
+        toast.success("Dados do fornecedor recuperados automaticamente.", {
+          duration: 3000,
+        });
+        return {
+          fornecedor: data.fornecedor,
+          chave_pix: data.chave_pix,
+        };
+      }
+
       return null;
     } catch (error) {
       console.error("Error in supplier lookup:", error);

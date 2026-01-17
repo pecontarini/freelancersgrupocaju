@@ -192,8 +192,8 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                 </ResponsiveContainer>
               </div>
 
-              {/* Ranking Cards */}
-              <div className="space-y-3">
+              {/* Ranking Cards - Hidden on mobile */}
+              <div className="hidden sm:block space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">
                   Ranking de Custos por Função
                 </h4>
@@ -231,8 +231,8 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
           </CardContent>
         </Card>
 
-        {/* Costs by Gerência - Bar Chart */}
-        <Card>
+        {/* Costs by Gerência - Bar Chart - Hidden on mobile */}
+        <Card className="hidden sm:block">
           <CardHeader>
             <CardTitle className="text-lg">Custos por Gerência</CardTitle>
           </CardHeader>
@@ -272,8 +272,8 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
           </CardContent>
         </Card>
 
-        {/* Costs by Period - Line Chart */}
-        <Card>
+        {/* Costs by Period - Line Chart - Hidden on mobile */}
+        <Card className="hidden sm:block">
           <CardHeader>
             <CardTitle className="text-lg">Evolução de Custos por Período</CardTitle>
           </CardHeader>

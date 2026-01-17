@@ -117,10 +117,15 @@ export function MaintenanceBudgetDashboard({
               }
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            if (open) {
+              handleOpenDialog();
+            } else {
+              setIsDialogOpen(false);
+            }
+          }}>
             <DialogTrigger asChild>
               <Button 
-                onClick={handleOpenDialog}
                 disabled={!selectedLojaId}
                 className="gap-2"
               >

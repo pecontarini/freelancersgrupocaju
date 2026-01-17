@@ -156,19 +156,18 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
           <CardContent>
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Donut Chart */}
-              <div className="h-[320px]">
+              <div className="h-[280px] sm:h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={dataByFuncao}
                       cx="50%"
-                      cy="50%"
-                      innerRadius={70}
-                      outerRadius={120}
+                      cy="45%"
+                      innerRadius={50}
+                      outerRadius={80}
                       paddingAngle={2}
                       dataKey="value"
-                      label={({ name, percentage }) => `${percentage}%`}
-                      labelLine={false}
+                      label={false}
                     >
                       {dataByFuncao.map((_, index) => (
                         <Cell
@@ -179,11 +178,12 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
                     </Pie>
                     <Tooltip content={<PieTooltipWithPercent />} />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
+                      wrapperStyle={{ paddingTop: 16 }}
                       formatter={(value, entry: any) => (
-                        <span className="text-sm text-foreground">
+                        <span className="text-xs sm:text-sm text-foreground">
                           {value} ({entry.payload.percentage}%)
                         </span>
                       )}

@@ -1,9 +1,8 @@
-import { FileText, Loader2 } from "lucide-react";
 import { useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { Button } from "@/components/ui/button";
+import { MaintenanceSelectionModal } from "@/components/MaintenanceSelectionModal";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
@@ -25,8 +24,8 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
     return `${day}/${month}/${year}`;
   };
 
-  const generatePDF = async () => {
-    if (entries.length === 0) return;
+  const generatePDF = async (selectedEntries: MaintenanceEntry[]) => {
+    if (selectedEntries.length === 0) return;
 
     setIsGenerating(true);
 
@@ -52,7 +51,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       }
 
       // Title
-      const displayLoja = lojaNome || entries[0]?.loja || "TODAS AS LOJAS";
+      const displayLoja = lojaNome || selectedEntries[0]?.loja || "TODAS AS LOJAS";
       doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
@@ -67,7 +66,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.text(`Data: ${today.toLocaleDateString("pt-BR")}`, 60, 35);
 
       // Table with entries
-      const tableData = entries.map((entry) => [
+      const tableData = selectedEntries.map((entry) => [
         formatDate(entry.data_servico),
         entry.fornecedor,
         entry.numero_nf,
@@ -108,7 +107,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
 
       // Summary
       const finalY = (doc as any).lastAutoTable.finalY + 10;
-      const totalValue = entries.reduce((sum, e) => sum + e.valor, 0);
+      const totalValue = selectedEntries.reduce((sum, e) => sum + e.valor, 0);
 
       doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.setLineWidth(0.5);
@@ -117,11 +116,11 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text(`Total de Registros: ${entries.length}`, 14, finalY + 8);
+      doc.text(`Total de Registros: ${selectedEntries.length}`, 14, finalY + 8);
       doc.text(`VALOR TOTAL: ${formatCurrency(totalValue)}`, 14, finalY + 16);
 
       // Attachments note
-      const entriesWithAttachments = entries.filter((e) => e.anexo_url);
+      const entriesWithAttachments = selectedEntries.filter((e) => e.anexo_url);
       if (entriesWithAttachments.length > 0) {
         doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
@@ -166,17 +165,11 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
   };
 
   return (
-    <Button
-      onClick={generatePDF}
-      disabled={entries.length === 0 || isGenerating}
-      className="gap-2"
-    >
-      {isGenerating ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <FileText className="h-4 w-4" />
-      )}
-      Gerar OP de Manutenção
-    </Button>
+    <MaintenanceSelectionModal
+      entries={entries}
+      lojaNome={lojaNome}
+      onGenerate={generatePDF}
+      isGenerating={isGenerating}
+    />
   );
 }

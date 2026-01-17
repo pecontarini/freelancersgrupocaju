@@ -73,24 +73,25 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
         selectedLojaName={currentLojaName}
       />
 
+      {/* PDF Export Action - Always visible */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <div>
+          <h3 className="font-semibold text-primary flex items-center gap-2">
+            <Wrench className="h-4 w-4" />
+            Ordem de Pagamento - Manutenção
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {filteredEntries.length > 0 
+              ? `${filteredEntries.length} registro(s) • ${formatCurrency(totalValue)}`
+              : "Nenhum registro para gerar PDF"
+            }
+          </p>
+        </div>
+        <MaintenanceExportButton entries={filteredEntries} lojaNome={currentLojaName} />
+      </div>
+
       {/* Form */}
       <MaintenanceForm />
-
-      {/* PDF Export Button */}
-      {filteredEntries.length > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <div>
-            <h3 className="font-semibold text-primary flex items-center gap-2">
-              <Wrench className="h-4 w-4" />
-              Ordem de Pagamento - Manutenção
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {filteredEntries.length} registro(s) • {formatCurrency(totalValue)}
-            </p>
-          </div>
-          <MaintenanceExportButton entries={filteredEntries} lojaNome={currentLojaName} />
-        </div>
-      )}
 
       {/* Entries List */}
       <MaintenanceList entries={filteredEntries} />

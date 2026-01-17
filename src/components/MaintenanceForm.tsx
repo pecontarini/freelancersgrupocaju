@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,13 +34,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+const formatCpfCnpj = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 11) {
+    // CPF format: 000.000.000-00
+    return digits
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  } else {
+    // CNPJ format: 00.000.000/0000-00
+    return digits
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1/$2")
+      .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+  }
+};
+
 const formSchema = z.object({
   loja_id: z.string().min(1, "Selecione a loja"),
+  cpf_cnpj: z.string().optional(),
   fornecedor: z.string().min(1, "Fornecedor é obrigatório").max(200),
+  chave_pix: z.string().optional(),
   data_servico: z.date({ required_error: "Data do serviço é obrigatória" }),
   numero_nf: z.string().min(1, "Número da NF é obrigatório").max(50),
   valor: z.string().min(1, "Valor é obrigatório"),
@@ -53,6 +74,7 @@ export function MaintenanceForm() {
   const { addEntry, isAdding } = useMaintenanceEntries();
   const { options: lojas } = useConfigLojas();
   const { isAdmin, unidades } = useUserProfile();
+  const { isLookingUp, lookupSupplierByCpfCnpj } = useCpfLookup();
   const [anexoUrl, setAnexoUrl] = useState<string | null>(null);
   const [anexoName, setAnexoName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -64,12 +86,33 @@ export function MaintenanceForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       loja_id: availableLojas.length === 1 ? availableLojas[0].id : "",
+      cpf_cnpj: "",
       fornecedor: "",
+      chave_pix: "",
       numero_nf: "",
       valor: "",
       descricao: "",
     },
   });
+
+  const cpfCnpjValue = form.watch("cpf_cnpj");
+
+  useEffect(() => {
+    const performLookup = async () => {
+      const cleanValue = cpfCnpjValue?.replace(/\D/g, "") || "";
+      // Only lookup if we have 11 digits (CPF) or 14 digits (CNPJ)
+      if (cleanValue.length === 11 || cleanValue.length === 14) {
+        const result = await lookupSupplierByCpfCnpj(cpfCnpjValue || "");
+        if (result) {
+          form.setValue("fornecedor", result.fornecedor);
+          if (result.chave_pix) {
+            form.setValue("chave_pix", result.chave_pix);
+          }
+        }
+      }
+    };
+    performLookup();
+  }, [cpfCnpjValue, lookupSupplierByCpfCnpj, form]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -128,7 +171,9 @@ export function MaintenanceForm() {
     await addEntry({
       loja: selectedLoja.nome,
       loja_id: data.loja_id,
+      cpf_cnpj: data.cpf_cnpj || null,
       fornecedor: data.fornecedor,
+      chave_pix: data.chave_pix || null,
       data_servico: format(data.data_servico, "yyyy-MM-dd"),
       numero_nf: data.numero_nf,
       valor: valorNumerico,
@@ -138,7 +183,9 @@ export function MaintenanceForm() {
 
     form.reset({
       loja_id: availableLojas.length === 1 ? availableLojas[0].id : "",
+      cpf_cnpj: "",
       fornecedor: "",
+      chave_pix: "",
       numero_nf: "",
       valor: "",
       descricao: "",
@@ -188,15 +235,53 @@ export function MaintenanceForm() {
                 )}
               />
 
+              {/* CPF/CNPJ */}
+              <FormField
+                control={form.control}
+                name="cpf_cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF/CNPJ do Fornecedor</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                        {...field}
+                        onChange={(e) => {
+                          const formatted = formatCpfCnpj(e.target.value);
+                          field.onChange(formatted);
+                        }}
+                        maxLength={18}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Fornecedor */}
               <FormField
                 control={form.control}
                 name="fornecedor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fornecedor</FormLabel>
+                    <FormLabel>Fornecedor {isLookingUp && <Loader2 className="inline h-3 w-3 animate-spin ml-1" />}</FormLabel>
                     <FormControl>
                       <Input placeholder="Nome do fornecedor" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Chave PIX */}
+              <FormField
+                control={form.control}
+                name="chave_pix"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Chave PIX</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Chave PIX do fornecedor" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

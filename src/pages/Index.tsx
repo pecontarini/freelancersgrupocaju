@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings, Users, Building2 } from "lucide-react";
+import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings, Users, Building2, Wrench } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -16,6 +16,7 @@ import { ConfigurationsTab } from "@/components/ConfigurationsTab";
 import { UnidadeSelector } from "@/components/UnidadeSelector";
 import { NetworkSummary } from "@/components/NetworkSummary";
 import { UserManagement } from "@/components/UserManagement";
+import { MaintenanceTab } from "@/components/MaintenanceTab";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -157,7 +158,7 @@ const Index = () => {
         )}
 
         <Tabs defaultValue={isAdmin ? "rede" : "lancamentos"} className="space-y-6">
-          <TabsList className={`grid w-full max-w-3xl ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
+          <TabsList className={`grid w-full max-w-4xl ${isAdmin ? "grid-cols-6" : "grid-cols-5"}`}>
             {isAdmin && (
               <TabsTrigger value="rede" className="gap-2">
                 <Building2 className="h-4 w-4" />
@@ -171,6 +172,10 @@ const Index = () => {
             <TabsTrigger value="gestao" className="gap-2">
               <LayoutDashboard className="h-4 w-4" />
               Gestão
+            </TabsTrigger>
+            <TabsTrigger value="manutencao" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              Manutenção
             </TabsTrigger>
             <TabsTrigger value="analises" className="gap-2">
               <BarChart3 className="h-4 w-4" />
@@ -255,6 +260,11 @@ const Index = () => {
 
             {/* Data Table */}
             <EntriesTable entries={filteredEntries} />
+          </TabsContent>
+
+          {/* Manutenção Tab */}
+          <TabsContent value="manutencao" className="space-y-6">
+            <MaintenanceTab selectedUnidadeId={selectedUnidadeId} />
           </TabsContent>
 
           {/* Análises Tab */}

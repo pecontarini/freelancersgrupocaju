@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +28,7 @@ import { formatCPF, formatCurrencyInput, isValidCPF } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useConfigLojas, useConfigFuncoes, useConfigGerencias } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
@@ -47,8 +48,10 @@ type FormData = z.infer<typeof formSchema>;
 export function FreelancerForm() {
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { createEntry } = useFreelancerEntries();
   const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
+  const { lookupFreelancerByCpf, isLookingUp } = useCpfLookup();
   
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
@@ -98,6 +101,7 @@ export function FreelancerForm() {
     form.reset();
     setCpfValue("");
     setValorValue("");
+    setAutoFilledFields(new Set());
     
     // Re-apply unidade for gerente with single store
     if (singleUnidade) {
@@ -118,7 +122,29 @@ export function FreelancerForm() {
     const formatted = formatCPF(e.target.value);
     setCpfValue(formatted);
     form.setValue("cpf", formatted);
+    
+    // Auto-lookup when CPF is complete (14 chars with formatting: 000.000.000-00)
+    if (formatted.length === 14) {
+      handleCpfLookup(formatted);
+    }
   };
+
+  const handleCpfLookup = useCallback(async (cpf: string) => {
+    const result = await lookupFreelancerByCpf(cpf);
+    if (result) {
+      form.setValue("nome_completo", result.nome_completo);
+      form.setValue("chave_pix", result.chave_pix);
+      
+      // Check if the function exists in options before setting
+      const funcaoExists = funcoes.some(f => f.nome === result.funcao);
+      if (funcaoExists) {
+        form.setValue("funcao", result.funcao);
+        setAutoFilledFields(new Set(["nome_completo", "chave_pix", "funcao"]));
+      } else {
+        setAutoFilledFields(new Set(["nome_completo", "chave_pix"]));
+      }
+    }
+  }, [lookupFreelancerByCpf, form, funcoes]);
 
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCurrencyInput(e.target.value);
@@ -126,6 +152,15 @@ export function FreelancerForm() {
     const numbers = e.target.value.replace(/\D/g, "");
     const amount = parseInt(numbers, 10) / 100;
     form.setValue("valor", isNaN(amount) ? 0 : amount);
+  };
+
+  // Clear auto-filled indicator when user manually changes a field
+  const handleFieldChange = (fieldName: string) => {
+    setAutoFilledFields(prev => {
+      const next = new Set(prev);
+      next.delete(fieldName);
+      return next;
+    });
   };
 
   return (
@@ -177,9 +212,17 @@ export function FreelancerForm() {
               <Input
                 id="nome_completo"
                 placeholder="Nome do freelancer"
-                className="input-focus-ring"
-                {...form.register("nome_completo")}
+                className={cn(
+                  "input-focus-ring",
+                  autoFilledFields.has("nome_completo") && "border-green-500 bg-green-50 dark:bg-green-950/20"
+                )}
+                {...form.register("nome_completo", {
+                  onChange: () => handleFieldChange("nome_completo"),
+                })}
               />
+              {autoFilledFields.has("nome_completo") && (
+                <p className="text-xs text-green-600">Preenchido automaticamente</p>
+              )}
               {form.formState.errors.nome_completo && (
                 <p className="text-sm text-destructive">{form.formState.errors.nome_completo.message}</p>
               )}
@@ -188,8 +231,18 @@ export function FreelancerForm() {
             {/* Função */}
             <div className="space-y-2">
               <Label htmlFor="funcao">Função</Label>
-              <Select onValueChange={(val) => form.setValue("funcao", val)} disabled={isLoadingFuncoes}>
-                <SelectTrigger className="input-focus-ring">
+              <Select 
+                onValueChange={(val) => {
+                  form.setValue("funcao", val);
+                  handleFieldChange("funcao");
+                }} 
+                disabled={isLoadingFuncoes}
+                value={form.watch("funcao") || undefined}
+              >
+                <SelectTrigger className={cn(
+                  "input-focus-ring",
+                  autoFilledFields.has("funcao") && "border-green-500 bg-green-50 dark:bg-green-950/20"
+                )}>
                   <SelectValue placeholder={isLoadingFuncoes ? "Carregando..." : "Selecione a função"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -200,6 +253,9 @@ export function FreelancerForm() {
                   ))}
                 </SelectContent>
               </Select>
+              {autoFilledFields.has("funcao") && (
+                <p className="text-xs text-green-600">Preenchido automaticamente</p>
+              )}
               {form.formState.errors.funcao && (
                 <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
               )}
@@ -288,13 +344,20 @@ export function FreelancerForm() {
             {/* CPF */}
             <div className="space-y-2">
               <Label htmlFor="cpf">CPF</Label>
-              <Input
-                id="cpf"
-                placeholder="000.000.000-00"
-                value={cpfValue}
-                onChange={handleCPFChange}
-                className="input-focus-ring"
-              />
+              <div className="relative">
+                <Input
+                  id="cpf"
+                  placeholder="000.000.000-00"
+                  value={cpfValue}
+                  onChange={handleCPFChange}
+                  className="input-focus-ring"
+                />
+                {isLookingUp && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
               {form.formState.errors.cpf && (
                 <p className="text-sm text-destructive">{form.formState.errors.cpf.message}</p>
               )}
@@ -306,9 +369,17 @@ export function FreelancerForm() {
               <Input
                 id="chave_pix"
                 placeholder="Email, telefone ou CPF"
-                className="input-focus-ring"
-                {...form.register("chave_pix")}
+                className={cn(
+                  "input-focus-ring",
+                  autoFilledFields.has("chave_pix") && "border-green-500 bg-green-50 dark:bg-green-950/20"
+                )}
+                {...form.register("chave_pix", {
+                  onChange: () => handleFieldChange("chave_pix"),
+                })}
               />
+              {autoFilledFields.has("chave_pix") && (
+                <p className="text-xs text-green-600">Preenchido automaticamente</p>
+              )}
               {form.formState.errors.chave_pix && (
                 <p className="text-sm text-destructive">{form.formState.errors.chave_pix.message}</p>
               )}

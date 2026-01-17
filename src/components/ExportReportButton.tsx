@@ -108,21 +108,11 @@ export function ExportReportButton({ entries, variant = "dropdown" }: ExportRepo
       const [year, month, day] = popDateStr.split("-");
       const formattedDateForFilename = `${day}-${month}-${year}`;
 
-      // Helper function to add watermark/background
+      // Helper function to add clean background
       const addBackground = () => {
-        // Subtle gradient-like background effect
-        doc.setFillColor(252, 250, 248); // Very light warm tone
+        // Clean white background
+        doc.setFillColor(255, 255, 255);
         doc.rect(0, 0, pageWidth, pageHeight, "F");
-        
-        // Add subtle watermark pattern
-        doc.setTextColor(245, 240, 235);
-        doc.setFontSize(60);
-        doc.setFont("helvetica", "bold");
-        for (let y = 40; y < pageHeight; y += 80) {
-          for (let x = -20; x < pageWidth; x += 100) {
-            doc.text("CAJU", x, y, { angle: -30 });
-          }
-        }
       };
 
       // Helper function to add header with logo

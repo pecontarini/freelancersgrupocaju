@@ -8,6 +8,10 @@ import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
+// Brand colors
+const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
+const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
+
 interface MaintenanceExportButtonProps {
   entries: MaintenanceEntry[];
   lojaNome?: string;
@@ -31,20 +35,14 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Watermark function
-      const addWatermark = () => {
-        doc.setFillColor(252, 250, 245);
+      // Clean background - no watermark
+      const addCleanBackground = () => {
+        doc.setFillColor(255, 255, 255);
         doc.rect(0, 0, pageWidth, pageHeight, "F");
-        doc.setTextColor(240, 230, 210);
-        doc.setFontSize(60);
-        doc.setFont("helvetica", "bold");
-        const text = "GRUPO CAJU";
-        const textWidth = doc.getTextWidth(text);
-        doc.text(text, (pageWidth - textWidth) / 2, pageHeight / 2, { angle: 45 });
       };
 
-      // Add watermark to first page
-      addWatermark();
+      // Add clean background to first page
+      addCleanBackground();
 
       // Header with logo
       try {
@@ -55,12 +53,12 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
 
       // Title
       const displayLoja = lojaNome || entries[0]?.loja || "TODAS AS LOJAS";
-      doc.setTextColor(200, 80, 50);
+      doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
       doc.text(`GRUPO CAJU - ${displayLoja.toUpperCase()}`, 60, 20);
 
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
       doc.setFontSize(12);
       doc.text("ORDEM DE PAGAMENTO - MANUTENÇÃO", 60, 28);
 
@@ -82,12 +80,12 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
         head: [["Data", "Fornecedor", "NF", "Descrição", "Valor"]],
         body: tableData,
         headStyles: {
-          fillColor: [200, 80, 50],
+          fillColor: [PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]],
           textColor: [255, 255, 255],
           fontStyle: "bold",
         },
         alternateRowStyles: {
-          fillColor: [252, 248, 240],
+          fillColor: [250, 250, 250],
         },
         styles: {
           fontSize: 9,
@@ -101,9 +99,9 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
           4: { cellWidth: 30, halign: "right" },
         },
         didDrawPage: (data) => {
-          // Add watermark on new pages
+          // Add clean background on new pages
           if (data.pageNumber > 1) {
-            addWatermark();
+            addCleanBackground();
           }
         },
       });
@@ -112,7 +110,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       const finalY = (doc as any).lastAutoTable.finalY + 10;
       const totalValue = entries.reduce((sum, e) => sum + e.valor, 0);
 
-      doc.setDrawColor(200, 80, 50);
+      doc.setDrawColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
       doc.setLineWidth(0.5);
       doc.line(14, finalY, pageWidth - 14, finalY);
 
@@ -134,13 +132,13 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
         entriesWithAttachments.forEach((entry, index) => {
           if (attachmentY > pageHeight - 20) {
             doc.addPage();
-            addWatermark();
+            addCleanBackground();
             attachmentY = 20;
           }
           doc.setFontSize(8);
           doc.setTextColor(100, 100, 100);
           doc.text(`${index + 1}. ${entry.fornecedor} (NF: ${entry.numero_nf}):`, 14, attachmentY);
-          doc.setTextColor(0, 100, 200);
+          doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
           doc.textWithLink(entry.anexo_url!.substring(0, 70) + "...", 14, attachmentY + 4, {
             url: entry.anexo_url!,
           });

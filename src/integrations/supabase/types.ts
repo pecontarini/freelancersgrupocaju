@@ -121,6 +121,88 @@ export type Database = {
           },
         ]
       }
+      maintenance_budgets: {
+        Row: {
+          budget_mensal: number
+          created_at: string
+          id: string
+          loja_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          budget_mensal?: number
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          budget_mensal?: number
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_budgets_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: true
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_entries: {
+        Row: {
+          anexo_url: string | null
+          created_at: string
+          created_by: string | null
+          data_servico: string
+          descricao: string | null
+          fornecedor: string
+          id: string
+          loja: string
+          loja_id: string | null
+          numero_nf: string
+          valor: number
+        }
+        Insert: {
+          anexo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_servico: string
+          descricao?: string | null
+          fornecedor: string
+          id?: string
+          loja: string
+          loja_id?: string | null
+          numero_nf: string
+          valor: number
+        }
+        Update: {
+          anexo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_servico?: string
+          descricao?: string | null
+          fornecedor?: string
+          id?: string
+          loja?: string
+          loja_id?: string | null
+          numero_nf?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

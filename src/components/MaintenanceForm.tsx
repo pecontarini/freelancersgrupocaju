@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
-import { CalendarIcon, Loader2, Upload, X, FileText } from "lucide-react";
+import { format, parse } from "date-fns";
+import { CalendarIcon, Loader2, Upload, X, FileText, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useCpfLookup } from "@/hooks/useCpfLookup";
+import { useInvoiceExtraction } from "@/hooks/useInvoiceExtraction";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -70,14 +72,28 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+// Track which fields were auto-extracted
+type ExtractedFields = {
+  cpf_cnpj?: boolean;
+  fornecedor?: boolean;
+  numero_nf?: boolean;
+  data_servico?: boolean;
+  valor?: boolean;
+  chave_pix?: boolean;
+};
+
 export function MaintenanceForm() {
   const { addEntry, isAdding } = useMaintenanceEntries();
   const { options: lojas } = useConfigLojas();
   const { isAdmin, unidades } = useUserProfile();
   const { isLookingUp, lookupSupplierByCpfCnpj } = useCpfLookup();
+  const { isExtracting, extractFromFile, clearExtractedData } = useInvoiceExtraction();
+  
   const [anexoUrl, setAnexoUrl] = useState<string | null>(null);
   const [anexoName, setAnexoName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [extractedFields, setExtractedFields] = useState<ExtractedFields>({});
+  const [showExtractionAlert, setShowExtractionAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const availableLojas = isAdmin ? lojas : unidades;
@@ -125,6 +141,9 @@ export function MaintenanceForm() {
     }
 
     setIsUploading(true);
+    setExtractedFields({});
+    setShowExtractionAlert(false);
+    
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -143,6 +162,71 @@ export function MaintenanceForm() {
       setAnexoUrl(publicUrl);
       setAnexoName(file.name);
       toast.success("Arquivo enviado com sucesso!");
+
+      // Now extract data from the file if it's an image or PDF
+      if (file.type.startsWith("image/") || file.type === "application/pdf") {
+        toast.info("Extraindo dados da NF automaticamente...", { duration: 3000 });
+        
+        const extracted = await extractFromFile(file);
+        
+        if (extracted) {
+          const newExtractedFields: ExtractedFields = {};
+          
+          // Apply extracted data to form fields
+          if (extracted.cnpj) {
+            const formatted = formatCpfCnpj(extracted.cnpj);
+            form.setValue("cpf_cnpj", formatted);
+            newExtractedFields.cpf_cnpj = true;
+          }
+          
+          if (extracted.fornecedor) {
+            form.setValue("fornecedor", extracted.fornecedor);
+            newExtractedFields.fornecedor = true;
+          }
+          
+          if (extracted.numero_nf) {
+            form.setValue("numero_nf", extracted.numero_nf);
+            newExtractedFields.numero_nf = true;
+          }
+          
+          if (extracted.data_servico) {
+            try {
+              // Try parsing DD/MM/YYYY format
+              const parsedDate = parse(extracted.data_servico, "dd/MM/yyyy", new Date());
+              if (!isNaN(parsedDate.getTime())) {
+                form.setValue("data_servico", parsedDate);
+                newExtractedFields.data_servico = true;
+              }
+            } catch {
+              console.log("Could not parse date:", extracted.data_servico);
+            }
+          }
+          
+          if (extracted.valor) {
+            // Format value for the input (remove R$ and extra spaces)
+            const cleanValue = extracted.valor.replace(/[R$\s]/g, "").trim();
+            form.setValue("valor", cleanValue);
+            newExtractedFields.valor = true;
+          }
+          
+          if (extracted.chave_pix) {
+            form.setValue("chave_pix", extracted.chave_pix);
+            newExtractedFields.chave_pix = true;
+          }
+          
+          setExtractedFields(newExtractedFields);
+          setShowExtractionAlert(true);
+          
+          const confidence = extracted.confidence;
+          if (confidence === "high") {
+            toast.success("Dados extraídos com alta confiança!", { duration: 4000 });
+          } else if (confidence === "medium") {
+            toast.warning("Dados extraídos. Por favor, confira os campos.", { duration: 4000 });
+          } else {
+            toast.warning("Extração com baixa confiança. Verifique todos os campos.", { duration: 5000 });
+          }
+        }
+      }
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Erro ao enviar arquivo");
@@ -154,6 +238,9 @@ export function MaintenanceForm() {
   const removeAttachment = () => {
     setAnexoUrl(null);
     setAnexoName(null);
+    setExtractedFields({});
+    setShowExtractionAlert(false);
+    clearExtractedData();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -193,6 +280,14 @@ export function MaintenanceForm() {
     removeAttachment();
   };
 
+  // Helper to get field styling based on extraction status
+  const getFieldClassName = (fieldName: keyof ExtractedFields) => {
+    if (extractedFields[fieldName]) {
+      return "ring-2 ring-amber-400 ring-offset-1 bg-amber-50 dark:bg-amber-950/20";
+    }
+    return "";
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -204,6 +299,80 @@ export function MaintenanceForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Extraction Alert */}
+            {showExtractionAlert && (
+              <Alert className="border-amber-400 bg-amber-50 dark:bg-amber-950/20">
+                <Sparkles className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  <span className="font-medium">Dados extraídos automaticamente da NF.</span>
+                  <br />
+                  <span className="text-sm">Campos destacados em amarelo foram preenchidos pela IA. Por favor, confira antes de salvar.</span>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Anexo - Moved to top for better UX */}
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                Anexo (Boleto/NF)
+                {isExtracting && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Sparkles className="h-3 w-3 animate-pulse text-primary" />
+                    Extraindo dados...
+                  </span>
+                )}
+              </FormLabel>
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  capture="environment"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload"
+                />
+                {!anexoUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-dashed border-2 h-20 hover:bg-primary/5"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading || isExtracting}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : isExtracting ? (
+                      <Sparkles className="mr-2 h-5 w-5 animate-pulse text-primary" />
+                    ) : (
+                      <Upload className="mr-2 h-5 w-5" />
+                    )}
+                    <div className="flex flex-col items-center">
+                      <span className="font-medium">
+                        {isUploading ? "Enviando..." : isExtracting ? "Extraindo dados..." : "Tirar Foto ou Anexar NF"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        A IA irá preencher os campos automaticamente
+                      </span>
+                    </div>
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-md border p-2 bg-primary/5">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <span className="flex-1 truncate text-sm font-medium">{anexoName}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={removeAttachment}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </FormItem>
+
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Loja */}
               <FormField
@@ -241,14 +410,22 @@ export function MaintenanceForm() {
                 name="cpf_cnpj"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CPF/CNPJ do Fornecedor</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      CPF/CNPJ do Fornecedor
+                      {extractedFields.cpf_cnpj && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                        className={getFieldClassName("cpf_cnpj")}
                         {...field}
                         onChange={(e) => {
                           const formatted = formatCpfCnpj(e.target.value);
                           field.onChange(formatted);
+                          // Clear extraction highlight on manual edit
+                          if (extractedFields.cpf_cnpj) {
+                            setExtractedFields(prev => ({ ...prev, cpf_cnpj: false }));
+                          }
                         }}
                         maxLength={18}
                       />
@@ -264,9 +441,23 @@ export function MaintenanceForm() {
                 name="fornecedor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Fornecedor {isLookingUp && <Loader2 className="inline h-3 w-3 animate-spin ml-1" />}</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Fornecedor
+                      {isLookingUp && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+                      {extractedFields.fornecedor && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="Nome do fornecedor" {...field} />
+                      <Input 
+                        placeholder="Nome do fornecedor" 
+                        className={getFieldClassName("fornecedor")}
+                        {...field} 
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (extractedFields.fornecedor) {
+                            setExtractedFields(prev => ({ ...prev, fornecedor: false }));
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -279,9 +470,22 @@ export function MaintenanceForm() {
                 name="chave_pix"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Chave PIX</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Chave PIX
+                      {extractedFields.chave_pix && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="Chave PIX do fornecedor" {...field} />
+                      <Input 
+                        placeholder="Chave PIX do fornecedor" 
+                        className={getFieldClassName("chave_pix")}
+                        {...field} 
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (extractedFields.chave_pix) {
+                            setExtractedFields(prev => ({ ...prev, chave_pix: false }));
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -294,7 +498,10 @@ export function MaintenanceForm() {
                 name="data_servico"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Data do Serviço</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Data do Serviço
+                      {extractedFields.data_servico && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -302,7 +509,8 @@ export function MaintenanceForm() {
                             variant="outline"
                             className={cn(
                               "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
+                              !field.value && "text-muted-foreground",
+                              getFieldClassName("data_servico")
                             )}
                           >
                             {field.value ? (
@@ -318,7 +526,12 @@ export function MaintenanceForm() {
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            field.onChange(date);
+                            if (extractedFields.data_servico) {
+                              setExtractedFields(prev => ({ ...prev, data_servico: false }));
+                            }
+                          }}
                           disabled={(date) => date > new Date()}
                           initialFocus
                         />
@@ -335,9 +548,22 @@ export function MaintenanceForm() {
                 name="numero_nf"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Número da Nota Fiscal</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Número da Nota Fiscal
+                      {extractedFields.numero_nf && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: NF-001234" {...field} />
+                      <Input 
+                        placeholder="Ex: NF-001234" 
+                        className={getFieldClassName("numero_nf")}
+                        {...field} 
+                        onChange={(e) => {
+                          field.onChange(e);
+                          if (extractedFields.numero_nf) {
+                            setExtractedFields(prev => ({ ...prev, numero_nf: false }));
+                          }
+                        }}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -350,10 +576,14 @@ export function MaintenanceForm() {
                 name="valor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor do Serviço (R$)</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Valor do Serviço (R$)
+                      {extractedFields.valor && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="0,00"
+                        className={getFieldClassName("valor")}
                         {...field}
                         onChange={(e) => {
                           let value = e.target.value.replace(/[^\d]/g, "");
@@ -365,6 +595,9 @@ export function MaintenanceForm() {
                             });
                           }
                           field.onChange(value);
+                          if (extractedFields.valor) {
+                            setExtractedFields(prev => ({ ...prev, valor: false }));
+                          }
                         }}
                       />
                     </FormControl>
@@ -372,50 +605,6 @@ export function MaintenanceForm() {
                   </FormItem>
                 )}
               />
-
-              {/* Anexo */}
-              <FormItem>
-                <FormLabel>Anexo (Boleto/NF)</FormLabel>
-                <div className="space-y-2">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  {!anexoUrl ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="mr-2 h-4 w-4" />
-                      )}
-                      {isUploading ? "Enviando..." : "Tirar Foto ou Anexar"}
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2 rounded-md border p-2">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <span className="flex-1 truncate text-sm">{anexoName}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={removeAttachment}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </FormItem>
             </div>
 
             {/* Descrição */}
@@ -437,7 +626,7 @@ export function MaintenanceForm() {
               )}
             />
 
-            <Button type="submit" className="w-full" disabled={isAdding}>
+            <Button type="submit" className="w-full" disabled={isAdding || isExtracting}>
               {isAdding ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

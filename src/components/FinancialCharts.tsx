@@ -153,47 +153,66 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
               Total do período: {formatCurrency(totalValue)}
             </p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-2 sm:px-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* Donut Chart */}
-              <div className="h-[280px] sm:h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={dataByFuncao}
-                      cx="50%"
-                      cy="45%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                      label={false}
-                    >
-                      {dataByFuncao.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={CHART_COLORS[index % CHART_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<PieTooltipWithPercent />} />
-                    <Legend
-                      layout="horizontal"
-                      align="center"
-                      verticalAlign="bottom"
-                      wrapperStyle={{ paddingTop: 16 }}
-                      formatter={(value, entry: any) => (
-                        <span className="text-xs sm:text-sm text-foreground">
-                          {value} ({entry.payload.percentage}%)
-                        </span>
-                      )}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+              {/* Donut Chart - Optimized for mobile */}
+              <div className="flex flex-col items-center">
+                <div className="w-full h-[200px] sm:h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dataByFuncao.slice(0, 6)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius="40%"
+                        outerRadius="75%"
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={false}
+                      >
+                        {dataByFuncao.slice(0, 6).map((_, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={CHART_COLORS[index % CHART_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<PieTooltipWithPercent />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Mobile-optimized Legend as list below chart */}
+                <div className="w-full mt-4 grid grid-cols-2 gap-2 sm:hidden">
+                  {dataByFuncao.slice(0, 6).map((funcao, index) => (
+                    <div key={funcao.name} className="flex items-center gap-2 text-xs">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                      />
+                      <span className="truncate text-foreground">{funcao.name}</span>
+                      <span className="text-muted-foreground ml-auto">{funcao.percentage}%</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Legend - shown only on larger screens */}
+                <div className="hidden sm:grid w-full mt-4 grid-cols-2 lg:grid-cols-3 gap-2">
+                  {dataByFuncao.map((funcao, index) => (
+                    <div key={funcao.name} className="flex items-center gap-2 text-sm">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                      />
+                      <span className="truncate text-foreground">{funcao.name}</span>
+                      <span className="text-muted-foreground ml-auto">{funcao.percentage}%</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Ranking Cards - Hidden on mobile */}
-              <div className="hidden sm:block space-y-3">
+              <div className="hidden lg:block space-y-3">
                 <h4 className="font-medium text-sm text-muted-foreground mb-3">
                   Ranking de Custos por Função
                 </h4>

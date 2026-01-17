@@ -10,6 +10,8 @@ export interface MaintenanceEntry {
   descricao: string | null;
   anexo_url: string | null;
   created_by: string | null;
+  cpf_cnpj: string | null;
+  chave_pix: string | null;
 }
 
 export interface MaintenanceBudget {

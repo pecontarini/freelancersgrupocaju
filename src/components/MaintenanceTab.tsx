@@ -39,14 +39,18 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
     });
   }, [entries, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
 
-  // Get current loja name for export
+  // Get current loja name for export and budget
   const currentLojaName = useMemo(() => {
     if (selectedUnidadeId) {
+      // First try to find from entries
       const entry = entries.find((e) => e.loja_id === selectedUnidadeId);
-      return entry?.loja;
+      if (entry?.loja) return entry.loja;
+      // Then try from user's unidades
+      const unidade = unidades.find((u) => u.id === selectedUnidadeId);
+      return unidade?.nome;
     }
     return undefined;
-  }, [entries, selectedUnidadeId]);
+  }, [entries, selectedUnidadeId, unidades]);
 
   // Calculate total for current filtered entries
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
@@ -66,6 +70,7 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
         entries={entries}
         budgets={budgets}
         selectedLojaId={selectedUnidadeId}
+        selectedLojaName={currentLojaName}
       />
 
       {/* Form */}

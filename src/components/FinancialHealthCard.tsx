@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency, parseDateString } from "@/lib/formatters";
@@ -32,6 +33,7 @@ export function FinancialHealthCard({
 }: FinancialHealthCardProps) {
   const { getBudgetForStoreMonth, getCurrentMonthYear, isLoading } = useStoreBudgets();
   const { options: lojas } = useConfigLojas();
+  const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
   const currentMonthYear = getCurrentMonthYear();
   const now = new Date();
@@ -41,19 +43,29 @@ export function FinancialHealthCard({
   const daysElapsed = differenceInDays(now, monthStart) + 1;
   const daysRemaining = totalDaysInMonth - daysElapsed;
 
+  // Determine effective store ID: use selected or fallback to first assigned store for gerentes
+  const effectiveStoreId = useMemo(() => {
+    if (selectedUnidadeId) return selectedUnidadeId;
+    // For gerentes without explicit selection, use their first assigned store
+    if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      return unidades[0].id;
+    }
+    return null;
+  }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
+
   const stats = useMemo(() => {
     // Filter entries for current month and selected store
     const currentMonthFreelancerEntries = freelancerEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_pop);
       const isCurrentMonth = entryDate >= monthStart && entryDate <= monthEnd;
-      const matchesStore = !selectedUnidadeId || entry.loja_id === selectedUnidadeId;
+      const matchesStore = !effectiveStoreId || entry.loja_id === effectiveStoreId;
       return isCurrentMonth && matchesStore;
     });
 
     const currentMonthMaintenanceEntries = maintenanceEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_servico);
       const isCurrentMonth = entryDate >= monthStart && entryDate <= monthEnd;
-      const matchesStore = !selectedUnidadeId || entry.loja_id === selectedUnidadeId;
+      const matchesStore = !effectiveStoreId || entry.loja_id === effectiveStoreId;
       return isCurrentMonth && matchesStore;
     });
 
@@ -61,9 +73,9 @@ export function FinancialHealthCard({
     const maintenanceTotal = currentMonthMaintenanceEntries.reduce((sum, e) => sum + e.valor, 0);
     const totalSpent = freelancerTotal + maintenanceTotal;
 
-    // Get budget for selected store
-    const budget = selectedUnidadeId 
-      ? getBudgetForStoreMonth(selectedUnidadeId, currentMonthYear)
+    // Get budget for effective store
+    const budget = effectiveStoreId 
+      ? getBudgetForStoreMonth(effectiveStoreId, currentMonthYear)
       : null;
     
     const freelancerBudget = budget?.freelancer_budget || 0;
@@ -115,7 +127,7 @@ export function FinancialHealthCard({
       performanceVsBudget,
       hasBudget: totalBudget > 0,
     };
-  }, [freelancerEntries, maintenanceEntries, selectedUnidadeId, monthStart, monthEnd, getBudgetForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
+  }, [freelancerEntries, maintenanceEntries, effectiveStoreId, monthStart, monthEnd, getBudgetForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
 
   const getProgressColor = (percentage: number) => {
     if (percentage > 90) return "bg-destructive";
@@ -138,8 +150,8 @@ export function FinancialHealthCard({
     return "Dentro do orçamento";
   };
 
-  const selectedStoreName = selectedUnidadeId 
-    ? lojas.find(l => l.id === selectedUnidadeId)?.nome || "Loja selecionada"
+  const selectedStoreName = effectiveStoreId 
+    ? lojas.find(l => l.id === effectiveStoreId)?.nome || "Loja selecionada"
     : "Todas as lojas";
 
   if (isLoading) return null;

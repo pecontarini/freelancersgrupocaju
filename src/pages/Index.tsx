@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ClipboardList, LayoutDashboard, Loader2, BarChart3, Settings, Users, Building2, Wrench } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,6 +37,18 @@ const Index = () => {
   const { entries: maintenanceEntries, isLoading: isLoadingMaintenance } = useMaintenanceEntries();
   const { isAdmin, isGerenteUnidade, unidades, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Auto-select first store for gerentes when they have stores assigned
+  useEffect(() => {
+    if (!isLoadingProfile && !isInitialized) {
+      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+        // Auto-select first store for gerentes
+        setSelectedUnidadeId(unidades[0].id);
+      }
+      setIsInitialized(true);
+    }
+  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isAdmin, unidades]);
 
   const [filters, setFilters] = useState<FilterState>({
     dateFrom: undefined,

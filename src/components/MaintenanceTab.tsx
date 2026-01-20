@@ -18,15 +18,25 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
   const { entries, budgets, isLoading } = useMaintenanceEntries();
   const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
 
+  // Determine effective store ID: use selected or fallback to first assigned store for gerentes
+  const effectiveStoreId = useMemo(() => {
+    if (selectedUnidadeId) return selectedUnidadeId;
+    // For gerentes without explicit selection, use their first assigned store
+    if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      return unidades[0].id;
+    }
+    return null;
+  }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
+
   // Filter entries based on selected loja and user permissions
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
       // Admin with no filter sees all
-      if (isAdmin && !selectedUnidadeId) return true;
+      if (isAdmin && !effectiveStoreId) return true;
 
       // Admin with filter or gerente
-      if (selectedUnidadeId) {
-        return entry.loja_id === selectedUnidadeId;
+      if (effectiveStoreId) {
+        return entry.loja_id === effectiveStoreId;
       }
 
       // Gerente sees only their stores
@@ -37,20 +47,20 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
 
       return true;
     });
-  }, [entries, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
+  }, [entries, effectiveStoreId, isAdmin, isGerenteUnidade, unidades]);
 
   // Get current loja name for export and budget
   const currentLojaName = useMemo(() => {
-    if (selectedUnidadeId) {
+    if (effectiveStoreId) {
       // First try to find from entries
-      const entry = entries.find((e) => e.loja_id === selectedUnidadeId);
+      const entry = entries.find((e) => e.loja_id === effectiveStoreId);
       if (entry?.loja) return entry.loja;
       // Then try from user's unidades
-      const unidade = unidades.find((u) => u.id === selectedUnidadeId);
+      const unidade = unidades.find((u) => u.id === effectiveStoreId);
       return unidade?.nome;
     }
     return undefined;
-  }, [entries, selectedUnidadeId, unidades]);
+  }, [entries, effectiveStoreId, unidades]);
 
   // Calculate total for current filtered entries
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
@@ -69,7 +79,7 @@ export function MaintenanceTab({ selectedUnidadeId }: MaintenanceTabProps) {
       <MaintenanceBudgetDashboard
         entries={entries}
         budgets={budgets}
-        selectedLojaId={selectedUnidadeId}
+        selectedLojaId={effectiveStoreId}
         selectedLojaName={currentLojaName}
       />
 

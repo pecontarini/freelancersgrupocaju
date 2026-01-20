@@ -17,8 +17,10 @@ import { UnidadeSelector } from "@/components/UnidadeSelector";
 import { NetworkSummary } from "@/components/NetworkSummary";
 import { UserManagement } from "@/components/UserManagement";
 import { MaintenanceTab } from "@/components/MaintenanceTab";
+import { FinancialHealthCard } from "@/components/FinancialHealthCard";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
+import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FilterState } from "@/types/freelancer";
 import { parseDateString, formatCurrency } from "@/lib/formatters";
@@ -32,6 +34,7 @@ const Index = () => {
     uniqueLojas,
   } = useFreelancerEntries();
 
+  const { entries: maintenanceEntries, isLoading: isLoadingMaintenance } = useMaintenanceEntries();
   const { isAdmin, isGerenteUnidade, unidades, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
 
@@ -102,7 +105,7 @@ const Index = () => {
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
   const uniqueFreelancers = new Set(filteredEntries.map((e) => e.cpf)).size;
 
-  if (isLoading || isLoadingProfile) {
+  if (isLoading || isLoadingProfile || isLoadingMaintenance) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -215,6 +218,13 @@ const Index = () => {
 
           {/* Gestão Tab */}
           <TabsContent value="gestao" className="space-y-6">
+            {/* Financial Health Card */}
+            <FinancialHealthCard
+              freelancerEntries={filteredEntries}
+              maintenanceEntries={maintenanceEntries}
+              selectedUnidadeId={selectedUnidadeId}
+            />
+
             {/* PDF Button - Prominent placement */}
             {filteredEntries.length > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
@@ -286,7 +296,7 @@ const Index = () => {
             />
 
             {/* Charts */}
-            <FinancialCharts entries={filteredEntries} />
+            <FinancialCharts entries={filteredEntries} selectedUnidadeId={selectedUnidadeId} />
           </TabsContent>
 
           {/* Configurações Tab - Admin Only */}

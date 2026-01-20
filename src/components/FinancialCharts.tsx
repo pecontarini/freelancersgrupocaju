@@ -12,16 +12,21 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FreelancerEntry } from "@/types/freelancer";
 import { formatCurrency, parseDateString } from "@/lib/formatters";
-import { TrendingUp, ChevronLeft, ChevronRight, BarChart3, PieChartIcon, TrendingUpIcon } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, BarChart3, PieChartIcon, TrendingUpIcon, Target, AlertTriangle } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
+import { useStoreBudgets } from "@/hooks/useStoreBudgets";
+import { startOfMonth, endOfMonth, getDaysInMonth, differenceInDays, format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface FinancialChartsProps {
   entries: FreelancerEntry[];
+  selectedUnidadeId?: string | null;
 }
 
 const CHART_COLORS = [
@@ -39,9 +44,10 @@ const CHART_COLORS = [
   "hsl(262, 52%, 47%)",   // Indigo
 ];
 
-export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
+export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsProps) => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const { getBudgetForStoreMonth, getCurrentMonthYear } = useStoreBudgets();
 
   const scrollPrev = useCallback(() => {
     if (emblaApi) emblaApi.scrollPrev();
@@ -62,6 +68,46 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
     emblaApi.on("select", onSelect);
     onSelect();
   }, [emblaApi, onSelect]);
+
+  // Get current budget for store
+  const currentMonthYear = getCurrentMonthYear();
+  const currentBudget = selectedUnidadeId 
+    ? getBudgetForStoreMonth(selectedUnidadeId, currentMonthYear)
+    : null;
+  const budgetAmount = currentBudget?.budget_amount || 0;
+
+  // Budget analysis calculations
+  const budgetStats = useMemo(() => {
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const totalDaysInMonth = getDaysInMonth(now);
+    const daysElapsed = differenceInDays(now, monthStart) + 1;
+
+    // Filter current month entries
+    const currentMonthEntries = entries.filter((entry) => {
+      const entryDate = parseDateString(entry.data_pop);
+      return entryDate >= monthStart && entryDate <= monthEnd;
+    });
+
+    const currentMonthTotal = currentMonthEntries.reduce((sum, e) => sum + e.valor, 0);
+    const dailyAverage = daysElapsed > 0 ? currentMonthTotal / daysElapsed : 0;
+    const projectedTotal = dailyAverage * totalDaysInMonth;
+    
+    const performanceVsBudget = budgetAmount > 0 
+      ? ((budgetAmount - projectedTotal) / budgetAmount) * 100 
+      : 0;
+
+    return {
+      currentMonthTotal,
+      dailyAverage,
+      projectedTotal,
+      performanceVsBudget,
+      hasBudget: budgetAmount > 0,
+      daysElapsed,
+      totalDaysInMonth,
+    };
+  }, [entries, budgetAmount]);
 
   // Calculate total for percentages
   const totalValue = useMemo(() => {
@@ -98,7 +144,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
       .sort((a, b) => b.value - a.value);
   }, [entries]);
 
-  // Data by Period (monthly)
+  // Data by Period (monthly) with budget line
   const dataByPeriod = useMemo(() => {
     const grouped = entries.reduce((acc, entry) => {
       const date = parseDateString(entry.data_pop);
@@ -111,14 +157,17 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
       .map(([period, value]) => {
         const [year, month] = period.split("-");
         const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+        // Add budget line for current month
+        const isCurrentMonth = period === currentMonthYear;
         return {
           name: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
           value,
+          budget: isCurrentMonth && budgetAmount > 0 ? budgetAmount : undefined,
           sortKey: period,
         };
       })
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  }, [entries]);
+  }, [entries, currentMonthYear, budgetAmount]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -249,7 +298,7 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
     </div>
   );
 
-  // Line Chart Component
+  // Line Chart Component with Budget Line
   const LineChartContent = () => (
     <div className="h-[280px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -266,6 +315,20 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
             fontSize={11}
           />
           <Tooltip content={<CustomTooltip />} />
+          {budgetAmount > 0 && (
+            <ReferenceLine 
+              y={budgetAmount} 
+              stroke="hsl(var(--destructive))" 
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              label={{ 
+                value: "Budget", 
+                position: "right",
+                fill: "hsl(var(--destructive))",
+                fontSize: 10,
+              }}
+            />
+          )}
           <Line
             type="monotone"
             dataKey="value"
@@ -279,8 +342,80 @@ export const FinancialCharts = ({ entries }: FinancialChartsProps) => {
     </div>
   );
 
+  // Budget Stats Card
+  const BudgetStatsCard = () => {
+    if (!budgetStats.hasBudget) return null;
+    
+    return (
+      <Card className="border-l-4 border-l-primary">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            Análise de Budget
+          </CardTitle>
+          <CardDescription>
+            Projeção baseada em {budgetStats.daysElapsed} de {budgetStats.totalDaysInMonth} dias
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Gasto do Mês</p>
+              <p className="text-lg font-bold">{formatCurrency(budgetStats.currentMonthTotal)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Média Diária</p>
+              <p className="text-lg font-bold">{formatCurrency(budgetStats.dailyAverage)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Projeção Fim do Mês</p>
+              <p className={cn(
+                "text-lg font-bold",
+                budgetStats.projectedTotal > budgetAmount ? "text-destructive" : "text-green-600"
+              )}>
+                {formatCurrency(budgetStats.projectedTotal)}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Performance</p>
+              <div className={cn(
+                "flex items-center gap-1 text-lg font-bold",
+                budgetStats.performanceVsBudget >= 0 ? "text-green-600" : "text-destructive"
+              )}>
+                {budgetStats.performanceVsBudget >= 0 ? (
+                  <>
+                    <TrendingDown className="h-4 w-4" />
+                    {budgetStats.performanceVsBudget.toFixed(1)}%
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="h-4 w-4" />
+                    {Math.abs(budgetStats.performanceVsBudget).toFixed(1)}%
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {budgetStats.performanceVsBudget >= 0 ? "abaixo do budget" : "acima do budget"}
+              </p>
+            </div>
+          </div>
+          {budgetStats.projectedTotal > budgetAmount && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+              <AlertTriangle className="h-4 w-4" />
+              No ritmo atual, a unidade fechará o mês com um gasto de {formatCurrency(budgetStats.projectedTotal)}, 
+              ultrapassando o budget em {formatCurrency(budgetStats.projectedTotal - budgetAmount)}.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/* Budget Stats Card */}
+      <BudgetStatsCard />
+
       {/* Mobile Carousel */}
       <div className="sm:hidden">
         <Card>

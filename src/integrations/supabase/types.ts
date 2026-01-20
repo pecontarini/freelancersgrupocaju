@@ -246,27 +246,33 @@ export type Database = {
       }
       store_budgets: {
         Row: {
-          budget_amount: number
           created_at: string
+          freelancer_budget: number
           id: string
+          maintenance_budget: number
           month_year: string
           store_id: string
+          total_budget: number | null
           updated_at: string
         }
         Insert: {
-          budget_amount?: number
           created_at?: string
+          freelancer_budget?: number
           id?: string
+          maintenance_budget?: number
           month_year: string
           store_id: string
+          total_budget?: number | null
           updated_at?: string
         }
         Update: {
-          budget_amount?: number
           created_at?: string
+          freelancer_budget?: number
           id?: string
+          maintenance_budget?: number
           month_year?: string
           store_id?: string
+          total_budget?: number | null
           updated_at?: string
         }
         Relationships: [

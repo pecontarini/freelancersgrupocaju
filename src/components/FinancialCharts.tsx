@@ -21,7 +21,7 @@ import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, BarChart3, PieChar
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
-import { startOfMonth, endOfMonth, getDaysInMonth, differenceInDays, format } from "date-fns";
+import { startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface FinancialChartsProps {
@@ -74,7 +74,8 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
   const currentBudget = selectedUnidadeId 
     ? getBudgetForStoreMonth(selectedUnidadeId, currentMonthYear)
     : null;
-  const budgetAmount = currentBudget?.budget_amount || 0;
+  const budgetAmount = currentBudget?.total_budget || 0;
+  const freelancerBudgetAmount = currentBudget?.freelancer_budget || 0;
 
   // Budget analysis calculations
   const budgetStats = useMemo(() => {
@@ -162,12 +163,13 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
         return {
           name: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
           value,
-          budget: isCurrentMonth && budgetAmount > 0 ? budgetAmount : undefined,
+          freelancerBudget: isCurrentMonth && freelancerBudgetAmount > 0 ? freelancerBudgetAmount : undefined,
+          totalBudget: isCurrentMonth && budgetAmount > 0 ? budgetAmount : undefined,
           sortKey: period,
         };
       })
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  }, [entries, currentMonthYear, budgetAmount]);
+  }, [entries, currentMonthYear, budgetAmount, freelancerBudgetAmount]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -298,7 +300,7 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
     </div>
   );
 
-  // Line Chart Component with Budget Line
+  // Line Chart Component with Budget Lines
   const LineChartContent = () => (
     <div className="h-[280px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -315,17 +317,31 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
             fontSize={11}
           />
           <Tooltip content={<CustomTooltip />} />
-          {budgetAmount > 0 && (
+          {freelancerBudgetAmount > 0 && (
             <ReferenceLine 
-              y={budgetAmount} 
-              stroke="hsl(var(--destructive))" 
+              y={freelancerBudgetAmount} 
+              stroke="hsl(217, 91%, 60%)" 
               strokeDasharray="5 5"
               strokeWidth={2}
               label={{ 
-                value: "Budget", 
+                value: "Budget Freelancer", 
+                position: "right",
+                fill: "hsl(217, 91%, 60%)",
+                fontSize: 9,
+              }}
+            />
+          )}
+          {budgetAmount > 0 && budgetAmount !== freelancerBudgetAmount && (
+            <ReferenceLine 
+              y={budgetAmount} 
+              stroke="hsl(var(--destructive))" 
+              strokeDasharray="3 3"
+              strokeWidth={1.5}
+              label={{ 
+                value: "Budget Total", 
                 position: "right",
                 fill: "hsl(var(--destructive))",
-                fontSize: 10,
+                fontSize: 9,
               }}
             />
           )}

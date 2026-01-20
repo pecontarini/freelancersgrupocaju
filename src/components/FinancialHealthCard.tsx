@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
@@ -15,6 +15,14 @@ interface FinancialHealthCardProps {
   freelancerEntries: FreelancerEntry[];
   maintenanceEntries: MaintenanceEntry[];
   selectedUnidadeId: string | null;
+}
+
+interface CategoryStats {
+  spent: number;
+  budget: number;
+  percentageUsed: number;
+  remaining: number;
+  hasBudget: boolean;
 }
 
 export function FinancialHealthCard({
@@ -58,32 +66,54 @@ export function FinancialHealthCard({
       ? getBudgetForStoreMonth(selectedUnidadeId, currentMonthYear)
       : null;
     
-    const budgetAmount = budget?.budget_amount || 0;
-    const percentageUsed = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
-    const remainingBudget = budgetAmount - totalSpent;
+    const freelancerBudget = budget?.freelancer_budget || 0;
+    const maintenanceBudget = budget?.maintenance_budget || 0;
+    const totalBudget = budget?.total_budget || 0;
+    
+    // Category stats
+    const freelancerStats: CategoryStats = {
+      spent: freelancerTotal,
+      budget: freelancerBudget,
+      percentageUsed: freelancerBudget > 0 ? (freelancerTotal / freelancerBudget) * 100 : 0,
+      remaining: freelancerBudget - freelancerTotal,
+      hasBudget: freelancerBudget > 0,
+    };
+
+    const maintenanceStats: CategoryStats = {
+      spent: maintenanceTotal,
+      budget: maintenanceBudget,
+      percentageUsed: maintenanceBudget > 0 ? (maintenanceTotal / maintenanceBudget) * 100 : 0,
+      remaining: maintenanceBudget - maintenanceTotal,
+      hasBudget: maintenanceBudget > 0,
+    };
+
+    const totalStats: CategoryStats = {
+      spent: totalSpent,
+      budget: totalBudget,
+      percentageUsed: totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0,
+      remaining: totalBudget - totalSpent,
+      hasBudget: totalBudget > 0,
+    };
 
     // Calculate daily average and projection
     const dailyAverage = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
     const projectedTotal = dailyAverage * totalDaysInMonth;
-    const projectedOverBudget = budgetAmount > 0 ? projectedTotal - budgetAmount : 0;
+    const projectedOverBudget = totalBudget > 0 ? projectedTotal - totalBudget : 0;
 
     // Performance indicator
-    const performanceVsBudget = budgetAmount > 0 
-      ? ((budgetAmount - projectedTotal) / budgetAmount) * 100 
+    const performanceVsBudget = totalBudget > 0 
+      ? ((totalBudget - projectedTotal) / totalBudget) * 100 
       : 0;
 
     return {
-      totalSpent,
-      freelancerTotal,
-      maintenanceTotal,
-      budgetAmount,
-      percentageUsed,
-      remainingBudget,
+      freelancer: freelancerStats,
+      maintenance: maintenanceStats,
+      total: totalStats,
       dailyAverage,
       projectedTotal,
       projectedOverBudget,
       performanceVsBudget,
-      hasBudget: budgetAmount > 0,
+      hasBudget: totalBudget > 0,
     };
   }, [freelancerEntries, maintenanceEntries, selectedUnidadeId, monthStart, monthEnd, getBudgetForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
 
@@ -95,16 +125,16 @@ export function FinancialHealthCard({
 
   const getStatusIcon = () => {
     if (!stats.hasBudget) return <Target className="h-5 w-5 text-muted-foreground" />;
-    if (stats.percentageUsed > 90) return <AlertTriangle className="h-5 w-5 text-destructive" />;
-    if (stats.percentageUsed > 70) return <TrendingUp className="h-5 w-5 text-amber-500" />;
+    if (stats.total.percentageUsed > 90) return <AlertTriangle className="h-5 w-5 text-destructive" />;
+    if (stats.total.percentageUsed > 70) return <TrendingUp className="h-5 w-5 text-amber-500" />;
     return <CheckCircle2 className="h-5 w-5 text-green-500" />;
   };
 
   const getStatusMessage = () => {
     if (!stats.hasBudget) return "Budget não configurado";
-    if (stats.percentageUsed > 100) return "Orçamento excedido!";
-    if (stats.percentageUsed > 90) return "Atenção: próximo do limite";
-    if (stats.percentageUsed > 70) return "Consumo moderado";
+    if (stats.total.percentageUsed > 100) return "Orçamento excedido!";
+    if (stats.total.percentageUsed > 90) return "Atenção: próximo do limite";
+    if (stats.total.percentageUsed > 70) return "Consumo moderado";
     return "Dentro do orçamento";
   };
 
@@ -113,6 +143,48 @@ export function FinancialHealthCard({
     : "Todas as lojas";
 
   if (isLoading) return null;
+
+  const CategoryProgressBar = ({ 
+    label, 
+    icon: Icon, 
+    iconColor, 
+    stats: catStats 
+  }: { 
+    label: string; 
+    icon: React.ElementType; 
+    iconColor: string; 
+    stats: CategoryStats;
+  }) => (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Icon className={cn("h-3.5 w-3.5", iconColor)} />
+          {label}
+        </span>
+        <span className="font-medium">
+          {catStats.hasBudget ? `${catStats.percentageUsed.toFixed(1)}%` : "N/A"}
+        </span>
+      </div>
+      {catStats.hasBudget ? (
+        <div className="relative">
+          <Progress value={0} className="h-2" />
+          <div 
+            className={cn(
+              "absolute inset-0 h-2 rounded-full transition-all",
+              getProgressColor(catStats.percentageUsed)
+            )}
+            style={{ width: `${Math.min(catStats.percentageUsed, 100)}%` }}
+          />
+        </div>
+      ) : (
+        <div className="h-2 bg-muted rounded-full" />
+      )}
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{formatCurrency(catStats.spent)}</span>
+        <span>{catStats.hasBudget ? formatCurrency(catStats.budget) : "Sem budget"}</span>
+      </div>
+    </div>
+  );
 
   return (
     <Card className="border-l-4 border-l-primary">
@@ -128,8 +200,8 @@ export function FinancialHealthCard({
           <span>{selectedStoreName} • {format(now, "MMMM yyyy", { locale: ptBR })}</span>
           <span className={cn(
             "text-xs font-medium",
-            stats.percentageUsed > 90 ? "text-destructive" :
-            stats.percentageUsed > 70 ? "text-amber-500" : "text-green-500"
+            stats.total.percentageUsed > 90 ? "text-destructive" :
+            stats.total.percentageUsed > 70 ? "text-amber-500" : "text-green-500"
           )}>
             {getStatusMessage()}
           </span>
@@ -137,70 +209,58 @@ export function FinancialHealthCard({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Main Progress */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Consumo do mês</span>
-            <span className="font-semibold">
-              {stats.hasBudget ? `${stats.percentageUsed.toFixed(1)}%` : "N/A"}
-            </span>
+        {/* Category Progress Bars */}
+        <div className="space-y-3">
+          <CategoryProgressBar 
+            label="Freelancers" 
+            icon={Users} 
+            iconColor="text-blue-500" 
+            stats={stats.freelancer} 
+          />
+          <CategoryProgressBar 
+            label="Manutenção" 
+            icon={Wrench} 
+            iconColor="text-amber-500" 
+            stats={stats.maintenance} 
+          />
+          <div className="pt-2 border-t">
+            <CategoryProgressBar 
+              label="Total Geral" 
+              icon={DollarSign} 
+              iconColor="text-primary" 
+              stats={stats.total} 
+            />
           </div>
-          {stats.hasBudget ? (
-            <div className="relative">
-              <Progress 
-                value={Math.min(stats.percentageUsed, 100)} 
-                className="h-3"
-              />
-              <div 
-                className={cn(
-                  "absolute inset-0 h-3 rounded-full",
-                  getProgressColor(stats.percentageUsed)
-                )}
-                style={{ width: `${Math.min(stats.percentageUsed, 100)}%` }}
-              />
-            </div>
-          ) : (
-            <div className="h-3 bg-muted rounded-full flex items-center justify-center">
-              <span className="text-[10px] text-muted-foreground">Sem budget</span>
-            </div>
-          )}
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Gasto Acumulado */}
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Gasto Acumulado</p>
-            <p className="text-lg font-bold text-foreground">
-              {formatCurrency(stats.totalSpent)}
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          {/* Saldo Freelancers */}
+          <div className="space-y-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Users className="h-3 w-3 text-blue-500" />
+              Saldo Freelancers
             </p>
-            <p className="text-xs text-muted-foreground">
-              Freelancer: {formatCurrency(stats.freelancerTotal)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Manutenção: {formatCurrency(stats.maintenanceTotal)}
+            <p className={cn(
+              "text-lg font-bold",
+              stats.freelancer.remaining >= 0 ? "text-blue-600" : "text-destructive"
+            )}>
+              {stats.freelancer.hasBudget ? formatCurrency(stats.freelancer.remaining) : "N/A"}
             </p>
           </div>
 
-          {/* Budget Definido */}
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Budget Definido</p>
-            <p className="text-lg font-bold text-primary">
-              {stats.hasBudget ? formatCurrency(stats.budgetAmount) : "Não definido"}
+          {/* Saldo Manutenção */}
+          <div className="space-y-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <Wrench className="h-3 w-3 text-amber-500" />
+              Saldo Manutenção
             </p>
-            {stats.hasBudget && (
-              <>
-                <p className={cn(
-                  "text-xs font-medium",
-                  stats.remainingBudget >= 0 ? "text-green-600" : "text-destructive"
-                )}>
-                  Saldo: {formatCurrency(stats.remainingBudget)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {daysRemaining} dias restantes
-                </p>
-              </>
-            )}
+            <p className={cn(
+              "text-lg font-bold",
+              stats.maintenance.remaining >= 0 ? "text-amber-600" : "text-destructive"
+            )}>
+              {stats.maintenance.hasBudget ? formatCurrency(stats.maintenance.remaining) : "N/A"}
+            </p>
           </div>
         </div>
 
@@ -223,8 +283,8 @@ export function FinancialHealthCard({
               <div className={cn(
                 "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
                 stats.performanceVsBudget >= 0 
-                  ? "bg-green-100 text-green-700" 
-                  : "bg-red-100 text-red-700"
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
               )}>
                 {stats.performanceVsBudget >= 0 ? (
                   <>
@@ -245,6 +305,9 @@ export function FinancialHealthCard({
                 Projeção ultrapassa o budget em {formatCurrency(stats.projectedOverBudget)}
               </p>
             )}
+            <p className="text-xs text-muted-foreground">
+              {daysRemaining} dias restantes no mês
+            </p>
           </div>
         )}
       </CardContent>

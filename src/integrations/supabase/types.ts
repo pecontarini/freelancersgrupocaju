@@ -244,6 +244,41 @@ export type Database = {
           },
         ]
       }
+      store_budgets: {
+        Row: {
+          budget_amount: number
+          created_at: string
+          id: string
+          month_year: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          budget_amount?: number
+          created_at?: string
+          id?: string
+          month_year: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          budget_amount?: number
+          created_at?: string
+          id?: string
+          month_year?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_budgets_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

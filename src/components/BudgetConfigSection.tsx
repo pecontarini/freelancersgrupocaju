@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, Calendar, Loader2, Store, Plus, Trash2 } from "lucide-react";
+import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,7 +41,8 @@ export function BudgetConfigSection() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(getCurrentMonthYear());
-  const [budgetAmount, setBudgetAmount] = useState<string>("");
+  const [freelancerBudget, setFreelancerBudget] = useState<string>("");
+  const [maintenanceBudget, setMaintenanceBudget] = useState<string>("");
 
   // Generate month options for the last 12 months and next 6 months
   const getMonthOptions = () => {
@@ -69,21 +70,30 @@ export function BudgetConfigSection() {
     return options;
   };
 
-  const handleSubmit = async () => {
-    if (!selectedStoreId || !selectedMonthYear || !budgetAmount) return;
+  const parseAmount = (value: string): number => {
+    const amount = parseFloat(value.replace(/[^\d,.-]/g, "").replace(",", "."));
+    return isNaN(amount) || amount < 0 ? 0 : amount;
+  };
 
-    const amount = parseFloat(budgetAmount.replace(/[^\d,.-]/g, "").replace(",", "."));
-    if (isNaN(amount) || amount < 0) return;
+  const handleSubmit = async () => {
+    if (!selectedStoreId || !selectedMonthYear) return;
+
+    const freelancerAmount = parseAmount(freelancerBudget);
+    const maintenanceAmount = parseAmount(maintenanceBudget);
+
+    if (freelancerAmount === 0 && maintenanceAmount === 0) return;
 
     await upsertBudget({
       store_id: selectedStoreId,
       month_year: selectedMonthYear,
-      budget_amount: amount,
+      freelancer_budget: freelancerAmount,
+      maintenance_budget: maintenanceAmount,
     });
 
     setIsDialogOpen(false);
     setSelectedStoreId("");
-    setBudgetAmount("");
+    setFreelancerBudget("");
+    setMaintenanceBudget("");
   };
 
   const handleDelete = async (budgetId: string) => {
@@ -135,7 +145,7 @@ export function BudgetConfigSection() {
               <DialogHeader>
                 <DialogTitle>Definir Orçamento Mensal</DialogTitle>
                 <DialogDescription>
-                  Configure o limite de gastos para uma loja em um mês específico.
+                  Configure os limites de gastos separados para freelancers e manutenção.
                 </DialogDescription>
               </DialogHeader>
 
@@ -178,15 +188,40 @@ export function BudgetConfigSection() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Valor do Budget (R$)</Label>
-                  <Input
-                    id="amount"
-                    type="text"
-                    placeholder="Ex: 50000"
-                    value={budgetAmount}
-                    onChange={(e) => setBudgetAmount(e.target.value)}
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="freelancer-amount" className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-blue-500" />
+                      Budget Freelancers
+                    </Label>
+                    <Input
+                      id="freelancer-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={freelancerBudget}
+                      onChange={(e) => setFreelancerBudget(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maintenance-amount" className="flex items-center gap-1.5">
+                      <Wrench className="h-3.5 w-3.5 text-amber-500" />
+                      Budget Manutenção
+                    </Label>
+                    <Input
+                      id="maintenance-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={maintenanceBudget}
+                      onChange={(e) => setMaintenanceBudget(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground">Budget Total</p>
+                  <p className="text-lg font-bold text-primary">
+                    {formatCurrency(parseAmount(freelancerBudget) + parseAmount(maintenanceBudget))}
+                  </p>
                 </div>
               </div>
 
@@ -196,7 +231,7 @@ export function BudgetConfigSection() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={!selectedStoreId || !selectedMonthYear || !budgetAmount || isUpdating}
+                  disabled={!selectedStoreId || !selectedMonthYear || (parseAmount(freelancerBudget) === 0 && parseAmount(maintenanceBudget) === 0) || isUpdating}
                 >
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar
@@ -206,7 +241,7 @@ export function BudgetConfigSection() {
           </Dialog>
         </div>
         <CardDescription>
-          Defina o orçamento mensal para cada loja. Os valores serão usados para controle de gastos com freelancers e manutenção.
+          Defina orçamentos separados para freelancers e manutenção de cada loja.
         </CardDescription>
       </CardHeader>
 
@@ -224,7 +259,19 @@ export function BudgetConfigSection() {
                 <TableRow>
                   <TableHead>Loja</TableHead>
                   <TableHead>Mês</TableHead>
-                  <TableHead className="text-right">Orçamento</TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Users className="h-3.5 w-3.5 text-blue-500" />
+                      Freelancers
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Wrench className="h-3.5 w-3.5 text-amber-500" />
+                      Manutenção
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -240,8 +287,14 @@ export function BudgetConfigSection() {
                     <TableCell className="capitalize">
                       {formatMonthYear(budget.month_year)}
                     </TableCell>
+                    <TableCell className="text-right text-blue-600">
+                      {formatCurrency(budget.freelancer_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-amber-600">
+                      {formatCurrency(budget.maintenance_budget)}
+                    </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
-                      {formatCurrency(budget.budget_amount)}
+                      {formatCurrency(budget.total_budget)}
                     </TableCell>
                     <TableCell>
                       <Button

@@ -21,6 +21,7 @@ import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, BarChart3, PieChar
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { getBudgetForStoreMonth, getCurrentMonthYear } = useStoreBudgets();
+  const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
   const scrollPrev = useCallback(() => {
     if (emblaApi) emblaApi.scrollPrev();
@@ -69,10 +71,20 @@ export const FinancialCharts = ({ entries, selectedUnidadeId }: FinancialChartsP
     onSelect();
   }, [emblaApi, onSelect]);
 
+  // Determine effective store ID: use selected or fallback to first assigned store for gerentes
+  const effectiveStoreId = useMemo(() => {
+    if (selectedUnidadeId) return selectedUnidadeId;
+    // For gerentes without explicit selection, use their first assigned store
+    if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      return unidades[0].id;
+    }
+    return null;
+  }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
+
   // Get current budget for store
   const currentMonthYear = getCurrentMonthYear();
-  const currentBudget = selectedUnidadeId 
-    ? getBudgetForStoreMonth(selectedUnidadeId, currentMonthYear)
+  const currentBudget = effectiveStoreId 
+    ? getBudgetForStoreMonth(effectiveStoreId, currentMonthYear)
     : null;
   const budgetAmount = currentBudget?.total_budget || 0;
   const freelancerBudgetAmount = currentBudget?.freelancer_budget || 0;

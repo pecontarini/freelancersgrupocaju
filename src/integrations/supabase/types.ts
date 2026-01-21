@@ -209,6 +209,47 @@ export type Database = {
           },
         ]
       }
+      operational_expenses: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          data_despesa: string
+          descricao: string | null
+          id: string
+          store_id: string
+          valor: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          data_despesa?: string
+          descricao?: string | null
+          id?: string
+          store_id: string
+          valor: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          data_despesa?: string
+          descricao?: string | null
+          id?: string
+          store_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_expenses_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -246,6 +287,7 @@ export type Database = {
       }
       store_budgets: {
         Row: {
+          cleaning_budget: number
           created_at: string
           freelancer_budget: number
           id: string
@@ -253,9 +295,11 @@ export type Database = {
           month_year: string
           store_id: string
           total_budget: number | null
+          uniforms_budget: number
           updated_at: string
         }
         Insert: {
+          cleaning_budget?: number
           created_at?: string
           freelancer_budget?: number
           id?: string
@@ -263,9 +307,11 @@ export type Database = {
           month_year: string
           store_id: string
           total_budget?: number | null
+          uniforms_budget?: number
           updated_at?: string
         }
         Update: {
+          cleaning_budget?: number
           created_at?: string
           freelancer_budget?: number
           id?: string
@@ -273,6 +319,7 @@ export type Database = {
           month_year?: string
           store_id?: string
           total_budget?: number | null
+          uniforms_budget?: number
           updated_at?: string
         }
         Relationships: [

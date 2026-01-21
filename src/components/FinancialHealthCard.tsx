@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency, parseDateString } from "@/lib/formatters";
@@ -32,6 +33,7 @@ export function FinancialHealthCard({
   selectedUnidadeId,
 }: FinancialHealthCardProps) {
   const { getBudgetForStoreMonth, getCurrentMonthYear, isLoading } = useStoreBudgets();
+  const { getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
   const { options: lojas } = useConfigLojas();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
@@ -71,7 +73,13 @@ export function FinancialHealthCard({
 
     const freelancerTotal = currentMonthFreelancerEntries.reduce((sum, e) => sum + e.valor, 0);
     const maintenanceTotal = currentMonthMaintenanceEntries.reduce((sum, e) => sum + e.valor, 0);
-    const totalSpent = freelancerTotal + maintenanceTotal;
+
+    // Get operational expenses for the store
+    const operationalTotals = effectiveStoreId 
+      ? getTotalsForStoreMonth(effectiveStoreId, currentMonthYear)
+      : { uniformes: 0, limpeza: 0, total: 0 };
+
+    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza;
 
     // Get budget for effective store
     const budget = effectiveStoreId 
@@ -80,6 +88,8 @@ export function FinancialHealthCard({
     
     const freelancerBudget = budget?.freelancer_budget || 0;
     const maintenanceBudget = budget?.maintenance_budget || 0;
+    const uniformsBudget = budget?.uniforms_budget || 0;
+    const cleaningBudget = budget?.cleaning_budget || 0;
     const totalBudget = budget?.total_budget || 0;
     
     // Category stats
@@ -97,6 +107,22 @@ export function FinancialHealthCard({
       percentageUsed: maintenanceBudget > 0 ? (maintenanceTotal / maintenanceBudget) * 100 : 0,
       remaining: maintenanceBudget - maintenanceTotal,
       hasBudget: maintenanceBudget > 0,
+    };
+
+    const uniformsStats: CategoryStats = {
+      spent: operationalTotals.uniformes,
+      budget: uniformsBudget,
+      percentageUsed: uniformsBudget > 0 ? (operationalTotals.uniformes / uniformsBudget) * 100 : 0,
+      remaining: uniformsBudget - operationalTotals.uniformes,
+      hasBudget: uniformsBudget > 0,
+    };
+
+    const cleaningStats: CategoryStats = {
+      spent: operationalTotals.limpeza,
+      budget: cleaningBudget,
+      percentageUsed: cleaningBudget > 0 ? (operationalTotals.limpeza / cleaningBudget) * 100 : 0,
+      remaining: cleaningBudget - operationalTotals.limpeza,
+      hasBudget: cleaningBudget > 0,
     };
 
     const totalStats: CategoryStats = {
@@ -120,6 +146,8 @@ export function FinancialHealthCard({
     return {
       freelancer: freelancerStats,
       maintenance: maintenanceStats,
+      uniforms: uniformsStats,
+      cleaning: cleaningStats,
       total: totalStats,
       dailyAverage,
       projectedTotal,
@@ -127,7 +155,7 @@ export function FinancialHealthCard({
       performanceVsBudget,
       hasBudget: totalBudget > 0,
     };
-  }, [freelancerEntries, maintenanceEntries, effectiveStoreId, monthStart, monthEnd, getBudgetForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
+  }, [freelancerEntries, maintenanceEntries, effectiveStoreId, monthStart, monthEnd, getBudgetForStoreMonth, getTotalsForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
 
   const getProgressColor = (percentage: number) => {
     if (percentage > 90) return "bg-destructive";
@@ -154,7 +182,7 @@ export function FinancialHealthCard({
     ? lojas.find(l => l.id === effectiveStoreId)?.nome || "Loja selecionada"
     : "Todas as lojas";
 
-  if (isLoading) return null;
+  if (isLoading || isLoadingExpenses) return null;
 
   const CategoryProgressBar = ({ 
     label, 
@@ -235,6 +263,18 @@ export function FinancialHealthCard({
             iconColor="text-amber-500" 
             stats={stats.maintenance} 
           />
+          <CategoryProgressBar 
+            label="Uniformes" 
+            icon={Shirt} 
+            iconColor="text-purple-500" 
+            stats={stats.uniforms} 
+          />
+          <CategoryProgressBar 
+            label="Limpeza" 
+            icon={SprayCanIcon} 
+            iconColor="text-cyan-500" 
+            stats={stats.cleaning} 
+          />
           <div className="pt-2 border-t">
             <CategoryProgressBar 
               label="Total Geral" 
@@ -246,15 +286,15 @@ export function FinancialHealthCard({
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4 pt-2">
+        <div className="grid grid-cols-2 gap-2">
           {/* Saldo Freelancers */}
-          <div className="space-y-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <div className="space-y-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Users className="h-3 w-3 text-blue-500" />
               Saldo Freelancers
             </p>
             <p className={cn(
-              "text-lg font-bold",
+              "text-sm font-bold",
               stats.freelancer.remaining >= 0 ? "text-blue-600" : "text-destructive"
             )}>
               {stats.freelancer.hasBudget ? formatCurrency(stats.freelancer.remaining) : "N/A"}
@@ -262,16 +302,44 @@ export function FinancialHealthCard({
           </div>
 
           {/* Saldo Manutenção */}
-          <div className="space-y-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-3">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <div className="space-y-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Wrench className="h-3 w-3 text-amber-500" />
               Saldo Manutenção
             </p>
             <p className={cn(
-              "text-lg font-bold",
+              "text-sm font-bold",
               stats.maintenance.remaining >= 0 ? "text-amber-600" : "text-destructive"
             )}>
               {stats.maintenance.hasBudget ? formatCurrency(stats.maintenance.remaining) : "N/A"}
+            </p>
+          </div>
+
+          {/* Saldo Uniformes */}
+          <div className="space-y-1 rounded-lg bg-purple-50 dark:bg-purple-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Shirt className="h-3 w-3 text-purple-500" />
+              Saldo Uniformes
+            </p>
+            <p className={cn(
+              "text-sm font-bold",
+              stats.uniforms.remaining >= 0 ? "text-purple-600" : "text-destructive"
+            )}>
+              {stats.uniforms.hasBudget ? formatCurrency(stats.uniforms.remaining) : "N/A"}
+            </p>
+          </div>
+
+          {/* Saldo Limpeza */}
+          <div className="space-y-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <SprayCanIcon className="h-3 w-3 text-cyan-500" />
+              Saldo Limpeza
+            </p>
+            <p className={cn(
+              "text-sm font-bold",
+              stats.cleaning.remaining >= 0 ? "text-cyan-600" : "text-destructive"
+            )}>
+              {stats.cleaning.hasBudget ? formatCurrency(stats.cleaning.remaining) : "N/A"}
             </p>
           </div>
         </div>

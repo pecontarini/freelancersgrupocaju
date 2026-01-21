@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench } from "lucide-react";
+import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,8 @@ export function BudgetConfigSection() {
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(getCurrentMonthYear());
   const [freelancerBudget, setFreelancerBudget] = useState<string>("");
   const [maintenanceBudget, setMaintenanceBudget] = useState<string>("");
+  const [uniformsBudget, setUniformsBudget] = useState<string>("");
+  const [cleaningBudget, setCleaningBudget] = useState<string>("");
 
   // Generate month options for the last 12 months and next 6 months
   const getMonthOptions = () => {
@@ -75,25 +77,39 @@ export function BudgetConfigSection() {
     return isNaN(amount) || amount < 0 ? 0 : amount;
   };
 
+  const calculateTotal = () => {
+    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget);
+  };
+
   const handleSubmit = async () => {
     if (!selectedStoreId || !selectedMonthYear) return;
 
     const freelancerAmount = parseAmount(freelancerBudget);
     const maintenanceAmount = parseAmount(maintenanceBudget);
+    const uniformsAmount = parseAmount(uniformsBudget);
+    const cleaningAmount = parseAmount(cleaningBudget);
 
-    if (freelancerAmount === 0 && maintenanceAmount === 0) return;
+    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0) return;
 
     await upsertBudget({
       store_id: selectedStoreId,
       month_year: selectedMonthYear,
       freelancer_budget: freelancerAmount,
       maintenance_budget: maintenanceAmount,
+      uniforms_budget: uniformsAmount,
+      cleaning_budget: cleaningAmount,
     });
 
     setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
     setSelectedStoreId("");
     setFreelancerBudget("");
     setMaintenanceBudget("");
+    setUniformsBudget("");
+    setCleaningBudget("");
   };
 
   const handleDelete = async (budgetId: string) => {
@@ -141,58 +157,60 @@ export function BudgetConfigSection() {
                 <span className="hidden sm:inline">Definir Budget</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Definir Orçamento Mensal</DialogTitle>
                 <DialogDescription>
-                  Configure os limites de gastos separados para freelancers e manutenção.
+                  Configure os limites de gastos para cada categoria operacional.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="store">Loja/Unidade</Label>
-                  <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-                    <SelectTrigger id="store">
-                      <SelectValue placeholder="Selecione a loja" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {lojas.map((loja) => (
-                        <SelectItem key={loja.id} value={loja.id}>
-                          <div className="flex items-center gap-2">
-                            <Store className="h-4 w-4" />
-                            {loja.nome}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="store">Loja/Unidade</Label>
+                    <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+                      <SelectTrigger id="store">
+                        <SelectValue placeholder="Selecione a loja" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lojas.map((loja) => (
+                          <SelectItem key={loja.id} value={loja.id}>
+                            <div className="flex items-center gap-2">
+                              <Store className="h-4 w-4" />
+                              {loja.nome}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="month">Mês de Referência</Label>
-                  <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear}>
-                    <SelectTrigger id="month">
-                      <SelectValue placeholder="Selecione o mês" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {getMonthOptions().map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            <span className="capitalize">{option.label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Label htmlFor="month">Mês de Referência</Label>
+                    <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear}>
+                      <SelectTrigger id="month">
+                        <SelectValue placeholder="Selecione o mês" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {getMonthOptions().map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              <span className="capitalize">{option.label}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="freelancer-amount" className="flex items-center gap-1.5">
                       <Users className="h-3.5 w-3.5 text-blue-500" />
-                      Budget Freelancers
+                      Freelancers
                     </Label>
                     <Input
                       id="freelancer-amount"
@@ -205,7 +223,7 @@ export function BudgetConfigSection() {
                   <div className="space-y-2">
                     <Label htmlFor="maintenance-amount" className="flex items-center gap-1.5">
                       <Wrench className="h-3.5 w-3.5 text-amber-500" />
-                      Budget Manutenção
+                      Manutenção
                     </Label>
                     <Input
                       id="maintenance-amount"
@@ -217,10 +235,39 @@ export function BudgetConfigSection() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="uniforms-amount" className="flex items-center gap-1.5">
+                      <Shirt className="h-3.5 w-3.5 text-purple-500" />
+                      Uniformes
+                    </Label>
+                    <Input
+                      id="uniforms-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={uniformsBudget}
+                      onChange={(e) => setUniformsBudget(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cleaning-amount" className="flex items-center gap-1.5">
+                      <SprayCanIcon className="h-3.5 w-3.5 text-cyan-500" />
+                      Limpeza
+                    </Label>
+                    <Input
+                      id="cleaning-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={cleaningBudget}
+                      onChange={(e) => setCleaningBudget(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="rounded-lg bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground">Budget Total</p>
                   <p className="text-lg font-bold text-primary">
-                    {formatCurrency(parseAmount(freelancerBudget) + parseAmount(maintenanceBudget))}
+                    {formatCurrency(calculateTotal())}
                   </p>
                 </div>
               </div>
@@ -231,7 +278,7 @@ export function BudgetConfigSection() {
                 </Button>
                 <Button
                   onClick={handleSubmit}
-                  disabled={!selectedStoreId || !selectedMonthYear || (parseAmount(freelancerBudget) === 0 && parseAmount(maintenanceBudget) === 0) || isUpdating}
+                  disabled={!selectedStoreId || !selectedMonthYear || calculateTotal() === 0 || isUpdating}
                 >
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar
@@ -241,7 +288,7 @@ export function BudgetConfigSection() {
           </Dialog>
         </div>
         <CardDescription>
-          Defina orçamentos separados para freelancers e manutenção de cada loja.
+          Defina orçamentos para Freelancers, Manutenção, Uniformes e Limpeza.
         </CardDescription>
       </CardHeader>
 
@@ -262,13 +309,25 @@ export function BudgetConfigSection() {
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
                       <Users className="h-3.5 w-3.5 text-blue-500" />
-                      Freelancers
+                      Free.
                     </span>
                   </TableHead>
                   <TableHead className="text-right">
                     <span className="flex items-center justify-end gap-1">
                       <Wrench className="h-3.5 w-3.5 text-amber-500" />
-                      Manutenção
+                      Manut.
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Shirt className="h-3.5 w-3.5 text-purple-500" />
+                      Unif.
+                    </span>
+                  </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <SprayCanIcon className="h-3.5 w-3.5 text-cyan-500" />
+                      Limp.
                     </span>
                   </TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -292,6 +351,12 @@ export function BudgetConfigSection() {
                     </TableCell>
                     <TableCell className="text-right text-amber-600">
                       {formatCurrency(budget.maintenance_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-purple-600">
+                      {formatCurrency(budget.uniforms_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-cyan-600">
+                      {formatCurrency(budget.cleaning_budget)}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
                       {formatCurrency(budget.total_budget)}

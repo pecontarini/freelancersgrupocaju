@@ -18,6 +18,7 @@ import { NetworkSummary } from "@/components/NetworkSummary";
 import { UserManagement } from "@/components/UserManagement";
 import { MaintenanceTab } from "@/components/MaintenanceTab";
 import { FinancialHealthCard } from "@/components/FinancialHealthCard";
+import { OperationalExpenseForm } from "@/components/OperationalExpenseForm";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
@@ -230,6 +231,11 @@ const Index = () => {
 
           {/* Gestão Tab */}
           <TabsContent value="gestao" className="space-y-6">
+            {/* Quick Actions Bar */}
+            <div className="flex flex-wrap items-center gap-2">
+              <OperationalExpenseForm storeId={selectedUnidadeId} />
+            </div>
+
             {/* Financial Health Card */}
             <FinancialHealthCard
               freelancerEntries={filteredEntries}

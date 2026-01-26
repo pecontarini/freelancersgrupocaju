@@ -19,6 +19,8 @@ import { LOGO_BASE64 } from "@/lib/logoBase64";
 interface ExportReportButtonProps {
   entries: FreelancerEntry[];
   variant?: "dropdown" | "button";
+  customTitle?: string;
+  dateRange?: { start: string | null; end: string | null };
 }
 
 // Colors for PDF styling - Using Grupo Caju brand colors (Coral/Terracotta: HSL 14, 70%, 48%)
@@ -49,7 +51,12 @@ const getPopDateString = (entries: FreelancerEntry[]): string => {
   return sortedDates[0]?.[0] || new Date().toISOString().split("T")[0];
 };
 
-export function ExportReportButton({ entries, variant = "dropdown" }: ExportReportButtonProps) {
+export function ExportReportButton({ 
+  entries, 
+  variant = "dropdown",
+  customTitle,
+  dateRange,
+}: ExportReportButtonProps) {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   const handleExportExcel = () => {
@@ -95,18 +102,25 @@ export function ExportReportButton({ entries, variant = "dropdown" }: ExportRepo
       const totalGeral = entries.reduce((sum, e) => sum + e.valor, 0);
       const totalColaboradores = new Set(entries.map((e) => e.cpf)).size;
 
-      // Get unique store/unidade - use most common if multiple
+      // Get unique store/unidade - use most common if multiple OR use customTitle
       const lojaCounts: Record<string, number> = {};
       entries.forEach((entry) => {
         lojaCounts[entry.loja] = (lojaCounts[entry.loja] || 0) + 1;
       });
       const sortedLojas = Object.entries(lojaCounts).sort((a, b) => b[1] - a[1]);
-      const unidadeName = sortedLojas[0]?.[0] || "TODAS";
+      const unidadeName = customTitle || sortedLojas[0]?.[0] || "TODAS";
 
-      // Get POP date for filename - parse string safely
-      const popDateStr = getPopDateString(entries);
-      const [year, month, day] = popDateStr.split("-");
-      const formattedDateForFilename = `${day}-${month}-${year}`;
+      // Get date range for filename
+      let formattedDateForFilename: string;
+      if (dateRange?.start && dateRange?.end) {
+        const [sYear, sMonth, sDay] = dateRange.start.split("-");
+        const [eYear, eMonth, eDay] = dateRange.end.split("-");
+        formattedDateForFilename = `${sDay}-${sMonth}-${sYear}_A_${eDay}-${eMonth}-${eYear}`;
+      } else {
+        const popDateStr = getPopDateString(entries);
+        const [year, month, day] = popDateStr.split("-");
+        formattedDateForFilename = `${day}-${month}-${year}`;
+      }
 
       // Helper function to add clean background
       const addBackground = () => {
@@ -142,7 +156,10 @@ export function ExportReportButton({ entries, variant = "dropdown" }: ExportRepo
 
         // Date and page info
         doc.setFontSize(9);
-        doc.text(`Data do POP: ${formatDate(popDateStr)}`, margin + 35, 33);
+        const dateDisplayText = dateRange?.start && dateRange?.end
+          ? `Período: ${formatDate(dateRange.start)} a ${formatDate(dateRange.end)}`
+          : `Data do POP: ${formatDate(getPopDateString(entries))}`;
+        doc.text(dateDisplayText, margin + 35, 33);
         doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, 33, { align: "right" });
 
         // Divider line

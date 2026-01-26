@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DollarSign, Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { LOGO_BASE64 } from "@/lib/logoBase64";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -59,16 +60,20 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md rounded-2xl shadow-card">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-              <DollarSign className="h-7 w-7" />
+            <div className="h-20 w-20 overflow-hidden rounded-2xl shadow-lg">
+              <img
+                src={LOGO_BASE64}
+                alt="Grupo Caju"
+                className="h-full w-full object-cover"
+              />
             </div>
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">FreelancerPay</CardTitle>
-            <CardDescription>Sistema de Gestão de Pagamentos</CardDescription>
+            <CardTitle className="font-display text-2xl font-bold uppercase">Grupo Caju</CardTitle>
+            <CardDescription>Portal da Liderança</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

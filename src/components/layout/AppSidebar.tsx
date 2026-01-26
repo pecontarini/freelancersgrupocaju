@@ -91,24 +91,25 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border pb-4">
-        <div className="flex items-center gap-3 px-2">
-          <div className="h-10 w-28 flex-shrink-0 overflow-hidden rounded-xl">
-            <img
-              src={grupoCajuLogo}
-              alt="Grupo Caju"
-              className="h-full w-full object-cover"
-            />
-          </div>
-          {!isCollapsed && (
-            <div className="flex flex-col">
-              <span className="font-display text-lg font-bold text-foreground">
-                GRUPO CAJU
-              </span>
+      <SidebarHeader className="border-b border-sidebar-border p-4">
+        <div className="flex flex-col items-center justify-center gap-2">
+          {isCollapsed ? (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <span className="font-display text-sm font-bold">C</span>
+            </div>
+          ) : (
+            <>
+              <div className="w-full overflow-hidden rounded-xl">
+                <img
+                  src={grupoCajuLogo}
+                  alt="Grupo Caju"
+                  className="h-auto w-full object-contain"
+                />
+              </div>
               <span className="text-xs text-muted-foreground">
                 Portal da Liderança
               </span>
-            </div>
+            </>
           )}
         </div>
       </SidebarHeader>

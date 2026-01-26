@@ -3,6 +3,7 @@ import { Search, X, Calendar, Filter } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { DateRange } from "react-day-picker";
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,17 +84,31 @@ export function FreelancerFilters({
     });
   };
 
+  // Handle date range selection
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    onFiltersChange({
+      ...filters,
+      dateStart: range?.from || null,
+      dateEnd: range?.to || null,
+    });
+  };
+
+  const dateRange: DateRange | undefined = 
+    filters.dateStart || filters.dateEnd
+      ? { from: filters.dateStart || undefined, to: filters.dateEnd || undefined }
+      : undefined;
+
   const formatDateRange = () => {
     if (filters.dateStart && filters.dateEnd) {
-      return `${format(filters.dateStart, "dd/MM")} - ${format(filters.dateEnd, "dd/MM")}`;
+      return `${format(filters.dateStart, "dd/MM/yy")} - ${format(filters.dateEnd, "dd/MM/yy")}`;
     }
     if (filters.dateStart) {
-      return `A partir de ${format(filters.dateStart, "dd/MM")}`;
+      return `${format(filters.dateStart, "dd/MM/yy")} - ...`;
     }
     if (filters.dateEnd) {
-      return `Até ${format(filters.dateEnd, "dd/MM")}`;
+      return `... - ${format(filters.dateEnd, "dd/MM/yy")}`;
     }
-    return "Período";
+    return "Selecionar Período";
   };
 
   // Get selected store name
@@ -155,14 +170,14 @@ export function FreelancerFilters({
           </SelectContent>
         </Select>
 
-        {/* Date Range Picker */}
+        {/* Date Range Picker - Single Calendar with Range Mode */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "w-[180px] justify-start text-left font-normal bg-background",
-                (filters.dateStart || filters.dateEnd) && "text-primary"
+                "w-[220px] justify-start text-left font-normal bg-background",
+                (filters.dateStart || filters.dateEnd) && "text-primary border-primary"
               )}
             >
               <Calendar className="mr-2 h-4 w-4" />
@@ -171,33 +186,20 @@ export function FreelancerFilters({
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0 bg-background z-50" align="start">
             <div className="p-3 space-y-3">
-              <div className="text-sm font-medium text-muted-foreground">
-                Data Inicial
+              <div className="text-sm font-medium text-center text-muted-foreground">
+                Selecione a Data Inicial e Final
               </div>
               <CalendarComponent
-                mode="single"
-                selected={filters.dateStart || undefined}
-                onSelect={(date) =>
-                  onFiltersChange({ ...filters, dateStart: date || null })
-                }
+                mode="range"
+                selected={dateRange}
+                onSelect={handleDateRangeSelect}
+                numberOfMonths={2}
                 locale={ptBR}
                 className="pointer-events-auto"
               />
-              <div className="text-sm font-medium text-muted-foreground">
-                Data Final
-              </div>
-              <CalendarComponent
-                mode="single"
-                selected={filters.dateEnd || undefined}
-                onSelect={(date) =>
-                  onFiltersChange({ ...filters, dateEnd: date || null })
-                }
-                locale={ptBR}
-                className="pointer-events-auto"
-              />
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className="flex justify-between gap-2 pt-2 border-t">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() =>
                     onFiltersChange({
@@ -220,7 +222,7 @@ export function FreelancerFilters({
                     })
                   }
                 >
-                  Limpar
+                  Limpar Datas
                 </Button>
               </div>
             </div>

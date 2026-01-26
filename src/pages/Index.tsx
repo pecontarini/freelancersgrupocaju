@@ -109,6 +109,20 @@ const Index = () => {
     });
   }, [operationalExpenses, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
 
+  // Filter maintenance entries based on selected unidade
+  const filteredMaintenanceEntries = useMemo(() => {
+    return maintenanceEntries.filter((entry) => {
+      if (selectedUnidadeId) {
+        return entry.loja_id === selectedUnidadeId;
+      }
+      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+        const unidadeIds = unidades.map((u) => u.id);
+        return unidadeIds.includes(entry.loja_id || "");
+      }
+      return true;
+    });
+  }, [maintenanceEntries, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
+
   if (
     isLoading ||
     isLoadingProfile ||
@@ -146,7 +160,8 @@ const Index = () => {
           <BudgetsGerenciaisTab
             freelancerEntries={filteredEntries}
             operationalExpenses={filteredOperationalExpenses}
-            selectedUnidadeId={selectedUnidadeId}
+            maintenanceEntries={filteredMaintenanceEntries}
+            selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
           />
         );
       case "remuneracao":
@@ -164,7 +179,8 @@ const Index = () => {
           <BudgetsGerenciaisTab
             freelancerEntries={filteredEntries}
             operationalExpenses={filteredOperationalExpenses}
-            selectedUnidadeId={selectedUnidadeId}
+            maintenanceEntries={filteredMaintenanceEntries}
+            selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
           />
         );
     }

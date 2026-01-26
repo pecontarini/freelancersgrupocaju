@@ -3,10 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+export type OperationalCategory = "uniformes" | "limpeza" | "apoio";
+
 export interface OperationalExpense {
   id: string;
   store_id: string;
-  category: "uniformes" | "limpeza";
+  category: OperationalCategory;
   valor: number;
   data_despesa: string;
   descricao: string | null;
@@ -43,7 +45,7 @@ export function useOperationalExpenses() {
       descricao,
     }: {
       store_id: string;
-      category: "uniformes" | "limpeza";
+      category: OperationalCategory;
       valor: number;
       data_despesa: string;
       descricao?: string;

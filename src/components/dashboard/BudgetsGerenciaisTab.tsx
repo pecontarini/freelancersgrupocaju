@@ -6,15 +6,20 @@ import {
   User,
   Calendar,
   DollarSign,
+  Wrench,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FreelancerForm } from "@/components/FreelancerForm";
-import { OperationalExpenseForm } from "@/components/OperationalExpenseForm";
+import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
 import { FreelancerEntry } from "@/types/freelancer";
+import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";
 import { formatCurrency } from "@/lib/formatters";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
@@ -22,49 +27,71 @@ import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
   operationalExpenses: OperationalExpense[];
+  maintenanceEntries: MaintenanceEntry[];
   selectedUnidadeId: string | null;
 }
 
 export function BudgetsGerenciaisTab({
   freelancerEntries,
   operationalExpenses,
+  maintenanceEntries,
   selectedUnidadeId,
 }: BudgetsGerenciaisTabProps) {
   const today = format(new Date(), "yyyy-MM-dd");
   const currentMonth = format(new Date(), "yyyy-MM");
 
   const { getBudgetForStoreMonth, getCurrentMonthYear } = useStoreBudgets();
-  
-  const budget = selectedUnidadeId 
-    ? getBudgetForStoreMonth(selectedUnidadeId, getCurrentMonthYear()) 
+
+  const budget = selectedUnidadeId
+    ? getBudgetForStoreMonth(selectedUnidadeId, getCurrentMonthYear())
     : undefined;
+
+  // Filter entries by selected store
+  const filteredFreelancers = useMemo(() => {
+    if (!selectedUnidadeId) return freelancerEntries;
+    return freelancerEntries.filter((e) => e.loja_id === selectedUnidadeId);
+  }, [freelancerEntries, selectedUnidadeId]);
+
+  const filteredMaintenance = useMemo(() => {
+    if (!selectedUnidadeId) return maintenanceEntries;
+    return maintenanceEntries.filter((e) => e.loja_id === selectedUnidadeId);
+  }, [maintenanceEntries, selectedUnidadeId]);
+
+  const filteredExpenses = useMemo(() => {
+    if (!selectedUnidadeId) return operationalExpenses;
+    return operationalExpenses.filter((e) => e.store_id === selectedUnidadeId);
+  }, [operationalExpenses, selectedUnidadeId]);
 
   // Filter today's entries
   const todayFreelancers = useMemo(() => {
-    return freelancerEntries.filter((entry) => entry.data_pop === today);
-  }, [freelancerEntries, today]);
+    return filteredFreelancers.filter((entry) => entry.data_pop === today);
+  }, [filteredFreelancers, today]);
 
   const todayExpenses = useMemo(() => {
-    return operationalExpenses.filter(
-      (expense) => expense.data_despesa === today
-    );
-  }, [operationalExpenses, today]);
+    return filteredExpenses.filter((expense) => expense.data_despesa === today);
+  }, [filteredExpenses, today]);
+
+  const todayMaintenance = useMemo(() => {
+    return filteredMaintenance.filter((entry) => entry.data_servico === today);
+  }, [filteredMaintenance, today]);
 
   // Calculate today's totals
-  const todayFreelancerTotal = todayFreelancers.reduce(
-    (sum, e) => sum + e.valor,
-    0
-  );
+  const todayFreelancerTotal = todayFreelancers.reduce((sum, e) => sum + e.valor, 0);
   const todayExpenseTotal = todayExpenses.reduce((sum, e) => sum + e.valor, 0);
-  const todayTotal = todayFreelancerTotal + todayExpenseTotal;
+  const todayMaintenanceTotal = todayMaintenance.reduce((sum, e) => sum + e.valor, 0);
+  const todayTotal = todayFreelancerTotal + todayExpenseTotal + todayMaintenanceTotal;
 
   // Calculate month totals
-  const monthFreelancerTotal = freelancerEntries
+  const monthFreelancerTotal = filteredFreelancers
     .filter((e) => e.data_pop.startsWith(currentMonth))
     .reduce((sum, e) => sum + e.valor, 0);
 
-  const monthExpenseTotal = operationalExpenses
+  const monthExpenseTotal = filteredExpenses
     .filter((e) => e.data_despesa.startsWith(currentMonth))
+    .reduce((sum, e) => sum + e.valor, 0);
+
+  const monthMaintenanceTotal = filteredMaintenance
+    .filter((e) => e.data_servico.startsWith(currentMonth))
     .reduce((sum, e) => sum + e.valor, 0);
 
   // Budget calculations
@@ -75,23 +102,20 @@ export function BudgetsGerenciaisTab({
       budget.cleaning_budget
     : 0;
 
+  const maintenanceBudget = budget?.maintenance_budget || 0;
+  const maintenancePercentage = maintenanceBudget
+    ? Math.min((monthMaintenanceTotal / maintenanceBudget) * 100, 100)
+    : 0;
+
   const daysInMonth = new Date(
     new Date().getFullYear(),
     new Date().getMonth() + 1,
     0
   ).getDate();
-  const currentDay = new Date().getDate();
   const avgDailyBudget = totalMonthlyBudget / daysInMonth;
 
   const dailyConsumptionPercentage = avgDailyBudget
     ? Math.min((todayTotal / avgDailyBudget) * 100, 100)
-    : 0;
-
-  const monthConsumptionPercentage = totalMonthlyBudget
-    ? Math.min(
-        ((monthFreelancerTotal + monthExpenseTotal) / totalMonthlyBudget) * 100,
-        100
-      )
     : 0;
 
   const getProgressColor = (percentage: number) => {
@@ -99,6 +123,13 @@ export function BudgetsGerenciaisTab({
     if (percentage < 90) return "bg-amber-500";
     return "bg-red-500";
   };
+
+  // Recent maintenance entries (last 10)
+  const recentMaintenance = useMemo(() => {
+    return filteredMaintenance
+      .filter((e) => e.data_servico.startsWith(currentMonth))
+      .slice(0, 10);
+  }, [filteredMaintenance, currentMonth]);
 
   return (
     <div className="space-y-6 fade-in">
@@ -120,12 +151,12 @@ export function BudgetsGerenciaisTab({
       </div>
 
       {/* Today's Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         {/* Freelancers Today */}
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              Freelancers Hoje
+              Freelancers
             </CardTitle>
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
@@ -134,7 +165,7 @@ export function BudgetsGerenciaisTab({
               {formatCurrency(todayFreelancerTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {todayFreelancers.length} profissional(is) escalado(s)
+              {todayFreelancers.length} escalado(s) hoje
             </p>
           </CardContent>
         </Card>
@@ -143,7 +174,7 @@ export function BudgetsGerenciaisTab({
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              Pequenas Despesas
+              Operacional
             </CardTitle>
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
@@ -152,7 +183,25 @@ export function BudgetsGerenciaisTab({
               {formatCurrency(todayExpenseTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {todayExpenses.length} lançamento(s) hoje
+              {todayExpenses.length} despesa(s) hoje
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Maintenance Today */}
+        <Card className="rounded-2xl shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+              Manutenção
+            </CardTitle>
+            <Wrench className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {formatCurrency(todayMaintenanceTotal)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {todayMaintenance.length} serviço(s) hoje
             </p>
           </CardContent>
         </Card>
@@ -215,10 +264,10 @@ export function BudgetsGerenciaisTab({
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
         <FreelancerForm />
-        <OperationalExpenseForm storeId={selectedUnidadeId} />
+        <UnifiedExpenseForm storeId={selectedUnidadeId} />
       </div>
 
-      {/* Today's Activity List */}
+      {/* Today's Freelancers List */}
       <Card className="rounded-2xl shadow-card">
         <CardHeader>
           <CardTitle className="text-base uppercase">
@@ -260,6 +309,108 @@ export function BudgetsGerenciaisTab({
               </p>
               <p className="text-sm text-muted-foreground">
                 Use o botão acima para lançar um novo gasto
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Maintenance Budget Status */}
+      <Card className="rounded-2xl shadow-card">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-base uppercase">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-orange-500" />
+              <span>Budget de Manutenção (Mês)</span>
+            </div>
+            <Badge
+              variant={
+                maintenancePercentage < 70
+                  ? "secondary"
+                  : maintenancePercentage < 90
+                  ? "outline"
+                  : "destructive"
+              }
+            >
+              {maintenancePercentage.toFixed(0)}%
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative h-4 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full transition-all duration-500 ${getProgressColor(
+                maintenancePercentage
+              )}`}
+              style={{ width: `${Math.min(maintenancePercentage, 100)}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Consumido: {formatCurrency(monthMaintenanceTotal)}</span>
+            <span>
+              Disponível: {formatCurrency(Math.max(maintenanceBudget - monthMaintenanceTotal, 0))}
+            </span>
+          </div>
+          {maintenanceBudget === 0 && (
+            <p className="text-xs text-amber-600">
+              ⚠️ Budget de manutenção não configurado para esta unidade/mês.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Maintenance History */}
+      <Card className="rounded-2xl shadow-card">
+        <CardHeader>
+          <CardTitle className="text-base uppercase">
+            Histórico de Manutenções (Mês Atual)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recentMaintenance.length > 0 ? (
+            <div className="space-y-3">
+              {recentMaintenance.map((entry) => {
+                const [year, month, day] = entry.data_servico.split("-");
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between rounded-xl bg-muted/50 p-4 transition-colors hover:bg-muted"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
+                        <Wrench className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{entry.fornecedor}</p>
+                        <p className="text-sm text-muted-foreground">
+                          NF: {entry.numero_nf} • {`${day}/${month}/${year}`}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-right">
+                      {entry.anexo_url && (
+                        <a
+                          href={entry.anexo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:text-primary/80"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      )}
+                      <p className="font-semibold text-orange-600">
+                        {formatCurrency(entry.valor)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Wrench className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">
+                Nenhuma manutenção registrada este mês
               </p>
             </div>
           )}

@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
 
 interface AppSidebarProps {
   activeTab: string;
@@ -93,9 +93,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border pb-4">
         <div className="flex items-center gap-3 px-2">
-          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-xl">
+          <div className="h-10 w-28 flex-shrink-0 overflow-hidden rounded-xl">
             <img
-              src={LOGO_BASE64}
+              src={grupoCajuLogo}
               alt="Grupo Caju"
               className="h-full w-full object-cover"
             />

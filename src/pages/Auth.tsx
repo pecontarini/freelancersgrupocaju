@@ -61,20 +61,17 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
       <Card className="w-full max-w-md rounded-2xl shadow-card">
-        <CardHeader className="text-center space-y-4">
+        <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
-            <div className="h-24 w-56 overflow-hidden rounded-2xl shadow-lg">
+            <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
               <img
                 src={grupoCajuLogo}
                 alt="Grupo Caju"
-                className="h-full w-full object-cover"
+                className="h-auto w-full object-contain"
               />
             </div>
           </div>
-          <div>
-            <CardTitle className="font-display text-2xl font-bold uppercase">Grupo Caju</CardTitle>
-            <CardDescription>Portal da Liderança</CardDescription>
-          </div>
+          <CardDescription className="text-base">Portal da Liderança</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

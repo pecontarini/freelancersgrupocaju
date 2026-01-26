@@ -10,6 +10,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { EntriesTable } from "@/components/EntriesTable";
 import { PaymentRequestGenerator } from "@/components/PaymentRequestGenerator";
 import { FinancialCharts } from "@/components/FinancialCharts";
+import { CostEvolutionChart } from "@/components/CostEvolutionChart";
 import { ImportSpreadsheetModal } from "@/components/ImportSpreadsheetModal";
 import { ExportReportButton } from "@/components/ExportReportButton";
 import { ConfigurationsTab } from "@/components/ConfigurationsTab";
@@ -22,6 +23,7 @@ import { OperationalExpenseForm } from "@/components/OperationalExpenseForm";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
+import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { FilterState } from "@/types/freelancer";
 import { parseDateString, formatCurrency } from "@/lib/formatters";
@@ -36,6 +38,7 @@ const Index = () => {
   } = useFreelancerEntries();
 
   const { entries: maintenanceEntries, isLoading: isLoadingMaintenance } = useMaintenanceEntries();
+  const { expenses: operationalExpenses, isLoading: isLoadingOperational } = useOperationalExpenses();
   const { isAdmin, isGerenteUnidade, unidades, isLoading: isLoadingProfile, hasNoRole } = useUserProfile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -118,7 +121,7 @@ const Index = () => {
   const totalValue = filteredEntries.reduce((sum, e) => sum + e.valor, 0);
   const uniqueFreelancers = new Set(filteredEntries.map((e) => e.cpf)).size;
 
-  if (isLoading || isLoadingProfile || isLoadingMaintenance) {
+  if (isLoading || isLoadingProfile || isLoadingMaintenance || isLoadingOperational) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -313,7 +316,15 @@ const Index = () => {
               uniqueFreelancers={uniqueFreelancers}
             />
 
-            {/* Charts */}
+            {/* Cost Evolution Chart - Multi-dimensional */}
+            <CostEvolutionChart
+              freelancerEntries={filteredEntries}
+              maintenanceEntries={maintenanceEntries}
+              operationalExpenses={operationalExpenses}
+              selectedUnidadeId={selectedUnidadeId}
+            />
+
+            {/* Other Charts */}
             <FinancialCharts entries={filteredEntries} selectedUnidadeId={selectedUnidadeId} />
           </TabsContent>
 

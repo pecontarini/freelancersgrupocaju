@@ -15,9 +15,11 @@ import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { FreelancerForm } from "@/components/FreelancerForm";
 import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
+import { ExportReportButton } from "@/components/ExportReportButton";
+import { FinancialHealthCard } from "@/components/FinancialHealthCard";
+import { CostEvolutionChart } from "@/components/CostEvolutionChart";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";
@@ -131,10 +133,15 @@ export function BudgetsGerenciaisTab({
       .slice(0, 10);
   }, [filteredMaintenance, currentMonth]);
 
+  // Filter freelancers for current month (for PDF)
+  const monthFreelancers = useMemo(() => {
+    return filteredFreelancers.filter((e) => e.data_pop.startsWith(currentMonth));
+  }, [filteredFreelancers, currentMonth]);
+
   return (
     <div className="space-y-6 fade-in">
-      {/* Date Header */}
-      <div className="flex items-center justify-between">
+      {/* Date Header with PDF Export */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
             <Calendar className="h-6 w-6 text-primary" />
@@ -148,6 +155,9 @@ export function BudgetsGerenciaisTab({
             </p>
           </div>
         </div>
+        
+        {/* PDF Export Button for Freelancers */}
+        <ExportReportButton entries={monthFreelancers} variant="dropdown" />
       </div>
 
       {/* Today's Summary Cards */}
@@ -267,12 +277,30 @@ export function BudgetsGerenciaisTab({
         <UnifiedExpenseForm storeId={selectedUnidadeId} />
       </div>
 
+      {/* Financial Health Card + Cost Evolution Chart */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <FinancialHealthCard
+          freelancerEntries={filteredFreelancers}
+          maintenanceEntries={filteredMaintenance}
+          selectedUnidadeId={selectedUnidadeId}
+        />
+        <CostEvolutionChart
+          freelancerEntries={filteredFreelancers}
+          maintenanceEntries={filteredMaintenance}
+          operationalExpenses={filteredExpenses}
+          selectedUnidadeId={selectedUnidadeId}
+        />
+      </div>
+
       {/* Today's Freelancers List */}
       <Card className="rounded-2xl shadow-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base uppercase">
             Freelancers Escalados Hoje
           </CardTitle>
+          {todayFreelancers.length > 0 && (
+            <ExportReportButton entries={todayFreelancers} variant="button" />
+          )}
         </CardHeader>
         <CardContent>
           {todayFreelancers.length > 0 ? (

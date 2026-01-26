@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -63,9 +63,9 @@ export default function Auth() {
       <Card className="w-full max-w-md rounded-2xl shadow-card">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="h-20 w-20 overflow-hidden rounded-2xl shadow-lg">
+            <div className="h-24 w-56 overflow-hidden rounded-2xl shadow-lg">
               <img
-                src={LOGO_BASE64}
+                src={grupoCajuLogo}
                 alt="Grupo Caju"
                 className="h-full w-full object-cover"
               />

@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   UtensilsCrossed,
   Bike,
+  Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,6 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -47,6 +54,9 @@ import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
 import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
 import { LeadershipRadar } from "@/components/dashboard/LeadershipRadar";
 import { WinsAlertsFeed } from "@/components/dashboard/WinsAlertsFeed";
+import { PerformanceEntryForm } from "@/components/dashboard/PerformanceEntryForm";
+import { PerformanceEntriesList } from "@/components/dashboard/PerformanceEntriesList";
+import { usePerformanceEntries } from "@/hooks/usePerformanceEntries";
 import {
   useNpsTargets,
   useBonusRules,
@@ -81,6 +91,10 @@ export function RemuneracaoVariavelTab({
   const { rules, getPercentage } = useBonusRules();
   const { configs, getConfig } = useBonusConfig();
   const { performances, getPerformancesByMonth } = useStorePerformance();
+  const { aggregatedByStore } = usePerformanceEntries();
+
+  // State for collapsible admin section
+  const [isEntryFormOpen, setIsEntryFormOpen] = useState(false);
 
   // Simulator state - Separate inputs for Salão and Delivery
   const [faturamentoSalao, setFaturamentoSalao] = useState([500000]);
@@ -268,31 +282,44 @@ export function RemuneracaoVariavelTab({
     );
   }, [lojas, brandFilter]);
 
-  // Get current month performances with store data for ranking
+  // Get current month performances with store data for ranking (use weekly entries)
   const rankingData = useMemo(() => {
     const monthPerformances = getPerformancesByMonth(currentMonthYear);
     
     return filteredStores
       .map((loja) => {
+        // Prioritize weekly accumulated entries, fall back to store_performance
+        const weeklyData = aggregatedByStore[loja.id];
         const perf = monthPerformances.find((p) => p.loja_id === loja.id);
-        const nps = perf?.nps_score || 0;
-        const supervisao = perf?.supervisao_score || 0;
-        const faturamento = perf?.faturamento || 0;
         
-        // Calculate average score
-        const avg = supervisao > 0 ? ((nps > 0 ? 50 : 0) + supervisao) / (nps > 0 ? 2 : 1) : 0;
+        // Use accumulated weekly data if available
+        const faturamento = weeklyData ? weeklyData.total_faturamento : (perf?.faturamento || 0);
+        const reclamacoes = weeklyData 
+          ? weeklyData.total_reclamacoes 
+          : (perf?.num_reclamacoes || 0);
+        
+        // Calculate NPS efficiency
+        const npsEfficiency = reclamacoes > 0 ? faturamento / reclamacoes : faturamento;
+        
+        // Supervision comes from audits (fixed pillar)
+        const supervisao = perf?.supervisao_score || 0;
+        
+        // Calculate average score (NPS efficiency normalized + supervision)
+        const npsNormalized = Math.min((npsEfficiency / 200000) * 100, 100); // Normalize to 0-100
+        const avg = supervisao > 0 ? (npsNormalized + supervisao) / 2 : npsNormalized;
         
         return {
           id: loja.id,
           nome: loja.nome,
-          nps: nps,
+          nps: npsEfficiency,
           supervisao: supervisao,
           faturamento: faturamento,
           avg: avg,
+          hasWeeklyData: !!weeklyData && weeklyData.entries_count > 0,
         };
       })
       .sort((a, b) => b.avg - a.avg);
-  }, [filteredStores, getPerformancesByMonth, currentMonthYear]);
+  }, [filteredStores, getPerformancesByMonth, currentMonthYear, aggregatedByStore]);
 
   // Get color based on value
   const getGaugeColor = (value: number) => {
@@ -377,6 +404,27 @@ export function RemuneracaoVariavelTab({
         </div>
       </div>
 
+      {/* Admin: Weekly Performance Entry Section */}
+      {isAdmin && (
+        <Collapsible open={isEntryFormOpen} onOpenChange={setIsEntryFormOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Lançar Dados Semanais (Faturamento & NPS)
+              </span>
+              <Badge variant="secondary" className="ml-2">
+                Admin
+              </Badge>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4 space-y-4">
+            <PerformanceEntryForm selectedUnidadeId={selectedUnidadeId} />
+            <PerformanceEntriesList selectedLojaId={selectedUnidadeId} />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* Wins & Alerts Feed - Activity Timeline */}
       <WinsAlertsFeed lojaId={selectedUnidadeId} showAllStores={isAdmin} />
 
@@ -404,6 +452,7 @@ export function RemuneracaoVariavelTab({
             supervisaoScore={simulatedSupervisao[0]}
             determineTier={determineTier}
             sector={selectedSector}
+            selectedLojaId={selectedUnidadeId}
           />
         </TabsContent>
 

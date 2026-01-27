@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { TrendingUp, TrendingDown, AlertTriangle, Target, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, AlertTriangle, Target, Sparkles, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { formatCurrency } from "@/lib/formatters";
 import { TIER_CONFIG, type BonusTier, type SectorType } from "@/hooks/useBonusRules";
+import { usePerformanceEntries, calculateProjection, type AggregatedPerformance } from "@/hooks/usePerformanceEntries";
 
 interface ForecastingCardProps {
   currentFaturamento: number;
@@ -12,6 +13,7 @@ interface ForecastingCardProps {
   supervisaoScore: number;
   determineTier: (sector: SectorType, efficiency: number) => BonusTier | null;
   sector: SectorType;
+  selectedLojaId?: string | null;
 }
 
 export function ForecastingCard({
@@ -20,7 +22,16 @@ export function ForecastingCard({
   supervisaoScore,
   determineTier,
   sector,
+  selectedLojaId,
 }: ForecastingCardProps) {
+  // Fetch real weekly entries for selected store
+  const { aggregatedByStore, getStoreAggregated } = usePerformanceEntries();
+  
+  // Get real aggregated data if store is selected
+  const realAggregated: AggregatedPerformance | null = selectedLojaId 
+    ? getStoreAggregated(selectedLojaId) 
+    : null;
+
   // Calculate days in month and elapsed days
   const forecastData = useMemo(() => {
     const now = new Date();
@@ -28,13 +39,30 @@ export function ForecastingCard({
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysRemaining = daysInMonth - currentDay;
 
-    // Forecasting formula: (Current / Elapsed Days) * Total Days
-    const dailyAverage = currentDay > 0 ? currentFaturamento / currentDay : 0;
-    const projectedFaturamento = dailyAverage * daysInMonth;
+    // Use REAL data from weekly entries if available, otherwise fall back to simulator values
+    const hasRealData = realAggregated && realAggregated.entries_count > 0;
+    
+    // Calculate real projection based on actual entries
+    const realProjection = hasRealData 
+      ? calculateProjection(realAggregated, daysInMonth)
+      : null;
 
-    // Project complaints based on current pace
-    const dailyComplaintsAvg = currentDay > 0 ? currentReclamacoes / currentDay : 0;
-    const projectedReclamacoes = Math.round(dailyComplaintsAvg * daysInMonth);
+    // Use real data for projection if available
+    const effectiveFaturamento = hasRealData ? realAggregated!.total_faturamento : currentFaturamento;
+    const effectiveReclamacoes = hasRealData ? realAggregated!.total_reclamacoes : currentReclamacoes;
+    const effectiveDailyAverage = hasRealData 
+      ? realAggregated!.daily_average_faturamento 
+      : (currentDay > 0 ? currentFaturamento / currentDay : 0);
+
+    // Forecasting formula using real daily average if available
+    const projectedFaturamento = hasRealData 
+      ? realProjection!.projectedFaturamento
+      : effectiveDailyAverage * daysInMonth;
+
+    // Project complaints based on real pace if available
+    const projectedReclamacoes = hasRealData 
+      ? realProjection!.projectedReclamacoes
+      : Math.round((currentDay > 0 ? currentReclamacoes / currentDay : 0) * daysInMonth);
 
     // Calculate projected NPS efficiency
     const projectedNpsEfficiency = projectedReclamacoes > 0 
@@ -43,9 +71,9 @@ export function ForecastingCard({
 
     // Determine projected tier
     const projectedTier = determineTier(sector, projectedNpsEfficiency);
-    const currentNpsEfficiency = currentReclamacoes > 0 
-      ? currentFaturamento / currentReclamacoes 
-      : currentFaturamento;
+    const currentNpsEfficiency = effectiveReclamacoes > 0 
+      ? effectiveFaturamento / effectiveReclamacoes 
+      : effectiveFaturamento;
     const currentTier = determineTier(sector, currentNpsEfficiency);
 
     // Check for Red Flag risk
@@ -62,7 +90,7 @@ export function ForecastingCard({
       currentDay,
       daysInMonth,
       daysRemaining,
-      dailyAverage,
+      dailyAverage: effectiveDailyAverage,
       projectedFaturamento,
       projectedReclamacoes,
       projectedNpsEfficiency,
@@ -72,8 +100,13 @@ export function ForecastingCard({
       gapToGold,
       additionalDailyRevenue,
       progressPercent: (currentDay / daysInMonth) * 100,
+      hasRealData,
+      confidenceLevel: realProjection?.confidenceLevel || 'low',
+      daysWithEntries: realAggregated?.days_with_entries || 0,
+      realFaturamento: effectiveFaturamento,
+      realReclamacoes: effectiveReclamacoes,
     };
-  }, [currentFaturamento, currentReclamacoes, supervisaoScore, determineTier, sector]);
+  }, [currentFaturamento, currentReclamacoes, supervisaoScore, determineTier, sector, realAggregated]);
 
   const getTierBadgeStyle = (tier: BonusTier | null) => {
     if (!tier) return "bg-destructive text-destructive-foreground";
@@ -90,9 +123,26 @@ export function ForecastingCard({
         <CardTitle className="flex items-center gap-2 text-base uppercase">
           <Target className="h-5 w-5 text-primary" />
           Projeção de Resultado
-          <Badge variant="outline" className="ml-auto text-xs">
-            Dia {forecastData.currentDay} de {forecastData.daysInMonth}
-          </Badge>
+          <div className="ml-auto flex items-center gap-2">
+            {forecastData.hasRealData && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs ${
+                  forecastData.confidenceLevel === 'high' 
+                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                    : forecastData.confidenceLevel === 'medium'
+                    ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                <BarChart3 className="h-3 w-3 mr-1" />
+                {forecastData.daysWithEntries} dias reais
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs">
+              Dia {forecastData.currentDay} de {forecastData.daysInMonth}
+            </Badge>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
@@ -115,11 +165,21 @@ export function ForecastingCard({
         {/* Current vs Projected */}
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-            <p className="text-xs text-muted-foreground uppercase">Realizado</p>
-            <p className="text-xl font-bold">{formatCurrency(currentFaturamento)}</p>
+            <p className="text-xs text-muted-foreground uppercase flex items-center gap-1">
+              Realizado
+              {forecastData.hasRealData && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">ACUMULADO</Badge>
+              )}
+            </p>
+            <p className="text-xl font-bold">{formatCurrency(forecastData.realFaturamento)}</p>
             <p className="text-xs text-muted-foreground">
               Média diária: {formatCurrency(forecastData.dailyAverage)}/dia
             </p>
+            {forecastData.hasRealData && (
+              <p className="text-xs text-emerald-600">
+                📊 Base: {forecastData.daysWithEntries} lançamentos reais
+              </p>
+            )}
           </div>
           <div className="rounded-xl bg-primary/10 p-4 space-y-2 relative overflow-hidden">
             <Sparkles className="absolute top-2 right-2 h-4 w-4 text-primary/40" />

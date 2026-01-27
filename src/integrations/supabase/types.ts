@@ -474,6 +474,53 @@ export type Database = {
           },
         ]
       }
+      store_performance_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entry_date: string
+          faturamento_delivery: number
+          faturamento_salao: number
+          id: string
+          loja_id: string
+          notes: string | null
+          reclamacoes_ifood: number
+          reclamacoes_salao: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          faturamento_delivery?: number
+          faturamento_salao?: number
+          id?: string
+          loja_id: string
+          notes?: string | null
+          reclamacoes_ifood?: number
+          reclamacoes_salao?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entry_date?: string
+          faturamento_delivery?: number
+          faturamento_salao?: number
+          id?: string
+          loja_id?: string
+          notes?: string | null
+          reclamacoes_ifood?: number
+          reclamacoes_salao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_performance_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supervision_audits: {
         Row: {
           audit_date: string

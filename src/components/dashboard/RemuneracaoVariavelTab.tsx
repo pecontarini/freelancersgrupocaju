@@ -51,7 +51,6 @@ import {
   useBonusConfig,
   useStorePerformance,
   calculateBonus,
-  checkRedFlag,
   TIER_CONFIG,
   POSITION_LABELS,
   type PositionType,
@@ -103,22 +102,75 @@ export function RemuneracaoVariavelTab({
     return determineTier(selectedSector, npsEfficiency);
   }, [selectedSector, npsEfficiency, determineTier]);
 
-  // Check for red flag
+  // Check for red flag (supervision below 80%)
   const isRedFlag = useMemo(() => {
-    return checkRedFlag(simulatedSupervisao[0], currentTier, 80);
-  }, [simulatedSupervisao, currentTier]);
+    return simulatedSupervisao[0] < 80;
+  }, [simulatedSupervisao]);
 
-  // Get base bonus value for selected store and position
+  // Determine supervision tier based on percentage
+  const supervisionTier = useMemo((): BonusTier | null => {
+    const score = simulatedSupervisao[0];
+    if (score >= 95) return "ouro";
+    if (score >= 90) return "prata";
+    if (score >= 80) return "bronze";
+    return null; // Red Flag
+  }, [simulatedSupervisao]);
+
+  // Determine if user is Gerente or Chefia based on selected position
+  const isGerente = useMemo(() => {
+    return selectedPosition === "gerente_front" || selectedPosition === "gerente_back";
+  }, [selectedPosition]);
+
+  // Calculate supervision bonus based on fixed tier values
+  const supervisionBonus = useMemo(() => {
+    if (isRedFlag || !supervisionTier) {
+      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+    }
+
+    // Fixed values per position type
+    if (isGerente) {
+      // Gerentes (Front e Back)
+      switch (supervisionTier) {
+        case "ouro": return { amount: 1500, tier: supervisionTier, tierLabel: "OURO" };
+        case "prata": return { amount: 1125, tier: supervisionTier, tierLabel: "PRATA" };
+        case "bronze": return { amount: 750, tier: supervisionTier, tierLabel: "BRONZE" };
+        default: return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+      }
+    } else {
+      // Chefias (Salão, APV, Cozinha, Sushi, Bar, Parrilla)
+      switch (supervisionTier) {
+        case "ouro": return { amount: 1500, tier: supervisionTier, tierLabel: "OURO" };
+        case "prata": return { amount: 1000, tier: supervisionTier, tierLabel: "PRATA" };
+        case "bronze": return { amount: 500, tier: supervisionTier, tierLabel: "BRONZE" };
+        default: return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+      }
+    }
+  }, [supervisionTier, isGerente, isRedFlag]);
+
+  // Get base bonus value for selected store and position (for NPS calculation)
   const baseValue = useMemo(() => {
     if (!selectedUnidadeId) return 3500; // Default value
     const config = getConfig(selectedUnidadeId, selectedPosition, currentMonthYear);
     return config?.base_bonus_value || 3500;
   }, [selectedUnidadeId, selectedPosition, currentMonthYear, getConfig]);
 
-  // Calculate final bonus
-  const bonusResult = useMemo(() => {
-    return calculateBonus(baseValue, currentTier, rules, selectedPosition, isRedFlag);
+  // Calculate NPS bonus (still uses the original calculation)
+  const npsBonus = useMemo(() => {
+    if (isRedFlag) return { amount: 0, percentage: 0, tier: null };
+    return calculateBonus(baseValue, currentTier, rules, selectedPosition, false);
   }, [baseValue, currentTier, rules, selectedPosition, isRedFlag]);
+
+  // Total bonus (supervision bonus, zeroed if Red Flag)
+  const bonusResult = useMemo(() => {
+    if (isRedFlag) {
+      return { amount: 0, percentage: 0, tier: null };
+    }
+    return {
+      amount: supervisionBonus.amount,
+      percentage: supervisionTier === "ouro" ? 100 : supervisionTier === "prata" ? (isGerente ? 75 : 66.6) : (isGerente ? 50 : 33.3),
+      tier: supervisionTier,
+    };
+  }, [supervisionBonus, supervisionTier, isGerente, isRedFlag]);
 
   // Filter stores by brand
   const filteredStores = useMemo(() => {
@@ -376,9 +428,23 @@ export function RemuneracaoVariavelTab({
                   <Users className="h-4 w-4" />
                   % Supervisão
                 </label>
-                <span className="text-sm font-bold text-primary">
-                  {simulatedSupervisao[0]}%
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-primary">
+                    {simulatedSupervisao[0]}%
+                  </span>
+                  {supervisionTier && !isRedFlag && (
+                    <Badge
+                      className={`bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white text-xs`}
+                    >
+                      {supervisionBonus.tierLabel}
+                    </Badge>
+                  )}
+                  {isRedFlag && (
+                    <Badge variant="destructive" className="text-xs">
+                      RED FLAG
+                    </Badge>
+                  )}
+                </div>
               </div>
               <Slider
                 value={simulatedSupervisao}
@@ -388,6 +454,14 @@ export function RemuneracaoVariavelTab({
                 step={1}
                 className="w-full"
               />
+              {/* Supervision Bonus Display */}
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Bônus Supervisão: <span className={isRedFlag ? "text-destructive font-bold" : "text-primary font-bold"}>{formatCurrency(supervisionBonus.amount)}</span></span>
+                <span className="text-muted-foreground">
+                  {isGerente ? "Gerente" : "Chefia"}: 
+                  {" "}Ouro R$1.500 | Prata R${isGerente ? "1.125" : "1.000"} | Bronze R${isGerente ? "750" : "500"}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -441,7 +515,7 @@ export function RemuneracaoVariavelTab({
                 <div className="text-center">
                   <p className="text-xl font-bold text-red-500">🚨 STATUS: RED FLAG</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    KPI abaixo do nível Bronze. Bônus bloqueado.
+                    Supervisão abaixo de 80%. Bônus TOTAL bloqueado.
                   </p>
                   <p className="text-3xl font-bold text-red-500 mt-4">
                     R$ 0,00
@@ -453,31 +527,35 @@ export function RemuneracaoVariavelTab({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground uppercase">
-                      Nível Atingido
+                      Nível Supervisão
                     </p>
-                    {currentTier && (
+                    {supervisionTier && (
                       <Badge
-                        className={`mt-1 bg-gradient-to-r ${TIER_CONFIG[currentTier].gradient} text-white`}
+                        className={`mt-1 bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white`}
                       >
-                        {TIER_CONFIG[currentTier].label}
+                        {TIER_CONFIG[supervisionTier].label}
                       </Badge>
                     )}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground uppercase">
-                      Bônus Estimado ({bonusResult.percentage}%)
+                      Bônus Supervisão ({bonusResult.percentage.toFixed(1)}%)
                     </p>
                     <p className="text-3xl font-bold text-primary">
-                      {formatCurrency(bonusResult.amount)}
+                      {formatCurrency(supervisionBonus.amount)}
                     </p>
                   </div>
                 </div>
 
-                {/* Tier Badges */}
+                {/* Tier Badges with Fixed Values */}
                 <div className="mt-6 flex gap-3">
                   {(["ouro", "prata", "bronze"] as BonusTier[]).map((tier) => {
-                    const isActive = currentTier === tier;
-                    const percentage = getPercentage(selectedPosition, tier);
+                    const isActive = supervisionTier === tier;
+                    // Fixed values based on position
+                    const tierValue = isGerente 
+                      ? (tier === "ouro" ? 1500 : tier === "prata" ? 1125 : 750)
+                      : (tier === "ouro" ? 1500 : tier === "prata" ? 1000 : 500);
+                    const tierMin = tier === "ouro" ? "≥95%" : tier === "prata" ? "90-94%" : "80-89%";
                     return (
                       <div
                         key={tier}
@@ -493,7 +571,8 @@ export function RemuneracaoVariavelTab({
                         <p className="text-xs font-medium uppercase">
                           {TIER_CONFIG[tier].label}
                         </p>
-                        <p className="text-xs">{percentage}%</p>
+                        <p className="text-xs font-bold">{formatCurrency(tierValue)}</p>
+                        <p className="text-xs opacity-75">{tierMin}</p>
                       </div>
                     );
                   })}

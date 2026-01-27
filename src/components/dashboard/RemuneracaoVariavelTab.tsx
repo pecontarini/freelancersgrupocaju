@@ -740,9 +740,9 @@ export function RemuneracaoVariavelTab({
             />
           </div>
 
-          {/* Final Result */}
+          {/* Final Result - Desktop */}
           <div
-            className={`rounded-2xl p-6 ${
+            className={`hidden md:block rounded-2xl p-6 ${
               isRedFlag
                 ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500"
                 : "bg-gradient-to-br from-muted/50 to-muted"
@@ -811,6 +811,42 @@ export function RemuneracaoVariavelTab({
                 </div>
               </>
             )}
+          </div>
+
+          {/* Final Result - Mobile (inline, not fixed) */}
+          <div className="md:hidden">
+            <MobileBonusResult
+              isRedFlag={isRedFlag}
+              redFlagReason={
+                simulatedSupervisao[0] < 80
+                  ? "Supervisão abaixo de 80%"
+                  : "NPS abaixo do mínimo"
+              }
+              totalBonus={totalNpsBonus + supervisionBonus.amount}
+              details={[
+                {
+                  label: "Salão",
+                  amount: npsBonusSalao.amount,
+                  tier: tierSalao,
+                  tierLabel: npsBonusSalao.tierLabel,
+                  color: "bg-amber-50 dark:bg-amber-950/30",
+                },
+                {
+                  label: "Delivery",
+                  amount: npsBonusDelivery.amount,
+                  tier: tierDelivery,
+                  tierLabel: npsBonusDelivery.tierLabel,
+                  color: "bg-sky-50 dark:bg-sky-950/30",
+                },
+                {
+                  label: "Supervisão",
+                  amount: supervisionBonus.amount,
+                  tier: supervisionTier,
+                  tierLabel: supervisionBonus.tierLabel,
+                  color: "bg-primary/5",
+                },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>
@@ -934,42 +970,6 @@ export function RemuneracaoVariavelTab({
 
       {/* Action Plan Dashboard - Now with its own filters and URL sync */}
       <ActionPlanDashboard />
-
-      {/* Mobile Sticky Bonus Result */}
-      {isMobile && (
-        <MobileBonusResult
-          isRedFlag={isRedFlag}
-          redFlagReason={
-            simulatedSupervisao[0] < 80
-              ? "Supervisão abaixo de 80%"
-              : "NPS abaixo do mínimo"
-          }
-          totalBonus={totalNpsBonus + supervisionBonus.amount}
-          details={[
-            {
-              label: "Salão",
-              amount: npsBonusSalao.amount,
-              tier: tierSalao,
-              tierLabel: npsBonusSalao.tierLabel,
-              color: "bg-amber-50 dark:bg-amber-950/30",
-            },
-            {
-              label: "Delivery",
-              amount: npsBonusDelivery.amount,
-              tier: tierDelivery,
-              tierLabel: npsBonusDelivery.tierLabel,
-              color: "bg-sky-50 dark:bg-sky-950/30",
-            },
-            {
-              label: "Supervisão",
-              amount: supervisionBonus.amount,
-              tier: supervisionTier,
-              tierLabel: supervisionBonus.tierLabel,
-              color: "bg-primary/5",
-            },
-          ]}
-        />
-      )}
     </div>
   );
 }

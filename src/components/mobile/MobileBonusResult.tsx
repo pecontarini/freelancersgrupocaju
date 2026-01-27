@@ -26,8 +26,8 @@ export function MobileBonusResult({
 }: MobileBonusResultProps) {
   if (isRedFlag) {
     return (
-      <div className="fixed bottom-20 left-4 right-4 z-40 md:hidden">
-        <div className="rounded-2xl bg-gradient-to-r from-red-500/20 to-red-600/10 border-2 border-red-500 p-4 shadow-lg backdrop-blur-sm">
+      <div className="mt-6">
+        <div className="rounded-2xl bg-gradient-to-r from-red-500/20 to-red-600/10 border-2 border-red-500 p-4 shadow-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -46,10 +46,10 @@ export function MobileBonusResult({
   }
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-40 md:hidden">
-      <div className="rounded-2xl bg-card/95 border shadow-lg backdrop-blur-sm p-4">
+    <div className="mt-6">
+      <div className="rounded-2xl bg-muted/50 border shadow-md p-4">
         {/* Mini details */}
-        <div className="flex gap-2 mb-3 overflow-x-auto">
+        <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
           {details.map((detail) => (
             <div
               key={detail.label}

@@ -12,6 +12,8 @@ import {
   ChefHat,
   Filter,
   LayoutDashboard,
+  UtensilsCrossed,
+  Bike,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -80,9 +82,11 @@ export function RemuneracaoVariavelTab({
   const { configs, getConfig } = useBonusConfig();
   const { performances, getPerformancesByMonth } = useStorePerformance();
 
-  // Simulator state
-  const [simulatedFaturamento, setSimulatedFaturamento] = useState([100000]);
-  const [simulatedReclamacoes, setSimulatedReclamacoes] = useState([1]);
+  // Simulator state - Separate inputs for Salão and Delivery
+  const [faturamentoSalao, setFaturamentoSalao] = useState([500000]);
+  const [reclamacoesSalao, setReclamacoesSalao] = useState([3]);
+  const [faturamentoDelivery, setFaturamentoDelivery] = useState([100000]);
+  const [reclamacoesDelivery, setReclamacoesDelivery] = useState([5]);
   const [simulatedSupervisao, setSimulatedSupervisao] = useState([85]);
   const [simulatedTempoPrato, setSimulatedTempoPrato] = useState([15]);
   const [selectedPosition, setSelectedPosition] = useState<PositionType>("gerente_front");
@@ -91,21 +95,71 @@ export function RemuneracaoVariavelTab({
 
   const currentMonthYear = format(new Date(), "yyyy-MM");
 
-  // Calculate NPS efficiency (Faturamento / Reclamações)
-  const npsEfficiency = useMemo(() => {
-    if (simulatedReclamacoes[0] === 0) return simulatedFaturamento[0];
-    return simulatedFaturamento[0] / simulatedReclamacoes[0];
-  }, [simulatedFaturamento, simulatedReclamacoes]);
+  // NPS Targets for each channel (Faturamento / Reclamações thresholds)
+  const NPS_TARGETS = {
+    salao: { ouro: 120000, prata: 90000, bronze: 60000 },
+    delivery: { ouro: 12000, prata: 9000, bronze: 6000 },
+  };
 
-  // Determine the tier based on efficiency
+  // Fixed bonus values per tier (50% of total NPS bonus for each channel)
+  const NPS_BONUS_VALUES = {
+    gerente: { ouro: 750, prata: 562.5, bronze: 375, aceitavel: 187.5 },
+    chefia: { ouro: 750, prata: 500, bronze: 250, aceitavel: 0 },
+  };
+
+  // Calculate efficiency for Salão
+  const eficienciaSalao = useMemo(() => {
+    if (reclamacoesSalao[0] === 0) return faturamentoSalao[0];
+    return faturamentoSalao[0] / reclamacoesSalao[0];
+  }, [faturamentoSalao, reclamacoesSalao]);
+
+  // Calculate efficiency for Delivery
+  const eficienciaDelivery = useMemo(() => {
+    if (reclamacoesDelivery[0] === 0) return faturamentoDelivery[0];
+    return faturamentoDelivery[0] / reclamacoesDelivery[0];
+  }, [faturamentoDelivery, reclamacoesDelivery]);
+
+  // Determine tier for Salão
+  const tierSalao = useMemo((): BonusTier | null => {
+    if (eficienciaSalao >= NPS_TARGETS.salao.ouro) return "ouro";
+    if (eficienciaSalao >= NPS_TARGETS.salao.prata) return "prata";
+    if (eficienciaSalao >= NPS_TARGETS.salao.bronze) return "bronze";
+    if (eficienciaSalao >= NPS_TARGETS.salao.bronze * 0.5) return "aceitavel";
+    return null; // Red Flag
+  }, [eficienciaSalao]);
+
+  // Determine tier for Delivery
+  const tierDelivery = useMemo((): BonusTier | null => {
+    if (eficienciaDelivery >= NPS_TARGETS.delivery.ouro) return "ouro";
+    if (eficienciaDelivery >= NPS_TARGETS.delivery.prata) return "prata";
+    if (eficienciaDelivery >= NPS_TARGETS.delivery.bronze) return "bronze";
+    if (eficienciaDelivery >= NPS_TARGETS.delivery.bronze * 0.5) return "aceitavel";
+    return null; // Red Flag
+  }, [eficienciaDelivery]);
+
+  // Legacy compatibility - combined efficiency for forecasting
+  const npsEfficiency = useMemo(() => {
+    return eficienciaSalao + eficienciaDelivery;
+  }, [eficienciaSalao, eficienciaDelivery]);
+
+  // Determine the tier based on combined efficiency (legacy compatibility)
   const currentTier = useMemo(() => {
     return determineTier(selectedSector, npsEfficiency);
   }, [selectedSector, npsEfficiency, determineTier]);
 
-  // Check for red flag (supervision below 80%)
+  // Check for red flag (supervision below 80% OR any NPS channel below minimum)
+  const isNpsRedFlag = useMemo(() => {
+    // For Gerentes, both channels must be above minimum threshold
+    if (selectedPosition === "gerente_front" || selectedPosition === "gerente_back") {
+      return tierSalao === null || tierDelivery === null;
+    }
+    // For Chefias, use combined efficiency
+    return tierSalao === null && tierDelivery === null;
+  }, [selectedPosition, tierSalao, tierDelivery]);
+
   const isRedFlag = useMemo(() => {
-    return simulatedSupervisao[0] < 80;
-  }, [simulatedSupervisao]);
+    return simulatedSupervisao[0] < 80 || isNpsRedFlag;
+  }, [simulatedSupervisao, isNpsRedFlag]);
 
   // Determine supervision tier based on percentage
   const supervisionTier = useMemo((): BonusTier | null => {
@@ -121,9 +175,42 @@ export function RemuneracaoVariavelTab({
     return selectedPosition === "gerente_front" || selectedPosition === "gerente_back";
   }, [selectedPosition]);
 
+  // Calculate NPS bonus for Salão (50% weight for Gerentes)
+  const npsBonusSalao = useMemo(() => {
+    if (isRedFlag || !tierSalao) {
+      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+    }
+    const values = isGerente ? NPS_BONUS_VALUES.gerente : NPS_BONUS_VALUES.chefia;
+    const amount = values[tierSalao];
+    return { 
+      amount, 
+      tier: tierSalao, 
+      tierLabel: TIER_CONFIG[tierSalao].label.toUpperCase() 
+    };
+  }, [tierSalao, isGerente, isRedFlag]);
+
+  // Calculate NPS bonus for Delivery (50% weight for Gerentes)
+  const npsBonusDelivery = useMemo(() => {
+    if (isRedFlag || !tierDelivery) {
+      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+    }
+    const values = isGerente ? NPS_BONUS_VALUES.gerente : NPS_BONUS_VALUES.chefia;
+    const amount = values[tierDelivery];
+    return { 
+      amount, 
+      tier: tierDelivery, 
+      tierLabel: TIER_CONFIG[tierDelivery].label.toUpperCase() 
+    };
+  }, [tierDelivery, isGerente, isRedFlag]);
+
+  // Total NPS Bonus (sum of both channels)
+  const totalNpsBonus = useMemo(() => {
+    return npsBonusSalao.amount + npsBonusDelivery.amount;
+  }, [npsBonusSalao, npsBonusDelivery]);
+
   // Calculate supervision bonus based on fixed tier values
   const supervisionBonus = useMemo(() => {
-    if (isRedFlag || !supervisionTier) {
+    if (simulatedSupervisao[0] < 80 || !supervisionTier) {
       return { amount: 0, tier: null, tierLabel: "RED FLAG" };
     }
 
@@ -145,16 +232,16 @@ export function RemuneracaoVariavelTab({
         default: return { amount: 0, tier: null, tierLabel: "RED FLAG" };
       }
     }
-  }, [supervisionTier, isGerente, isRedFlag]);
+  }, [supervisionTier, isGerente, simulatedSupervisao]);
 
-  // Get base bonus value for selected store and position (for NPS calculation)
+  // Get base bonus value for selected store and position (legacy)
   const baseValue = useMemo(() => {
-    if (!selectedUnidadeId) return 3500; // Default value
+    if (!selectedUnidadeId) return 3500;
     const config = getConfig(selectedUnidadeId, selectedPosition, currentMonthYear);
     return config?.base_bonus_value || 3500;
   }, [selectedUnidadeId, selectedPosition, currentMonthYear, getConfig]);
 
-  // Calculate NPS bonus (still uses the original calculation)
+  // Calculate legacy NPS bonus for compatibility
   const npsBonus = useMemo(() => {
     if (isRedFlag) return { amount: 0, percentage: 0, tier: null };
     return calculateBonus(baseValue, currentTier, rules, selectedPosition, false);
@@ -312,8 +399,8 @@ export function RemuneracaoVariavelTab({
 
         <TabsContent value="forecast" className="animate-fade-in">
           <ForecastingCard
-            currentFaturamento={simulatedFaturamento[0]}
-            currentReclamacoes={simulatedReclamacoes[0]}
+            currentFaturamento={faturamentoSalao[0] + faturamentoDelivery[0]}
+            currentReclamacoes={reclamacoesSalao[0] + reclamacoesDelivery[0]}
             supervisaoScore={simulatedSupervisao[0]}
             determineTier={determineTier}
             sector={selectedSector}
@@ -380,21 +467,36 @@ export function RemuneracaoVariavelTab({
             </div>
           </div>
 
-          {/* Sliders */}
-          <div className="space-y-6">
+          {/* NPS Inputs - Salão Block */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/30 dark:bg-amber-950/20 dark:border-amber-800 p-4 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <UtensilsCrossed className="h-5 w-5 text-amber-600" />
+              <span className="text-sm font-bold uppercase text-amber-700 dark:text-amber-400">
+                Pilar A - Salão (50%)
+              </span>
+              {tierSalao && !isRedFlag && (
+                <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white text-xs`}>
+                  {npsBonusSalao.tierLabel}
+                </Badge>
+              )}
+              {!tierSalao && (
+                <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>
+              )}
+            </div>
+
             <div className="space-y-3">
               <div className="flex justify-between">
-                <label className="text-sm font-medium uppercase flex items-center gap-2">
+                <label className="text-sm font-medium flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
-                  Faturamento do Setor
+                  Faturamento Salão
                 </label>
                 <span className="text-sm font-bold text-primary">
-                  {formatCurrency(simulatedFaturamento[0])}
+                  {formatCurrency(faturamentoSalao[0])}
                 </span>
               </div>
               <Slider
-                value={simulatedFaturamento}
-                onValueChange={setSimulatedFaturamento}
+                value={faturamentoSalao}
+                onValueChange={setFaturamentoSalao}
                 min={0}
                 max={4000000}
                 step={10000}
@@ -404,104 +506,189 @@ export function RemuneracaoVariavelTab({
 
             <div className="space-y-3">
               <div className="flex justify-between">
-                <label className="text-sm font-medium uppercase flex items-center gap-2">
+                <label className="text-sm font-medium flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4" />
-                  Número de Reclamações
+                  Reclamações Salão
                 </label>
                 <span className="text-sm font-bold text-destructive">
-                  {simulatedReclamacoes[0]}
+                  {reclamacoesSalao[0]}
                 </span>
               </div>
               <Slider
-                value={simulatedReclamacoes}
-                onValueChange={setSimulatedReclamacoes}
+                value={reclamacoesSalao}
+                onValueChange={setReclamacoesSalao}
                 min={0}
-                max={20}
+                max={50}
                 step={1}
+                className="w-full"
+              />
+            </div>
+
+            {/* Salão Efficiency Display */}
+            <div className="rounded-lg bg-background/80 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Eficiência Salão:</span>
+                <span className="font-bold">{formatCurrency(eficienciaSalao)}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-muted-foreground">Target Ouro: &gt; R$ 120k</span>
+                <span className="font-bold text-primary">{formatCurrency(npsBonusSalao.amount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* NPS Inputs - Delivery Block */}
+          <div className="rounded-xl border border-sky-200 bg-sky-50/30 dark:bg-sky-950/20 dark:border-sky-800 p-4 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Bike className="h-5 w-5 text-sky-600" />
+              <span className="text-sm font-bold uppercase text-sky-700 dark:text-sky-400">
+                Pilar B - Delivery (50%)
+              </span>
+              {tierDelivery && !isRedFlag && (
+                <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white text-xs`}>
+                  {npsBonusDelivery.tierLabel}
+                </Badge>
+              )}
+              {!tierDelivery && (
+                <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Faturamento Delivery
+                </label>
+                <span className="text-sm font-bold text-primary">
+                  {formatCurrency(faturamentoDelivery[0])}
+                </span>
+              </div>
+              <Slider
+                value={faturamentoDelivery}
+                onValueChange={setFaturamentoDelivery}
+                min={0}
+                max={1500000}
+                step={5000}
                 className="w-full"
               />
             </div>
 
             <div className="space-y-3">
               <div className="flex justify-between">
-                <label className="text-sm font-medium uppercase flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  % Supervisão
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Reclamações iFood
                 </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-primary">
-                    {simulatedSupervisao[0]}%
-                  </span>
-                  {supervisionTier && !isRedFlag && (
-                    <Badge
-                      className={`bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white text-xs`}
-                    >
-                      {supervisionBonus.tierLabel}
-                    </Badge>
-                  )}
-                  {isRedFlag && (
-                    <Badge variant="destructive" className="text-xs">
-                      RED FLAG
-                    </Badge>
-                  )}
-                </div>
+                <span className="text-sm font-bold text-destructive">
+                  {reclamacoesDelivery[0]}
+                </span>
               </div>
               <Slider
-                value={simulatedSupervisao}
-                onValueChange={setSimulatedSupervisao}
+                value={reclamacoesDelivery}
+                onValueChange={setReclamacoesDelivery}
                 min={0}
                 max={100}
                 step={1}
                 className="w-full"
               />
-              {/* Supervision Bonus Display */}
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Bônus Supervisão: <span className={isRedFlag ? "text-destructive font-bold" : "text-primary font-bold"}>{formatCurrency(supervisionBonus.amount)}</span></span>
-                <span className="text-muted-foreground">
-                  {isGerente ? "Gerente" : "Chefia"}: 
-                  {" "}Ouro R$1.500 | Prata R${isGerente ? "1.125" : "1.000"} | Bronze R${isGerente ? "750" : "500"}
-                </span>
-              </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <label className="text-sm font-medium uppercase flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Tempo Médio Prato (min)
-                </label>
-                <span className="text-sm font-bold text-muted-foreground">
-                  {simulatedTempoPrato[0]} min
-                </span>
+            {/* Delivery Efficiency Display */}
+            <div className="rounded-lg bg-background/80 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Eficiência Delivery:</span>
+                <span className="font-bold">{formatCurrency(eficienciaDelivery)}</span>
               </div>
-              <Slider
-                value={simulatedTempoPrato}
-                onValueChange={setSimulatedTempoPrato}
-                min={5}
-                max={45}
-                step={1}
-                className="w-full"
-              />
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-muted-foreground">Target Ouro: &gt; R$ 12k</span>
+                <span className="font-bold text-primary">{formatCurrency(npsBonusDelivery.amount)}</span>
+              </div>
             </div>
           </div>
 
-          {/* NPS Efficiency Display */}
-          <div className="rounded-xl bg-muted/50 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground uppercase">
-                Eficiência NPS (Faturamento / Reclamações)
-              </span>
-              <span className="text-lg font-bold">
-                {formatCurrency(npsEfficiency)}
+          {/* Total NPS Bonus Display */}
+          <div className="rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-amber-500" />
+                <span className="text-sm font-bold uppercase">Bônus NPS Total</span>
+              </div>
+              <span className="text-xl font-bold text-primary">
+                {formatCurrency(totalNpsBonus)}
               </span>
             </div>
-            <Progress 
-              value={Math.min((npsEfficiency / 400000) * 100, 100)} 
-              className="h-2" 
+            <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+              <span>Salão: {formatCurrency(npsBonusSalao.amount)} ({npsBonusSalao.tierLabel})</span>
+              <span>|</span>
+              <span>Delivery: {formatCurrency(npsBonusDelivery.amount)} ({npsBonusDelivery.tierLabel})</span>
+            </div>
+          </div>
+
+          {/* Supervision Slider */}
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <label className="text-sm font-medium uppercase flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                % Supervisão
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-primary">
+                  {simulatedSupervisao[0]}%
+                </span>
+                {supervisionTier && simulatedSupervisao[0] >= 80 && (
+                  <Badge
+                    className={`bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white text-xs`}
+                  >
+                    {supervisionBonus.tierLabel}
+                  </Badge>
+                )}
+                {simulatedSupervisao[0] < 80 && (
+                  <Badge variant="destructive" className="text-xs">
+                    RED FLAG
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Slider
+              value={simulatedSupervisao}
+              onValueChange={setSimulatedSupervisao}
+              min={0}
+              max={100}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>Bônus Supervisão: <span className={simulatedSupervisao[0] < 80 ? "text-destructive font-bold" : "text-primary font-bold"}>{formatCurrency(supervisionBonus.amount)}</span></span>
+              <span className="text-muted-foreground">
+                {isGerente ? "Gerente" : "Chefia"}: 
+                {" "}Ouro R$1.500 | Prata R${isGerente ? "1.125" : "1.000"} | Bronze R${isGerente ? "750" : "500"}
+              </span>
+            </div>
+          </div>
+
+          {/* Tempo Médio Prato */}
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <label className="text-sm font-medium uppercase flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Tempo Médio Prato (min)
+              </label>
+              <span className="text-sm font-bold text-muted-foreground">
+                {simulatedTempoPrato[0]} min
+              </span>
+            </div>
+            <Slider
+              value={simulatedTempoPrato}
+              onValueChange={setSimulatedTempoPrato}
+              min={5}
+              max={45}
+              step={1}
+              className="w-full"
             />
           </div>
 
-          {/* Result */}
+          {/* Final Result */}
           <div
             className={`rounded-2xl p-6 ${
               isRedFlag
@@ -515,7 +702,10 @@ export function RemuneracaoVariavelTab({
                 <div className="text-center">
                   <p className="text-xl font-bold text-red-500">🚨 STATUS: RED FLAG</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Supervisão abaixo de 80%. Bônus TOTAL bloqueado.
+                    {simulatedSupervisao[0] < 80 
+                      ? "Supervisão abaixo de 80%." 
+                      : "NPS de algum canal abaixo do mínimo."}
+                    {" "}Bônus TOTAL bloqueado.
                   </p>
                   <p className="text-3xl font-bold text-red-500 mt-4">
                     R$ 0,00
@@ -524,58 +714,48 @@ export function RemuneracaoVariavelTab({
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground uppercase">
-                      Nível Supervisão
-                    </p>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-3 rounded-xl bg-background/50">
+                    <p className="text-xs text-muted-foreground uppercase">NPS Salão</p>
+                    <p className="text-lg font-bold text-amber-600">{formatCurrency(npsBonusSalao.amount)}</p>
+                    {tierSalao && (
+                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white`}>
+                        {TIER_CONFIG[tierSalao].label}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-background/50">
+                    <p className="text-xs text-muted-foreground uppercase">NPS Delivery</p>
+                    <p className="text-lg font-bold text-sky-600">{formatCurrency(npsBonusDelivery.amount)}</p>
+                    {tierDelivery && (
+                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white`}>
+                        {TIER_CONFIG[tierDelivery].label}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-center p-3 rounded-xl bg-background/50">
+                    <p className="text-xs text-muted-foreground uppercase">Supervisão</p>
+                    <p className="text-lg font-bold text-primary">{formatCurrency(supervisionBonus.amount)}</p>
                     {supervisionTier && (
-                      <Badge
-                        className={`mt-1 bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white`}
-                      >
+                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white`}>
                         {TIER_CONFIG[supervisionTier].label}
                       </Badge>
                     )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground uppercase">
-                      Bônus Supervisão ({bonusResult.percentage.toFixed(1)}%)
-                    </p>
-                    <p className="text-3xl font-bold text-primary">
-                      {formatCurrency(supervisionBonus.amount)}
-                    </p>
-                  </div>
                 </div>
 
-                {/* Tier Badges with Fixed Values */}
-                <div className="mt-6 flex gap-3">
-                  {(["ouro", "prata", "bronze"] as BonusTier[]).map((tier) => {
-                    const isActive = supervisionTier === tier;
-                    // Fixed values based on position
-                    const tierValue = isGerente 
-                      ? (tier === "ouro" ? 1500 : tier === "prata" ? 1125 : 750)
-                      : (tier === "ouro" ? 1500 : tier === "prata" ? 1000 : 500);
-                    const tierMin = tier === "ouro" ? "≥95%" : tier === "prata" ? "90-94%" : "80-89%";
-                    return (
-                      <div
-                        key={tier}
-                        className={`flex-1 rounded-xl p-3 text-center transition-all ${
-                          isActive
-                            ? `bg-gradient-to-r ${TIER_CONFIG[tier].gradient} text-white shadow-lg scale-105`
-                            : "bg-muted/50"
-                        }`}
-                      >
-                        {tier === "ouro" && <Trophy className="h-6 w-6 mx-auto mb-1" />}
-                        {tier === "prata" && <Medal className="h-6 w-6 mx-auto mb-1" />}
-                        {tier === "bronze" && <Award className="h-6 w-6 mx-auto mb-1" />}
-                        <p className="text-xs font-medium uppercase">
-                          {TIER_CONFIG[tier].label}
-                        </p>
-                        <p className="text-xs font-bold">{formatCurrency(tierValue)}</p>
-                        <p className="text-xs opacity-75">{tierMin}</p>
-                      </div>
-                    );
-                  })}
+                {/* Total */}
+                <div className="flex items-center justify-between border-t pt-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground uppercase">Bônus Total Estimado</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      NPS ({formatCurrency(totalNpsBonus)}) + Supervisão ({formatCurrency(supervisionBonus.amount)})
+                    </p>
+                  </div>
+                  <p className="text-4xl font-bold text-primary">
+                    {formatCurrency(totalNpsBonus + supervisionBonus.amount)}
+                  </p>
                 </div>
               </>
             )}

@@ -11,6 +11,7 @@ import {
   Users,
   ChefHat,
   Filter,
+  LayoutDashboard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -19,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -39,6 +41,10 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { ActionPlanDashboard } from "@/components/ActionPlanDashboard";
 import { AuditReportButton } from "@/components/AuditReportButton";
+import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
+import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
+import { LeadershipRadar } from "@/components/dashboard/LeadershipRadar";
+import { WinsAlertsFeed } from "@/components/dashboard/WinsAlertsFeed";
 import {
   useNpsTargets,
   useBonusRules,
@@ -216,7 +222,7 @@ export function RemuneracaoVariavelTab({
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
             <TrendingUp className="h-6 w-6 text-primary" />
@@ -231,6 +237,45 @@ export function RemuneracaoVariavelTab({
           </div>
         </div>
       </div>
+
+      {/* Wins & Alerts Feed - Activity Timeline */}
+      <WinsAlertsFeed lojaId={selectedUnidadeId} showAllStores={isAdmin} />
+
+      {/* Strategic BI Section with Tabs */}
+      <Tabs defaultValue="forecast" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsTrigger value="forecast" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Projeção</span>
+          </TabsTrigger>
+          <TabsTrigger value="heatmap" className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">Conformidade</span>
+          </TabsTrigger>
+          <TabsTrigger value="radar" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Competências</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="forecast" className="animate-fade-in">
+          <ForecastingCard
+            currentFaturamento={simulatedFaturamento[0]}
+            currentReclamacoes={simulatedReclamacoes[0]}
+            supervisaoScore={simulatedSupervisao[0]}
+            determineTier={determineTier}
+            sector={selectedSector}
+          />
+        </TabsContent>
+
+        <TabsContent value="heatmap" className="animate-fade-in">
+          <ComplianceHeatmap lojaId={selectedUnidadeId} />
+        </TabsContent>
+
+        <TabsContent value="radar" className="animate-fade-in">
+          <LeadershipRadar lojaId={selectedUnidadeId} />
+        </TabsContent>
+      </Tabs>
 
       {/* Bonus Simulator */}
       <Card className="rounded-2xl shadow-card overflow-hidden">

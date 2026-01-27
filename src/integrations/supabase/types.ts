@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      bonus_config: {
+        Row: {
+          base_bonus_value: number
+          created_at: string
+          id: string
+          loja_id: string | null
+          month_year: string
+          position_type: Database["public"]["Enums"]["position_type"]
+          updated_at: string
+        }
+        Insert: {
+          base_bonus_value?: number
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          month_year: string
+          position_type: Database["public"]["Enums"]["position_type"]
+          updated_at?: string
+        }
+        Update: {
+          base_bonus_value?: number
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          month_year?: string
+          position_type?: Database["public"]["Enums"]["position_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonus_config_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bonus_rules: {
+        Row: {
+          created_at: string
+          id: string
+          percentage: number
+          position_type: Database["public"]["Enums"]["position_type"]
+          tier: Database["public"]["Enums"]["bonus_tier"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          percentage?: number
+          position_type: Database["public"]["Enums"]["position_type"]
+          tier: Database["public"]["Enums"]["bonus_tier"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          percentage?: number
+          position_type?: Database["public"]["Enums"]["position_type"]
+          tier?: Database["public"]["Enums"]["bonus_tier"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       config_funcoes: {
         Row: {
           created_at: string
@@ -209,6 +274,33 @@ export type Database = {
           },
         ]
       }
+      nps_targets: {
+        Row: {
+          created_at: string
+          id: string
+          min_efficiency: number
+          sector_type: Database["public"]["Enums"]["sector_type"]
+          tier: Database["public"]["Enums"]["bonus_tier"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          min_efficiency: number
+          sector_type: Database["public"]["Enums"]["sector_type"]
+          tier: Database["public"]["Enums"]["bonus_tier"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          min_efficiency?: number
+          sector_type?: Database["public"]["Enums"]["sector_type"]
+          tier?: Database["public"]["Enums"]["bonus_tier"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       operational_expenses: {
         Row: {
           category: string
@@ -332,6 +424,56 @@ export type Database = {
           },
         ]
       }
+      store_performance: {
+        Row: {
+          created_at: string
+          faturamento: number
+          id: string
+          loja_id: string
+          month_year: string
+          nps_score: number | null
+          num_reclamacoes: number
+          supervisao_score: number
+          tempo_comanda_avg: number | null
+          tempo_prato_avg: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          faturamento?: number
+          id?: string
+          loja_id: string
+          month_year: string
+          nps_score?: number | null
+          num_reclamacoes?: number
+          supervisao_score?: number
+          tempo_comanda_avg?: number | null
+          tempo_prato_avg?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          faturamento?: number
+          id?: string
+          loja_id?: string
+          month_year?: string
+          nps_score?: number | null
+          num_reclamacoes?: number
+          supervisao_score?: number
+          tempo_comanda_avg?: number | null
+          tempo_prato_avg?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_performance_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -403,6 +545,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "gerente_unidade"
+      bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
+      kpi_type: "nps" | "supervisao" | "tempo_prato" | "tempo_comanda"
+      position_type:
+        | "gerente_front"
+        | "gerente_back"
+        | "chefia_front"
+        | "chefia_back"
+      sector_type: "salao" | "back" | "apv" | "delivery"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -531,6 +681,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "gerente_unidade"],
+      bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
+      kpi_type: ["nps", "supervisao", "tempo_prato", "tempo_comanda"],
+      position_type: [
+        "gerente_front",
+        "gerente_back",
+        "chefia_front",
+        "chefia_back",
+      ],
+      sector_type: ["salao", "back", "apv", "delivery"],
     },
   },
 } as const

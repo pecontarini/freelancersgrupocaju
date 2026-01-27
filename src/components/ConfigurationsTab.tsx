@@ -1,7 +1,8 @@
 import { Store, Briefcase, Users } from "lucide-react";
 import { ConfigSection } from "@/components/ConfigSection";
 import { ClearEntriesModal } from "@/components/ClearEntriesModal";
-import { BudgetConfigSection } from "@/components/BudgetConfigSection";
+import { BudgetConfigSection as OperationalBudgetSection } from "@/components/OperationalBudgetConfigSection";
+import { BonusConfigSection } from "@/components/BonusConfigSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useConfigLojas,
@@ -29,7 +30,12 @@ export function ConfigurationsTab() {
 
       {/* Budget Configuration - Admin Only */}
       {isAdmin && (
-        <BudgetConfigSection />
+        <OperationalBudgetSection />
+      )}
+
+      {/* Bonus Rules Configuration - Admin Only */}
+      {isAdmin && (
+        <BonusConfigSection />
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

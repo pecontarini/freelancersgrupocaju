@@ -474,6 +474,116 @@ export type Database = {
           },
         ]
       }
+      supervision_audits: {
+        Row: {
+          audit_date: string
+          created_at: string
+          created_by: string | null
+          global_score: number
+          id: string
+          loja_id: string
+          pdf_url: string | null
+          processed_at: string
+          updated_at: string
+        }
+        Insert: {
+          audit_date: string
+          created_at?: string
+          created_by?: string | null
+          global_score?: number
+          id?: string
+          loja_id: string
+          pdf_url?: string | null
+          processed_at?: string
+          updated_at?: string
+        }
+        Update: {
+          audit_date?: string
+          created_at?: string
+          created_by?: string | null
+          global_score?: number
+          id?: string
+          loja_id?: string
+          pdf_url?: string | null
+          processed_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervision_audits_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supervision_failures: {
+        Row: {
+          audit_id: string
+          category: string | null
+          created_at: string
+          id: string
+          is_recurring: boolean
+          item_name: string
+          loja_id: string
+          resolution_photo_url: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          audit_id: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_recurring?: boolean
+          item_name: string
+          loja_id: string
+          resolution_photo_url?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          audit_id?: string
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_recurring?: boolean
+          item_name?: string
+          loja_id?: string
+          resolution_photo_url?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supervision_failures_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "supervision_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervision_failures_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

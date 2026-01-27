@@ -36,6 +36,9 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { ActionPlanDashboard } from "@/components/ActionPlanDashboard";
+import { AuditReportButton } from "@/components/AuditReportButton";
 import {
   useNpsTargets,
   useBonusRules,
@@ -66,6 +69,7 @@ export function RemuneracaoVariavelTab({
   selectedUnidadeId,
 }: RemuneracaoVariavelTabProps) {
   const { options: lojas } = useConfigLojas();
+  const { isAdmin } = useUserProfile();
   const { targets, determineTier } = useNpsTargets();
   const { rules, getPercentage } = useBonusRules();
   const { configs, getConfig } = useBonusConfig();
@@ -458,12 +462,13 @@ export function RemuneracaoVariavelTab({
       {/* Ranking Inter-Unidades */}
       <Card className="rounded-2xl shadow-card">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <CardTitle className="flex items-center gap-2 text-base uppercase">
               <Trophy className="h-5 w-5 text-amber-500" />
               Ranking Inter-Unidades
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isAdmin && <AuditReportButton brandFilter={brandFilter} />}
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={brandFilter} onValueChange={setBrandFilter}>
                 <SelectTrigger className="w-[150px]">
@@ -549,6 +554,9 @@ export function RemuneracaoVariavelTab({
           </Table>
         </CardContent>
       </Card>
+
+      {/* Action Plan Dashboard */}
+      <ActionPlanDashboard selectedLojaId={selectedUnidadeId} isAdmin={isAdmin} />
     </div>
   );
 }

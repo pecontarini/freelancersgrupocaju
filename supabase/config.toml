@@ -1,1 +1,7 @@
 project_id = "munehfraeisxfvpplkfi"
+
+[functions.process-checklist-pdf]
+verify_jwt = false
+
+[functions.extract-invoice-data]
+verify_jwt = false

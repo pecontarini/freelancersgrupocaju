@@ -3,6 +3,7 @@ import { ConfigSection } from "@/components/ConfigSection";
 import { ClearEntriesModal } from "@/components/ClearEntriesModal";
 import { BudgetConfigSection as OperationalBudgetSection } from "@/components/OperationalBudgetConfigSection";
 import { BonusConfigSection } from "@/components/BonusConfigSection";
+import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useConfigLojas,
@@ -36,6 +37,11 @@ export function ConfigurationsTab() {
       {/* Bonus Rules Configuration - Admin Only */}
       {isAdmin && (
         <BonusConfigSection />
+      )}
+
+      {/* Checklist Import - Admin Only */}
+      {isAdmin && (
+        <ChecklistImportSection />
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

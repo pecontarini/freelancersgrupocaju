@@ -245,4 +245,66 @@
   .hover-lift:hover {
     @apply -translate-y-1 shadow-lg;
   }
+
+  /* Hide scrollbar for carousels */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area for bottom navigation */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* Touch-friendly slider */
+  .touch-slider [data-radix-slider-thumb] {
+    @apply h-7 w-7;
+  }
+
+  /* Mobile card optimizations */
+  @media (max-width: 768px) {
+    .mobile-card-grid {
+      @apply grid grid-cols-1 gap-3;
+    }
+    
+    .mobile-touch-target {
+      @apply min-h-[44px] min-w-[44px];
+    }
+    
+    /* Reduce padding on mobile */
+    .mobile-compact {
+      @apply p-3;
+    }
+    
+    /* Full-width charts on mobile */
+    .mobile-chart-container {
+      @apply w-full overflow-hidden;
+    }
+    
+    .mobile-chart-container .recharts-wrapper {
+      @apply w-full !important;
+    }
+  }
+
+  /* High contrast badges for bright environments */
+  .badge-gold-hc {
+    @apply bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold shadow-md;
+  }
+  
+  .badge-silver-hc {
+    @apply bg-gradient-to-r from-slate-400 to-slate-500 text-white font-bold shadow-md;
+  }
+  
+  .badge-bronze-hc {
+    @apply bg-gradient-to-r from-amber-700 to-amber-800 text-white font-bold shadow-md;
+  }
+  
+  .badge-redflag-hc {
+    @apply bg-gradient-to-r from-red-500 to-red-600 text-white font-bold shadow-md animate-pulse;
+  }
 }

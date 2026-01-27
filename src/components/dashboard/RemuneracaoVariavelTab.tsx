@@ -295,8 +295,8 @@ export function RemuneracaoVariavelTab({
                 value={simulatedFaturamento}
                 onValueChange={setSimulatedFaturamento}
                 min={0}
-                max={200000}
-                step={1000}
+                max={4000000}
+                step={10000}
                 className="w-full"
               />
             </div>
@@ -373,7 +373,7 @@ export function RemuneracaoVariavelTab({
               </span>
             </div>
             <Progress 
-              value={Math.min((npsEfficiency / 120000) * 100, 100)} 
+              value={Math.min((npsEfficiency / 400000) * 100, 100)} 
               className="h-2" 
             />
           </div>

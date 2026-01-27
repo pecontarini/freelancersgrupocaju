@@ -48,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ActionPlanDashboard } from "@/components/action-plan";
 import { AuditReportButton } from "@/components/AuditReportButton";
 import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
@@ -57,6 +58,7 @@ import { WinsAlertsFeed } from "@/components/dashboard/WinsAlertsFeed";
 import { PerformanceEntryForm } from "@/components/dashboard/PerformanceEntryForm";
 import { PerformanceEntriesList } from "@/components/dashboard/PerformanceEntriesList";
 import { usePerformanceEntries } from "@/hooks/usePerformanceEntries";
+import { MobileRankingCard, MobileBonusResult } from "@/components/mobile";
 import {
   useNpsTargets,
   useBonusRules,
@@ -87,6 +89,7 @@ export function RemuneracaoVariavelTab({
 }: RemuneracaoVariavelTabProps) {
   const { options: lojas } = useConfigLojas();
   const { isAdmin } = useUserProfile();
+  const isMobile = useIsMobile();
   const { targets, determineTier } = useNpsTargets();
   const { rules, getPercentage } = useBonusRules();
   const { configs, getConfig } = useBonusConfig();
@@ -839,77 +842,134 @@ export function RemuneracaoVariavelTab({
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16">Pos.</TableHead>
-                <TableHead>Unidade</TableHead>
-                <TableHead className="text-center">NPS Efic.</TableHead>
-                <TableHead className="text-center">Supervisão</TableHead>
-                <TableHead className="text-right">Média</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          {/* Mobile: Card-based layout */}
+          {isMobile ? (
+            <div className="space-y-3">
               {rankingData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Nenhum dado de performance encontrado para este mês.
-                  </TableCell>
-                </TableRow>
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum dado de performance encontrado para este mês.
+                </div>
               ) : (
                 rankingData.map((store, index) => (
-                  <TableRow
+                  <MobileRankingCard
                     key={store.id}
-                    className={
-                      store.id === selectedUnidadeId ? "bg-primary/5" : undefined
-                    }
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {index === 0 && (
-                          <Medal className="h-5 w-5 text-amber-500" />
-                        )}
-                        {index === 1 && (
-                          <Medal className="h-5 w-5 text-slate-400" />
-                        )}
-                        {index === 2 && (
-                          <Medal className="h-5 w-5 text-amber-700" />
-                        )}
-                        {index > 2 && (
-                          <span className="text-muted-foreground">
-                            {index + 1}º
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{store.nome}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        variant={store.nps >= 95000 ? "default" : "secondary"}
-                      >
-                        {formatCurrency(store.nps)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        variant={store.supervisao >= 85 ? "default" : "secondary"}
-                      >
-                        {store.supervisao.toFixed(0)}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-bold">
-                      {store.avg.toFixed(0)}%
-                    </TableCell>
-                  </TableRow>
+                    store={store}
+                    index={index}
+                    isSelected={store.id === selectedUnidadeId}
+                  />
                 ))
               )}
-            </TableBody>
-          </Table>
+            </div>
+          ) : (
+            /* Desktop: Table layout */
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Pos.</TableHead>
+                  <TableHead>Unidade</TableHead>
+                  <TableHead className="text-center">NPS Efic.</TableHead>
+                  <TableHead className="text-center">Supervisão</TableHead>
+                  <TableHead className="text-right">Média</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rankingData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Nenhum dado de performance encontrado para este mês.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rankingData.map((store, index) => (
+                    <TableRow
+                      key={store.id}
+                      className={
+                        store.id === selectedUnidadeId ? "bg-primary/5" : undefined
+                      }
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {index === 0 && (
+                            <Medal className="h-5 w-5 text-amber-500" />
+                          )}
+                          {index === 1 && (
+                            <Medal className="h-5 w-5 text-slate-400" />
+                          )}
+                          {index === 2 && (
+                            <Medal className="h-5 w-5 text-amber-700" />
+                          )}
+                          {index > 2 && (
+                            <span className="text-muted-foreground">
+                              {index + 1}º
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{store.nome}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={store.nps >= 95000 ? "default" : "secondary"}
+                        >
+                          {formatCurrency(store.nps)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={store.supervisao >= 85 ? "default" : "secondary"}
+                        >
+                          {store.supervisao.toFixed(0)}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {store.avg.toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       {/* Action Plan Dashboard - Now with its own filters and URL sync */}
       <ActionPlanDashboard />
+
+      {/* Mobile Sticky Bonus Result */}
+      {isMobile && (
+        <MobileBonusResult
+          isRedFlag={isRedFlag}
+          redFlagReason={
+            simulatedSupervisao[0] < 80
+              ? "Supervisão abaixo de 80%"
+              : "NPS abaixo do mínimo"
+          }
+          totalBonus={totalNpsBonus + supervisionBonus.amount}
+          details={[
+            {
+              label: "Salão",
+              amount: npsBonusSalao.amount,
+              tier: tierSalao,
+              tierLabel: npsBonusSalao.tierLabel,
+              color: "bg-amber-50 dark:bg-amber-950/30",
+            },
+            {
+              label: "Delivery",
+              amount: npsBonusDelivery.amount,
+              tier: tierDelivery,
+              tierLabel: npsBonusDelivery.tierLabel,
+              color: "bg-sky-50 dark:bg-sky-950/30",
+            },
+            {
+              label: "Supervisão",
+              amount: supervisionBonus.amount,
+              tier: supervisionTier,
+              tierLabel: supervisionBonus.tierLabel,
+              color: "bg-primary/5",
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

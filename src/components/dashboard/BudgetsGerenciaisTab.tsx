@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
+import { MobileFreelancerCard } from "@/components/mobile/MobileFreelancerCard";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -57,6 +59,7 @@ export function BudgetsGerenciaisTab({
 }: BudgetsGerenciaisTabProps) {
   const today = format(new Date(), "yyyy-MM-dd");
   const currentMonth = format(new Date(), "yyyy-MM");
+  const isMobile = useIsMobile();
 
   const { getBudgetForStoreMonth, getCurrentMonthYear } = useStoreBudgets();
   const { options: lojas } = useConfigLojas();
@@ -425,6 +428,18 @@ export function BudgetsGerenciaisTab({
           {filteredFreelancers.length > 0 ? (
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
               {filteredFreelancers.slice(0, 20).map((entry) => {
+                // Mobile: use card component
+                if (isMobile) {
+                  return (
+                    <MobileFreelancerCard
+                      key={entry.id}
+                      entry={entry}
+                      onDelete={(id) => deleteFreelancer.mutate(id)}
+                    />
+                  );
+                }
+
+                // Desktop: inline row
                 const [year, month, day] = entry.data_pop.split("-");
                 return (
                   <div

@@ -18,6 +18,8 @@ import { useStorePerformance, type BonusTier } from "@/hooks/useBonusRules";
 import { useSupervisionAudits } from "@/hooks/useSupervisionAudits";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { formatCurrency } from "@/lib/formatters";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileWinsFeed } from "@/components/mobile/MobileWinsFeed";
 
 interface FeedEvent {
   id: string;
@@ -39,6 +41,7 @@ export function WinsAlertsFeed({ lojaId, showAllStores = false }: WinsAlertsFeed
   const { performances } = useStorePerformance();
   const { audits, failures } = useSupervisionAudits(showAllStores ? undefined : lojaId);
   const { options: lojas } = useConfigLojas();
+  const isMobile = useIsMobile();
 
   const getStoreName = (storeId: string) => {
     return lojas.find(l => l.id === storeId)?.nome || "Unidade";
@@ -194,6 +197,29 @@ export function WinsAlertsFeed({ lojaId, showAllStores = false }: WinsAlertsFeed
     }
   };
 
+  // Mobile: Use carousel or compact layout
+  if (isMobile) {
+    return (
+      <Card className="rounded-2xl shadow-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base uppercase">
+            <Bell className="h-5 w-5 text-primary" />
+            Vitórias e Alertas
+            {feedEvents.length > 0 && (
+              <Badge variant="secondary" className="ml-auto">
+                {feedEvents.length}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-3">
+          <MobileWinsFeed events={feedEvents} variant="carousel" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Desktop: Full layout
   return (
     <Card className="rounded-2xl shadow-card">
       <CardHeader>

@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
+import { BottomNavigation } from "@/components/layout/BottomNavigation";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
@@ -67,6 +69,7 @@ const Index = () => {
     isLoading: isLoadingProfile,
     hasNoRole,
   } = useUserProfile();
+  const isMobile = useIsMobile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(
     null
   );
@@ -198,6 +201,25 @@ const Index = () => {
     }
   };
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <div className="flex min-h-screen flex-col pb-20 pt-14">
+        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="px-4 py-4">
+          <PortalHeader
+            title={currentTabConfig.title}
+            subtitle={currentTabConfig.subtitle}
+            selectedUnidadeId={selectedUnidadeId}
+            onUnidadeChange={setSelectedUnidadeId}
+          />
+        </div>
+        <main className="flex-1 px-4 pb-4">{renderTabContent()}</main>
+      </div>
+    );
+  }
+
+  // Desktop layout with sidebar
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full">

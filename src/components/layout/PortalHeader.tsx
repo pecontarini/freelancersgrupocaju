@@ -1,6 +1,7 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UnidadeSelector } from "@/components/UnidadeSelector";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PortalHeaderProps {
   title: string;
@@ -16,10 +17,42 @@ export function PortalHeader({
   onUnidadeChange,
 }: PortalHeaderProps) {
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
+  const isMobile = useIsMobile();
 
   const showUnidadeSelector =
     isAdmin || (isGerenteUnidade && unidades.length > 1);
 
+  // Mobile layout - more compact
+  if (isMobile) {
+    return (
+      <header className="flex flex-col gap-3">
+        <div>
+          <h1 className="font-display text-lg font-bold uppercase tracking-tight text-foreground">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
+
+        {showUnidadeSelector && (
+          <UnidadeSelector
+            selectedUnidadeId={selectedUnidadeId}
+            onUnidadeChange={onUnidadeChange}
+          />
+        )}
+
+        {/* Single store indicator for gerente */}
+        {isGerenteUnidade && !isAdmin && unidades.length === 1 && (
+          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+            <span className="font-medium text-sm">{unidades[0]?.nome}</span>
+          </div>
+        )}
+      </header>
+    );
+  }
+
+  // Desktop layout
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b bg-card/80 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-4">

@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
 import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
+import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
@@ -27,6 +28,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   remuneracao: {
     title: "Remuneração Variável",
     subtitle: "Performance mensal e metas de bônus",
+  },
+  diagnostico: {
+    title: "Diagnóstico de Auditoria",
+    subtitle: "Análise de não conformidades e plano de ação",
   },
   cmv: {
     title: "CMV (Unitários)",
@@ -167,6 +172,13 @@ const Index = () => {
       case "remuneracao":
         return (
           <RemuneracaoVariavelTab selectedUnidadeId={selectedUnidadeId} />
+        );
+      case "diagnostico":
+        return (
+          <AuditDiagnosticDashboard 
+            selectedUnidadeId={selectedUnidadeId} 
+            isAdmin={isAdmin} 
+          />
         );
       case "cmv":
         return <CMVTab />;

@@ -9,6 +9,7 @@ import {
   LogOut,
   User,
   ChevronRight,
+  ClipboardCheck,
 } from "lucide-react";
 
 import {
@@ -55,6 +56,12 @@ const menuItems = [
     id: "remuneracao",
     icon: TrendingUp,
     description: "Performance e metas",
+  },
+  {
+    title: "DIAGNÓSTICO AUDITORIA",
+    id: "diagnostico",
+    icon: ClipboardCheck,
+    description: "Análise de não conformidades",
   },
   {
     title: "CMV (UNITÁRIOS)",

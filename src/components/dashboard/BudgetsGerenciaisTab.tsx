@@ -8,12 +8,25 @@ import {
   DollarSign,
   Wrench,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { FreelancerForm } from "@/components/FreelancerForm";
 import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
 import { ExportReportButton } from "@/components/ExportReportButton";
@@ -26,6 +39,8 @@ import { OperationalExpense } from "@/hooks/useOperationalExpenses";
 import { formatCurrency } from "@/lib/formatters";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
+import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -45,6 +60,8 @@ export function BudgetsGerenciaisTab({
 
   const { getBudgetForStoreMonth, getCurrentMonthYear } = useStoreBudgets();
   const { options: lojas } = useConfigLojas();
+  const { deleteEntry: deleteFreelancer } = useFreelancerEntries();
+  const { deleteEntry: deleteMaintenance } = useMaintenanceEntries();
 
   // Filter state
   const [filters, setFilters] = useState<FreelancerFiltersState>({
@@ -425,10 +442,39 @@ export function BudgetsGerenciaisTab({
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-3">
                       <p className="font-semibold text-primary">
                         {formatCurrency(entry.valor)}
                       </p>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Deseja excluir este lançamento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação é permanente e removerá o gasto de{" "}
+                              <strong>{entry.nome_completo}</strong> do cálculo de budget da unidade.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteFreelancer.mutate(entry.id)}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 );
@@ -531,7 +577,7 @@ export function BudgetsGerenciaisTab({
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-right">
+                    <div className="flex items-center gap-3">
                       {entry.anexo_url && (
                         <a
                           href={entry.anexo_url}
@@ -545,6 +591,35 @@ export function BudgetsGerenciaisTab({
                       <p className="font-semibold text-orange-600">
                         {formatCurrency(entry.valor)}
                       </p>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Deseja excluir este lançamento?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta ação é permanente e removerá o registro de manutenção de{" "}
+                              <strong>{entry.fornecedor}</strong> do cálculo de budget da unidade.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMaintenance(entry.id)}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 );

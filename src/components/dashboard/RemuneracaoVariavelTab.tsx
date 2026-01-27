@@ -48,7 +48,7 @@ import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { ActionPlanDashboard } from "@/components/ActionPlanDashboard";
+import { ActionPlanDashboard } from "@/components/action-plan";
 import { AuditReportButton } from "@/components/AuditReportButton";
 import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
 import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
@@ -908,8 +908,8 @@ export function RemuneracaoVariavelTab({
         </CardContent>
       </Card>
 
-      {/* Action Plan Dashboard */}
-      <ActionPlanDashboard selectedLojaId={selectedUnidadeId} isAdmin={isAdmin} />
+      {/* Action Plan Dashboard - Now with its own filters and URL sync */}
+      <ActionPlanDashboard />
     </div>
   );
 }

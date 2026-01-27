@@ -204,18 +204,20 @@ const Index = () => {
   // Mobile layout
   if (isMobile) {
     return (
-      <div className="flex min-h-screen flex-col pb-20 pt-14">
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <div className="px-4 py-4">
-          <PortalHeader
-            title={currentTabConfig.title}
-            subtitle={currentTabConfig.subtitle}
-            selectedUnidadeId={selectedUnidadeId}
-            onUnidadeChange={setSelectedUnidadeId}
-          />
+      <SidebarProvider>
+        <div className="flex min-h-screen flex-col pb-20 pt-14 w-full">
+          <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          <div className="px-4 py-4">
+            <PortalHeader
+              title={currentTabConfig.title}
+              subtitle={currentTabConfig.subtitle}
+              selectedUnidadeId={selectedUnidadeId}
+              onUnidadeChange={setSelectedUnidadeId}
+            />
+          </div>
+          <main className="flex-1 px-4 pb-4">{renderTabContent()}</main>
         </div>
-        <main className="flex-1 px-4 pb-4">{renderTabContent()}</main>
-      </div>
+      </SidebarProvider>
     );
   }
 

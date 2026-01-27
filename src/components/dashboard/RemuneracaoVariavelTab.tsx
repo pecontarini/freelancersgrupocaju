@@ -80,7 +80,7 @@ interface RemuneracaoVariavelTabProps {
 const BRAND_PATTERNS: Record<string, string[]> = {
   caminito: ["CAMINITO", "MULT"],
   nazo: ["NAZO", "NFE"],
-  frangobrasil: ["FB", "FRANGO"],
+  fosters: ["FB", "FOSTER"],
   caju: ["CAJU"],
 };
 
@@ -834,7 +834,7 @@ export function RemuneracaoVariavelTab({
                   <SelectItem value="all">Todas as Marcas</SelectItem>
                   <SelectItem value="caminito">Caminito</SelectItem>
                   <SelectItem value="nazo">Nazo</SelectItem>
-                  <SelectItem value="frangobrasil">Frango Brasil</SelectItem>
+                  <SelectItem value="fosters">FOSTERS BURGUER</SelectItem>
                   <SelectItem value="caju">Caju</SelectItem>
                 </SelectContent>
               </Select>

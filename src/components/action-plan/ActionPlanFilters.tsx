@@ -18,7 +18,8 @@ import { useMemo } from "react";
 const BRAND_PREFIXES: Record<string, string> = {
   "MULT": "Caminito",
   "NFE": "Nazo",
-  "FB": "Frango Brasil",
+  "FB": "FOSTERS BURGUER",
+  "FOSTER": "FOSTERS BURGUER",
   "CAJU": "Caju",
 };
 

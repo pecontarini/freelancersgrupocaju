@@ -17,7 +17,7 @@ interface AuditReportButtonProps {
 const BRAND_PATTERNS: Record<string, string[]> = {
   caminito: ["CAMINITO", "MULT"],
   nazo: ["NAZO", "NFE"],
-  frangobrasil: ["FB", "FRANGO"],
+  fosters: ["FB", "FOSTER"],
   caju: ["CAJU"],
 };
 
@@ -98,7 +98,7 @@ export function AuditReportButton({ brandFilter = "all" }: AuditReportButtonProp
       // Title
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
-      const brandName = brandFilter === "all" ? "TODAS AS MARCAS" : brandFilter.toUpperCase();
+      const brandName = brandFilter === "all" ? "TODAS AS MARCAS" : (brandFilter === "fosters" ? "FOSTERS BURGUER" : brandFilter.toUpperCase());
       doc.text(`RELATÓRIO DE AUDITORIA - ${brandName}`, pageWidth / 2, 35, { align: "center" });
 
       // Date

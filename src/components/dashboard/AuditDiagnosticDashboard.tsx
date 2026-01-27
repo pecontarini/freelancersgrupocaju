@@ -260,7 +260,7 @@ export function AuditDiagnosticDashboard({
               <SelectItem value="caminito">Caminito</SelectItem>
               <SelectItem value="nazo">Nazo</SelectItem>
               <SelectItem value="caju">Caju</SelectItem>
-              <SelectItem value="fosters">Foster's / FB</SelectItem>
+              <SelectItem value="fosters">FOSTERS BURGUER</SelectItem>
             </SelectContent>
           </Select>
         )}

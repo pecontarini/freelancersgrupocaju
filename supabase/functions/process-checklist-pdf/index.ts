@@ -40,20 +40,31 @@ Analise este PDF de auditoria de supervisão e extraia os seguintes dados em for
   "global_score": <número entre 0 e 100 representando a nota global/percentual de conformidade>,
   "audit_date": "<data da auditoria no formato YYYY-MM-DD>",
   "unit_name": "<nome da unidade/loja auditada>",
+  "area_scores": [
+    {
+      "area_name": "<nome da área/setor (ex: BAR, COZINHA, SALÃO, APV, etc)>",
+      "score": <nota percentual da área>,
+      "total_items": <total de itens avaliados na área>,
+      "conforming_items": <itens conformes>
+    }
+  ],
   "failures": [
     {
       "item_name": "<nome do item não conforme>",
-      "category": "<categoria do item, se disponível>"
+      "category": "<categoria/área do item - IMPORTANTE: identifique se é BAR, COZINHA, COZINHA QUENTE, PARRILLA, SUSHI, ESTOQUE, RECEBIMENTO, SALÃO, RECEPÇÃO, APV, DELIVERY, EXPEDIÇÃO, CAIXA, ADMINISTRATIVO ou outro>"
     }
   ]
 }
 
 Instruções:
 1. A nota global geralmente aparece como percentual de conformidade ou nota final
-2. Extraia TODOS os itens marcados como "Não", "Não Conforme", "NC", "Reprovado" ou similares
-3. Identifique a unidade pelo nome da loja ou estabelecimento
-4. Se não encontrar algum dado, use null
-5. Retorne APENAS o JSON, sem explicações adicionais`;
+2. Extraia TODAS as áreas/setores com suas notas individuais (ex: BAR 95%, COZINHA 88%, SALÃO 92%)
+3. Extraia TODOS os itens marcados como "Não", "Não Conforme", "NC", "Reprovado" ou similares
+4. Para cada falha, identifique a área/setor correspondente na categoria
+5. Identifique a unidade pelo nome da loja ou estabelecimento
+6. As áreas típicas são: BAR, COZINHA, COZINHA QUENTE, PARRILLA, SUSHI, ESTOQUE, RECEBIMENTO, SALÃO, RECEPÇÃO, APV, DELIVERY, EXPEDIÇÃO, CAIXA, ADMINISTRATIVO
+7. Se não encontrar algum dado, use null
+8. Retorne APENAS o JSON, sem explicações adicionais`;
 
     const messages: any[] = [
       { role: "system", content: extractionPrompt },

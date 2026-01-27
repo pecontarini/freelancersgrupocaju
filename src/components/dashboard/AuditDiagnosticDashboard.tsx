@@ -46,6 +46,13 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useSupervisionAudits, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { SectorBadgeCompact } from "@/components/dashboard/SectorResponsibilityBadges";
+import { 
+  SECTOR_POSITION_MAP, 
+  categorizeItemToSector,
+  POSITION_COLORS,
+  type AuditSector,
+} from "@/lib/sectorPositionMapping";
 
 interface AuditDiagnosticDashboardProps {
   selectedUnidadeId: string | null;
@@ -60,42 +67,37 @@ const BRAND_PATTERNS: Record<string, string[]> = {
   fosters: ["FOSTER", "FB"],
 };
 
-const SECTOR_KEYWORDS: Record<string, string[]> = {
-  Cozinha: ["cozinha", "preparo", "alimento", "temperatura", "geladeira", "freezer", "estoque alimentos", "higienização equipamentos", "manipulação"],
-  Salão: ["salão", "mesa", "cadeira", "atendimento", "cardápio", "cliente", "ambiente", "decoração"],
-  Banheiros: ["banheiro", "sanitário", "wc", "higiene pessoal", "papel", "sabonete", "limpeza sanitária"],
-  Estoque: ["estoque", "armazenamento", "validade", "etiqueta", "organização", "fifo", "peps", "depósito"],
-  Bar: ["bar", "bebida", "drink", "coquetel", "cerveja", "vinho", "gelo"],
-  Delivery: ["delivery", "embalagem", "entrega", "ifood", "aplicativo", "motoboy"],
+// Visual sector config for charts (maps to the new sector system)
+const SECTOR_DISPLAY: Record<string, { 
+  icon: React.ElementType; 
+  color: string;
+  keywords: string[];
+}> = {
+  bar: { icon: Beer, color: "hsl(280, 70%, 50%)", keywords: [] },
+  cozinha: { icon: ChefHat, color: "hsl(20, 80%, 50%)", keywords: [] },
+  salao: { icon: UtensilsCrossed, color: "hsl(150, 60%, 45%)", keywords: [] },
+  estoque: { icon: Warehouse, color: "hsl(var(--chart-4))", keywords: [] },
+  delivery: { icon: Truck, color: "hsl(210, 80%, 50%)", keywords: [] },
+  outros: { icon: Bath, color: "hsl(var(--muted-foreground))", keywords: [] },
 };
 
-const SECTOR_COLORS: Record<string, string> = {
-  Cozinha: "hsl(var(--chart-1))",
-  Salão: "hsl(var(--chart-2))",
-  Banheiros: "hsl(var(--chart-3))",
-  Estoque: "hsl(var(--chart-4))",
-  Bar: "hsl(var(--chart-5))",
-  Delivery: "hsl(210, 80%, 50%)",
-  Outros: "hsl(var(--muted-foreground))",
-};
+// Get display name for a sector
+function getSectorDisplayName(sector: AuditSector): string {
+  return SECTOR_POSITION_MAP[sector]?.displayName || sector;
+}
 
-const SECTOR_ICONS: Record<string, React.ElementType> = {
-  Cozinha: ChefHat,
-  Salão: UtensilsCrossed,
-  Banheiros: Bath,
-  Estoque: Warehouse,
-  Bar: Beer,
-  Delivery: Truck,
-};
-
-function categorizeSector(itemName: string): string {
-  const lowerName = itemName.toLowerCase();
-  for (const [sector, keywords] of Object.entries(SECTOR_KEYWORDS)) {
-    if (keywords.some((kw) => lowerName.includes(kw))) {
-      return sector;
-    }
+// Get color for a sector (use position color if chief exists)
+function getSectorColor(sector: AuditSector): string {
+  const config = SECTOR_POSITION_MAP[sector];
+  if (config?.primaryChief) {
+    return POSITION_COLORS[config.primaryChief];
   }
-  return "Outros";
+  return POSITION_COLORS[config?.responsibleManager || 'gerente_back'];
+}
+
+// Get icon for a sector
+function getSectorIcon(sector: string): React.ElementType {
+  return SECTOR_DISPLAY[sector]?.icon || Bath;
 }
 
 export function AuditDiagnosticDashboard({
@@ -181,18 +183,19 @@ export function AuditDiagnosticDashboard({
   }, [currentMonthFailures, previousMonthFailures]);
 
   const sectorDistribution = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts: Record<AuditSector, number> = {} as Record<AuditSector, number>;
     currentMonthFailures.forEach((f) => {
-      const sector = categorizeSector(f.item_name);
+      const sector = categorizeItemToSector(f.item_name, f.category);
       counts[sector] = (counts[sector] || 0) + 1;
     });
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     return Object.entries(counts)
       .map(([sector, count]) => ({
-        sector,
+        sector: sector as AuditSector,
+        displayName: getSectorDisplayName(sector as AuditSector),
         count,
         percentage: total > 0 ? Math.round((count / total) * 100) : 0,
-        color: SECTOR_COLORS[sector] || SECTOR_COLORS["Outros"],
+        color: getSectorColor(sector as AuditSector),
       }))
       .sort((a, b) => b.count - a.count);
   }, [currentMonthFailures]);
@@ -430,7 +433,7 @@ export function AuditDiagnosticDashboard({
                             const data = payload[0].payload;
                             return (
                               <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                                <p className="font-medium">{data.sector}</p>
+                                <p className="font-medium">{data.displayName}</p>
                                 <p className="text-primary font-bold">
                                   {data.count} falhas ({data.percentage}%)
                                 </p>
@@ -445,7 +448,7 @@ export function AuditDiagnosticDashboard({
                 </div>
                 <div className="space-y-3">
                   {sectorDistribution.slice(0, 5).map((sector) => {
-                    const Icon = SECTOR_ICONS[sector.sector] || Building2;
+                    const Icon = getSectorIcon(sector.sector);
                     return (
                       <div key={sector.sector} className="flex items-center gap-3">
                         <div
@@ -456,7 +459,10 @@ export function AuditDiagnosticDashboard({
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between text-sm">
-                            <span className="font-medium">{sector.sector}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{sector.displayName}</span>
+                              <SectorBadgeCompact sector={sector.sector} />
+                            </div>
                             <span className="text-muted-foreground">{sector.percentage}%</span>
                           </div>
                           <Progress value={sector.percentage} className="h-1.5 mt-1" />

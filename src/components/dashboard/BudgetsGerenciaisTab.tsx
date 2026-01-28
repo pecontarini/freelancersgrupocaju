@@ -70,7 +70,7 @@ export function BudgetsGerenciaisTab({
   const [filters, setFilters] = useState<FreelancerFiltersState>({
     searchTerm: "",
     lojaId: selectedUnidadeId,
-    funcao: null,
+    funcoes: [],
     dateStart: null,
     dateEnd: null,
   });
@@ -105,15 +105,15 @@ export function BudgetsGerenciaisTab({
         if (!entry.nome_completo.toLowerCase().includes(searchLower)) return false;
       }
       
-      // Function filter
-      if (filters.funcao && entry.funcao !== filters.funcao) return false;
+      // Function filter (multi-select)
+      if (filters.funcoes.length > 0 && !filters.funcoes.includes(entry.funcao)) return false;
       
       // Date range filter
       if (!isInDateRange(entry.data_pop)) return false;
       
       return true;
     });
-  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcao, filters.dateStart, filters.dateEnd]);
+  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcoes, filters.dateStart, filters.dateEnd]);
 
   const filteredMaintenance = useMemo(() => {
     return maintenanceEntries.filter((entry) => {
@@ -228,7 +228,7 @@ export function BudgetsGerenciaisTab({
   const hasActiveFilters = !!(
     filters.searchTerm ||
     filters.lojaId ||
-    filters.funcao ||
+    filters.funcoes.length > 0 ||
     filters.dateStart ||
     filters.dateEnd
   );

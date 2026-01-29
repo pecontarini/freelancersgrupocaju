@@ -39,6 +39,19 @@ export interface ReclamacaoInput {
   anexo_url?: string;
 }
 
+export interface ImageExtractionResult {
+  success: boolean;
+  nota_estrelas?: number;
+  texto_reclamacao?: string;
+  fonte?: FonteReclamacao;
+  tipo_operacao?: TipoOperacao;
+  resumo?: string;
+  temas?: string[];
+  palavras_chave?: string[];
+  confianca?: "alta" | "media" | "baixa";
+  error?: string;
+}
+
 export interface ReclamacoesAgregadas {
   loja_id: string;
   total: number;

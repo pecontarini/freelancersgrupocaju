@@ -1,14 +1,9 @@
-import { NetworkSummary } from "@/components/NetworkSummary";
-import { FreelancerEntry } from "@/types/freelancer";
+import { ExecutiveNetworkDashboard } from "@/components/dashboard/ExecutiveNetworkDashboard";
 
-interface RedeTabProps {
-  entries: FreelancerEntry[];
-}
-
-export function RedeTab({ entries }: RedeTabProps) {
+export function RedeTab() {
   return (
     <div className="fade-in">
-      <NetworkSummary entries={entries} />
+      <ExecutiveNetworkDashboard />
     </div>
   );
 }

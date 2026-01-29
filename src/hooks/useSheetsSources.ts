@@ -134,7 +134,7 @@ export function useSheetsSources() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sheets_sources'] });
-      toast.success('Fonte removida!');
+      toast.success('Sincronização removida com sucesso');
     },
     onError: () => {
       toast.error('Erro ao remover fonte.');

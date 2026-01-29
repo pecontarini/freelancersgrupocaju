@@ -9,6 +9,8 @@ import {
   Share2,
   ExternalLink,
   MessageSquare,
+  ShieldCheck,
+  Edit3,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerClose } from "@/components/ui/drawer";
@@ -18,6 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useActionPlans } from "@/hooks/useActionPlans";
 import { ActionPlanStatusBadge } from "./ActionPlanStatusBadge";
 import { ActionPlanResolutionForm } from "./ActionPlanResolutionForm";
@@ -56,6 +59,7 @@ export function ReclamacaoDetailView({
   onOpenChange,
 }: ReclamacaoDetailViewProps) {
   const isMobile = useIsMobile();
+  const { isAdmin, isGerenteUnidade } = useUserProfile();
   const [isImageZoomed, setIsImageZoomed] = useState(false);
 
   // Get action plan for this reclamacao's pain tags
@@ -71,6 +75,10 @@ export function ReclamacaoDetailView({
   );
 
   if (!reclamacao) return null;
+
+  // Determine user capabilities
+  const canManagerEdit = isGerenteUnidade && relatedActionPlan?.status === "pending";
+  const canAdminValidate = isAdmin && relatedActionPlan?.status === "in_analysis";
 
   // WhatsApp share message
   const handleShareWhatsApp = () => {
@@ -89,6 +97,13 @@ _Enviado do Portal da Liderança_`;
 
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://wa.me/?text=${encodedMessage}`, "_blank");
+  };
+
+  // Open image in new tab
+  const handleOpenImageNewTab = () => {
+    if (reclamacao.anexo_url) {
+      window.open(reclamacao.anexo_url, "_blank");
+    }
   };
 
   const DetailContent = () => (
@@ -135,41 +150,55 @@ _Enviado do Portal da Liderança_`;
 
         <Separator />
 
-        {/* Evidence Image */}
+        {/* Evidence Image - Prominent Display */}
         {reclamacao.anexo_url && (
           <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-muted-foreground uppercase">
-              Evidência
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase">
+                Evidência (Print)
+              </h4>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs gap-1"
+                onClick={handleOpenImageNewTab}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Abrir em Nova Aba
+              </Button>
+            </div>
             <div 
-              className="relative cursor-pointer group rounded-lg overflow-hidden border"
+              className="relative cursor-pointer group rounded-xl overflow-hidden border-2 border-muted bg-black/5 dark:bg-white/5"
               onClick={() => setIsImageZoomed(true)}
             >
-              <AspectRatio ratio={16/9}>
+              <AspectRatio ratio={16/10}>
                 <img 
                   src={reclamacao.anexo_url} 
                   alt="Print da reclamação" 
-                  className="object-cover w-full h-full"
+                  className="object-contain w-full h-full"
                 />
               </AspectRatio>
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <ZoomIn className="h-8 w-8 text-white" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div className="flex items-center gap-2 text-white">
+                  <ZoomIn className="h-6 w-6" />
+                  <span className="text-sm font-medium">Ampliar</span>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* AI Analysis */}
+        {/* AI Analysis - Dores da Operação */}
         <div className="space-y-2">
           <h4 className="text-sm font-semibold text-muted-foreground uppercase">
-            Análise da IA (Dores da Operação)
+            Dores da Operação (Análise IA)
           </h4>
           
           {/* Tags */}
           {(reclamacao.temas?.length > 0 || reclamacao.palavras_chave?.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {(reclamacao.temas?.length > 0 ? reclamacao.temas : reclamacao.palavras_chave)?.map((tag, idx) => (
-                <Badge key={idx} variant="secondary" className="text-xs">
+                <Badge key={idx} variant="secondary" className="text-xs bg-primary/10 text-primary">
                   {tag.startsWith("#") ? tag : `#${tag}`}
                 </Badge>
               ))}
@@ -178,18 +207,18 @@ _Enviado do Portal da Liderança_`;
 
           {/* AI Summary */}
           {reclamacao.resumo_ia && (
-            <p className="text-sm bg-muted/50 rounded-lg p-3">
-              {reclamacao.resumo_ia}
-            </p>
+            <div className="bg-muted/50 rounded-lg p-3 border">
+              <p className="text-sm leading-relaxed">{reclamacao.resumo_ia}</p>
+            </div>
           )}
 
           {/* Original Text (OCR) */}
           {reclamacao.texto_original && (
             <details className="group">
-              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                Ver texto original (OCR)
+              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground flex items-center gap-1">
+                <span>▸</span> Ver texto original (OCR)
               </summary>
-              <p className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded p-2 whitespace-pre-wrap">
+              <p className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded p-2 whitespace-pre-wrap border">
                 {reclamacao.texto_original}
               </p>
             </details>
@@ -212,11 +241,26 @@ _Enviado do Portal da Liderança_`;
             )}
           </div>
           
-          {!relatedActionPlan && (
-            <p className="text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4 inline mr-1" />
-              Nenhum plano de ação vinculado ainda.
-            </p>
+          {!relatedActionPlan ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+              <MessageSquare className="h-4 w-4" />
+              <span>Nenhum plano de ação vinculado ainda.</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm">
+              {canManagerEdit && (
+                <Badge variant="outline" className="gap-1 text-primary">
+                  <Edit3 className="h-3 w-3" />
+                  Você pode editar este plano
+                </Badge>
+              )}
+              {canAdminValidate && (
+                <Badge variant="outline" className="gap-1 text-emerald-600">
+                  <ShieldCheck className="h-3 w-3" />
+                  Aguardando sua validação
+                </Badge>
+              )}
+            </div>
           )}
         </div>
 
@@ -226,48 +270,37 @@ _Enviado do Portal da Liderança_`;
             <Separator />
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-muted-foreground uppercase">
-                Resolução do Problema
+                Plano de Resolução
               </h4>
               <ActionPlanResolutionForm
                 actionPlan={relatedActionPlan}
                 onUpdate={async (data) => { await updateActionPlan.mutateAsync(data); }}
               />
             </div>
-
-            {/* Timeline */}
-            <Separator />
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase">
-                Linha do Tempo
-              </h4>
-              <ActionPlanTimeline actionPlanId={relatedActionPlan.id} />
-            </div>
           </>
         )}
 
-        {/* Actions */}
+        {/* Actions Footer */}
         <Separator />
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="gap-2 flex-1 sm:flex-none"
             onClick={handleShareWhatsApp}
           >
             <Share2 className="h-4 w-4" />
-            Compartilhar no WhatsApp
+            Enviar para WhatsApp
           </Button>
           {reclamacao.anexo_url && (
             <Button
               variant="ghost"
               size="sm"
               className="gap-2"
-              asChild
+              onClick={handleOpenImageNewTab}
             >
-              <a href={reclamacao.anexo_url} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4" />
-                Abrir Imagem
-              </a>
+              <ExternalLink className="h-4 w-4" />
+              Abrir Imagem
             </Button>
           )}
         </div>
@@ -275,25 +308,38 @@ _Enviado do Portal da Liderança_`;
     </ScrollArea>
   );
 
-  // Zoomed Image Dialog
+  // Zoomed Image Dialog - Full screen with dark overlay
   const ZoomedImageDialog = () => (
     <Dialog open={isImageZoomed} onOpenChange={setIsImageZoomed}>
-      <DialogContent className="max-w-4xl p-2">
-        <DialogClose className="absolute right-2 top-2 z-10">
-          <X className="h-5 w-5" />
+      <DialogContent className="max-w-5xl p-0 bg-black/95 border-0">
+        <DialogClose className="absolute right-3 top-3 z-10 rounded-full bg-white/10 p-2 hover:bg-white/20 transition-colors">
+          <X className="h-5 w-5 text-white" />
         </DialogClose>
         {reclamacao.anexo_url && (
-          <img 
-            src={reclamacao.anexo_url} 
-            alt="Print da reclamação ampliado" 
-            className="w-full h-auto max-h-[85vh] object-contain rounded"
-          />
+          <div className="flex items-center justify-center min-h-[60vh] p-4">
+            <img 
+              src={reclamacao.anexo_url} 
+              alt="Print da reclamação ampliado" 
+              className="max-w-full max-h-[85vh] object-contain rounded"
+            />
+          </div>
         )}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            onClick={handleOpenImageNewTab}
+          >
+            <ExternalLink className="h-4 w-4" />
+            Abrir em Nova Aba
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
 
-  // Desktop: Dialog
+  // Desktop: Dialog with semi-transparent overlay
   if (!isMobile) {
     return (
       <>
@@ -315,15 +361,18 @@ _Enviado do Portal da Liderança_`;
     );
   }
 
-  // Mobile: Drawer
+  // Mobile: Drawer (slides from bottom)
   return (
     <>
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="max-h-[95vh]">
           <DrawerHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <DrawerTitle className="text-base">
+              <DrawerTitle className="text-base flex items-center gap-2">
                 Detalhes da Reclamação
+                {reclamacao.is_grave && (
+                  <Badge variant="destructive" className="text-xs">GRAVE</Badge>
+                )}
               </DrawerTitle>
               <DrawerClose asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">

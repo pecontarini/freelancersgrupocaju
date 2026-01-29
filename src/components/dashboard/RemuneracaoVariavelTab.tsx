@@ -77,6 +77,8 @@ import {
   useMetasCargo,
   type Cargo,
 } from "@/hooks/useCargos";
+import { RankingsTab } from "@/components/dashboard/RankingsTab";
+import { BonusCalculatorCard } from "@/components/dashboard/BonusCalculatorCard";
 
 interface RemuneracaoVariavelTabProps {
   selectedUnidadeId: string | null;
@@ -467,10 +469,14 @@ export function RemuneracaoVariavelTab({
 
       {/* Strategic BI Section with Tabs */}
       <Tabs defaultValue="forecast" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
+        <TabsList className="grid w-full grid-cols-4 mb-4">
           <TabsTrigger value="forecast" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             <span className="hidden sm:inline">Projeção</span>
+          </TabsTrigger>
+          <TabsTrigger value="rankings" className="flex items-center gap-2">
+            <Trophy className="h-4 w-4" />
+            <span className="hidden sm:inline">Rankings</span>
           </TabsTrigger>
           <TabsTrigger value="heatmap" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
@@ -493,6 +499,10 @@ export function RemuneracaoVariavelTab({
           />
         </TabsContent>
 
+        <TabsContent value="rankings" className="animate-fade-in">
+          <RankingsTab />
+        </TabsContent>
+
         <TabsContent value="heatmap" className="animate-fade-in">
           <ComplianceHeatmap lojaId={selectedUnidadeId} />
         </TabsContent>
@@ -501,6 +511,14 @@ export function RemuneracaoVariavelTab({
           <LeadershipRadar lojaId={selectedUnidadeId} />
         </TabsContent>
       </Tabs>
+
+      {/* V2: Bonus Calculator when cargo is selected */}
+      {selectedCargoId && selectedUnidadeId && (
+        <BonusCalculatorCard 
+          lojaId={selectedUnidadeId} 
+          cargoId={selectedCargoId} 
+        />
+      )}
 
       {/* Bonus Simulator */}
       <Card className="rounded-2xl shadow-card overflow-hidden">

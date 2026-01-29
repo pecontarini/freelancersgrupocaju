@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   AlertTriangle,
   Upload,
   Loader2,
-  MessageSquare,
-  Calendar,
+  Camera,
   Store,
   Star,
+  Check,
+  X,
+  Edit2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -40,86 +40,123 @@ interface ReclamacaoModalProps {
   trigger?: React.ReactNode;
 }
 
-const FONTES: { value: FonteReclamacao; label: string }[] = [
-  { value: "google", label: "Google" },
-  { value: "ifood", label: "iFood" },
-  { value: "tripadvisor", label: "TripAdvisor" },
-  { value: "getin", label: "Get In" },
-  { value: "manual", label: "Manual" },
-];
+interface ExtractedData {
+  nota_estrelas: number;
+  texto_reclamacao: string;
+  fonte: FonteReclamacao;
+  tipo_operacao: TipoOperacao;
+  resumo: string;
+  temas: string[];
+  palavras_chave: string[];
+  confianca: "alta" | "media" | "baixa";
+}
+
+const FONTE_LABELS: Record<FonteReclamacao, string> = {
+  google: "Google",
+  ifood: "iFood",
+  tripadvisor: "TripAdvisor",
+  getin: "Get In",
+  manual: "Manual",
+  sheets: "Planilha",
+};
 
 export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // Form state
+  // Form state - only unidade is required from user
   const [lojaId, setLojaId] = useState(selectedLojaId || "");
-  const [fonte, setFonte] = useState<FonteReclamacao>("google");
-  const [tipoOperacao, setTipoOperacao] = useState<TipoOperacao>("salao");
   const [dataReclamacao, setDataReclamacao] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [notaReclamacao, setNotaReclamacao] = useState(3);
-  const [textoOriginal, setTextoOriginal] = useState("");
-  const [resumoIA, setResumoIA] = useState("");
-  const [temas, setTemas] = useState<string[]>([]);
-  const [anexoFile, setAnexoFile] = useState<File | null>(null);
+  
+  // Optional manual override
+  const [manualTipoOperacao, setManualTipoOperacao] = useState<TipoOperacao | null>(null);
 
   const { options: lojas } = useConfigLojas();
   const { createReclamacao } = useReclamacoes();
 
-  const isGrave = notaReclamacao <= 3;
+  const effectiveTipoOperacao = manualTipoOperacao || extractedData?.tipo_operacao || "salao";
+  const isGrave = extractedData ? extractedData.nota_estrelas <= 3 : false;
 
-  // Process text with AI
-  const processWithAI = async () => {
-    if (!textoOriginal.trim()) {
-      toast.error("Digite o texto da reclamação primeiro.");
+  // Convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Handle image upload and AI processing
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Apenas imagens são aceitas para extração automática.");
       return;
     }
 
+    // Validate size (max 10MB for AI processing)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imagem muito grande. Máximo 10MB.");
+      return;
+    }
+
+    // Create preview
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
+    setImageFile(file);
+    setExtractedData(null);
+
+    // Process with AI
     setIsProcessingAI(true);
     try {
+      const base64 = await fileToBase64(file);
+      
       const { data, error } = await supabase.functions.invoke('process-reclamacao', {
-        body: { texto: textoOriginal },
+        body: { 
+          imageBase64: base64,
+          mimeType: file.type,
+        },
       });
 
       if (error) throw error;
 
-      if (data) {
-        setResumoIA(data.resumo || "");
-        setTemas(data.temas || []);
-        if (data.tipo_operacao) {
-          setTipoOperacao(data.tipo_operacao as TipoOperacao);
-        }
-        if (data.nota_sugerida) {
-          setNotaReclamacao(data.nota_sugerida);
-        }
-        toast.success("Texto processado pela IA!");
+      if (data.success) {
+        setExtractedData(data);
+        toast.success("Dados extraídos automaticamente!", {
+          description: `Fonte: ${FONTE_LABELS[data.fonte as FonteReclamacao]} | ${data.nota_estrelas} estrelas`,
+        });
+      } else {
+        toast.error(data.error || "Erro ao extrair dados da imagem.");
       }
     } catch (err) {
       console.error("AI processing error:", err);
-      toast.error("Erro ao processar com IA. Preencha manualmente.");
+      toast.error("Erro ao processar imagem. Tente novamente.");
     } finally {
       setIsProcessingAI(false);
     }
-  };
+  }, []);
 
-  // Handle file upload
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file type
-      if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
-        toast.error("Apenas imagens ou PDFs são aceitos.");
-        return;
-      }
-      // Check size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Arquivo muito grande. Máximo 5MB.");
-        return;
-      }
-      setAnexoFile(file);
-    }
-  };
+  // Reset form
+  const resetForm = useCallback(() => {
+    setExtractedData(null);
+    setImagePreview(null);
+    setImageFile(null);
+    setManualTipoOperacao(null);
+    setLojaId(selectedLojaId || "");
+    setDataReclamacao(format(new Date(), "yyyy-MM-dd"));
+  }, [selectedLojaId]);
 
   // Submit form
   const handleSubmit = async () => {
@@ -128,16 +165,21 @@ export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProp
       return;
     }
 
+    if (!extractedData) {
+      toast.error("Faça upload de uma imagem primeiro.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let anexoUrl: string | undefined;
 
-      // Upload attachment if present
-      if (anexoFile) {
-        const fileName = `${Date.now()}-${anexoFile.name}`;
+      // Upload image if present
+      if (imageFile) {
+        const fileName = `${Date.now()}-${imageFile.name}`;
         const { error: uploadError } = await supabase.storage
-          .from("audit-photos") // Reusing existing bucket
-          .upload(`reclamacoes/${fileName}`, anexoFile);
+          .from("audit-photos")
+          .upload(`reclamacoes/${fileName}`, imageFile);
 
         if (uploadError) throw uploadError;
 
@@ -150,21 +192,18 @@ export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProp
 
       await createReclamacao.mutateAsync({
         loja_id: lojaId,
-        fonte,
-        tipo_operacao: tipoOperacao,
+        fonte: extractedData.fonte,
+        tipo_operacao: effectiveTipoOperacao,
         data_reclamacao: dataReclamacao,
-        nota_reclamacao: notaReclamacao,
-        texto_original: textoOriginal || undefined,
-        resumo_ia: resumoIA || undefined,
-        temas: temas.length > 0 ? temas : undefined,
+        nota_reclamacao: extractedData.nota_estrelas,
+        texto_original: extractedData.texto_reclamacao || undefined,
+        resumo_ia: extractedData.resumo || undefined,
+        temas: extractedData.temas.length > 0 ? extractedData.temas : undefined,
+        palavras_chave: extractedData.palavras_chave.length > 0 ? extractedData.palavras_chave : undefined,
         anexo_url: anexoUrl,
       });
 
-      // Reset form
-      setTextoOriginal("");
-      setResumoIA("");
-      setTemas([]);
-      setAnexoFile(null);
+      resetForm();
       setOpen(false);
     } catch (err) {
       console.error("Submit error:", err);
@@ -174,11 +213,14 @@ export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen) resetForm();
+    }}>
       <DialogTrigger asChild>
         {trigger || (
           <Button className="gap-2">
-            <AlertTriangle className="h-4 w-4" />
+            <Camera className="h-4 w-4" />
             Adicionar Reclamação
           </Button>
         )}
@@ -190,16 +232,163 @@ export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProp
             Nova Reclamação
           </DialogTitle>
           <DialogDescription>
-            Registre uma reclamação de cliente. Os dados serão usados nos rankings e cálculos de bônus.
+            Faça upload de um screenshot da avaliação. O sistema extrairá automaticamente todas as informações.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 pt-4">
-          {/* Unidade */}
+          {/* Image Upload - Primary Action */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 font-medium">
+              <Camera className="h-4 w-4" />
+              Screenshot da Avaliação
+            </Label>
+            
+            {!imagePreview ? (
+              <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold">Clique para fazer upload</span> ou arraste a imagem
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG ou WEBP (máx. 10MB)
+                  </p>
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={isProcessingAI}
+                />
+              </label>
+            ) : (
+              <div className="relative">
+                <img 
+                  src={imagePreview} 
+                  alt="Preview" 
+                  className="w-full h-48 object-cover rounded-lg border"
+                />
+                {isProcessingAI && (
+                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-lg">
+                    <div className="text-center">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                      <p className="text-sm font-medium">Analisando imagem...</p>
+                      <p className="text-xs text-muted-foreground">Extraindo dados automaticamente</p>
+                    </div>
+                  </div>
+                )}
+                {!isProcessingAI && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8"
+                    onClick={() => {
+                      setImagePreview(null);
+                      setImageFile(null);
+                      setExtractedData(null);
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Extracted Data Display */}
+          {extractedData && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Check className="h-4 w-4 text-green-500" />
+                  Dados Extraídos
+                </h4>
+                <Badge variant={extractedData.confianca === "alta" ? "default" : "secondary"}>
+                  Confiança {extractedData.confianca}
+                </Badge>
+              </div>
+
+              {/* Stars and Severity */}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`h-5 w-5 ${
+                        star <= extractedData.nota_estrelas
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  ))}
+                </div>
+                {isGrave ? (
+                  <Badge variant="destructive">Grave</Badge>
+                ) : (
+                  <Badge variant="secondary">Não Grave</Badge>
+                )}
+              </div>
+
+              {/* Source and Operation Type */}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Fonte:</span>{" "}
+                  <span className="font-medium">{FONTE_LABELS[extractedData.fonte]}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Operação:</span>{" "}
+                  <span className="font-medium">
+                    {effectiveTipoOperacao === "delivery" ? "Delivery" : "Salão"}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setManualTipoOperacao(
+                      effectiveTipoOperacao === "delivery" ? "salao" : "delivery"
+                    )}
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Summary */}
+              {extractedData.resumo && (
+                <div>
+                  <span className="text-xs text-muted-foreground">Resumo:</span>
+                  <p className="text-sm">{extractedData.resumo}</p>
+                </div>
+              )}
+
+              {/* Themes */}
+              {extractedData.temas.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {extractedData.temas.map((tema, i) => (
+                    <Badge key={i} variant="outline" className="text-xs">
+                      {tema}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              {/* Extracted Text Preview */}
+              {extractedData.texto_reclamacao && (
+                <div className="text-xs text-muted-foreground bg-background rounded p-2 max-h-20 overflow-y-auto">
+                  "{extractedData.texto_reclamacao.substring(0, 200)}
+                  {extractedData.texto_reclamacao.length > 200 ? "..." : ""}"
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Required: Unidade Selection */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Store className="h-4 w-4" />
-              Unidade
+              Unidade <span className="text-destructive">*</span>
             </Label>
             <Select value={lojaId} onValueChange={setLojaId}>
               <SelectTrigger>
@@ -215,146 +404,20 @@ export function ReclamacaoModal({ selectedLojaId, trigger }: ReclamacaoModalProp
             </Select>
           </div>
 
-          {/* Fonte e Tipo */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Fonte</Label>
-              <Select value={fonte} onValueChange={(v) => setFonte(v as FonteReclamacao)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FONTES.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de Operação</Label>
-              <Select value={tipoOperacao} onValueChange={(v) => setTipoOperacao(v as TipoOperacao)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="salao">Salão</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Data e Nota */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Data
-              </Label>
-              <Input
-                type="date"
-                value={dataReclamacao}
-                onChange={(e) => setDataReclamacao(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Star className="h-4 w-4" />
-                Nota (1-5)
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={notaReclamacao}
-                  onChange={(e) => setNotaReclamacao(Number(e.target.value))}
-                  className="w-20"
-                />
-                {isGrave ? (
-                  <Badge variant="destructive">Grave</Badge>
-                ) : (
-                  <Badge variant="secondary">Não Grave</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Texto Original */}
+          {/* Date (optional, defaults to today) */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Texto da Reclamação (opcional)
-            </Label>
-            <Textarea
-              placeholder="Cole ou digite o texto da reclamação..."
-              value={textoOriginal}
-              onChange={(e) => setTextoOriginal(e.target.value)}
-              rows={4}
-            />
-            {textoOriginal.trim() && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={processWithAI}
-                disabled={isProcessingAI}
-                className="w-full"
-              >
-                {isProcessingAI ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processando com IA...
-                  </>
-                ) : (
-                  "Processar com IA"
-                )}
-              </Button>
-            )}
-          </div>
-
-          {/* AI Results */}
-          {resumoIA && (
-            <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-              <Label className="text-xs text-muted-foreground">Resumo IA:</Label>
-              <p className="text-sm">{resumoIA}</p>
-              {temas.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {temas.map((tema, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs">
-                      {tema}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Anexo */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              Anexo (opcional)
-            </Label>
+            <Label className="text-sm text-muted-foreground">Data da Reclamação</Label>
             <Input
-              type="file"
-              accept="image/*,application/pdf"
-              onChange={handleFileChange}
+              type="date"
+              value={dataReclamacao}
+              onChange={(e) => setDataReclamacao(e.target.value)}
             />
-            {anexoFile && (
-              <p className="text-xs text-muted-foreground">
-                Arquivo: {anexoFile.name}
-              </p>
-            )}
           </div>
 
           {/* Submit */}
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !lojaId}
+            disabled={isSubmitting || !lojaId || !extractedData || isProcessingAI}
             className="w-full"
           >
             {isSubmitting ? (

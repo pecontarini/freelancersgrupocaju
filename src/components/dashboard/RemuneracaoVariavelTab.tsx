@@ -1,50 +1,15 @@
 import { useState, useMemo } from "react";
-import {
-  TrendingUp,
-  Award,
-  Target,
-  Trophy,
-  Medal,
-  Star,
-  AlertTriangle,
-  Clock,
-  Users,
-  ChefHat,
-  Filter,
-  LayoutDashboard,
-  UtensilsCrossed,
-  Bike,
-  Plus,
-  Briefcase,
-} from "lucide-react";
+import { TrendingUp, Award, Target, Trophy, Medal, Star, AlertTriangle, Clock, Users, ChefHat, Filter, LayoutDashboard, UtensilsCrossed, Bike, Plus, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
@@ -60,26 +25,10 @@ import { PerformanceEntryForm } from "@/components/dashboard/PerformanceEntryFor
 import { PerformanceEntriesList } from "@/components/dashboard/PerformanceEntriesList";
 import { usePerformanceEntries } from "@/hooks/usePerformanceEntries";
 import { MobileRankingCard, MobileBonusResult } from "@/components/mobile";
-import {
-  useNpsTargets,
-  useBonusRules,
-  useBonusConfig,
-  useStorePerformance,
-  calculateBonus,
-  TIER_CONFIG,
-  POSITION_LABELS,
-  type PositionType,
-  type SectorType,
-  type BonusTier,
-} from "@/hooks/useBonusRules";
-import {
-  useCargos,
-  useMetasCargo,
-  type Cargo,
-} from "@/hooks/useCargos";
+import { useNpsTargets, useBonusRules, useBonusConfig, useStorePerformance, calculateBonus, TIER_CONFIG, POSITION_LABELS, type PositionType, type SectorType, type BonusTier } from "@/hooks/useBonusRules";
+import { useCargos, useMetasCargo, type Cargo } from "@/hooks/useCargos";
 import { RankingsTab } from "@/components/dashboard/RankingsTab";
 import { BonusCalculatorCard } from "@/components/dashboard/BonusCalculatorCard";
-
 interface RemuneracaoVariavelTabProps {
   selectedUnidadeId: string | null;
 }
@@ -89,24 +38,51 @@ const BRAND_PATTERNS: Record<string, string[]> = {
   caminito: ["CAMINITO", "MULT"],
   nazo: ["NAZO", "NFE"],
   fosters: ["FB", "FOSTER"],
-  caju: ["CAJU"],
+  caju: ["CAJU"]
 };
-
 export function RemuneracaoVariavelTab({
-  selectedUnidadeId,
+  selectedUnidadeId
 }: RemuneracaoVariavelTabProps) {
-  const { options: lojas } = useConfigLojas();
-  const { isAdmin } = useUserProfile();
+  const {
+    options: lojas
+  } = useConfigLojas();
+  const {
+    isAdmin
+  } = useUserProfile();
   const isMobile = useIsMobile();
-  const { targets, determineTier } = useNpsTargets();
-  const { rules, getPercentage } = useBonusRules();
-  const { configs, getConfig } = useBonusConfig();
-  const { performances, getPerformancesByMonth } = useStorePerformance();
-  const { aggregatedByStore } = usePerformanceEntries();
-  
+  const {
+    targets,
+    determineTier
+  } = useNpsTargets();
+  const {
+    rules,
+    getPercentage
+  } = useBonusRules();
+  const {
+    configs,
+    getConfig
+  } = useBonusConfig();
+  const {
+    performances,
+    getPerformancesByMonth
+  } = useStorePerformance();
+  const {
+    aggregatedByStore
+  } = usePerformanceEntries();
+
   // V2: Load cargos from database
-  const { cargos, gerencias, chefias, chefiasBack, chefiasFront, isLoading: isLoadingCargos } = useCargos();
-  const { metas, getMetasByCargo } = useMetasCargo();
+  const {
+    cargos,
+    gerencias,
+    chefias,
+    chefiasBack,
+    chefiasFront,
+    isLoading: isLoadingCargos
+  } = useCargos();
+  const {
+    metas,
+    getMetasByCargo
+  } = useMetasCargo();
 
   // State for collapsible admin section
   const [isEntryFormOpen, setIsEntryFormOpen] = useState(false);
@@ -121,43 +97,60 @@ export function RemuneracaoVariavelTab({
   const [selectedPosition, setSelectedPosition] = useState<PositionType>("gerente_front");
   const [selectedSector, setSelectedSector] = useState<SectorType>("salao");
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  
+
   // V2: Selected cargo from new model
   const [selectedCargoId, setSelectedCargoId] = useState<string>("");
-  
+
   // Get selected cargo details
   const selectedCargo = useMemo(() => {
     return cargos.find(c => c.id === selectedCargoId);
   }, [cargos, selectedCargoId]);
-  
+
   // Get metas for selected cargo
   const selectedCargoMetas = useMemo(() => {
     if (!selectedCargoId) return [];
     return getMetasByCargo(selectedCargoId);
   }, [selectedCargoId, getMetasByCargo]);
-  
+
   // V2: Determine if cargo is Gerencia or Chefia
   const isGerenteV2 = useMemo(() => {
     return selectedCargo?.categoria === 'gerencia';
   }, [selectedCargo]);
-  
+
   // V2: Get pote variável from cargo
   const poteVariavelV2 = useMemo(() => {
     return selectedCargo?.pote_variavel_max || 3000;
   }, [selectedCargo]);
-
   const currentMonthYear = format(new Date(), "yyyy-MM");
 
   // NPS Targets for each channel (Faturamento / Reclamações thresholds)
   const NPS_TARGETS = {
-    salao: { ouro: 120000, prata: 90000, bronze: 60000 },
-    delivery: { ouro: 12000, prata: 9000, bronze: 6000 },
+    salao: {
+      ouro: 120000,
+      prata: 90000,
+      bronze: 60000
+    },
+    delivery: {
+      ouro: 12000,
+      prata: 9000,
+      bronze: 6000
+    }
   };
 
   // Fixed bonus values per tier (50% of total NPS bonus for each channel)
   const NPS_BONUS_VALUES = {
-    gerente: { ouro: 750, prata: 562.5, bronze: 375, aceitavel: 187.5 },
-    chefia: { ouro: 750, prata: 500, bronze: 250, aceitavel: 0 },
+    gerente: {
+      ouro: 750,
+      prata: 562.5,
+      bronze: 375,
+      aceitavel: 187.5
+    },
+    chefia: {
+      ouro: 750,
+      prata: 500,
+      bronze: 250,
+      aceitavel: 0
+    }
   };
 
   // Calculate efficiency for Salão
@@ -209,7 +202,6 @@ export function RemuneracaoVariavelTab({
     // For Chefias, use combined efficiency
     return tierSalao === null && tierDelivery === null;
   }, [selectedPosition, tierSalao, tierDelivery]);
-
   const isRedFlag = useMemo(() => {
     return simulatedSupervisao[0] < 80 || isNpsRedFlag;
   }, [simulatedSupervisao, isNpsRedFlag]);
@@ -231,28 +223,36 @@ export function RemuneracaoVariavelTab({
   // Calculate NPS bonus for Salão (50% weight for Gerentes)
   const npsBonusSalao = useMemo(() => {
     if (isRedFlag || !tierSalao) {
-      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+      return {
+        amount: 0,
+        tier: null,
+        tierLabel: "RED FLAG"
+      };
     }
     const values = isGerente ? NPS_BONUS_VALUES.gerente : NPS_BONUS_VALUES.chefia;
     const amount = values[tierSalao];
-    return { 
-      amount, 
-      tier: tierSalao, 
-      tierLabel: TIER_CONFIG[tierSalao].label.toUpperCase() 
+    return {
+      amount,
+      tier: tierSalao,
+      tierLabel: TIER_CONFIG[tierSalao].label.toUpperCase()
     };
   }, [tierSalao, isGerente, isRedFlag]);
 
   // Calculate NPS bonus for Delivery (50% weight for Gerentes)
   const npsBonusDelivery = useMemo(() => {
     if (isRedFlag || !tierDelivery) {
-      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+      return {
+        amount: 0,
+        tier: null,
+        tierLabel: "RED FLAG"
+      };
     }
     const values = isGerente ? NPS_BONUS_VALUES.gerente : NPS_BONUS_VALUES.chefia;
     const amount = values[tierDelivery];
-    return { 
-      amount, 
-      tier: tierDelivery, 
-      tierLabel: TIER_CONFIG[tierDelivery].label.toUpperCase() 
+    return {
+      amount,
+      tier: tierDelivery,
+      tierLabel: TIER_CONFIG[tierDelivery].label.toUpperCase()
     };
   }, [tierDelivery, isGerente, isRedFlag]);
 
@@ -264,25 +264,69 @@ export function RemuneracaoVariavelTab({
   // Calculate supervision bonus based on fixed tier values
   const supervisionBonus = useMemo(() => {
     if (simulatedSupervisao[0] < 80 || !supervisionTier) {
-      return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+      return {
+        amount: 0,
+        tier: null,
+        tierLabel: "RED FLAG"
+      };
     }
 
     // Fixed values per position type
     if (isGerente) {
       // Gerentes (Front e Back)
       switch (supervisionTier) {
-        case "ouro": return { amount: 1500, tier: supervisionTier, tierLabel: "OURO" };
-        case "prata": return { amount: 1125, tier: supervisionTier, tierLabel: "PRATA" };
-        case "bronze": return { amount: 750, tier: supervisionTier, tierLabel: "BRONZE" };
-        default: return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+        case "ouro":
+          return {
+            amount: 1500,
+            tier: supervisionTier,
+            tierLabel: "OURO"
+          };
+        case "prata":
+          return {
+            amount: 1125,
+            tier: supervisionTier,
+            tierLabel: "PRATA"
+          };
+        case "bronze":
+          return {
+            amount: 750,
+            tier: supervisionTier,
+            tierLabel: "BRONZE"
+          };
+        default:
+          return {
+            amount: 0,
+            tier: null,
+            tierLabel: "RED FLAG"
+          };
       }
     } else {
       // Chefias (Salão, APV, Cozinha, Sushi, Bar, Parrilla)
       switch (supervisionTier) {
-        case "ouro": return { amount: 1500, tier: supervisionTier, tierLabel: "OURO" };
-        case "prata": return { amount: 1000, tier: supervisionTier, tierLabel: "PRATA" };
-        case "bronze": return { amount: 500, tier: supervisionTier, tierLabel: "BRONZE" };
-        default: return { amount: 0, tier: null, tierLabel: "RED FLAG" };
+        case "ouro":
+          return {
+            amount: 1500,
+            tier: supervisionTier,
+            tierLabel: "OURO"
+          };
+        case "prata":
+          return {
+            amount: 1000,
+            tier: supervisionTier,
+            tierLabel: "PRATA"
+          };
+        case "bronze":
+          return {
+            amount: 500,
+            tier: supervisionTier,
+            tierLabel: "BRONZE"
+          };
+        default:
+          return {
+            amount: 0,
+            tier: null,
+            tierLabel: "RED FLAG"
+          };
       }
     }
   }, [supervisionTier, isGerente, simulatedSupervisao]);
@@ -296,19 +340,27 @@ export function RemuneracaoVariavelTab({
 
   // Calculate legacy NPS bonus for compatibility
   const npsBonus = useMemo(() => {
-    if (isRedFlag) return { amount: 0, percentage: 0, tier: null };
+    if (isRedFlag) return {
+      amount: 0,
+      percentage: 0,
+      tier: null
+    };
     return calculateBonus(baseValue, currentTier, rules, selectedPosition, false);
   }, [baseValue, currentTier, rules, selectedPosition, isRedFlag]);
 
   // Total bonus (supervision bonus, zeroed if Red Flag)
   const bonusResult = useMemo(() => {
     if (isRedFlag) {
-      return { amount: 0, percentage: 0, tier: null };
+      return {
+        amount: 0,
+        percentage: 0,
+        tier: null
+      };
     }
     return {
       amount: supervisionBonus.amount,
-      percentage: supervisionTier === "ouro" ? 100 : supervisionTier === "prata" ? (isGerente ? 75 : 66.6) : (isGerente ? 50 : 33.3),
-      tier: supervisionTier,
+      percentage: supervisionTier === "ouro" ? 100 : supervisionTier === "prata" ? isGerente ? 75 : 66.6 : isGerente ? 50 : 33.3,
+      tier: supervisionTier
     };
   }, [supervisionBonus, supervisionTier, isGerente, isRedFlag]);
 
@@ -316,48 +368,40 @@ export function RemuneracaoVariavelTab({
   const filteredStores = useMemo(() => {
     if (brandFilter === "all") return lojas;
     const patterns = BRAND_PATTERNS[brandFilter] || [];
-    return lojas.filter((loja) =>
-      patterns.some((pattern) => loja.nome.toUpperCase().includes(pattern))
-    );
+    return lojas.filter(loja => patterns.some(pattern => loja.nome.toUpperCase().includes(pattern)));
   }, [lojas, brandFilter]);
 
   // Get current month performances with store data for ranking (use weekly entries)
   const rankingData = useMemo(() => {
     const monthPerformances = getPerformancesByMonth(currentMonthYear);
-    
-    return filteredStores
-      .map((loja) => {
-        // Prioritize weekly accumulated entries, fall back to store_performance
-        const weeklyData = aggregatedByStore[loja.id];
-        const perf = monthPerformances.find((p) => p.loja_id === loja.id);
-        
-        // Use accumulated weekly data if available
-        const faturamento = weeklyData ? weeklyData.total_faturamento : (perf?.faturamento || 0);
-        const reclamacoes = weeklyData 
-          ? weeklyData.total_reclamacoes 
-          : (perf?.num_reclamacoes || 0);
-        
-        // Calculate NPS efficiency
-        const npsEfficiency = reclamacoes > 0 ? faturamento / reclamacoes : faturamento;
-        
-        // Supervision comes from audits (fixed pillar)
-        const supervisao = perf?.supervisao_score || 0;
-        
-        // Calculate average score (NPS efficiency normalized + supervision)
-        const npsNormalized = Math.min((npsEfficiency / 200000) * 100, 100); // Normalize to 0-100
-        const avg = supervisao > 0 ? (npsNormalized + supervisao) / 2 : npsNormalized;
-        
-        return {
-          id: loja.id,
-          nome: loja.nome,
-          nps: npsEfficiency,
-          supervisao: supervisao,
-          faturamento: faturamento,
-          avg: avg,
-          hasWeeklyData: !!weeklyData && weeklyData.entries_count > 0,
-        };
-      })
-      .sort((a, b) => b.avg - a.avg);
+    return filteredStores.map(loja => {
+      // Prioritize weekly accumulated entries, fall back to store_performance
+      const weeklyData = aggregatedByStore[loja.id];
+      const perf = monthPerformances.find(p => p.loja_id === loja.id);
+
+      // Use accumulated weekly data if available
+      const faturamento = weeklyData ? weeklyData.total_faturamento : perf?.faturamento || 0;
+      const reclamacoes = weeklyData ? weeklyData.total_reclamacoes : perf?.num_reclamacoes || 0;
+
+      // Calculate NPS efficiency
+      const npsEfficiency = reclamacoes > 0 ? faturamento / reclamacoes : faturamento;
+
+      // Supervision comes from audits (fixed pillar)
+      const supervisao = perf?.supervisao_score || 0;
+
+      // Calculate average score (NPS efficiency normalized + supervision)
+      const npsNormalized = Math.min(npsEfficiency / 200000 * 100, 100); // Normalize to 0-100
+      const avg = supervisao > 0 ? (npsNormalized + supervisao) / 2 : npsNormalized;
+      return {
+        id: loja.id,
+        nome: loja.nome,
+        nps: npsEfficiency,
+        supervisao: supervisao,
+        faturamento: faturamento,
+        avg: avg,
+        hasWeeklyData: !!weeklyData && weeklyData.entries_count > 0
+      };
+    }).sort((a, b) => b.avg - a.avg);
   }, [filteredStores, getPerformancesByMonth, currentMonthYear, aggregatedByStore]);
 
   // Get color based on value
@@ -373,43 +417,25 @@ export function RemuneracaoVariavelTab({
     value,
     label,
     target,
-    icon: Icon,
+    icon: Icon
   }: {
     value: number;
     label: string;
     target: number;
     icon?: React.ElementType;
   }) => {
-    const percentage = Math.min((value / target) * 100, 100);
-
-    return (
-      <Card className="rounded-2xl shadow-card">
+    const percentage = Math.min(value / target * 100, 100);
+    return <Card className="rounded-2xl shadow-card">
         <CardContent className="flex flex-col items-center justify-center p-6">
           <div className="relative h-32 w-32">
             <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 50">
-              <path
-                d="M 10 50 A 40 40 0 0 1 90 50"
-                fill="none"
-                stroke="hsl(var(--muted))"
-                strokeWidth="8"
-                strokeLinecap="round"
-              />
-              <path
-                d="M 10 50 A 40 40 0 0 1 90 50"
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${percentage * 1.26}, 126`}
-                className="transition-all duration-500"
-              />
+              <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" strokeLinecap="round" />
+              <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="hsl(var(--primary))" strokeWidth="8" strokeLinecap="round" strokeDasharray={`${percentage * 1.26}, 126`} className="transition-all duration-500" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-end pb-2">
               {Icon && <Icon className={`h-5 w-5 mb-1 ${getGaugeColor(percentage)}`} />}
               <span className={`text-2xl font-bold ${getGaugeColor(percentage)}`}>
-                {typeof value === "number" && value > 1000
-                  ? formatCurrency(value)
-                  : `${value.toFixed(0)}%`}
+                {typeof value === "number" && value > 1000 ? formatCurrency(value) : `${value.toFixed(0)}%`}
               </span>
             </div>
           </div>
@@ -420,12 +446,9 @@ export function RemuneracaoVariavelTab({
             Meta: {target > 1000 ? formatCurrency(target) : `${target}%`}
           </p>
         </CardContent>
-      </Card>
-    );
+      </Card>;
   };
-
-  return (
-    <div className="space-y-6 fade-in">
+  return <div className="space-y-6 fade-in">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -437,15 +460,16 @@ export function RemuneracaoVariavelTab({
               Performance Mensal
             </h2>
             <p className="text-muted-foreground">
-              {format(new Date(), "MMMM 'de' yyyy", { locale: ptBR })}
+              {format(new Date(), "MMMM 'de' yyyy", {
+              locale: ptBR
+            })}
             </p>
           </div>
         </div>
       </div>
 
       {/* Admin: Weekly Performance Entry Section */}
-      {isAdmin && (
-        <Collapsible open={isEntryFormOpen} onOpenChange={setIsEntryFormOpen}>
+      {isAdmin && <Collapsible open={isEntryFormOpen} onOpenChange={setIsEntryFormOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="outline" className="w-full justify-between">
               <span className="flex items-center gap-2">
@@ -461,8 +485,7 @@ export function RemuneracaoVariavelTab({
             <PerformanceEntryForm selectedUnidadeId={selectedUnidadeId} />
             <PerformanceEntriesList selectedLojaId={selectedUnidadeId} />
           </CollapsibleContent>
-        </Collapsible>
-      )}
+        </Collapsible>}
 
       {/* Wins & Alerts Feed - Activity Timeline */}
       <WinsAlertsFeed lojaId={selectedUnidadeId} showAllStores={isAdmin} />
@@ -489,14 +512,7 @@ export function RemuneracaoVariavelTab({
         </TabsList>
 
         <TabsContent value="forecast" className="animate-fade-in">
-          <ForecastingCard
-            currentFaturamento={faturamentoSalao[0] + faturamentoDelivery[0]}
-            currentReclamacoes={reclamacoesSalao[0] + reclamacoesDelivery[0]}
-            supervisaoScore={simulatedSupervisao[0]}
-            determineTier={determineTier}
-            sector={selectedSector}
-            selectedLojaId={selectedUnidadeId}
-          />
+          <ForecastingCard currentFaturamento={faturamentoSalao[0] + faturamentoDelivery[0]} currentReclamacoes={reclamacoesSalao[0] + reclamacoesDelivery[0]} supervisaoScore={simulatedSupervisao[0]} determineTier={determineTier} sector={selectedSector} selectedLojaId={selectedUnidadeId} />
         </TabsContent>
 
         <TabsContent value="rankings" className="animate-fade-in">
@@ -513,12 +529,7 @@ export function RemuneracaoVariavelTab({
       </Tabs>
 
       {/* V2: Bonus Calculator when cargo is selected */}
-      {selectedCargoId && selectedUnidadeId && (
-        <BonusCalculatorCard 
-          lojaId={selectedUnidadeId} 
-          cargoId={selectedCargoId} 
-        />
-      )}
+      {selectedCargoId && selectedUnidadeId && <BonusCalculatorCard lojaId={selectedUnidadeId} cargoId={selectedCargoId} />}
 
       {/* Bonus Simulator */}
       <Card className="rounded-2xl shadow-card overflow-hidden">
@@ -535,66 +546,47 @@ export function RemuneracaoVariavelTab({
           {/* V2: Cargo selector with grouped options */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium uppercase flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
+              <label className="text-sm font-medium uppercase flex items-center gap-2">CARGO<Briefcase className="h-4 w-4" />
                 Cargo (V2)
               </label>
-              <Select
-                value={selectedCargoId}
-                onValueChange={setSelectedCargoId}
-              >
+              <Select value={selectedCargoId} onValueChange={setSelectedCargoId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cargo" />
                 </SelectTrigger>
                 <SelectContent>
                   {/* Gerências */}
-                  {gerencias.length > 0 && (
-                    <>
+                  {gerencias.length > 0 && <>
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
                         Gerência (Teto R$ 5.000)
                       </div>
-                      {gerencias.map((cargo) => (
-                        <SelectItem key={cargo.id} value={cargo.id}>
+                      {gerencias.map(cargo => <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
+                        </SelectItem>)}
+                    </>}
                   {/* Chefias Front */}
-                  {chefiasFront.length > 0 && (
-                    <>
+                  {chefiasFront.length > 0 && <>
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase mt-1">
                         Chefia Front (Teto R$ 3.000)
                       </div>
-                      {chefiasFront.map((cargo) => (
-                        <SelectItem key={cargo.id} value={cargo.id}>
+                      {chefiasFront.map(cargo => <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
+                        </SelectItem>)}
+                    </>}
                   {/* Chefias Back */}
-                  {chefiasBack.length > 0 && (
-                    <>
+                  {chefiasBack.length > 0 && <>
                       <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase mt-1">
                         Chefia Back (Teto R$ 3.000)
                       </div>
-                      {chefiasBack.map((cargo) => (
-                        <SelectItem key={cargo.id} value={cargo.id}>
+                      {chefiasBack.map(cargo => <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome} {cargo.setor_back && `(${cargo.setor_back})`}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
+                        </SelectItem>)}
+                    </>}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium uppercase">Setor (Legacy)</label>
-              <Select
-                value={selectedSector}
-                onValueChange={(v) => setSelectedSector(v as SectorType)}
-              >
+              <Select value={selectedSector} onValueChange={v => setSelectedSector(v as SectorType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -609,14 +601,9 @@ export function RemuneracaoVariavelTab({
           </div>
           
           {/* V2: Display selected cargo info */}
-          {selectedCargo && (
-            <div className="rounded-lg bg-primary/5 p-3 flex items-center justify-between">
+          {selectedCargo && <div className="rounded-lg bg-primary/5 p-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {selectedCargo.categoria === 'gerencia' ? (
-                  <Briefcase className="h-5 w-5 text-primary" />
-                ) : (
-                  <ChefHat className="h-5 w-5 text-primary" />
-                )}
+                {selectedCargo.categoria === 'gerencia' ? <Briefcase className="h-5 w-5 text-primary" /> : <ChefHat className="h-5 w-5 text-primary" />}
                 <div>
                   <p className="font-medium">{selectedCargo.nome}</p>
                   <p className="text-xs text-muted-foreground">
@@ -628,8 +615,7 @@ export function RemuneracaoVariavelTab({
                 <p className="text-xs text-muted-foreground">Pote Máximo</p>
                 <p className="font-bold text-primary">{formatCurrency(poteVariavelV2)}</p>
               </div>
-            </div>
-          )}
+            </div>}
 
           {/* NPS Inputs - Salão Block */}
           <div className="rounded-xl border border-amber-200 bg-amber-50/30 dark:bg-amber-950/20 dark:border-amber-800 p-4 space-y-4">
@@ -638,14 +624,10 @@ export function RemuneracaoVariavelTab({
               <span className="text-sm font-bold uppercase text-amber-700 dark:text-amber-400">
                 Pilar A - Salão (50%)
               </span>
-              {tierSalao && !isRedFlag && (
-                <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white text-xs`}>
+              {tierSalao && !isRedFlag && <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white text-xs`}>
                   {npsBonusSalao.tierLabel}
-                </Badge>
-              )}
-              {!tierSalao && (
-                <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>
-              )}
+                </Badge>}
+              {!tierSalao && <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>}
             </div>
 
             <div className="space-y-3">
@@ -658,14 +640,7 @@ export function RemuneracaoVariavelTab({
                   {formatCurrency(faturamentoSalao[0])}
                 </span>
               </div>
-              <Slider
-                value={faturamentoSalao}
-                onValueChange={setFaturamentoSalao}
-                min={0}
-                max={4000000}
-                step={10000}
-                className="w-full"
-              />
+              <Slider value={faturamentoSalao} onValueChange={setFaturamentoSalao} min={0} max={4000000} step={10000} className="w-full" />
             </div>
 
             <div className="space-y-3">
@@ -678,14 +653,7 @@ export function RemuneracaoVariavelTab({
                   {reclamacoesSalao[0]}
                 </span>
               </div>
-              <Slider
-                value={reclamacoesSalao}
-                onValueChange={setReclamacoesSalao}
-                min={0}
-                max={50}
-                step={1}
-                className="w-full"
-              />
+              <Slider value={reclamacoesSalao} onValueChange={setReclamacoesSalao} min={0} max={50} step={1} className="w-full" />
             </div>
 
             {/* Salão Efficiency Display */}
@@ -708,14 +676,10 @@ export function RemuneracaoVariavelTab({
               <span className="text-sm font-bold uppercase text-sky-700 dark:text-sky-400">
                 Pilar B - Delivery (50%)
               </span>
-              {tierDelivery && !isRedFlag && (
-                <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white text-xs`}>
+              {tierDelivery && !isRedFlag && <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white text-xs`}>
                   {npsBonusDelivery.tierLabel}
-                </Badge>
-              )}
-              {!tierDelivery && (
-                <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>
-              )}
+                </Badge>}
+              {!tierDelivery && <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>}
             </div>
 
             <div className="space-y-3">
@@ -728,14 +692,7 @@ export function RemuneracaoVariavelTab({
                   {formatCurrency(faturamentoDelivery[0])}
                 </span>
               </div>
-              <Slider
-                value={faturamentoDelivery}
-                onValueChange={setFaturamentoDelivery}
-                min={0}
-                max={1500000}
-                step={5000}
-                className="w-full"
-              />
+              <Slider value={faturamentoDelivery} onValueChange={setFaturamentoDelivery} min={0} max={1500000} step={5000} className="w-full" />
             </div>
 
             <div className="space-y-3">
@@ -748,14 +705,7 @@ export function RemuneracaoVariavelTab({
                   {reclamacoesDelivery[0]}
                 </span>
               </div>
-              <Slider
-                value={reclamacoesDelivery}
-                onValueChange={setReclamacoesDelivery}
-                min={0}
-                max={100}
-                step={1}
-                className="w-full"
-              />
+              <Slider value={reclamacoesDelivery} onValueChange={setReclamacoesDelivery} min={0} max={100} step={1} className="w-full" />
             </div>
 
             {/* Delivery Efficiency Display */}
@@ -800,28 +750,15 @@ export function RemuneracaoVariavelTab({
                 <span className="text-sm font-bold text-primary">
                   {simulatedSupervisao[0]}%
                 </span>
-                {supervisionTier && simulatedSupervisao[0] >= 80 && (
-                  <Badge
-                    className={`bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white text-xs`}
-                  >
+                {supervisionTier && simulatedSupervisao[0] >= 80 && <Badge className={`bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white text-xs`}>
                     {supervisionBonus.tierLabel}
-                  </Badge>
-                )}
-                {simulatedSupervisao[0] < 80 && (
-                  <Badge variant="destructive" className="text-xs">
+                  </Badge>}
+                {simulatedSupervisao[0] < 80 && <Badge variant="destructive" className="text-xs">
                     RED FLAG
-                  </Badge>
-                )}
+                  </Badge>}
               </div>
             </div>
-            <Slider
-              value={simulatedSupervisao}
-              onValueChange={setSimulatedSupervisao}
-              min={0}
-              max={100}
-              step={1}
-              className="w-full"
-            />
+            <Slider value={simulatedSupervisao} onValueChange={setSimulatedSupervisao} min={0} max={100} step={1} className="w-full" />
             <div className="flex justify-between text-xs text-muted-foreground mt-1">
               <span>Bônus Supervisão: <span className={simulatedSupervisao[0] < 80 ? "text-destructive font-bold" : "text-primary font-bold"}>{formatCurrency(supervisionBonus.amount)}</span></span>
               <span className="text-muted-foreground">
@@ -842,70 +779,46 @@ export function RemuneracaoVariavelTab({
                 {simulatedTempoPrato[0]} min
               </span>
             </div>
-            <Slider
-              value={simulatedTempoPrato}
-              onValueChange={setSimulatedTempoPrato}
-              min={5}
-              max={45}
-              step={1}
-              className="w-full"
-            />
+            <Slider value={simulatedTempoPrato} onValueChange={setSimulatedTempoPrato} min={5} max={45} step={1} className="w-full" />
           </div>
 
           {/* Final Result - Desktop */}
-          <div
-            className={`hidden md:block rounded-2xl p-6 ${
-              isRedFlag
-                ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500"
-                : "bg-gradient-to-br from-muted/50 to-muted"
-            }`}
-          >
-            {isRedFlag ? (
-              <div className="flex flex-col items-center gap-4">
+          <div className={`hidden md:block rounded-2xl p-6 ${isRedFlag ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500" : "bg-gradient-to-br from-muted/50 to-muted"}`}>
+            {isRedFlag ? <div className="flex flex-col items-center gap-4">
                 <AlertTriangle className="h-12 w-12 text-red-500" />
                 <div className="text-center">
                   <p className="text-xl font-bold text-red-500">🚨 STATUS: RED FLAG</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    {simulatedSupervisao[0] < 80 
-                      ? "Supervisão abaixo de 80%." 
-                      : "NPS de algum canal abaixo do mínimo."}
+                    {simulatedSupervisao[0] < 80 ? "Supervisão abaixo de 80%." : "NPS de algum canal abaixo do mínimo."}
                     {" "}Bônus TOTAL bloqueado.
                   </p>
                   <p className="text-3xl font-bold text-red-500 mt-4">
                     R$ 0,00
                   </p>
                 </div>
-              </div>
-            ) : (
-              <>
+              </div> : <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                   <div className="text-center p-3 rounded-xl bg-background/50">
                     <p className="text-xs text-muted-foreground uppercase">NPS Salão</p>
                     <p className="text-lg font-bold text-amber-600">{formatCurrency(npsBonusSalao.amount)}</p>
-                    {tierSalao && (
-                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white`}>
+                    {tierSalao && <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierSalao].gradient} text-white`}>
                         {TIER_CONFIG[tierSalao].label}
-                      </Badge>
-                    )}
+                      </Badge>}
                   </div>
                   <div className="text-center p-3 rounded-xl bg-background/50">
                     <p className="text-xs text-muted-foreground uppercase">NPS Delivery</p>
                     <p className="text-lg font-bold text-sky-600">{formatCurrency(npsBonusDelivery.amount)}</p>
-                    {tierDelivery && (
-                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white`}>
+                    {tierDelivery && <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tierDelivery].gradient} text-white`}>
                         {TIER_CONFIG[tierDelivery].label}
-                      </Badge>
-                    )}
+                      </Badge>}
                   </div>
                   <div className="text-center p-3 rounded-xl bg-background/50">
                     <p className="text-xs text-muted-foreground uppercase">Supervisão</p>
                     <p className="text-lg font-bold text-primary">{formatCurrency(supervisionBonus.amount)}</p>
-                    {supervisionTier && (
-                      <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white`}>
+                    {supervisionTier && <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[supervisionTier].gradient} text-white`}>
                         {TIER_CONFIG[supervisionTier].label}
-                      </Badge>
-                    )}
+                      </Badge>}
                   </div>
                 </div>
 
@@ -921,44 +834,30 @@ export function RemuneracaoVariavelTab({
                     {formatCurrency(totalNpsBonus + supervisionBonus.amount)}
                   </p>
                 </div>
-              </>
-            )}
+              </>}
           </div>
 
           {/* Final Result - Mobile (inline, not fixed) */}
           <div className="md:hidden">
-            <MobileBonusResult
-              isRedFlag={isRedFlag}
-              redFlagReason={
-                simulatedSupervisao[0] < 80
-                  ? "Supervisão abaixo de 80%"
-                  : "NPS abaixo do mínimo"
-              }
-              totalBonus={totalNpsBonus + supervisionBonus.amount}
-              details={[
-                {
-                  label: "Salão",
-                  amount: npsBonusSalao.amount,
-                  tier: tierSalao,
-                  tierLabel: npsBonusSalao.tierLabel,
-                  color: "bg-amber-50 dark:bg-amber-950/30",
-                },
-                {
-                  label: "Delivery",
-                  amount: npsBonusDelivery.amount,
-                  tier: tierDelivery,
-                  tierLabel: npsBonusDelivery.tierLabel,
-                  color: "bg-sky-50 dark:bg-sky-950/30",
-                },
-                {
-                  label: "Supervisão",
-                  amount: supervisionBonus.amount,
-                  tier: supervisionTier,
-                  tierLabel: supervisionBonus.tierLabel,
-                  color: "bg-primary/5",
-                },
-              ]}
-            />
+            <MobileBonusResult isRedFlag={isRedFlag} redFlagReason={simulatedSupervisao[0] < 80 ? "Supervisão abaixo de 80%" : "NPS abaixo do mínimo"} totalBonus={totalNpsBonus + supervisionBonus.amount} details={[{
+            label: "Salão",
+            amount: npsBonusSalao.amount,
+            tier: tierSalao,
+            tierLabel: npsBonusSalao.tierLabel,
+            color: "bg-amber-50 dark:bg-amber-950/30"
+          }, {
+            label: "Delivery",
+            amount: npsBonusDelivery.amount,
+            tier: tierDelivery,
+            tierLabel: npsBonusDelivery.tierLabel,
+            color: "bg-sky-50 dark:bg-sky-950/30"
+          }, {
+            label: "Supervisão",
+            amount: supervisionBonus.amount,
+            tier: supervisionTier,
+            tierLabel: supervisionBonus.tierLabel,
+            color: "bg-primary/5"
+          }]} />
           </div>
         </CardContent>
       </Card>
@@ -991,26 +890,12 @@ export function RemuneracaoVariavelTab({
         </CardHeader>
         <CardContent>
           {/* Mobile: Card-based layout */}
-          {isMobile ? (
-            <div className="space-y-3">
-              {rankingData.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
+          {isMobile ? <div className="space-y-3">
+              {rankingData.length === 0 ? <div className="text-center py-8 text-muted-foreground">
                   Nenhum dado de performance encontrado para este mês.
-                </div>
-              ) : (
-                rankingData.map((store, index) => (
-                  <MobileRankingCard
-                    key={store.id}
-                    store={store}
-                    index={index}
-                    isSelected={store.id === selectedUnidadeId}
-                  />
-                ))
-              )}
-            </div>
-          ) : (
-            /* Desktop: Table layout */
-            <Table>
+                </div> : rankingData.map((store, index) => <MobileRankingCard key={store.id} store={store} index={index} isSelected={store.id === selectedUnidadeId} />)}
+            </div> : (/* Desktop: Table layout */
+        <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Pos.</TableHead>
@@ -1021,67 +906,42 @@ export function RemuneracaoVariavelTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rankingData.length === 0 ? (
-                  <TableRow>
+                {rankingData.length === 0 ? <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       Nenhum dado de performance encontrado para este mês.
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  rankingData.map((store, index) => (
-                    <TableRow
-                      key={store.id}
-                      className={
-                        store.id === selectedUnidadeId ? "bg-primary/5" : undefined
-                      }
-                    >
+                  </TableRow> : rankingData.map((store, index) => <TableRow key={store.id} className={store.id === selectedUnidadeId ? "bg-primary/5" : undefined}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {index === 0 && (
-                            <Medal className="h-5 w-5 text-amber-500" />
-                          )}
-                          {index === 1 && (
-                            <Medal className="h-5 w-5 text-slate-400" />
-                          )}
-                          {index === 2 && (
-                            <Medal className="h-5 w-5 text-amber-700" />
-                          )}
-                          {index > 2 && (
-                            <span className="text-muted-foreground">
+                          {index === 0 && <Medal className="h-5 w-5 text-amber-500" />}
+                          {index === 1 && <Medal className="h-5 w-5 text-slate-400" />}
+                          {index === 2 && <Medal className="h-5 w-5 text-amber-700" />}
+                          {index > 2 && <span className="text-muted-foreground">
                               {index + 1}º
-                            </span>
-                          )}
+                            </span>}
                         </div>
                       </TableCell>
                       <TableCell className="font-medium">{store.nome}</TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          variant={store.nps >= 95000 ? "default" : "secondary"}
-                        >
+                        <Badge variant={store.nps >= 95000 ? "default" : "secondary"}>
                           {formatCurrency(store.nps)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          variant={store.supervisao >= 85 ? "default" : "secondary"}
-                        >
+                        <Badge variant={store.supervisao >= 85 ? "default" : "secondary"}>
                           {store.supervisao.toFixed(0)}%
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-bold">
                         {store.avg.toFixed(0)}%
                       </TableCell>
-                    </TableRow>
-                  ))
-                )}
+                    </TableRow>)}
               </TableBody>
-            </Table>
-          )}
+            </Table>)}
         </CardContent>
       </Card>
 
       {/* Action Plan Dashboard - Now with its own filters and URL sync */}
       <ActionPlanDashboard />
-    </div>
-  );
+    </div>;
 }

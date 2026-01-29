@@ -1,8 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
+import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Lightbulb, 
   AlertCircle, 
@@ -15,6 +14,8 @@ import {
   Truck
 } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
+import { useActionPlans } from "@/hooks/useActionPlans";
+import { ActionPlanResolutionForm } from "./ActionPlanResolutionForm";
 import type { Reclamacao } from "@/hooks/useReclamacoes";
 
 interface LeaderDiagnosticCardProps {
@@ -24,70 +25,14 @@ interface LeaderDiagnosticCardProps {
 }
 
 // AI-driven action recommendations based on pain point
-const PAIN_ACTIONS: Record<string, { icon: React.ElementType; actions: string[] }> = {
-  "#Demora": {
-    icon: Clock,
-    actions: [
-      "Revisar tempo médio de produção no KDS",
-      "Verificar escala de horários de pico",
-      "Analisar gargalos na cozinha",
-      "Treinar equipe em técnicas de agilidade"
-    ]
-  },
-  "#AtendimentoLento": {
-    icon: Clock,
-    actions: [
-      "Aumentar staff no horário de pico",
-      "Implementar sistema de chamadas",
-      "Redistribuir estações de atendimento",
-      "Criar protocolo de atendimento rápido"
-    ]
-  },
-  "#ComidaFria": {
-    icon: Utensils,
-    actions: [
-      "Verificar lâmpadas de aquecimento",
-      "Revisar tempo de expedição",
-      "Treinar equipe de pass sobre timing",
-      "Implementar controle de temperatura"
-    ]
-  },
-  "#ErroDePedido": {
-    icon: AlertCircle,
-    actions: [
-      "Revisar processo de conferência",
-      "Implementar dupla checagem",
-      "Treinar equipe sobre cardápio",
-      "Melhorar comunicação cozinha-salão"
-    ]
-  },
-  "#Delivery": {
-    icon: Truck,
-    actions: [
-      "Verificar rotas de entrega",
-      "Revisar embalagens térmicas",
-      "Treinar motoboys sobre cuidados",
-      "Implementar rastreamento em tempo real"
-    ]
-  },
-  "#Atendimento": {
-    icon: Users,
-    actions: [
-      "Realizar treinamento de hospitalidade",
-      "Revisar scripts de atendimento",
-      "Implementar cliente oculto",
-      "Criar sistema de feedback imediato"
-    ]
-  },
-  "default": {
-    icon: Target,
-    actions: [
-      "Analisar causa raiz detalhadamente",
-      "Reunir equipe para brainstorming",
-      "Definir plano de ação com prazos",
-      "Monitorar indicadores semanalmente"
-    ]
-  }
+const PAIN_ICONS: Record<string, React.ElementType> = {
+  "#Demora": Clock,
+  "#AtendimentoLento": Clock,
+  "#ComidaFria": Utensils,
+  "#ErroDePedido": AlertCircle,
+  "#Delivery": Truck,
+  "#Atendimento": Users,
+  "default": Target,
 };
 
 // Calculate bonus impact based on complaints
@@ -98,8 +43,11 @@ function calculateBonusImpact(gravesCount: number): number {
 }
 
 export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDiagnosticCardProps) {
-  // Find the main pain point
-  const mainPain = useMemo(() => {
+  const currentMonth = format(new Date(), "yyyy-MM");
+  const { actionPlans, createActionPlan, updateActionPlan } = useActionPlans(lojaId, currentMonth);
+  
+  // Find all pain points with counts
+  const painPoints = useMemo(() => {
     const tagCounts: Record<string, number> = {};
     
     for (const rec of reclamacoes) {
@@ -110,27 +58,35 @@ export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDi
       }
     }
     
-    // Find most frequent
-    let maxTag = "";
-    let maxCount = 0;
-    for (const [tag, count] of Object.entries(tagCounts)) {
-      if (count > maxCount) {
-        maxTag = tag;
-        maxCount = count;
-      }
-    }
-    
-    return { tag: maxTag, count: maxCount };
+    // Convert to sorted array
+    return Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .filter(p => p.count >= 2) // Only show if appears 2+ times
+      .sort((a, b) => b.count - a.count);
   }, [reclamacoes]);
+
+  // Main pain point
+  const mainPain = painPoints[0] || { tag: "", count: 0 };
   
-  // Get action recommendations
-  const recommendations = useMemo(() => {
-    const painConfig = PAIN_ACTIONS[mainPain.tag] || PAIN_ACTIONS["default"];
-    return {
-      icon: painConfig.icon,
-      actions: painConfig.actions
-    };
-  }, [mainPain.tag]);
+  // Auto-create action plans for critical pains
+  useEffect(() => {
+    if (!lojaId) return;
+    
+    painPoints.forEach(pain => {
+      // Check if action plan already exists
+      const exists = actionPlans.some(
+        ap => ap.pain_tag === pain.tag && ap.loja_id === lojaId
+      );
+      
+      if (!exists && pain.count >= 2) {
+        createActionPlan.mutate({
+          loja_id: lojaId,
+          pain_tag: pain.tag,
+          referencia_mes: currentMonth,
+        });
+      }
+    });
+  }, [painPoints, lojaId, actionPlans, createActionPlan, currentMonth]);
   
   // Calculate stats
   const stats = useMemo(() => {
@@ -139,8 +95,12 @@ export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDi
     const delivery = reclamacoes.filter(r => r.tipo_operacao === 'delivery').length;
     const bonusImpact = calculateBonusImpact(graves);
     
-    return { graves, salao, delivery, bonusImpact };
-  }, [reclamacoes]);
+    // Count resolved action plans
+    const resolved = actionPlans.filter(ap => ap.status === 'resolved').length;
+    const pending = actionPlans.filter(ap => ap.status === 'pending').length;
+    
+    return { graves, salao, delivery, bonusImpact, resolved, pending };
+  }, [reclamacoes, actionPlans]);
   
   if (reclamacoes.length === 0) {
     return (
@@ -158,7 +118,7 @@ export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDi
     );
   }
   
-  const IconComponent = recommendations.icon;
+  const IconComponent = PAIN_ICONS[mainPain.tag] || PAIN_ICONS["default"];
   
   return (
     <Card className="rounded-2xl border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/50 dark:from-amber-950/30 dark:to-orange-950/20 dark:border-amber-800">
@@ -173,11 +133,18 @@ export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDi
               {lojaNome ? `Análise para ${lojaNome}` : "Análise da operação do mês"}
             </CardDescription>
           </div>
-          {stats.graves > 0 && (
-            <Badge variant="destructive">
-              {stats.graves} Graves
-            </Badge>
-          )}
+          <div className="flex gap-2">
+            {stats.pending > 0 && (
+              <Badge variant="destructive">
+                {stats.pending} Pendente{stats.pending > 1 ? "s" : ""}
+              </Badge>
+            )}
+            {stats.resolved > 0 && (
+              <Badge className="bg-emerald-500">
+                {stats.resolved} Resolvido{stats.resolved > 1 ? "s" : ""}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       
@@ -223,28 +190,30 @@ export function LeaderDiagnosticCard({ reclamacoes, lojaId, lojaNome }: LeaderDi
           </div>
         </div>
         
-        {/* Action Checklist */}
-        <div className="space-y-2">
+        {/* Action Plans - Structured Resolution Forms */}
+        <div className="space-y-3">
           <h4 className="text-sm font-semibold uppercase flex items-center gap-2">
             <Target className="h-4 w-4 text-primary" />
-            Plano de Resolução
+            Planos de Resolução
           </h4>
-          <div className="space-y-2">
-            {recommendations.actions.map((action, idx) => (
-              <div 
-                key={idx}
-                className="flex items-start gap-3 rounded-lg bg-background/60 p-3 hover:bg-background/80 transition-colors"
-              >
-                <Checkbox id={`action-${idx}`} className="mt-0.5" />
-                <label 
-                  htmlFor={`action-${idx}`}
-                  className="text-sm cursor-pointer flex-1"
-                >
-                  {action}
-                </label>
-              </div>
-            ))}
-          </div>
+          
+          {actionPlans.length > 0 ? (
+            <div className="space-y-2">
+              {actionPlans.map((plan) => (
+                <ActionPlanResolutionForm
+                  key={plan.id}
+                  actionPlan={plan}
+                  onUpdate={async (input) => {
+                    await updateActionPlan.mutateAsync(input);
+                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Nenhum plano de ação pendente.
+            </p>
+          )}
         </div>
         
         {/* Trend Warning */}

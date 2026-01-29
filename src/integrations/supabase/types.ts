@@ -14,6 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_plan_comments: {
+        Row: {
+          action_plan_id: string
+          created_at: string
+          id: string
+          message: string
+          user_id: string
+        }
+        Insert: {
+          action_plan_id: string
+          created_at?: string
+          id?: string
+          message: string
+          user_id: string
+        }
+        Update: {
+          action_plan_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_plan_comments_action_plan_id_fkey"
+            columns: ["action_plan_id"]
+            isOneToOne: false
+            referencedRelation: "action_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      action_plans: {
+        Row: {
+          acao_preventiva: string | null
+          causa_raiz: string | null
+          created_at: string
+          created_by: string | null
+          deadline_at: string
+          evidencia_url: string | null
+          id: string
+          loja_id: string
+          medida_tomada: string | null
+          pain_tag: string
+          referencia_mes: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: Database["public"]["Enums"]["action_plan_status"]
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          acao_preventiva?: string | null
+          causa_raiz?: string | null
+          created_at?: string
+          created_by?: string | null
+          deadline_at?: string
+          evidencia_url?: string | null
+          id?: string
+          loja_id: string
+          medida_tomada?: string | null
+          pain_tag: string
+          referencia_mes: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["action_plan_status"]
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          acao_preventiva?: string | null
+          causa_raiz?: string | null
+          created_at?: string
+          created_by?: string | null
+          deadline_at?: string
+          evidencia_url?: string | null
+          id?: string
+          loja_id?: string
+          medida_tomada?: string | null
+          pain_tag?: string
+          referencia_mes?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: Database["public"]["Enums"]["action_plan_status"]
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_plans_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       avaliacoes: {
         Row: {
           cargo_id: string
@@ -1056,6 +1156,7 @@ export type Database = {
       }
     }
     Enums: {
+      action_plan_status: "pending" | "in_analysis" | "resolved"
       app_role: "admin" | "gerente_unidade"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
       categoria_cargo: "gerencia" | "chefia"
@@ -1202,6 +1303,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      action_plan_status: ["pending", "in_analysis", "resolved"],
       app_role: ["admin", "gerente_unidade"],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
       categoria_cargo: ["gerencia", "chefia"],

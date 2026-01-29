@@ -3,6 +3,8 @@ import { ConfigSection } from "@/components/ConfigSection";
 import { ClearEntriesModal } from "@/components/ClearEntriesModal";
 import { BudgetConfigSection as OperationalBudgetSection } from "@/components/OperationalBudgetConfigSection";
 import { BonusConfigSection } from "@/components/BonusConfigSection";
+import { CargosConfigSection } from "@/components/CargosConfigSection";
+import { GoogleSheetsSync } from "@/components/GoogleSheetsSync";
 import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -34,9 +36,19 @@ export function ConfigurationsTab() {
         <OperationalBudgetSection />
       )}
 
-      {/* Bonus Rules Configuration - Admin Only */}
+      {/* NEW: Cargos V2 Configuration - Admin Only */}
+      {isAdmin && (
+        <CargosConfigSection />
+      )}
+
+      {/* Legacy Bonus Rules Configuration - Admin Only */}
       {isAdmin && (
         <BonusConfigSection />
+      )}
+
+      {/* Google Sheets Sync - Admin Only */}
+      {isAdmin && (
+        <GoogleSheetsSync />
       )}
 
       {/* Checklist Import - Admin Only */}

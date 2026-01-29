@@ -15,6 +15,7 @@ import {
   UtensilsCrossed,
   Bike,
   Plus,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -71,6 +72,11 @@ import {
   type SectorType,
   type BonusTier,
 } from "@/hooks/useBonusRules";
+import {
+  useCargos,
+  useMetasCargo,
+  type Cargo,
+} from "@/hooks/useCargos";
 
 interface RemuneracaoVariavelTabProps {
   selectedUnidadeId: string | null;
@@ -95,6 +101,10 @@ export function RemuneracaoVariavelTab({
   const { configs, getConfig } = useBonusConfig();
   const { performances, getPerformancesByMonth } = useStorePerformance();
   const { aggregatedByStore } = usePerformanceEntries();
+  
+  // V2: Load cargos from database
+  const { cargos, gerencias, chefias, chefiasBack, chefiasFront, isLoading: isLoadingCargos } = useCargos();
+  const { metas, getMetasByCargo } = useMetasCargo();
 
   // State for collapsible admin section
   const [isEntryFormOpen, setIsEntryFormOpen] = useState(false);
@@ -109,6 +119,30 @@ export function RemuneracaoVariavelTab({
   const [selectedPosition, setSelectedPosition] = useState<PositionType>("gerente_front");
   const [selectedSector, setSelectedSector] = useState<SectorType>("salao");
   const [brandFilter, setBrandFilter] = useState<string>("all");
+  
+  // V2: Selected cargo from new model
+  const [selectedCargoId, setSelectedCargoId] = useState<string>("");
+  
+  // Get selected cargo details
+  const selectedCargo = useMemo(() => {
+    return cargos.find(c => c.id === selectedCargoId);
+  }, [cargos, selectedCargoId]);
+  
+  // Get metas for selected cargo
+  const selectedCargoMetas = useMemo(() => {
+    if (!selectedCargoId) return [];
+    return getMetasByCargo(selectedCargoId);
+  }, [selectedCargoId, getMetasByCargo]);
+  
+  // V2: Determine if cargo is Gerencia or Chefia
+  const isGerenteV2 = useMemo(() => {
+    return selectedCargo?.categoria === 'gerencia';
+  }, [selectedCargo]);
+  
+  // V2: Get pote variável from cargo
+  const poteVariavelV2 = useMemo(() => {
+    return selectedCargo?.pote_variavel_max || 3000;
+  }, [selectedCargo]);
 
   const currentMonthYear = format(new Date(), "yyyy-MM");
 
@@ -480,28 +514,66 @@ export function RemuneracaoVariavelTab({
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          {/* Position and Sector selectors */}
+          {/* V2: Cargo selector with grouped options */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium uppercase">Cargo</label>
+              <label className="text-sm font-medium uppercase flex items-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                Cargo (V2)
+              </label>
               <Select
-                value={selectedPosition}
-                onValueChange={(v) => setSelectedPosition(v as PositionType)}
+                value={selectedCargoId}
+                onValueChange={setSelectedCargoId}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o cargo" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(POSITION_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="" disabled>Selecione...</SelectItem>
+                  {/* Gerências */}
+                  {gerencias.length > 0 && (
+                    <>
+                      <SelectItem value="__gerencia_header" disabled className="font-bold text-xs text-muted-foreground">
+                        GERÊNCIA (Teto R$ 5.000)
+                      </SelectItem>
+                      {gerencias.map((cargo) => (
+                        <SelectItem key={cargo.id} value={cargo.id}>
+                          {cargo.nome}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {/* Chefias Front */}
+                  {chefiasFront.length > 0 && (
+                    <>
+                      <SelectItem value="__chefia_front_header" disabled className="font-bold text-xs text-muted-foreground mt-2">
+                        CHEFIA FRONT (Teto R$ 3.000)
+                      </SelectItem>
+                      {chefiasFront.map((cargo) => (
+                        <SelectItem key={cargo.id} value={cargo.id}>
+                          {cargo.nome}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {/* Chefias Back */}
+                  {chefiasBack.length > 0 && (
+                    <>
+                      <SelectItem value="__chefia_back_header" disabled className="font-bold text-xs text-muted-foreground mt-2">
+                        CHEFIA BACK (Teto R$ 3.000)
+                      </SelectItem>
+                      {chefiasBack.map((cargo) => (
+                        <SelectItem key={cargo.id} value={cargo.id}>
+                          {cargo.nome} {cargo.setor_back && `(${cargo.setor_back})`}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium uppercase">Setor</label>
+              <label className="text-sm font-medium uppercase">Setor (Legacy)</label>
               <Select
                 value={selectedSector}
                 onValueChange={(v) => setSelectedSector(v as SectorType)}
@@ -518,6 +590,29 @@ export function RemuneracaoVariavelTab({
               </Select>
             </div>
           </div>
+          
+          {/* V2: Display selected cargo info */}
+          {selectedCargo && (
+            <div className="rounded-lg bg-primary/5 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {selectedCargo.categoria === 'gerencia' ? (
+                  <Briefcase className="h-5 w-5 text-primary" />
+                ) : (
+                  <ChefHat className="h-5 w-5 text-primary" />
+                )}
+                <div>
+                  <p className="font-medium">{selectedCargo.nome}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCargoMetas.length} metas configuradas
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Pote Máximo</p>
+                <p className="font-bold text-primary">{formatCurrency(poteVariavelV2)}</p>
+              </div>
+            </div>
+          )}
 
           {/* NPS Inputs - Salão Block */}
           <div className="rounded-xl border border-amber-200 bg-amber-50/30 dark:bg-amber-950/20 dark:border-amber-800 p-4 space-y-4">

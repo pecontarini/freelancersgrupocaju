@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      avaliacoes: {
+        Row: {
+          cargo_id: string
+          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
+          created_at: string
+          fonte: Database["public"]["Enums"]["origem_dado"]
+          id: string
+          loja_id: string
+          metadata: Json | null
+          referencia_mes: string
+          score_percentual: number
+          updated_at: string
+        }
+        Insert: {
+          cargo_id: string
+          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
+          created_at?: string
+          fonte?: Database["public"]["Enums"]["origem_dado"]
+          id?: string
+          loja_id: string
+          metadata?: Json | null
+          referencia_mes: string
+          score_percentual?: number
+          updated_at?: string
+        }
+        Update: {
+          cargo_id?: string
+          codigo_meta?: Database["public"]["Enums"]["codigo_meta"]
+          created_at?: string
+          fonte?: Database["public"]["Enums"]["origem_dado"]
+          id?: string
+          loja_id?: string
+          metadata?: Json | null
+          referencia_mes?: string
+          score_percentual?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avaliacoes_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bonus_config: {
         Row: {
           base_bonus_value: number
@@ -75,6 +129,45 @@ export type Database = {
           percentage?: number
           position_type?: Database["public"]["Enums"]["position_type"]
           tier?: Database["public"]["Enums"]["bonus_tier"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cargos: {
+        Row: {
+          ativo: boolean
+          categoria: Database["public"]["Enums"]["categoria_cargo"]
+          created_at: string
+          familia_operacional: Database["public"]["Enums"]["familia_operacional"]
+          id: string
+          marca_aplicavel: Json | null
+          nome: string
+          pote_variavel_max: number
+          setor_back: Database["public"]["Enums"]["setor_back"] | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: Database["public"]["Enums"]["categoria_cargo"]
+          created_at?: string
+          familia_operacional: Database["public"]["Enums"]["familia_operacional"]
+          id?: string
+          marca_aplicavel?: Json | null
+          nome: string
+          pote_variavel_max?: number
+          setor_back?: Database["public"]["Enums"]["setor_back"] | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: Database["public"]["Enums"]["categoria_cargo"]
+          created_at?: string
+          familia_operacional?: Database["public"]["Enums"]["familia_operacional"]
+          id?: string
+          marca_aplicavel?: Json | null
+          nome?: string
+          pote_variavel_max?: number
+          setor_back?: Database["public"]["Enums"]["setor_back"] | null
           updated_at?: string
         }
         Relationships: []
@@ -274,6 +367,50 @@ export type Database = {
           },
         ]
       }
+      metas_cargo: {
+        Row: {
+          ativo: boolean
+          cargo_id: string
+          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
+          created_at: string
+          id: string
+          origem_dado: Database["public"]["Enums"]["origem_dado"]
+          peso: number
+          teto_valor: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cargo_id: string
+          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
+          created_at?: string
+          id?: string
+          origem_dado?: Database["public"]["Enums"]["origem_dado"]
+          peso?: number
+          teto_valor?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cargo_id?: string
+          codigo_meta?: Database["public"]["Enums"]["codigo_meta"]
+          created_at?: string
+          id?: string
+          origem_dado?: Database["public"]["Enums"]["origem_dado"]
+          peso?: number
+          teto_valor?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_cargo_cargo_id_fkey"
+            columns: ["cargo_id"]
+            isOneToOne: false
+            referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nps_targets: {
         Row: {
           created_at: string
@@ -371,6 +508,53 @@ export type Database = {
           {
             foreignKeyName: "profiles_unidade_id_fkey"
             columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sincronizacoes_sheets: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          erro: string | null
+          id: string
+          linhas_importadas: number
+          loja_id: string | null
+          referencia_mes: string
+          status: string
+          url: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          erro?: string | null
+          id?: string
+          linhas_importadas?: number
+          loja_id?: string | null
+          referencia_mes: string
+          status?: string
+          url: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          erro?: string | null
+          id?: string
+          linhas_importadas?: number
+          loja_id?: string | null
+          referencia_mes?: string
+          status?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sincronizacoes_sheets_loja_id_fkey"
+            columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
@@ -703,13 +887,23 @@ export type Database = {
     Enums: {
       app_role: "admin" | "gerente_unidade"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
+      categoria_cargo: "gerencia" | "chefia"
+      codigo_meta:
+        | "nps_salao"
+        | "nps_delivery"
+        | "supervisao"
+        | "conformidade_setor"
+        | "tempo_prato"
+      familia_operacional: "front" | "back"
       kpi_type: "nps" | "supervisao" | "tempo_prato" | "tempo_comanda"
+      origem_dado: "sheets" | "pdf" | "kds" | "manual"
       position_type:
         | "gerente_front"
         | "gerente_back"
         | "chefia_front"
         | "chefia_back"
       sector_type: "salao" | "back" | "apv" | "delivery"
+      setor_back: "cozinha" | "bar" | "parrilla" | "sushi"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -839,7 +1033,17 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "gerente_unidade"],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
+      categoria_cargo: ["gerencia", "chefia"],
+      codigo_meta: [
+        "nps_salao",
+        "nps_delivery",
+        "supervisao",
+        "conformidade_setor",
+        "tempo_prato",
+      ],
+      familia_operacional: ["front", "back"],
       kpi_type: ["nps", "supervisao", "tempo_prato", "tempo_comanda"],
+      origem_dado: ["sheets", "pdf", "kds", "manual"],
       position_type: [
         "gerente_front",
         "gerente_back",
@@ -847,6 +1051,7 @@ export const Constants = {
         "chefia_back",
       ],
       sector_type: ["salao", "back", "apv", "delivery"],
+      setor_back: ["cozinha", "bar", "parrilla", "sushi"],
     },
   },
 } as const

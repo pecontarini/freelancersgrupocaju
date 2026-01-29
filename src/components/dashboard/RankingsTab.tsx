@@ -6,11 +6,7 @@ import {
   Medal,
   Award,
   TrendingUp,
-  TrendingDown,
   AlertTriangle,
-  Users,
-  Star,
-  ChefHat,
   Target,
   Filter,
   Loader2,
@@ -37,7 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { usePerformanceEntries } from "@/hooks/usePerformanceEntries";
 import { useSupervisionAudits } from "@/hooks/useSupervisionAudits";
-import { useCargos, type Cargo, SETOR_BACK_LABELS } from "@/hooks/useCargos";
+import { useReclamacoes } from "@/hooks/useReclamacoes";
 import { formatCurrency } from "@/lib/formatters";
 
 // Brand patterns for filtering
@@ -47,15 +43,6 @@ const BRAND_PATTERNS: Record<string, string[]> = {
   caju: ["CAJU", "CJ"],
   fosters: ["FOSTERS", "FB"],
 };
-
-interface RankingItem {
-  id: string;
-  nome: string;
-  value: number;
-  trend?: "up" | "down" | "stable";
-  details?: string;
-  badge?: string;
-}
 
 // Get position icon
 const getPositionIcon = (position: number) => {
@@ -81,17 +68,18 @@ const getTierBadge = (score: number) => {
 
 export function RankingsTab() {
   const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [selectedCargoId, setSelectedCargoId] = useState<string>("");
   const currentMonth = format(new Date(), "yyyy-MM");
 
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
   const { aggregatedByStore, isLoading: isLoadingPerformance } = usePerformanceEntries();
-  const { cargos, chefiasBack, isLoading: isLoadingCargos } = useCargos();
   
-  // Get the last audits for supervision ranking
+  // STRICT SEPARATION: Supervision data ONLY from audits (PDF data)
   const { audits, isLoadingAudits } = useSupervisionAudits(null);
+  
+  // STRICT SEPARATION: Reclamações data for complaints ranking
+  const { agregadoPorLoja, isLoading: isLoadingReclamacoes } = useReclamacoes(undefined, currentMonth);
 
-  const isLoading = isLoadingLojas || isLoadingPerformance || isLoadingCargos || isLoadingAudits;
+  const isLoading = isLoadingLojas || isLoadingPerformance || isLoadingAudits || isLoadingReclamacoes;
 
   // Filter stores by brand
   const filteredLojas = useMemo(() => {
@@ -102,31 +90,37 @@ export function RankingsTab() {
     );
   }, [lojas, brandFilter]);
 
-  // Ranking 1: NPS (Faturamento / Reclamações) by Unit
+  // ============================================
+  // RANKING 1: NPS by Unit
+  // Based ONLY on NPS values - no cargo filtering
+  // ============================================
   const npsRanking = useMemo(() => {
     return filteredLojas
       .map((loja) => {
         const data = aggregatedByStore[loja.id];
-        if (!data) return null;
+        if (!data || data.total_faturamento === 0) return null;
 
+        // NPS efficiency = Faturamento / Reclamações
         const faturamento = data.total_faturamento || 0;
         const reclamacoes = data.total_reclamacoes || 1;
-        const efficiency = faturamento / reclamacoes;
+        const npsEfficiency = faturamento / reclamacoes;
 
         return {
           id: loja.id,
           nome: loja.nome,
-          value: efficiency,
+          npsEfficiency,
           faturamento,
           reclamacoes,
-          details: `${formatCurrency(faturamento)} / ${reclamacoes} rec.`,
         };
       })
       .filter(Boolean)
-      .sort((a, b) => (b?.value || 0) - (a?.value || 0)) as (RankingItem & { faturamento: number; reclamacoes: number })[];
+      .sort((a, b) => (b?.npsEfficiency || 0) - (a?.npsEfficiency || 0));
   }, [filteredLojas, aggregatedByStore]);
 
-  // Ranking 2: Supervisão by Unit (latest audit score)
+  // ============================================
+  // RANKING 2: Supervisão by Unit
+  // Based ONLY on audit/PDF data - NEVER Sheets or complaints
+  // ============================================
   const supervisaoRanking = useMemo(() => {
     // Group audits by loja and get the latest
     const latestByLoja = new Map<string, { score: number; date: string }>();
@@ -146,39 +140,45 @@ export function RankingsTab() {
         return {
           id: loja.id,
           nome: loja.nome,
-          value: auditData.score,
-          details: format(new Date(auditData.date), "dd/MM/yyyy"),
+          score: auditData.score,
+          auditDate: auditData.date,
         };
       })
       .filter(Boolean)
-      .sort((a, b) => (b?.value || 0) - (a?.value || 0)) as RankingItem[];
+      .sort((a, b) => (b?.score || 0) - (a?.score || 0));
   }, [filteredLojas, audits]);
 
-  // Ranking 3: Reclamações x Faturamento (inverse efficiency - lower is better for complaints)
+  // ============================================
+  // RANKING 3: Reclamações x Faturamento
+  // Formula: índice = faturamento_total / total_reclamacoes_graves
+  // Higher is better (more revenue per grave complaint)
+  // ============================================
   const reclamacoesRanking = useMemo(() => {
     return filteredLojas
       .map((loja) => {
         const data = aggregatedByStore[loja.id];
-        if (!data) return null;
-
-        const faturamento = data.total_faturamento || 0;
-        const reclamacoes = data.total_reclamacoes || 0;
+        const recData = agregadoPorLoja[loja.id];
         
-        // Calculate complaints per R$ 100k of revenue
-        const rate = faturamento > 0 ? (reclamacoes / faturamento) * 100000 : 0;
+        if (!data || data.total_faturamento === 0) return null;
+
+        const faturamento = data.total_faturamento;
+        // Use graves from reclamacoes table if available, fallback to total_reclamacoes
+        const reclamacoesGraves = recData?.graves || Math.ceil(data.total_reclamacoes * 0.5) || 1;
+        
+        // índice = faturamento / reclamações graves
+        const indice = faturamento / reclamacoesGraves;
 
         return {
           id: loja.id,
           nome: loja.nome,
-          value: rate,
           faturamento,
-          reclamacoes,
-          details: `${reclamacoes} recl. / ${formatCurrency(faturamento)}`,
+          reclamacoesGraves,
+          indice,
         };
       })
       .filter(Boolean)
-      .sort((a, b) => (a?.value || 0) - (b?.value || 0)) as (RankingItem & { faturamento: number; reclamacoes: number })[]; // Lower is better
-  }, [filteredLojas, aggregatedByStore]);
+      .sort((a, b) => (b?.indice || 0) - (a?.indice || 0)); // Higher is better
+  }, [filteredLojas, aggregatedByStore, agregadoPorLoja]);
 
   if (isLoading) {
     return (
@@ -216,7 +216,7 @@ export function RankingsTab() {
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="nps" className="gap-2">
             <TrendingUp className="h-4 w-4" />
-            NPS Eficiência
+            NPS
           </TabsTrigger>
           <TabsTrigger value="supervisao" className="gap-2">
             <Target className="h-4 w-4" />
@@ -228,7 +228,7 @@ export function RankingsTab() {
           </TabsTrigger>
         </TabsList>
 
-        {/* NPS Efficiency Ranking */}
+        {/* RANKING 1: NPS */}
         <TabsContent value="nps">
           <Card className="rounded-2xl">
             <CardHeader>
@@ -237,13 +237,13 @@ export function RankingsTab() {
                 Ranking NPS por Unidade
               </CardTitle>
               <CardDescription>
-                Eficiência = Faturamento ÷ Reclamações. Quanto maior, melhor.
+                Baseado APENAS em NPS (Faturamento ÷ Reclamações). Sem filtro de cargo.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {npsRanking.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  Nenhum dado de performance encontrado para o período.
+                  Nenhum dado de NPS encontrado para o período.
                 </p>
               ) : (
                 <Table>
@@ -253,18 +253,18 @@ export function RankingsTab() {
                       <TableHead>Unidade</TableHead>
                       <TableHead className="text-right">Faturamento</TableHead>
                       <TableHead className="text-right">Reclamações</TableHead>
-                      <TableHead className="text-right">Eficiência</TableHead>
+                      <TableHead className="text-right">Eficiência NPS</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {npsRanking.map((item, index) => (
-                      <TableRow key={item.id} className={index < 3 ? "bg-muted/30" : ""}>
+                      <TableRow key={item!.id} className={index < 3 ? "bg-muted/30" : ""}>
                         <TableCell>{getPositionIcon(index + 1)}</TableCell>
-                        <TableCell className="font-medium">{item.nome}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.faturamento)}</TableCell>
-                        <TableCell className="text-right">{item.reclamacoes}</TableCell>
+                        <TableCell className="font-medium">{item!.nome}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(item!.faturamento)}</TableCell>
+                        <TableCell className="text-right">{item!.reclamacoes}</TableCell>
                         <TableCell className="text-right font-bold text-primary">
-                          {formatCurrency(item.value)}
+                          {formatCurrency(item!.npsEfficiency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -275,7 +275,7 @@ export function RankingsTab() {
           </Card>
         </TabsContent>
 
-        {/* Supervision Ranking */}
+        {/* RANKING 2: Supervisão (ONLY from audits) */}
         <TabsContent value="supervisao">
           <Card className="rounded-2xl">
             <CardHeader>
@@ -284,7 +284,7 @@ export function RankingsTab() {
                 Ranking Supervisão por Unidade
               </CardTitle>
               <CardDescription>
-                Baseado na última auditoria de cada unidade.
+                Baseado APENAS em dados de auditoria/PDF. Não usa planilhas ou reclamações.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -305,18 +305,20 @@ export function RankingsTab() {
                   </TableHeader>
                   <TableBody>
                     {supervisaoRanking.map((item, index) => (
-                      <TableRow key={item.id} className={index < 3 ? "bg-muted/30" : ""}>
+                      <TableRow key={item!.id} className={index < 3 ? "bg-muted/30" : ""}>
                         <TableCell>{getPositionIcon(index + 1)}</TableCell>
-                        <TableCell className="font-medium">{item.nome}</TableCell>
-                        <TableCell className="text-muted-foreground">{item.details}</TableCell>
+                        <TableCell className="font-medium">{item!.nome}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(item!.auditDate), "dd/MM/yyyy")}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Progress value={item.value} className="w-16 h-2" />
-                            <span className="font-bold">{item.value.toFixed(1)}%</span>
+                            <Progress value={item!.score} className="w-16 h-2" />
+                            <span className="font-bold">{item!.score.toFixed(1)}%</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {getTierBadge(item.value)}
+                          {getTierBadge(item!.score)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -327,7 +329,7 @@ export function RankingsTab() {
           </Card>
         </TabsContent>
 
-        {/* Complaints Ranking */}
+        {/* RANKING 3: Reclamações x Faturamento */}
         <TabsContent value="reclamacoes">
           <Card className="rounded-2xl">
             <CardHeader>
@@ -336,7 +338,7 @@ export function RankingsTab() {
                 Ranking Reclamações x Faturamento
               </CardTitle>
               <CardDescription>
-                Taxa = Reclamações por R$ 100k de faturamento. Quanto menor, melhor.
+                Índice = Faturamento ÷ Reclamações Graves (nota ≤ 3). Maior é melhor.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -350,21 +352,25 @@ export function RankingsTab() {
                     <TableRow>
                       <TableHead className="w-16">#</TableHead>
                       <TableHead>Unidade</TableHead>
-                      <TableHead className="text-right">Reclamações</TableHead>
+                      <TableHead className="text-right">Rec. Graves</TableHead>
                       <TableHead className="text-right">Faturamento</TableHead>
-                      <TableHead className="text-right">Taxa/100k</TableHead>
+                      <TableHead className="text-right">Índice</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {reclamacoesRanking.map((item, index) => (
-                      <TableRow key={item.id} className={index < 3 ? "bg-muted/30" : ""}>
+                      <TableRow key={item!.id} className={index < 3 ? "bg-muted/30" : ""}>
                         <TableCell>{getPositionIcon(index + 1)}</TableCell>
-                        <TableCell className="font-medium">{item.nome}</TableCell>
-                        <TableCell className="text-right">{item.reclamacoes}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.faturamento)}</TableCell>
+                        <TableCell className="font-medium">{item!.nome}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant="destructive" className="text-xs">
+                            {item!.reclamacoesGraves}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{formatCurrency(item!.faturamento)}</TableCell>
                         <TableCell className="text-right font-bold">
-                          <span className={item.value < 5 ? "text-emerald-600" : item.value < 10 ? "text-amber-600" : "text-red-600"}>
-                            {item.value.toFixed(2)}
+                          <span className={item!.indice > 100000 ? "text-emerald-600" : item!.indice > 50000 ? "text-amber-600" : "text-red-600"}>
+                            {formatCurrency(item!.indice)}
                           </span>
                         </TableCell>
                       </TableRow>

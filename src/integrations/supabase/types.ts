@@ -514,6 +514,177 @@ export type Database = {
           },
         ]
       }
+      reclamacoes: {
+        Row: {
+          anexo_url: string | null
+          created_at: string
+          created_by: string | null
+          data_reclamacao: string
+          fonte: string
+          id: string
+          is_grave: boolean | null
+          loja_id: string
+          nota_reclamacao: number
+          palavras_chave: Json | null
+          referencia_mes: string
+          resumo_ia: string | null
+          temas: Json | null
+          texto_original: string | null
+          tipo_operacao: string
+          updated_at: string
+        }
+        Insert: {
+          anexo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_reclamacao?: string
+          fonte: string
+          id?: string
+          is_grave?: boolean | null
+          loja_id: string
+          nota_reclamacao: number
+          palavras_chave?: Json | null
+          referencia_mes: string
+          resumo_ia?: string | null
+          temas?: Json | null
+          texto_original?: string | null
+          tipo_operacao: string
+          updated_at?: string
+        }
+        Update: {
+          anexo_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_reclamacao?: string
+          fonte?: string
+          id?: string
+          is_grave?: boolean | null
+          loja_id?: string
+          nota_reclamacao?: number
+          palavras_chave?: Json | null
+          referencia_mes?: string
+          resumo_ia?: string | null
+          temas?: Json | null
+          texto_original?: string | null
+          tipo_operacao?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacoes_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sheets_sources: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          gid: string | null
+          id: string
+          nome: string
+          ultima_sincronizacao: string | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          gid?: string | null
+          id?: string
+          nome: string
+          ultima_sincronizacao?: string | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          gid?: string | null
+          id?: string
+          nome?: string
+          ultima_sincronizacao?: string | null
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      sheets_staging: {
+        Row: {
+          created_at: string
+          data_referencia: string
+          faturamento: number
+          id: string
+          is_grave: boolean | null
+          loja_id: string | null
+          nota_reclamacao: number | null
+          nps: number | null
+          processed: boolean
+          source_id: string
+          sync_id: string | null
+          tipo_operacao: string | null
+          unidade_normalizada: string | null
+          unidade_raw: string
+        }
+        Insert: {
+          created_at?: string
+          data_referencia: string
+          faturamento?: number
+          id?: string
+          is_grave?: boolean | null
+          loja_id?: string | null
+          nota_reclamacao?: number | null
+          nps?: number | null
+          processed?: boolean
+          source_id: string
+          sync_id?: string | null
+          tipo_operacao?: string | null
+          unidade_normalizada?: string | null
+          unidade_raw: string
+        }
+        Update: {
+          created_at?: string
+          data_referencia?: string
+          faturamento?: number
+          id?: string
+          is_grave?: boolean | null
+          loja_id?: string | null
+          nota_reclamacao?: number | null
+          nps?: number | null
+          processed?: boolean
+          source_id?: string
+          sync_id?: string | null
+          tipo_operacao?: string | null
+          unidade_normalizada?: string | null
+          unidade_raw?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheets_staging_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sheets_staging_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sheets_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sheets_staging_sync_id_fkey"
+            columns: ["sync_id"]
+            isOneToOne: false
+            referencedRelation: "sincronizacoes_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sincronizacoes_sheets: {
         Row: {
           completed_at: string | null

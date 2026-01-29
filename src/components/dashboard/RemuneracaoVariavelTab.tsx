@@ -546,7 +546,8 @@ export function RemuneracaoVariavelTab({
           {/* V2: Cargo selector with grouped options */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium uppercase flex items-center gap-2">CARGO<Briefcase className="h-4 w-4" />
+              <label className="text-sm font-medium uppercase flex items-center gap-2">CARGO
+CARGO<Briefcase className="h-4 w-4" />
                 Cargo (V2)
               </label>
               <Select value={selectedCargoId} onValueChange={setSelectedCargoId}>

@@ -547,13 +547,12 @@ export function RemuneracaoVariavelTab({
                   <SelectValue placeholder="Selecione o cargo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" disabled>Selecione...</SelectItem>
                   {/* Gerências */}
                   {gerencias.length > 0 && (
                     <>
-                      <SelectItem value="__gerencia_header" disabled className="font-bold text-xs text-muted-foreground">
-                        GERÊNCIA (Teto R$ 5.000)
-                      </SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                        Gerência (Teto R$ 5.000)
+                      </div>
                       {gerencias.map((cargo) => (
                         <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome}
@@ -564,9 +563,9 @@ export function RemuneracaoVariavelTab({
                   {/* Chefias Front */}
                   {chefiasFront.length > 0 && (
                     <>
-                      <SelectItem value="__chefia_front_header" disabled className="font-bold text-xs text-muted-foreground mt-2">
-                        CHEFIA FRONT (Teto R$ 3.000)
-                      </SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase mt-1">
+                        Chefia Front (Teto R$ 3.000)
+                      </div>
                       {chefiasFront.map((cargo) => (
                         <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome}
@@ -577,9 +576,9 @@ export function RemuneracaoVariavelTab({
                   {/* Chefias Back */}
                   {chefiasBack.length > 0 && (
                     <>
-                      <SelectItem value="__chefia_back_header" disabled className="font-bold text-xs text-muted-foreground mt-2">
-                        CHEFIA BACK (Teto R$ 3.000)
-                      </SelectItem>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase mt-1">
+                        Chefia Back (Teto R$ 3.000)
+                      </div>
                       {chefiasBack.map((cargo) => (
                         <SelectItem key={cargo.id} value={cargo.id}>
                           {cargo.nome} {cargo.setor_back && `(${cargo.setor_back})`}

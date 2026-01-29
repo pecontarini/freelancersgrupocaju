@@ -37,7 +37,7 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 export function GoogleSheetsSync() {
   const [sheetsUrl, setSheetsUrl] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
-  const [selectedLojaId, setSelectedLojaId] = useState<string>("");
+  const [selectedLojaId, setSelectedLojaId] = useState<string>("all");
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { sincronizacoes, processSheetsSync, isLoading } = useSincronizacoes();
@@ -69,7 +69,7 @@ export function GoogleSheetsSync() {
       await processSheetsSync({
         url: sheetsUrl,
         referencia_mes: selectedMonth,
-        loja_id: selectedLojaId || null,
+        loja_id: selectedLojaId === "all" ? null : selectedLojaId,
       });
       setSheetsUrl("");
     } catch (error) {
@@ -176,7 +176,7 @@ export function GoogleSheetsSync() {
                   <SelectValue placeholder="Todas as unidades" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as unidades</SelectItem>
+                  <SelectItem value="all">Todas as unidades</SelectItem>
                   {lojas.map((loja) => (
                     <SelectItem key={loja.id} value={loja.id}>
                       {loja.nome}

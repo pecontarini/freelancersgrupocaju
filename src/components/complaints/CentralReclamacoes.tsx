@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -8,6 +8,7 @@ import {
   ExternalLink,
   MessageSquare,
   ShieldCheck,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useReclamacoes, type FonteReclamacao } from "@/hooks/useReclamacoes";
+import { useReclamacoes, type FonteReclamacao, type Reclamacao } from "@/hooks/useReclamacoes";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -41,6 +42,7 @@ import { DoresOperacaoPareto } from "./DoresOperacaoPareto";
 import { LeaderDiagnosticCard } from "./LeaderDiagnosticCard";
 import { MobileAlertsFeed } from "./MobileAlertsFeed";
 import { AdminFloatingButton } from "./AdminFloatingButton";
+import { ReclamacaoDetailView } from "./ReclamacaoDetailView";
 
 interface CentralReclamacoesProps {
   selectedLojaId?: string | null;
@@ -73,6 +75,10 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
   const { options: lojas } = useConfigLojas();
   const { isAdmin } = useUserProfile();
   const isMobile = useIsMobile();
+  
+  // State for detail view
+  const [selectedReclamacao, setSelectedReclamacao] = useState<Reclamacao | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const lojaMap = useMemo(() => {
     return new Map(lojas.map((l) => [l.id, l.nome]));
@@ -89,6 +95,11 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
     const delivery = reclamacoes.filter((r) => r.tipo_operacao === "delivery").length;
     return { total, graves, salao, delivery };
   }, [reclamacoes]);
+  
+  const handleOpenDetail = (rec: Reclamacao) => {
+    setSelectedReclamacao(rec);
+    setIsDetailOpen(true);
+  };
 
   return (
     <>
@@ -206,12 +217,16 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
                             <TableHead className="text-xs">Tipo</TableHead>
                             <TableHead className="text-xs text-center">Nota</TableHead>
                             <TableHead className="text-xs">Status</TableHead>
-                            {isAdmin && <TableHead className="text-xs w-16"></TableHead>}
+                            <TableHead className="text-xs w-10"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {reclamacoes.map((rec) => (
-                            <TableRow key={rec.id}>
+                            <TableRow 
+                              key={rec.id}
+                              className="cursor-pointer hover:bg-accent/50 transition-colors"
+                              onClick={() => handleOpenDetail(rec)}
+                            >
                               <TableCell className="text-xs">
                                 {format(new Date(rec.data_reclamacao), "dd/MM")}
                               </TableCell>
@@ -242,21 +257,21 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
                                   </Badge>
                                 )}
                               </TableCell>
-                              {isAdmin && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    {rec.anexo_url && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7"
-                                        asChild
-                                      >
-                                        <a href={rec.anexo_url} target="_blank" rel="noopener noreferrer">
-                                          <ExternalLink className="h-3 w-3" />
-                                        </a>
-                                      </Button>
-                                    )}
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center gap-1">
+                                  {isAdmin && rec.anexo_url && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      asChild
+                                    >
+                                      <a href={rec.anexo_url} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    </Button>
+                                  )}
+                                  {isAdmin && (
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
@@ -281,9 +296,10 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
                                         </AlertDialogFooter>
                                       </AlertDialogContent>
                                     </AlertDialog>
-                                  </div>
-                                </TableCell>
-                              )}
+                                  )}
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -301,6 +317,14 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
       {isAdmin && isMobile && (
         <AdminFloatingButton selectedLojaId={selectedLojaId} />
       )}
+      
+      {/* Detail View Modal/Drawer */}
+      <ReclamacaoDetailView
+        reclamacao={selectedReclamacao}
+        lojaNome={selectedReclamacao ? lojaMap.get(selectedReclamacao.loja_id) : undefined}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
     </>
   );
 }

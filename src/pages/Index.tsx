@@ -195,7 +195,7 @@ const Index = () => {
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":
-        return isAdmin ? <RedeTab entries={entries} /> : null;
+        return isAdmin ? <RedeTab /> : null;
       default:
         return (
           <BudgetsGerenciaisTab

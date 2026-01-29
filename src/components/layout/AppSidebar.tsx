@@ -10,6 +10,7 @@ import {
   User,
   ChevronRight,
   ClipboardCheck,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -72,6 +73,12 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
+  {
+    title: "DORES DA OPERAÇÃO",
+    id: "cx",
+    icon: AlertTriangle,
+    description: "Gestão centralizada de CX",
+  },
   {
     title: "CONFIGURAÇÕES",
     id: "configuracoes",

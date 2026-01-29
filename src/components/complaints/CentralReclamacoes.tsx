@@ -130,16 +130,16 @@ export function CentralReclamacoes({ selectedLojaId }: CentralReclamacoesProps) 
 
         <CardContent className="space-y-4">
           {/* Tabs for different views */}
-          <Tabs defaultValue={isMobile ? "alertas" : "diagnostico"} className="w-full">
+          <Tabs defaultValue={isMobile ? "alertas" : "alertas"} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="diagnostico">
-                <span className="hidden sm:inline">Diagnóstico</span>
-                <span className="sm:hidden">Diag.</span>
-              </TabsTrigger>
-              <TabsTrigger value="pareto">Pareto</TabsTrigger>
               <TabsTrigger value="alertas">
                 <span className="hidden sm:inline">Alertas</span>
                 <span className="sm:hidden">Feed</span>
+              </TabsTrigger>
+              <TabsTrigger value="pareto">Pareto</TabsTrigger>
+              <TabsTrigger value="diagnostico">
+                <span className="hidden sm:inline">Diagnóstico</span>
+                <span className="sm:hidden">Diag.</span>
               </TabsTrigger>
             </TabsList>
 

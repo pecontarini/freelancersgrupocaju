@@ -4,3 +4,7 @@ export { DoresOperacaoPareto } from "./DoresOperacaoPareto";
 export { LeaderDiagnosticCard } from "./LeaderDiagnosticCard";
 export { MobileAlertsFeed } from "./MobileAlertsFeed";
 export { AdminFloatingButton } from "./AdminFloatingButton";
+export { ActionPlanResolutionForm } from "./ActionPlanResolutionForm";
+export { ActionPlanStatusBadge } from "./ActionPlanStatusBadge";
+export { ActionPlanTimeline } from "./ActionPlanTimeline";
+export { VoiceInputButton } from "./VoiceInputButton";

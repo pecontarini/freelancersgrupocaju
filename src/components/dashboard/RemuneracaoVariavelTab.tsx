@@ -585,7 +585,7 @@ export function RemuneracaoVariavelTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium uppercase">Setor (Legacy)</label>
+              <label className="text-sm font-medium uppercase">SETOR </label>
               <Select value={selectedSector} onValueChange={v => setSelectedSector(v as SectorType)}>
                 <SelectTrigger>
                   <SelectValue />

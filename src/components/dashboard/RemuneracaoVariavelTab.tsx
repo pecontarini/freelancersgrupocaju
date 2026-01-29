@@ -17,6 +17,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ActionPlanDashboard } from "@/components/action-plan";
 import { AuditReportButton } from "@/components/AuditReportButton";
+import { CentralReclamacoes } from "@/components/complaints";
 import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
 import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
 import { LeadershipRadar } from "@/components/dashboard/LeadershipRadar";
@@ -531,7 +532,8 @@ export function RemuneracaoVariavelTab({
       {/* V2: Bonus Calculator when cargo is selected */}
       {selectedCargoId && selectedUnidadeId && <BonusCalculatorCard lojaId={selectedUnidadeId} cargoId={selectedCargoId} />}
 
-      {/* Bonus Simulator */}
+      {/* Central de Reclamações */}
+      <CentralReclamacoes selectedLojaId={selectedUnidadeId} />
       <Card className="rounded-2xl shadow-card overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5">
           <CardTitle className="flex items-center gap-2 text-base uppercase">

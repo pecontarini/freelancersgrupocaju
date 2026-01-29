@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.extract-invoice-data]
 verify_jwt = false
+
+[functions.sync-google-sheets]
+verify_jwt = false
+
+[functions.sync-sheets-staging]
+verify_jwt = false
+
+[functions.process-reclamacao]
+verify_jwt = false

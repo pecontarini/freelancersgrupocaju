@@ -8,3 +8,4 @@ export { ActionPlanResolutionForm } from "./ActionPlanResolutionForm";
 export { ActionPlanStatusBadge } from "./ActionPlanStatusBadge";
 export { ActionPlanTimeline } from "./ActionPlanTimeline";
 export { VoiceInputButton } from "./VoiceInputButton";
+export { ReclamacaoDetailView } from "./ReclamacaoDetailView";

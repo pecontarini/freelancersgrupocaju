@@ -1,19 +1,20 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   AlertTriangle, 
   Flame, 
-  Clock,
   MessageSquare,
-  TrendingDown,
   Utensils,
-  Truck
+  Truck,
+  ChevronRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ReclamacaoDetailView } from "./ReclamacaoDetailView";
 import type { Reclamacao } from "@/hooks/useReclamacoes";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 
 interface MobileAlertsFeedProps {
   reclamacoes: Reclamacao[];
@@ -28,6 +29,15 @@ function formatRelativeDate(dateStr: string): string {
 }
 
 export function MobileAlertsFeed({ reclamacoes, lojaId }: MobileAlertsFeedProps) {
+  const [selectedReclamacao, setSelectedReclamacao] = useState<Reclamacao | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { options: lojas } = useConfigLojas();
+
+  // Map lojas
+  const lojaMap = useMemo(() => {
+    return new Map(lojas.map((l) => [l.id, l.nome]));
+  }, [lojas]);
+
   // Sort by date (most recent first) and take last 10
   const recentAlerts = useMemo(() => {
     return [...reclamacoes]
@@ -52,6 +62,11 @@ export function MobileAlertsFeed({ reclamacoes, lojaId }: MobileAlertsFeedProps)
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count);
   }, [reclamacoes]);
+
+  const handleOpenDetail = (rec: Reclamacao) => {
+    setSelectedReclamacao(rec);
+    setIsDetailOpen(true);
+  };
   
   if (reclamacoes.length === 0) {
     return (
@@ -65,109 +80,124 @@ export function MobileAlertsFeed({ reclamacoes, lojaId }: MobileAlertsFeedProps)
   }
   
   return (
-    <Card className="rounded-2xl">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-base uppercase">
-          <AlertTriangle className="h-5 w-5 text-amber-500" />
-          Alertas do Turno
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="space-y-3">
-        {/* Critical Tags Banner */}
-        {criticalPains.length > 0 && (
-          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Flame className="h-4 w-4 text-destructive" />
-              <span className="text-sm font-semibold text-destructive uppercase">
-                Dores Críticas
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {criticalPains.map(pain => (
-                <Badge 
-                  key={pain.tag} 
-                  variant="destructive" 
-                  className="text-xs"
-                >
-                  {pain.tag} ({pain.count}x)
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
+    <>
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base uppercase">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Alertas do Turno
+          </CardTitle>
+        </CardHeader>
         
-        {/* Recent Alerts List */}
-        <ScrollArea className="h-64">
-          <div className="space-y-2">
-            {recentAlerts.map((rec, idx) => (
-              <div 
-                key={rec.id}
-                className={`
-                  rounded-lg p-3 flex items-start gap-3
-                  ${rec.is_grave 
-                    ? 'bg-destructive/5 border border-destructive/20' 
-                    : 'bg-muted/50'
-                  }
-                `}
-              >
-                <div className={`
-                  rounded-full p-1.5
-                  ${rec.is_grave ? 'bg-destructive/20' : 'bg-muted'}
-                `}>
-                  {rec.tipo_operacao === 'delivery' 
-                    ? <Truck className={`h-4 w-4 ${rec.is_grave ? 'text-destructive' : 'text-muted-foreground'}`} />
-                    : <Utensils className={`h-4 w-4 ${rec.is_grave ? 'text-destructive' : 'text-muted-foreground'}`} />
-                  }
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-muted-foreground">
-                      {formatRelativeDate(rec.data_reclamacao)}
-                    </span>
-                    {rec.is_grave && (
-                      <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
-                        GRAVE
-                      </Badge>
-                    )}
-                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5 capitalize">
-                      {rec.fonte}
-                    </Badge>
+        <CardContent className="space-y-3">
+          {/* Critical Tags Banner */}
+          {criticalPains.length > 0 && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Flame className="h-4 w-4 text-destructive" />
+                <span className="text-sm font-semibold text-destructive uppercase">
+                  Dores Críticas
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {criticalPains.map(pain => (
+                  <Badge 
+                    key={pain.tag} 
+                    variant="destructive" 
+                    className="text-xs"
+                  >
+                    {pain.tag} ({pain.count}x)
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Recent Alerts List */}
+          <ScrollArea className="h-64">
+            <div className="space-y-2">
+              {recentAlerts.map((rec) => (
+                <div 
+                  key={rec.id}
+                  onClick={() => handleOpenDetail(rec)}
+                  className={`
+                    rounded-lg p-3 flex items-start gap-3 cursor-pointer
+                    transition-colors hover:bg-accent/50
+                    ${rec.is_grave 
+                      ? 'bg-destructive/5 border border-destructive/20' 
+                      : 'bg-muted/50'
+                    }
+                  `}
+                >
+                  <div className={`
+                    rounded-full p-1.5
+                    ${rec.is_grave ? 'bg-destructive/20' : 'bg-muted'}
+                  `}>
+                    {rec.tipo_operacao === 'delivery' 
+                      ? <Truck className={`h-4 w-4 ${rec.is_grave ? 'text-destructive' : 'text-muted-foreground'}`} />
+                      : <Utensils className={`h-4 w-4 ${rec.is_grave ? 'text-destructive' : 'text-muted-foreground'}`} />
+                    }
                   </div>
                   
-                  {/* Summary or themes */}
-                  {rec.resumo_ia ? (
-                    <p className="text-sm line-clamp-2">{rec.resumo_ia}</p>
-                  ) : rec.temas && rec.temas.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {rec.temas.slice(0, 3).map((tema, tIdx) => (
-                        <span key={tIdx} className="text-xs text-primary">
-                          {tema.startsWith('#') ? tema : `#${tema}`}
-                        </span>
-                      ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs text-muted-foreground">
+                        {formatRelativeDate(rec.data_reclamacao)}
+                      </span>
+                      {rec.is_grave && (
+                        <Badge variant="destructive" className="text-[10px] py-0 px-1.5">
+                          GRAVE
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 capitalize">
+                        {rec.fonte}
+                      </Badge>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nota: {rec.nota_reclamacao}/5
-                    </p>
-                  )}
+                    
+                    {/* Summary or themes */}
+                    {rec.resumo_ia ? (
+                      <p className="text-sm line-clamp-2">{rec.resumo_ia}</p>
+                    ) : rec.temas && rec.temas.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {rec.temas.slice(0, 3).map((tema, tIdx) => (
+                          <span key={tIdx} className="text-xs text-primary">
+                            {tema.startsWith('#') ? tema : `#${tema}`}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Nota: {rec.nota_reclamacao}/5
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Rating & Chevron */}
+                  <div className="flex items-center gap-1">
+                    <span className={`
+                      font-bold text-lg
+                      ${rec.nota_reclamacao <= 2 ? 'text-destructive' : 
+                        rec.nota_reclamacao <= 3 ? 'text-amber-500' : 
+                        'text-muted-foreground'}
+                    `}>
+                      {rec.nota_reclamacao}★
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
                 </div>
-                
-                {/* Rating */}
-                <div className={`
-                  font-bold text-lg
-                  ${rec.nota_reclamacao <= 2 ? 'text-destructive' : 
-                    rec.nota_reclamacao <= 3 ? 'text-amber-500' : 
-                    'text-muted-foreground'}
-                `}>
-                  {rec.nota_reclamacao}★
-                </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Detail View Modal/Drawer */}
+      <ReclamacaoDetailView
+        reclamacao={selectedReclamacao}
+        lojaNome={selectedReclamacao ? lojaMap.get(selectedReclamacao.loja_id) : undefined}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
+    </>
   );
 }

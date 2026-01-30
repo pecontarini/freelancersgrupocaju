@@ -1,4 +1,4 @@
-import { Store, Filter, X } from "lucide-react";
+import { Store, Filter, X, Repeat, Tag } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useMemo } from "react";
 
 // Brand detection based on store name prefixes
@@ -38,6 +40,12 @@ interface ActionPlanFiltersProps {
   statusFilter: "all" | "pending" | "resolved";
   onStatusChange: (status: "all" | "pending" | "resolved") => void;
   onClearFilters: () => void;
+  // New props for recurrence filtering
+  showOnlyRecurring?: boolean;
+  onRecurringToggle?: (value: boolean) => void;
+  selectedTag?: string | null;
+  onTagChange?: (tag: string | null) => void;
+  availableTags?: string[];
 }
 
 export function ActionPlanFilters({
@@ -46,6 +54,11 @@ export function ActionPlanFilters({
   statusFilter,
   onStatusChange,
   onClearFilters,
+  showOnlyRecurring = false,
+  onRecurringToggle,
+  selectedTag = null,
+  onTagChange,
+  availableTags = [],
 }: ActionPlanFiltersProps) {
   const { options: lojas, isLoading } = useConfigLojas();
   const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
@@ -67,7 +80,7 @@ export function ActionPlanFilters({
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [lojas, unidades, isAdmin]);
 
-  const hasActiveFilters = selectedLojaId !== null || statusFilter !== "all";
+  const hasActiveFilters = selectedLojaId !== null || statusFilter !== "all" || showOnlyRecurring || selectedTag !== null;
 
   // Single store manager - show locked badge
   if (isGerenteUnidade && unidades.length === 1) {
@@ -93,6 +106,44 @@ export function ActionPlanFilters({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Recurring toggle */}
+        {onRecurringToggle && (
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+            <Switch
+              id="recurring-filter"
+              checked={showOnlyRecurring}
+              onCheckedChange={onRecurringToggle}
+            />
+            <Label htmlFor="recurring-filter" className="text-sm flex items-center gap-1.5 cursor-pointer">
+              <Repeat className="h-4 w-4 text-destructive" />
+              Apenas Recorrentes
+            </Label>
+          </div>
+        )}
+
+        {/* Tag filter */}
+        {onTagChange && availableTags.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Tag className="h-4 w-4 text-muted-foreground" />
+            <Select
+              value={selectedTag || "all"}
+              onValueChange={(value) => onTagChange(value === "all" ? null : value)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrar por Tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Tags</SelectItem>
+                {availableTags.map((tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    #{tag}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
     );
   }
@@ -157,6 +208,44 @@ export function ActionPlanFilters({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Recurring toggle */}
+      {onRecurringToggle && (
+        <div className="flex items-center gap-2 rounded-lg border px-3 py-2">
+          <Switch
+            id="recurring-filter-admin"
+            checked={showOnlyRecurring}
+            onCheckedChange={onRecurringToggle}
+          />
+          <Label htmlFor="recurring-filter-admin" className="text-sm flex items-center gap-1.5 cursor-pointer">
+            <Repeat className="h-4 w-4 text-destructive" />
+            Apenas Recorrentes
+          </Label>
+        </div>
+      )}
+
+      {/* Tag filter */}
+      {onTagChange && availableTags.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Tag className="h-4 w-4 text-muted-foreground" />
+          <Select
+            value={selectedTag || "all"}
+            onValueChange={(value) => onTagChange(value === "all" ? null : value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por Tag" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Tags</SelectItem>
+              {availableTags.map((tag) => (
+                <SelectItem key={tag} value={tag}>
+                  #{tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Clear filters button - Admin only */}
       {isAdmin && hasActiveFilters && (

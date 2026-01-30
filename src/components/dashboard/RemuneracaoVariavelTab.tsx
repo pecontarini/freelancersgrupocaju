@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { TrendingUp, Award, Target, Trophy, Medal, Star, AlertTriangle, Clock, Users, ChefHat, Filter, LayoutDashboard, UtensilsCrossed, Bike, Plus, Briefcase } from "lucide-react";
+import { TrendingUp, Award, Target, Trophy, Medal, Star, AlertTriangle, Clock, Users, ChefHat, Filter, LayoutDashboard, UtensilsCrossed, Bike, Plus, Briefcase, Timer } from "lucide-react";
 import { format } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell } from "recharts";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ export function RemuneracaoVariavelTab({
   const [reclamacoesDelivery, setReclamacoesDelivery] = useState([5]);
   const [simulatedSupervisao, setSimulatedSupervisao] = useState([85]);
   const [simulatedTempoPrato, setSimulatedTempoPrato] = useState([15]);
+  const [simulatedTempoComanda, setSimulatedTempoComanda] = useState([16]);
   const [selectedPosition, setSelectedPosition] = useState<PositionType>("gerente_front");
   const [selectedSector, setSelectedSector] = useState<SectorType>("salao");
   const [brandFilter, setBrandFilter] = useState<string>("all");
@@ -152,6 +154,22 @@ export function RemuneracaoVariavelTab({
       bronze: 250,
       aceitavel: 0
     }
+  };
+
+  // Tempo de Comanda targets (ONLY for Chefias - NOT Gerentes)
+  const TEMPO_COMANDA_TARGETS = {
+    ouro: 14,      // < 14 min
+    prata: 18,     // 14-18 min
+    bronze: 22,    // 18-22 min
+    // > 22 min = Red Flag
+  };
+
+  // Tempo de Comanda bonus values (ONLY for Chefias)
+  const TEMPO_COMANDA_BONUS = {
+    ouro: 500,
+    prata: 350,
+    bronze: 200,
+    aceitavel: 0
   };
 
   // Calculate efficiency for Salão
@@ -220,6 +238,44 @@ export function RemuneracaoVariavelTab({
   const isGerente = useMemo(() => {
     return selectedPosition === "gerente_front" || selectedPosition === "gerente_back";
   }, [selectedPosition]);
+
+  // Determine Tempo de Comanda tier (ONLY affects Chefias, not Gerentes)
+  const tempoComandaTier = useMemo((): BonusTier | null => {
+    const tempo = simulatedTempoComanda[0];
+    if (tempo < TEMPO_COMANDA_TARGETS.ouro) return "ouro";
+    if (tempo <= TEMPO_COMANDA_TARGETS.prata) return "prata";
+    if (tempo <= TEMPO_COMANDA_TARGETS.bronze) return "bronze";
+    return null; // Red Flag (> 22 min)
+  }, [simulatedTempoComanda]);
+
+  // Calculate Tempo de Comanda bonus (ONLY for Chefias)
+  const tempoComandaBonus = useMemo(() => {
+    // Only affects Chefias, NOT Gerentes
+    if (isGerente || isGerenteV2) {
+      return {
+        amount: 0,
+        tier: null,
+        tierLabel: "N/A",
+        applicable: false
+      };
+    }
+
+    if (!tempoComandaTier) {
+      return {
+        amount: 0,
+        tier: null,
+        tierLabel: "RED FLAG",
+        applicable: true
+      };
+    }
+
+    return {
+      amount: TEMPO_COMANDA_BONUS[tempoComandaTier],
+      tier: tempoComandaTier,
+      tierLabel: TIER_CONFIG[tempoComandaTier].label.toUpperCase(),
+      applicable: true
+    };
+  }, [tempoComandaTier, isGerente, isGerenteV2]);
 
   // Calculate NPS bonus for Salão (50% weight for Gerentes)
   const npsBonusSalao = useMemo(() => {
@@ -784,6 +840,118 @@ export function RemuneracaoVariavelTab({
             <Slider value={simulatedTempoPrato} onValueChange={setSimulatedTempoPrato} min={5} max={45} step={1} className="w-full" />
           </div>
 
+          {/* Tempo de Comanda - ONLY for Chefias */}
+          {!isGerente && !isGerenteV2 && (
+            <div className="rounded-xl border border-violet-200 bg-violet-50/30 dark:bg-violet-950/20 dark:border-violet-800 p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Timer className="h-5 w-5 text-violet-600" />
+                <span className="text-sm font-bold uppercase text-violet-700 dark:text-violet-400">
+                  Pilar C - Tempo de Comanda (Exclusivo Chefias)
+                </span>
+                {tempoComandaTier && <Badge className={`ml-auto bg-gradient-to-r ${TIER_CONFIG[tempoComandaTier].gradient} text-white text-xs`}>
+                    {tempoComandaBonus.tierLabel}
+                  </Badge>}
+                {!tempoComandaTier && <Badge variant="destructive" className="ml-auto text-xs">RED FLAG</Badge>}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Timer className="h-4 w-4" />
+                    Tempo Médio de Comanda
+                  </label>
+                  <span className={`text-sm font-bold ${simulatedTempoComanda[0] > 22 ? "text-destructive" : "text-primary"}`}>
+                    {simulatedTempoComanda[0]} min
+                  </span>
+                </div>
+                <Slider 
+                  value={simulatedTempoComanda} 
+                  onValueChange={setSimulatedTempoComanda} 
+                  min={8} 
+                  max={35} 
+                  step={1} 
+                  className="w-full" 
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    Bônus: <span className={!tempoComandaTier ? "text-destructive font-bold" : "text-primary font-bold"}>
+                      {formatCurrency(tempoComandaBonus.amount)}
+                    </span>
+                  </span>
+                  <span>Ouro &lt;14min | Prata 14-18min | Bronze 18-22min</span>
+                </div>
+              </div>
+
+              {/* Tempo de Comanda Evolution Chart */}
+              <div className="rounded-lg bg-background/80 p-3">
+                <p className="text-xs font-medium mb-2 text-muted-foreground">Evolução Tempo Médio (últimos 6 meses)</p>
+                <div className="h-32">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { mes: "Ago", tempo: 19 },
+                      { mes: "Set", tempo: 17 },
+                      { mes: "Out", tempo: 18 },
+                      { mes: "Nov", tempo: 15 },
+                      { mes: "Dez", tempo: 16 },
+                      { mes: "Jan", tempo: simulatedTempoComanda[0] },
+                    ]}>
+                      <XAxis dataKey="mes" tick={{ fontSize: 10 }} />
+                      <YAxis domain={[0, 30]} tick={{ fontSize: 10 }} />
+                      <Tooltip 
+                        formatter={(value: number) => [`${value} min`, 'Tempo']}
+                        contentStyle={{ fontSize: 12 }}
+                      />
+                      <ReferenceLine y={14} stroke="hsl(var(--chart-1))" strokeDasharray="3 3" />
+                      <ReferenceLine y={22} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
+                      <Bar dataKey="tempo" radius={[4, 4, 0, 0]}>
+                        {[
+                          { mes: "Ago", tempo: 19 },
+                          { mes: "Set", tempo: 17 },
+                          { mes: "Out", tempo: 18 },
+                          { mes: "Nov", tempo: 15 },
+                          { mes: "Dez", tempo: 16 },
+                          { mes: "Jan", tempo: simulatedTempoComanda[0] },
+                        ].map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.tempo < 14 ? "hsl(var(--chart-1))" : 
+                                  entry.tempo <= 18 ? "hsl(var(--chart-2))" : 
+                                  entry.tempo <= 22 ? "hsl(var(--chart-3))" : 
+                                  "hsl(var(--destructive))"}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-[hsl(var(--chart-1))]" /> Ouro
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-[hsl(var(--chart-2))]" /> Prata
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-[hsl(var(--chart-3))]" /> Bronze
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-[hsl(var(--destructive))]" /> Red Flag
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Info for Gerentes that Tempo de Comanda doesn't apply */}
+          {(isGerente || isGerenteV2) && (
+            <div className="rounded-lg bg-muted/50 p-3 text-center">
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Timer className="h-4 w-4" />
+                Pilar "Tempo de Comanda" não se aplica a cargos de Gerência.
+              </p>
+            </div>
+          )}
+
           {/* Final Result - Desktop */}
           <div className={`hidden md:block rounded-2xl p-6 ${isRedFlag ? "bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500" : "bg-gradient-to-br from-muted/50 to-muted"}`}>
             {isRedFlag ? <div className="flex flex-col items-center gap-4">
@@ -800,7 +968,7 @@ export function RemuneracaoVariavelTab({
                 </div>
               </div> : <>
                 {/* Summary Cards */}
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className={`grid gap-4 mb-6 ${tempoComandaBonus.applicable ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   <div className="text-center p-3 rounded-xl bg-background/50">
                     <p className="text-xs text-muted-foreground uppercase">NPS Salão</p>
                     <p className="text-lg font-bold text-amber-600">{formatCurrency(npsBonusSalao.amount)}</p>
@@ -822,6 +990,17 @@ export function RemuneracaoVariavelTab({
                         {TIER_CONFIG[supervisionTier].label}
                       </Badge>}
                   </div>
+                  {/* Tempo de Comanda Card - Only for Chefias */}
+                  {tempoComandaBonus.applicable && (
+                    <div className="text-center p-3 rounded-xl bg-violet-50/50 dark:bg-violet-950/30">
+                      <p className="text-xs text-muted-foreground uppercase">Tempo Comanda</p>
+                      <p className="text-lg font-bold text-violet-600">{formatCurrency(tempoComandaBonus.amount)}</p>
+                      {tempoComandaTier && <Badge className={`mt-1 text-xs bg-gradient-to-r ${TIER_CONFIG[tempoComandaTier].gradient} text-white`}>
+                          {TIER_CONFIG[tempoComandaTier].label}
+                        </Badge>}
+                      {!tempoComandaTier && <Badge variant="destructive" className="mt-1 text-xs">RED FLAG</Badge>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Total */}
@@ -830,10 +1009,11 @@ export function RemuneracaoVariavelTab({
                     <p className="text-sm text-muted-foreground uppercase">Bônus Total Estimado</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       NPS ({formatCurrency(totalNpsBonus)}) + Supervisão ({formatCurrency(supervisionBonus.amount)})
+                      {tempoComandaBonus.applicable && ` + Tempo ({formatCurrency(tempoComandaBonus.amount)})`}
                     </p>
                   </div>
                   <p className="text-4xl font-bold text-primary">
-                    {formatCurrency(totalNpsBonus + supervisionBonus.amount)}
+                    {formatCurrency(totalNpsBonus + supervisionBonus.amount + tempoComandaBonus.amount)}
                   </p>
                 </div>
               </>}
@@ -841,25 +1021,42 @@ export function RemuneracaoVariavelTab({
 
           {/* Final Result - Mobile (inline, not fixed) */}
           <div className="md:hidden">
-            <MobileBonusResult isRedFlag={isRedFlag} redFlagReason={simulatedSupervisao[0] < 80 ? "Supervisão abaixo de 80%" : "NPS abaixo do mínimo"} totalBonus={totalNpsBonus + supervisionBonus.amount} details={[{
-            label: "Salão",
-            amount: npsBonusSalao.amount,
-            tier: tierSalao,
-            tierLabel: npsBonusSalao.tierLabel,
-            color: "bg-amber-50 dark:bg-amber-950/30"
-          }, {
-            label: "Delivery",
-            amount: npsBonusDelivery.amount,
-            tier: tierDelivery,
-            tierLabel: npsBonusDelivery.tierLabel,
-            color: "bg-sky-50 dark:bg-sky-950/30"
-          }, {
-            label: "Supervisão",
-            amount: supervisionBonus.amount,
-            tier: supervisionTier,
-            tierLabel: supervisionBonus.tierLabel,
-            color: "bg-primary/5"
-          }]} />
+            <MobileBonusResult 
+              isRedFlag={isRedFlag} 
+              redFlagReason={simulatedSupervisao[0] < 80 ? "Supervisão abaixo de 80%" : "NPS abaixo do mínimo"} 
+              totalBonus={totalNpsBonus + supervisionBonus.amount + tempoComandaBonus.amount} 
+              details={[
+                {
+                  label: "Salão",
+                  amount: npsBonusSalao.amount,
+                  tier: tierSalao,
+                  tierLabel: npsBonusSalao.tierLabel,
+                  color: "bg-amber-50 dark:bg-amber-950/30"
+                }, 
+                {
+                  label: "Delivery",
+                  amount: npsBonusDelivery.amount,
+                  tier: tierDelivery,
+                  tierLabel: npsBonusDelivery.tierLabel,
+                  color: "bg-sky-50 dark:bg-sky-950/30"
+                }, 
+                {
+                  label: "Supervisão",
+                  amount: supervisionBonus.amount,
+                  tier: supervisionTier,
+                  tierLabel: supervisionBonus.tierLabel,
+                  color: "bg-primary/5"
+                },
+                // Only add Tempo de Comanda for Chefias
+                ...(tempoComandaBonus.applicable ? [{
+                  label: "Tempo Comanda",
+                  amount: tempoComandaBonus.amount,
+                  tier: tempoComandaTier,
+                  tierLabel: tempoComandaBonus.tierLabel,
+                  color: "bg-violet-50 dark:bg-violet-950/30"
+                }] : [])
+              ]} 
+            />
           </div>
         </CardContent>
       </Card>

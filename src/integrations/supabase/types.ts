@@ -272,6 +272,176 @@ export type Database = {
         }
         Relationships: []
       }
+      cmv_inventory: {
+        Row: {
+          cmv_item_id: string
+          id: string
+          loja_id: string
+          quantidade_atual: number
+          ultima_contagem: string | null
+          updated_at: string
+        }
+        Insert: {
+          cmv_item_id: string
+          id?: string
+          loja_id: string
+          quantidade_atual?: number
+          ultima_contagem?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cmv_item_id?: string
+          id?: string
+          loja_id?: string
+          quantidade_atual?: number
+          ultima_contagem?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_inventory_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_inventory_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cmv_items: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          created_at: string
+          id: string
+          nome: string
+          peso_padrao_g: number | null
+          preco_custo_atual: number
+          unidade: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          peso_padrao_g?: number | null
+          preco_custo_atual?: number
+          unidade?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          peso_padrao_g?: number | null
+          preco_custo_atual?: number
+          unidade?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cmv_movements: {
+        Row: {
+          cmv_item_id: string
+          created_at: string
+          created_by: string | null
+          data_movimento: string
+          id: string
+          loja_id: string
+          preco_unitario: number | null
+          quantidade: number
+          referencia: string | null
+          tipo_movimento: string
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string
+          created_by?: string | null
+          data_movimento?: string
+          id?: string
+          loja_id: string
+          preco_unitario?: number | null
+          quantidade: number
+          referencia?: string | null
+          tipo_movimento: string
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_movimento?: string
+          id?: string
+          loja_id?: string
+          preco_unitario?: number | null
+          quantidade?: number
+          referencia?: string | null
+          tipo_movimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_movements_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_movements_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cmv_sales_mappings: {
+        Row: {
+          cmv_item_id: string
+          created_at: string
+          id: string
+          multiplicador: number
+          nome_venda: string
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string
+          id?: string
+          multiplicador?: number
+          nome_venda: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string
+          id?: string
+          multiplicador?: number
+          nome_venda?: string
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_sales_mappings_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_funcoes: {
         Row: {
           created_at: string

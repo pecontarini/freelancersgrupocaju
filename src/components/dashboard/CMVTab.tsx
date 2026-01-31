@@ -1,8 +1,11 @@
-import { Package, BarChart3, TrendingDown, AlertTriangle } from "lucide-react";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Package } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CMVItemForm, CMVInventoryForm, CMVSalesMappingList } from "@/components/cmv";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function CMVTab() {
+  const { isAdmin } = useUserProfile();
+
   return (
     <div className="space-y-6 fade-in">
       {/* Header */}
@@ -15,95 +18,48 @@ export function CMVTab() {
             CMV (Unitários)
           </h2>
           <p className="text-muted-foreground">
-            Controle de insumos e estoque
+            Controle de insumos e estoque de carnes
           </p>
         </div>
       </div>
 
-      {/* Placeholder Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-2xl shadow-card border-dashed border-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              CMV Realizado
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-muted-foreground">---%</div>
-            <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-          </CardContent>
-        </Card>
+      {/* Main Content with Tabs */}
+      <Tabs defaultValue="cadastro" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+          <TabsTrigger value="inventario">Inventário</TabsTrigger>
+          <TabsTrigger value="mapeamentos">Mapeamentos</TabsTrigger>
+        </TabsList>
 
-        <Card className="rounded-2xl shadow-card border-dashed border-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              Meta CMV
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-muted-foreground">---%</div>
-            <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-          </CardContent>
-        </Card>
+        {/* Cadastro de Itens */}
+        <TabsContent value="cadastro" className="space-y-6">
+          {isAdmin ? (
+            <CMVItemForm />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Apenas administradores podem gerenciar o cadastro de itens</p>
+            </div>
+          )}
+        </TabsContent>
 
-        <Card className="rounded-2xl shadow-card border-dashed border-2">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              Alertas de Estoque
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-muted-foreground">---</div>
-            <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Inventário */}
+        <TabsContent value="inventario" className="space-y-6">
+          {isAdmin ? (
+            <CMVInventoryForm />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Apenas administradores podem gerenciar o inventário</p>
+            </div>
+          )}
+        </TabsContent>
 
-      {/* Coming Soon Section */}
-      <Card className="rounded-2xl shadow-card">
-        <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-6">
-            <Package className="h-10 w-10 text-muted-foreground" />
-          </div>
-          <h3 className="font-display text-xl font-bold uppercase mb-2">
-            Módulo em Desenvolvimento
-          </h3>
-          <p className="text-muted-foreground max-w-md">
-            O controle de CMV (Custo de Mercadorias Vendidas) está sendo
-            desenvolvido para oferecer rastreamento detalhado de insumos,
-            gestão de estoque e análise de custos unitários.
-          </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="rounded-xl bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">📦</p>
-              <p className="text-xs text-muted-foreground mt-2 uppercase">
-                Gestão de Insumos
-              </p>
-            </div>
-            <div className="rounded-xl bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">📊</p>
-              <p className="text-xs text-muted-foreground mt-2 uppercase">
-                Análise de Custos
-              </p>
-            </div>
-            <div className="rounded-xl bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">🔔</p>
-              <p className="text-xs text-muted-foreground mt-2 uppercase">
-                Alertas Inteligentes
-              </p>
-            </div>
-            <div className="rounded-xl bg-muted/50 p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">📈</p>
-              <p className="text-xs text-muted-foreground mt-2 uppercase">
-                Projeções
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Mapeamentos de Vendas */}
+        <TabsContent value="mapeamentos" className="space-y-6">
+          <CMVSalesMappingList />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

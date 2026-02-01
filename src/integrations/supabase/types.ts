@@ -404,6 +404,47 @@ export type Database = {
           },
         ]
       }
+      cmv_price_history: {
+        Row: {
+          cmv_item_id: string
+          created_at: string
+          created_by: string | null
+          fonte: string
+          id: string
+          preco_anterior: number
+          preco_novo: number
+          referencia_nf: string | null
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string
+          created_by?: string | null
+          fonte?: string
+          id?: string
+          preco_anterior: number
+          preco_novo: number
+          referencia_nf?: string | null
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string
+          created_by?: string | null
+          fonte?: string
+          id?: string
+          preco_anterior?: number
+          preco_novo?: number
+          referencia_nf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_price_history_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_sales_mappings: {
         Row: {
           cmv_item_id: string

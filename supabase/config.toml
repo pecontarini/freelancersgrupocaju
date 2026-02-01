@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.process-reclamacao]
 verify_jwt = false
+
+[functions.extract-nfe-data]
+verify_jwt = false
+
+[functions.extract-sales-report]
+verify_jwt = false

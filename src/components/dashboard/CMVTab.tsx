@@ -1,6 +1,13 @@
-import { Package } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CMVItemForm, CMVInventoryForm, CMVSalesMappingList } from "@/components/cmv";
+import { 
+  CMVItemForm, 
+  CMVInventoryForm, 
+  CMVSalesMappingList,
+  CMVNFeProcessor,
+  CMVSalesProcessor,
+  CMVPriceHistory
+} from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function CMVTab() {
@@ -24,21 +31,45 @@ export function CMVTab() {
       </div>
 
       {/* Main Content with Tabs */}
-      <Tabs defaultValue="cadastro" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
+      <Tabs defaultValue="nfe" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+          <TabsTrigger value="nfe" className="flex items-center gap-1">
+            <FileUp className="h-3 w-3" />
+            <span className="hidden sm:inline">NFe</span>
+          </TabsTrigger>
+          <TabsTrigger value="vendas" className="flex items-center gap-1">
+            <ShoppingCart className="h-3 w-3" />
+            <span className="hidden sm:inline">Vendas</span>
+          </TabsTrigger>
           <TabsTrigger value="inventario">Inventário</TabsTrigger>
+          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
           <TabsTrigger value="mapeamentos">Mapeamentos</TabsTrigger>
+          <TabsTrigger value="historico" className="flex items-center gap-1">
+            <History className="h-3 w-3" />
+            <span className="hidden sm:inline">Preços</span>
+          </TabsTrigger>
         </TabsList>
 
-        {/* Cadastro de Itens */}
-        <TabsContent value="cadastro" className="space-y-6">
+        {/* Scanner de NFe */}
+        <TabsContent value="nfe" className="space-y-6">
           {isAdmin ? (
-            <CMVItemForm />
+            <CMVNFeProcessor />
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Apenas administradores podem gerenciar o cadastro de itens</p>
+              <FileUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Apenas administradores podem processar notas fiscais</p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Processador de Vendas */}
+        <TabsContent value="vendas" className="space-y-6">
+          {isAdmin ? (
+            <CMVSalesProcessor />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Apenas administradores podem processar relatórios de vendas</p>
             </div>
           )}
         </TabsContent>
@@ -55,9 +86,26 @@ export function CMVTab() {
           )}
         </TabsContent>
 
+        {/* Cadastro de Itens */}
+        <TabsContent value="cadastro" className="space-y-6">
+          {isAdmin ? (
+            <CMVItemForm />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Apenas administradores podem gerenciar o cadastro de itens</p>
+            </div>
+          )}
+        </TabsContent>
+
         {/* Mapeamentos de Vendas */}
         <TabsContent value="mapeamentos" className="space-y-6">
           <CMVSalesMappingList />
+        </TabsContent>
+
+        {/* Histórico de Preços */}
+        <TabsContent value="historico" className="space-y-6">
+          <CMVPriceHistory />
         </TabsContent>
       </Tabs>
     </div>

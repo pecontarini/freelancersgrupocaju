@@ -9,6 +9,7 @@ import {
   Wrench,
   ExternalLink,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -43,6 +44,7 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { MobileFreelancerCard } from "@/components/mobile/MobileFreelancerCard";
+import { MaintenanceSingleExportButton } from "@/components/MaintenanceSingleExportButton";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -592,7 +594,7 @@ export function BudgetsGerenciaisTab({
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3">
                       {entry.anexo_url && (
                         <a
                           href={entry.anexo_url}
@@ -606,6 +608,7 @@ export function BudgetsGerenciaisTab({
                       <p className="font-semibold text-orange-600">
                         {formatCurrency(entry.valor)}
                       </p>
+                      <MaintenanceSingleExportButton entry={entry} />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button

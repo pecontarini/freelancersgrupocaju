@@ -24,6 +24,7 @@ import {
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
+import { MaintenanceSingleExportButton } from "@/components/MaintenanceSingleExportButton";
 
 interface MaintenanceListProps {
   entries: MaintenanceEntry[];
@@ -61,6 +62,7 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
             <TableHead>Descrição</TableHead>
             <TableHead className="text-right">Valor</TableHead>
             <TableHead className="text-center">Anexo</TableHead>
+            <TableHead className="text-center">PDF</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
@@ -93,6 +95,9 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
                 ) : (
                   <span className="text-muted-foreground">-</span>
                 )}
+              </TableCell>
+              <TableCell className="text-center">
+                <MaintenanceSingleExportButton entry={entry} />
               </TableCell>
               <TableCell>
                 <AlertDialog>

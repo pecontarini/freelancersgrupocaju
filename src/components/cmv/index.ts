@@ -7,3 +7,4 @@ export { CMVSalesProcessor } from "./CMVSalesProcessor";
 export { CMVPriceHistory } from "./CMVPriceHistory";
 export { CMVAnalyticsDashboard } from "./CMVAnalyticsDashboard";
 export { CMVPeriodOpening } from "./CMVPeriodOpening";
+export { CMVUnitHeader } from "./CMVUnitHeader";

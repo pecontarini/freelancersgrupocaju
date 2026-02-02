@@ -1,5 +1,7 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, CalendarCheck, ClipboardCheck } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   CMVItemForm, 
   CMVInventoryForm, 
@@ -8,15 +10,18 @@ import {
   CMVSalesProcessor,
   CMVPriceHistory,
   CMVAnalyticsDashboard,
-  CMVPeriodOpening
+  CMVPeriodOpening,
+  CMVUnitHeader
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
 
 export function CMVTab() {
   const { isAdmin, isGerenteUnidade } = useUserProfile();
+  const { effectiveUnidadeId } = useUnidade();
 
-  // Both admin and gerente can access inventory
-  const canAccessInventory = isAdmin || isGerenteUnidade;
+  // Both admin and gerente can access operational features
+  const canAccessOperational = isAdmin || isGerenteUnidade;
 
   return (
     <div className="space-y-6 fade-in">
@@ -27,118 +32,205 @@ export function CMVTab() {
         </div>
         <div>
           <h2 className="font-display text-2xl font-bold uppercase">
-            CMV (Unitários)
+            CMV Carnes
           </h2>
           <p className="text-muted-foreground">
-            Controle de insumos e estoque de carnes
+            Controle de estoque e custos de porcionados
           </p>
         </div>
       </div>
 
+      {/* Unit Selection Header - Always Visible */}
+      <CMVUnitHeader />
+
       {/* Main Content with Tabs */}
-      <Tabs defaultValue="abertura" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8 max-w-5xl">
-          <TabsTrigger value="abertura" className="flex items-center gap-1">
-            <CalendarCheck className="h-3 w-3" />
-            <span className="hidden sm:inline">Abertura</span>
+      <Tabs defaultValue="operacional" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+          <TabsTrigger value="operacional" className="flex items-center gap-1.5">
+            <ClipboardCheck className="h-4 w-4" />
+            <span className="hidden sm:inline">Operacional</span>
           </TabsTrigger>
-          <TabsTrigger value="auditoria" className="flex items-center gap-1">
-            <BarChart3 className="h-3 w-3" />
+          <TabsTrigger value="auditoria" className="flex items-center gap-1.5">
+            <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Auditoria</span>
           </TabsTrigger>
-          <TabsTrigger value="nfe" className="flex items-center gap-1">
-            <FileUp className="h-3 w-3" />
-            <span className="hidden sm:inline">NFe</span>
+          <TabsTrigger value="entradas" className="flex items-center gap-1.5">
+            <FileUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Entradas</span>
           </TabsTrigger>
-          <TabsTrigger value="vendas" className="flex items-center gap-1">
-            <ShoppingCart className="h-3 w-3" />
-            <span className="hidden sm:inline">Vendas</span>
+          <TabsTrigger value="saidas" className="flex items-center gap-1.5">
+            <ShoppingCart className="h-4 w-4" />
+            <span className="hidden sm:inline">Saídas</span>
           </TabsTrigger>
-          <TabsTrigger value="inventario" className="flex items-center gap-1">
-            <ClipboardCheck className="h-3 w-3" />
-            <span className="hidden sm:inline">Contagem</span>
-          </TabsTrigger>
-          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
-          <TabsTrigger value="mapeamentos">Mapeamentos</TabsTrigger>
-          <TabsTrigger value="historico" className="flex items-center gap-1">
-            <History className="h-3 w-3" />
-            <span className="hidden sm:inline">Preços</span>
+          <TabsTrigger value="configuracoes" className="flex items-center gap-1.5">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Config</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* Abertura de Período */}
-        <TabsContent value="abertura" className="space-y-6">
-          {canAccessInventory ? (
-            <CMVPeriodOpening />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <CalendarCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Acesso restrito</p>
+        {/* ====== ABA 1: OPERACIONAL (Abertura + Contagem) ====== */}
+        <TabsContent value="operacional" className="space-y-6">
+          {!effectiveUnidadeId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Selecione uma unidade acima</p>
+                <p className="text-sm">Para gerenciar estoque inicial e contagens</p>
+              </CardContent>
+            </Card>
+          ) : canAccessOperational ? (
+            <div className="space-y-6">
+              {/* Guide Card */}
+              <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                    Fluxo de Trabalho
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground space-y-2">
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">1</span>
+                    <p><strong>Abertura de Período:</strong> Registre a contagem física inicial de todos os itens no início do mês.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">2</span>
+                    <p><strong>Entradas (NFe):</strong> Faça upload das notas fiscais para registrar recebimentos.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">3</span>
+                    <p><strong>Saídas (Vendas):</strong> Processe relatórios de vendas para baixa teórica do estoque.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">4</span>
+                    <p><strong>Auditoria:</strong> Acompanhe divergências entre estoque teórico e contagem real.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Period Opening / Initial Stock */}
+              <CMVPeriodOpening />
             </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Acesso restrito</p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
-        {/* Dashboard de Auditoria */}
+        {/* ====== ABA 2: AUDITORIA (Dashboard BI) ====== */}
         <TabsContent value="auditoria" className="space-y-6">
           <CMVAnalyticsDashboard />
         </TabsContent>
 
-        {/* Scanner de NFe */}
-        <TabsContent value="nfe" className="space-y-6">
+        {/* ====== ABA 3: ENTRADAS (NFe Scanner) ====== */}
+        <TabsContent value="entradas" className="space-y-6">
+          {!effectiveUnidadeId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <FileUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Selecione uma unidade acima</p>
+                <p className="text-sm">Para registrar entradas de notas fiscais</p>
+              </CardContent>
+            </Card>
+          ) : isAdmin ? (
+            <div className="space-y-4">
+              <Alert>
+                <FileUp className="h-4 w-4" />
+                <AlertTitle>Registrar Entrada de Mercadorias</AlertTitle>
+                <AlertDescription>
+                  Faça upload da NFe (foto ou PDF) para extrair automaticamente os itens e quantidades.
+                  O sistema irá vincular à unidade selecionada e atualizar o estoque.
+                </AlertDescription>
+              </Alert>
+              <CMVNFeProcessor />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <FileUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Apenas administradores podem processar notas fiscais</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ====== ABA 4: SAÍDAS (Vendas) ====== */}
+        <TabsContent value="saidas" className="space-y-6">
+          {!effectiveUnidadeId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Selecione uma unidade acima</p>
+                <p className="text-sm">Para processar baixa de vendas</p>
+              </CardContent>
+            </Card>
+          ) : isAdmin ? (
+            <div className="space-y-4">
+              <Alert>
+                <ShoppingCart className="h-4 w-4" />
+                <AlertTitle>Processar Relatório de Vendas</AlertTitle>
+                <AlertDescription>
+                  Faça upload do relatório de vendas para dar baixa teórica no estoque.
+                  Os itens serão mapeados automaticamente usando as configurações de mapeamento.
+                </AlertDescription>
+              </Alert>
+              <CMVSalesProcessor />
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Apenas administradores podem processar relatórios de vendas</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ====== ABA 5: CONFIGURAÇÕES (Cadastro + Mapeamentos + Preços) ====== */}
+        <TabsContent value="configuracoes" className="space-y-6">
           {isAdmin ? (
-            <CMVNFeProcessor />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <FileUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Apenas administradores podem processar notas fiscais</p>
+            <div className="space-y-6">
+              {/* Sub-tabs for configuration */}
+              <Tabs defaultValue="cadastro" className="space-y-4">
+                <TabsList className="w-full max-w-md">
+                  <TabsTrigger value="cadastro" className="flex-1">
+                    <Package className="h-4 w-4 mr-2" />
+                    Cadastro de Itens
+                  </TabsTrigger>
+                  <TabsTrigger value="mapeamentos" className="flex-1">
+                    Mapeamentos
+                  </TabsTrigger>
+                  <TabsTrigger value="historico" className="flex-1">
+                    <History className="h-4 w-4 mr-2" />
+                    Preços
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="cadastro">
+                  <CMVItemForm />
+                </TabsContent>
+
+                <TabsContent value="mapeamentos">
+                  <CMVSalesMappingList />
+                </TabsContent>
+
+                <TabsContent value="historico">
+                  <CMVPriceHistory />
+                </TabsContent>
+              </Tabs>
             </div>
-          )}
-        </TabsContent>
-
-        {/* Processador de Vendas */}
-        <TabsContent value="vendas" className="space-y-6">
-          {isAdmin ? (
-            <CMVSalesProcessor />
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Apenas administradores podem processar relatórios de vendas</p>
-            </div>
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Apenas administradores podem gerenciar configurações</p>
+              </CardContent>
+            </Card>
           )}
-        </TabsContent>
-
-        {/* Inventário / Contagem */}
-        <TabsContent value="inventario" className="space-y-6">
-          {canAccessInventory ? (
-            <CMVInventoryForm />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Acesso restrito</p>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Cadastro de Itens */}
-        <TabsContent value="cadastro" className="space-y-6">
-          {isAdmin ? (
-            <CMVItemForm />
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Apenas administradores podem gerenciar o cadastro de itens</p>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Mapeamentos de Vendas */}
-        <TabsContent value="mapeamentos" className="space-y-6">
-          <CMVSalesMappingList />
-        </TabsContent>
-
-        {/* Histórico de Preços */}
-        <TabsContent value="historico" className="space-y-6">
-          <CMVPriceHistory />
         </TabsContent>
       </Tabs>
     </div>

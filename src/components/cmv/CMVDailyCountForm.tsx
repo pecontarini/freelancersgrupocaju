@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ export function CMVDailyCountForm() {
   );
 
   // Initialize counts from existing data
-  useMemo(() => {
+  useEffect(() => {
     if (contagensByDate.length > 0) {
       const existingCounts: Record<string, ItemCount> = {};
       contagensByDate.forEach(c => {

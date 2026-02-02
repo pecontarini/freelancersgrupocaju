@@ -272,6 +272,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cmv_contagens: {
+        Row: {
+          cmv_item_id: string
+          created_at: string
+          created_by: string | null
+          data_contagem: string
+          id: string
+          loja_id: string
+          preco_custo_snapshot: number
+          quantidade: number
+          updated_at: string
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string
+          created_by?: string | null
+          data_contagem: string
+          id?: string
+          loja_id: string
+          preco_custo_snapshot: number
+          quantidade?: number
+          updated_at?: string
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_contagem?: string
+          id?: string
+          loja_id?: string
+          preco_custo_snapshot?: number
+          quantidade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_contagens_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_contagens_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_inventory: {
         Row: {
           cmv_item_id: string

@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3 } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, CalendarCheck, ClipboardCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   CMVItemForm, 
@@ -7,12 +7,16 @@ import {
   CMVNFeProcessor,
   CMVSalesProcessor,
   CMVPriceHistory,
-  CMVAnalyticsDashboard
+  CMVAnalyticsDashboard,
+  CMVPeriodOpening
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function CMVTab() {
-  const { isAdmin } = useUserProfile();
+  const { isAdmin, isGerenteUnidade } = useUserProfile();
+
+  // Both admin and gerente can access inventory
+  const canAccessInventory = isAdmin || isGerenteUnidade;
 
   return (
     <div className="space-y-6 fade-in">
@@ -32,8 +36,12 @@ export function CMVTab() {
       </div>
 
       {/* Main Content with Tabs */}
-      <Tabs defaultValue="auditoria" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 max-w-4xl">
+      <Tabs defaultValue="abertura" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8 max-w-5xl">
+          <TabsTrigger value="abertura" className="flex items-center gap-1">
+            <CalendarCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Abertura</span>
+          </TabsTrigger>
           <TabsTrigger value="auditoria" className="flex items-center gap-1">
             <BarChart3 className="h-3 w-3" />
             <span className="hidden sm:inline">Auditoria</span>
@@ -46,7 +54,10 @@ export function CMVTab() {
             <ShoppingCart className="h-3 w-3" />
             <span className="hidden sm:inline">Vendas</span>
           </TabsTrigger>
-          <TabsTrigger value="inventario">Inventário</TabsTrigger>
+          <TabsTrigger value="inventario" className="flex items-center gap-1">
+            <ClipboardCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Contagem</span>
+          </TabsTrigger>
           <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
           <TabsTrigger value="mapeamentos">Mapeamentos</TabsTrigger>
           <TabsTrigger value="historico" className="flex items-center gap-1">
@@ -54,6 +65,18 @@ export function CMVTab() {
             <span className="hidden sm:inline">Preços</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Abertura de Período */}
+        <TabsContent value="abertura" className="space-y-6">
+          {canAccessInventory ? (
+            <CMVPeriodOpening />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <CalendarCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Acesso restrito</p>
+            </div>
+          )}
+        </TabsContent>
 
         {/* Dashboard de Auditoria */}
         <TabsContent value="auditoria" className="space-y-6">
@@ -84,14 +107,14 @@ export function CMVTab() {
           )}
         </TabsContent>
 
-        {/* Inventário */}
+        {/* Inventário / Contagem */}
         <TabsContent value="inventario" className="space-y-6">
-          {isAdmin ? (
+          {canAccessInventory ? (
             <CMVInventoryForm />
           ) : (
             <div className="text-center py-12 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Apenas administradores podem gerenciar o inventário</p>
+              <p>Acesso restrito</p>
             </div>
           )}
         </TabsContent>

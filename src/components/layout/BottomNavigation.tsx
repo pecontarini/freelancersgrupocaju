@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -21,6 +21,7 @@ const navItems = [
   { id: "budgets", label: "Budgets", icon: Wallet },
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
+  { id: "cmv", label: "CMV", icon: Package },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
@@ -75,13 +76,6 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                     onClick={() => onTabChange("rede")}
                   >
                     Visão Rede
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => onTabChange("cmv")}
-                  >
-                    CMV (Unitários)
                   </Button>
                 </div>
               )}

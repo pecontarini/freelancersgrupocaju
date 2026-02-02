@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CalendarIcon, ClipboardCheck, Loader2, Save, CheckCircle } from "lucide-react";
+import { CalendarIcon, ClipboardCheck, Loader2, Save, CheckCircle, FileSpreadsheet, FileText } from "lucide-react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
+import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -105,6 +109,121 @@ export function CMVDailyCountForm() {
   const progress = totalItems > 0 ? Math.round((countedItems / totalItems) * 100) : 0;
 
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+
+  // Get items with counts for export
+  const getExportData = () => {
+    return activeItems
+      .filter(item => {
+        const count = counts[item.id];
+        return count?.quantidade !== undefined && count?.quantidade !== "";
+      })
+      .map(item => {
+        const count = counts[item.id];
+        const qty = parseInt(count.quantidade) || 0;
+        const cost = count.preco_custo_snapshot || item.preco_custo_atual;
+        return {
+          nome: item.nome,
+          categoria: item.categoria || "-",
+          unidade: item.unidade,
+          quantidade: qty,
+          custo_unitario: cost,
+          valor_total: qty * cost,
+          peso_padrao_g: item.peso_padrao_g,
+        };
+      });
+  };
+
+  const handleExportExcel = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      toast.error("Nenhuma contagem para exportar");
+      return;
+    }
+
+    const worksheetData = [
+      ["CONTAGEM FÍSICA - CMV CARNES"],
+      [`Data: ${format(selectedDate, "dd/MM/yyyy")}`],
+      [""],
+      ["Item", "Categoria", "Unidade", "Quantidade", "Custo Unit. (R$)", "Valor Total (R$)"],
+      ...data.map(item => [
+        item.nome,
+        item.categoria,
+        item.unidade,
+        item.quantidade,
+        item.custo_unitario.toFixed(2),
+        item.valor_total.toFixed(2),
+      ]),
+      [""],
+      ["TOTAL", "", "", data.reduce((sum, i) => sum + i.quantidade, 0), "", 
+        data.reduce((sum, i) => sum + i.valor_total, 0).toFixed(2)],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Contagem");
+    
+    const fileName = `Contagem_CMV_${format(selectedDate, "yyyy-MM-dd")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    toast.success("Excel exportado com sucesso!");
+  };
+
+  const handleExportPDF = () => {
+    const data = getExportData();
+    if (data.length === 0) {
+      toast.error("Nenhuma contagem para exportar");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Logo
+    try {
+      doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 15);
+    } catch (e) {
+      console.log("Logo not available");
+    }
+
+    // Header
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("CONTAGEM FÍSICA - CMV CARNES", pageWidth / 2, 20, { align: "center" });
+
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Data: ${format(selectedDate, "dd/MM/yyyy")}`, pageWidth / 2, 28, { align: "center" });
+
+    // Summary
+    const totalQty = data.reduce((sum, i) => sum + i.quantidade, 0);
+    const totalValue = data.reduce((sum, i) => sum + i.valor_total, 0);
+
+    doc.setFontSize(10);
+    doc.text(`Total de Itens: ${data.length}`, 14, 40);
+    doc.text(`Quantidade Total: ${totalQty} unidades`, 14, 46);
+    doc.text(`Valor Total em Estoque: R$ ${totalValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 14, 52);
+
+    // Table
+    autoTable(doc, {
+      startY: 60,
+      head: [["Item", "Categoria", "Un.", "Qtd", "Custo (R$)", "Total (R$)"]],
+      body: data.map(item => [
+        item.nome,
+        item.categoria,
+        item.unidade,
+        item.quantidade.toString(),
+        item.custo_unitario.toFixed(2),
+        item.valor_total.toFixed(2),
+      ]),
+      foot: [["TOTAL", "", "", totalQty.toString(), "", `R$ ${totalValue.toFixed(2)}`]],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [59, 130, 246] },
+      footStyles: { fillColor: [229, 231, 235], textColor: [0, 0, 0], fontStyle: "bold" },
+    });
+
+    const fileName = `Contagem_CMV_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+    doc.save(fileName);
+    toast.success("PDF exportado com sucesso!");
+  };
 
   return (
     <div className="space-y-6">
@@ -259,8 +378,26 @@ export function CMVDailyCountForm() {
             </div>
           )}
 
-          {/* Submit Button */}
-          <div className="flex justify-end">
+          {/* Action Buttons */}
+          <div className="flex flex-wrap justify-between gap-2">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleExportExcel}
+                disabled={countedItems === 0}
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleExportPDF}
+                disabled={countedItems === 0}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+            </div>
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || countedItems === 0}

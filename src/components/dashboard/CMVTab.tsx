@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -11,7 +11,9 @@ import {
   CMVPriceHistory,
   CMVAnalyticsDashboard,
   CMVPeriodOpening,
-  CMVUnitHeader
+  CMVUnitHeader,
+  CMVDailyCountForm,
+  CMVPeriodAudit
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -70,7 +72,7 @@ export function CMVTab() {
 
         {/* ====== ABA 1: OPERACIONAL (Abertura + Contagem) ====== */}
         <TabsContent value="operacional" className="space-y-6">
-          {!effectiveUnidadeId ? (
+        {!effectiveUnidadeId ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -91,7 +93,7 @@ export function CMVTab() {
                 <CardContent className="text-sm text-muted-foreground space-y-2">
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">1</span>
-                    <p><strong>Abertura de Período:</strong> Registre a contagem física inicial de todos os itens no início do mês.</p>
+                    <p><strong>Contagem Diária:</strong> Registre a contagem física todos os dias (salva o custo vigente).</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">2</span>
@@ -103,12 +105,15 @@ export function CMVTab() {
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">4</span>
-                    <p><strong>Auditoria:</strong> Acompanhe divergências entre estoque teórico e contagem real.</p>
+                    <p><strong>Auditoria:</strong> Selecione um período para calcular divergências e prejuízos.</p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Period Opening / Initial Stock */}
+              {/* Daily Count Form */}
+              <CMVDailyCountForm />
+
+              {/* Period Opening / Initial Stock - Keep for backward compatibility */}
               <CMVPeriodOpening />
             </div>
           ) : (
@@ -121,8 +126,12 @@ export function CMVTab() {
           )}
         </TabsContent>
 
-        {/* ====== ABA 2: AUDITORIA (Dashboard BI) ====== */}
+        {/* ====== ABA 2: AUDITORIA (Dashboard BI + Auditoria por Período) ====== */}
         <TabsContent value="auditoria" className="space-y-6">
+          {/* Period Audit - Flexible Date Range */}
+          <CMVPeriodAudit />
+          
+          {/* BI Dashboard */}
           <CMVAnalyticsDashboard />
         </TabsContent>
 
@@ -136,7 +145,7 @@ export function CMVTab() {
                 <p className="text-sm">Para registrar entradas de notas fiscais</p>
               </CardContent>
             </Card>
-          ) : isAdmin ? (
+          ) : canAccessOperational ? (
             <div className="space-y-4">
               <Alert>
                 <FileUp className="h-4 w-4" />
@@ -152,7 +161,7 @@ export function CMVTab() {
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <FileUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Apenas administradores podem processar notas fiscais</p>
+                <p>Acesso restrito</p>
               </CardContent>
             </Card>
           )}

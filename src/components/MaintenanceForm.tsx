@@ -269,7 +269,19 @@ export function MaintenanceForm() {
       return;
     }
 
-    const valorNumerico = parseFloat(data.valor.replace(/[^\d,]/g, "").replace(",", "."));
+    // Parse Brazilian currency format: "1.440,00" -> 1440.00
+    // First remove all dots (thousand separators), then replace comma with dot (decimal separator)
+    const valorNumerico = parseFloat(
+      data.valor
+        .replace(/\./g, "")  // Remove thousand separators (dots)
+        .replace(",", ".")   // Replace decimal comma with dot
+        .replace(/[^\d.]/g, "") // Remove any remaining non-numeric chars except dot
+    );
+
+    if (isNaN(valorNumerico) || valorNumerico <= 0) {
+      toast.error("Valor inválido. Digite um valor maior que zero.");
+      return;
+    }
 
     await addEntry({
       loja: selectedLoja.nome,

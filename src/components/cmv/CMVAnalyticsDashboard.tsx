@@ -8,9 +8,12 @@ import {
   Target,
   FileText,
   ExternalLink,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -27,6 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   LineChart,
   Line,
@@ -45,6 +54,10 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency } from "@/lib/formatters";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { LOGO_BASE64 } from "@/lib/logoBase64";
 
 export function CMVAnalyticsDashboard() {
   const { isAdmin, unidades } = useUserProfile();
@@ -53,6 +66,7 @@ export function CMVAnalyticsDashboard() {
 
   // Filter stores based on user role
   const availableStores = isAdmin ? lojas : unidades;
+  const selectedStoreName = availableStores.find((s) => s.id === selectedLojaId)?.nome || "";
 
   const {
     reconciliationData,
@@ -68,13 +82,212 @@ export function CMVAnalyticsDashboard() {
   // Colors for charts
   const COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6"];
 
+  // Export to CSV
+  const exportToCSV = (type: "reconciliation" | "entries" | "inventory") => {
+    let headers: string[] = [];
+    let rows: (string | number)[][] = [];
+    let filename = "";
+
+    const today = format(new Date(), "yyyy-MM-dd");
+
+    switch (type) {
+      case "reconciliation":
+        headers = ["Item", "Categoria", "Est. Inicial", "Entradas", "Saídas", "Esperado", "Contagem", "Divergência", "Prejuízo (R$)"];
+        rows = reconciliationData.map((r) => [
+          r.itemName,
+          r.categoria,
+          r.estoqueInicial,
+          r.entradasNfe,
+          r.saidasVendas,
+          r.estoqueEsperado,
+          r.contagemReal,
+          r.divergencia,
+          r.prejuizo.toFixed(2),
+        ]);
+        filename = `CMV_Conciliacao_${selectedStoreName}_${today}.csv`;
+        break;
+      case "entries":
+        headers = ["Data", "Item", "Categoria", "Quantidade", "Preço Unit.", "Referência NFe"];
+        rows = entriesReport.map((e: any) => [
+          format(parseISO(e.data_movimento), "dd/MM/yyyy"),
+          e.cmv_item?.nome || "",
+          e.cmv_item?.categoria || "",
+          e.quantidade,
+          e.preco_unitario?.toFixed(2) || "",
+          e.referencia || "",
+        ]);
+        filename = `CMV_Entradas_${selectedStoreName}_${today}.csv`;
+        break;
+      case "inventory":
+        headers = ["Item", "Categoria", "Esperado", "Contagem", "Preço Unit.", "Valor Estoque", "Status"];
+        rows = reconciliationData.map((r) => [
+          r.itemName,
+          r.categoria,
+          r.estoqueEsperado,
+          r.contagemReal,
+          r.precoCusto.toFixed(2),
+          (r.contagemReal * r.precoCusto).toFixed(2),
+          r.divergencia === 0 ? "Conciliado" : r.divergencia > 0 ? `Furo (${r.divergencia})` : `Sobra (${Math.abs(r.divergencia)})`,
+        ]);
+        filename = `CMV_Inventario_${selectedStoreName}_${today}.csv`;
+        break;
+    }
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map((row) => row.join(";")),
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    toast.success("CSV exportado com sucesso!");
+  };
+
+  // Export to PDF
+  const exportToPDF = (type: "reconciliation" | "entries" | "inventory") => {
+    const doc = new jsPDF();
+    const today = format(new Date(), "dd/MM/yyyy");
+    let filename = "";
+
+    // Add logo
+    try {
+      doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 30);
+    } catch {
+      // Continue without logo
+    }
+
+    // Title
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+
+    let title = "";
+    let headers: string[] = [];
+    let rows: (string | number)[][] = [];
+
+    switch (type) {
+      case "reconciliation":
+        title = `RELATÓRIO DE CONCILIAÇÃO CMV - ${selectedStoreName.toUpperCase()}`;
+        headers = ["Item", "Inicial", "Entradas", "Saídas", "Esperado", "Contagem", "Diverg.", "Prejuízo"];
+        rows = reconciliationData.map((r) => [
+          r.itemName.slice(0, 20),
+          r.estoqueInicial,
+          r.entradasNfe,
+          r.saidasVendas,
+          r.estoqueEsperado,
+          r.contagemReal,
+          r.divergencia,
+          formatCurrency(r.prejuizo),
+        ]);
+        filename = `CMV_Conciliacao_${selectedStoreName}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+        break;
+      case "entries":
+        title = `RELATÓRIO DE ENTRADAS (NFe) - ${selectedStoreName.toUpperCase()}`;
+        headers = ["Data", "Item", "Categoria", "Qtd", "Preço", "NFe"];
+        rows = entriesReport.map((e: any) => [
+          format(parseISO(e.data_movimento), "dd/MM"),
+          (e.cmv_item?.nome || "").slice(0, 20),
+          e.cmv_item?.categoria || "",
+          e.quantidade,
+          e.preco_unitario ? formatCurrency(e.preco_unitario) : "-",
+          e.referencia?.slice(0, 15) || "-",
+        ]);
+        filename = `CMV_Entradas_${selectedStoreName}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+        break;
+      case "inventory":
+        title = `POSIÇÃO DE ESTOQUE CMV - ${selectedStoreName.toUpperCase()}`;
+        headers = ["Item", "Esperado", "Contagem", "Preço", "Valor Est.", "Status"];
+        rows = reconciliationData.map((r) => [
+          r.itemName.slice(0, 20),
+          r.estoqueEsperado,
+          r.contagemReal,
+          formatCurrency(r.precoCusto),
+          formatCurrency(r.contagemReal * r.precoCusto),
+          r.divergencia === 0 ? "OK" : r.divergencia > 0 ? `Furo (${r.divergencia})` : `Sobra`,
+        ]);
+        filename = `CMV_Inventario_${selectedStoreName}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+        break;
+    }
+
+    doc.text(title, 50, 25);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Gerado em: ${today}`, 50, 32);
+
+    // Summary box for reconciliation
+    if (type === "reconciliation") {
+      doc.setFillColor(254, 226, 226); // Light red
+      doc.rect(14, 45, 80, 20, "F");
+      doc.setFontSize(9);
+      doc.text("PREJUÍZO TOTAL", 18, 52);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(220, 38, 38);
+      doc.text(formatCurrency(totalPrejuizo), 18, 60);
+      doc.setTextColor(0, 0, 0);
+
+      doc.setFillColor(220, 252, 231); // Light green
+      doc.rect(100, 45, 80, 20, "F");
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("ACURACIDADE", 104, 52);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(22, 163, 74);
+      doc.text(`${summaryStats.accuracyRate}%`, 104, 60);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // Table
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: type === "reconciliation" ? 72 : 45,
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: "bold",
+        fontSize: 8,
+      },
+      bodyStyles: {
+        fontSize: 8,
+      },
+      alternateRowStyles: {
+        fillColor: [249, 250, 251],
+      },
+      columnStyles: type === "reconciliation" ? {
+        6: { halign: "center" },
+        7: { halign: "right" },
+      } : {},
+    });
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Página ${i} de ${pageCount} | Grupo Caju - CMV Carnes`,
+        doc.internal.pageSize.width / 2,
+        doc.internal.pageSize.height - 10,
+        { align: "center" }
+      );
+    }
+
+    doc.save(filename);
+    toast.success("PDF exportado com sucesso!");
+  };
+
   return (
     <div className="space-y-6">
       {/* Store Filter */}
       <Card className="rounded-2xl shadow-card">
         <CardContent className="pt-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1 max-w-xs">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px] max-w-xs">
               <Select value={selectedLojaId} onValueChange={setSelectedLojaId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma unidade" />
@@ -90,7 +303,7 @@ export function CMVAnalyticsDashboard() {
             </div>
             {selectedLojaId && (
               <Badge variant="outline" className="text-sm">
-                {availableStores.find((s) => s.id === selectedLojaId)?.nome}
+                Caminito
               </Badge>
             )}
           </div>
@@ -123,7 +336,7 @@ export function CMVAnalyticsDashboard() {
                   {formatCurrency(totalPrejuizo)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Baseado em divergências detectadas
+                  (Divergência × Custo Atualizado)
                 </p>
               </CardContent>
             </Card>
@@ -180,16 +393,21 @@ export function CMVAnalyticsDashboard() {
             <Card className="rounded-2xl shadow-card border-l-4 border-l-blue-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-                  Movimentações
+                  Valor em Estoque
                 </CardTitle>
                 <Package className="h-4 w-4 text-blue-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {entriesReport.length + salesReport.length}
+                  {formatCurrency(
+                    reconciliationData.reduce(
+                      (sum, r) => sum + r.contagemReal * r.precoCusto,
+                      0
+                    )
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {entriesReport.length} entradas, {salesReport.length} saídas
+                  {reconciliationData.reduce((sum, r) => sum + r.contagemReal, 0)} unidades
                 </p>
               </CardContent>
             </Card>
@@ -202,7 +420,7 @@ export function CMVAnalyticsDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg font-bold uppercase">
                   <BarChart3 className="h-5 w-5 text-red-500" />
-                  Top Itens Divergentes
+                  Top Furos (Prejuízo)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -221,16 +439,36 @@ export function CMVAnalyticsDashboard() {
                         margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                        <XAxis type="number" />
+                        <XAxis type="number" tickFormatter={(v) => `R$${v}`} />
                         <YAxis
                           type="category"
                           dataKey="itemName"
                           width={100}
-                          tick={{ fontSize: 12 }}
+                          tick={{ fontSize: 11 }}
                         />
                         <Tooltip
-                          formatter={(value: number) => [formatCurrency(value), "Prejuízo"]}
-                          labelFormatter={(label) => `Item: ${label}`}
+                          formatter={(value: number, name: string) => [
+                            formatCurrency(value),
+                            "Prejuízo",
+                          ]}
+                          labelFormatter={(label) => `${label}`}
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-background border rounded-lg p-3 shadow-lg">
+                                  <p className="font-semibold">{label}</p>
+                                  <p className="text-red-600">
+                                    Prejuízo: {formatCurrency(data.prejuizoReais)}
+                                  </p>
+                                  <p className="text-muted-foreground text-sm">
+                                    Divergência: {data.divergenciaUnidades} unidades
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
                         />
                         <Bar dataKey="prejuizoReais" radius={[0, 4, 4, 0]}>
                           {divergenceRanking.map((_, index) => (
@@ -249,7 +487,7 @@ export function CMVAnalyticsDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg font-bold uppercase">
                   <TrendingUp className="h-5 w-5 text-green-500" />
-                  Evolução da Acuracidade
+                  Evolução Semanal (8 semanas)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -261,7 +499,7 @@ export function CMVAnalyticsDashboard() {
                     >
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                       <XAxis dataKey="weekLabel" tick={{ fontSize: 12 }} />
-                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
                       <Tooltip
                         formatter={(value: number) => [`${value}%`, "Acuracidade"]}
                         labelFormatter={(label) => `Semana de ${label}`}
@@ -283,17 +521,51 @@ export function CMVAnalyticsDashboard() {
 
           {/* Reports Tabs */}
           <Card className="rounded-2xl shadow-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg font-bold uppercase">
                 <FileText className="h-5 w-5" />
                 Relatórios Consolidados
               </CardTitle>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportToPDF("reconciliation")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Conciliação (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportToCSV("reconciliation")}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Conciliação (CSV)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportToPDF("entries")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Entradas (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportToCSV("entries")}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Entradas (CSV)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportToPDF("inventory")}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Inventário (PDF)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportToCSV("inventory")}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Inventário (CSV)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="reconciliation" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-4 max-w-lg">
                   <TabsTrigger value="reconciliation">Conciliação</TabsTrigger>
-                  <TabsTrigger value="entries">Entradas (NFe)</TabsTrigger>
+                  <TabsTrigger value="entries">Entradas</TabsTrigger>
                   <TabsTrigger value="sales">Vendas</TabsTrigger>
                   <TabsTrigger value="inventory">Posição</TabsTrigger>
                 </TabsList>

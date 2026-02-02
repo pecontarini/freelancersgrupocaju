@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   CMVItemForm, 
@@ -6,7 +6,8 @@ import {
   CMVSalesMappingList,
   CMVNFeProcessor,
   CMVSalesProcessor,
-  CMVPriceHistory
+  CMVPriceHistory,
+  CMVAnalyticsDashboard
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
@@ -31,8 +32,12 @@ export function CMVTab() {
       </div>
 
       {/* Main Content with Tabs */}
-      <Tabs defaultValue="nfe" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 max-w-3xl">
+      <Tabs defaultValue="auditoria" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-7 max-w-4xl">
+          <TabsTrigger value="auditoria" className="flex items-center gap-1">
+            <BarChart3 className="h-3 w-3" />
+            <span className="hidden sm:inline">Auditoria</span>
+          </TabsTrigger>
           <TabsTrigger value="nfe" className="flex items-center gap-1">
             <FileUp className="h-3 w-3" />
             <span className="hidden sm:inline">NFe</span>
@@ -49,6 +54,11 @@ export function CMVTab() {
             <span className="hidden sm:inline">Preços</span>
           </TabsTrigger>
         </TabsList>
+
+        {/* Dashboard de Auditoria */}
+        <TabsContent value="auditoria" className="space-y-6">
+          <CMVAnalyticsDashboard />
+        </TabsContent>
 
         {/* Scanner de NFe */}
         <TabsContent value="nfe" className="space-y-6">

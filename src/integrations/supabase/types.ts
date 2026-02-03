@@ -455,6 +455,53 @@ export type Database = {
           },
         ]
       }
+      cmv_pending_sales_items: {
+        Row: {
+          created_at: string
+          id: string
+          loja_id: string | null
+          nome_venda_normalizado: string
+          nome_venda_original: string
+          primeira_ocorrencia: string
+          status: string
+          total_ocorrencias: number
+          ultima_ocorrencia: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          nome_venda_normalizado: string
+          nome_venda_original: string
+          primeira_ocorrencia?: string
+          status?: string
+          total_ocorrencias?: number
+          ultima_ocorrencia?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          loja_id?: string | null
+          nome_venda_normalizado?: string
+          nome_venda_original?: string
+          primeira_ocorrencia?: string
+          status?: string
+          total_ocorrencias?: number
+          ultima_ocorrencia?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_pending_sales_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_price_history: {
         Row: {
           cmv_item_id: string
@@ -1412,6 +1459,7 @@ export type Database = {
         Returns: boolean
       }
       is_first_user: { Args: never; Returns: boolean }
+      normalize_sales_item_name: { Args: { name: string }; Returns: string }
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
         Returns: boolean

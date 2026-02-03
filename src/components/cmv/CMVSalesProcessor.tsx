@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { FileUp, Loader2, AlertTriangle, CheckCircle, HelpCircle, ShoppingCart, 
 import { toast } from "sonner";
 import { useSalesExtraction, ExtractedSalesItem } from "@/hooks/useSalesExtraction";
 import { useCMVItems, useCMVSalesMappings, useCMVInventory } from "@/hooks/useCMV";
+import { useCMVPendingItems, normalizeItemName } from "@/hooks/useCMVPendingItems";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { CMVSalesMappingModal } from "./CMVSalesMappingModal";
@@ -30,6 +31,7 @@ export function CMVSalesProcessor() {
   const { items: cmvItems } = useCMVItems();
   const { mappings } = useCMVSalesMappings();
   const { inventory } = useCMVInventory(effectiveUnidadeId || undefined);
+  const { addPendingItem } = useCMVPendingItems();
   
   const [processedItems, setProcessedItems] = useState<ProcessedSalesItem[]>([]);
   const [mappingModal, setMappingModal] = useState<{
@@ -38,15 +40,25 @@ export function CMVSalesProcessor() {
   }>({ open: false, itemName: "" });
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Normalize function for consistent matching
+  const normalizeForMatching = (name: string): string => {
+    return normalizeItemName(name);
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const data = await extractFromFile(file);
     if (data && data.items.length > 0) {
+      const unmappedToRegister: string[] = [];
+      
       const processed: ProcessedSalesItem[] = data.items.map(salesItem => {
+        const normalizedName = normalizeForMatching(salesItem.nome);
+        
+        // Check existing mapping (normalized comparison)
         const existingMapping = mappings.find(m => 
-          m.nome_venda.toLowerCase() === salesItem.nome.toLowerCase()
+          normalizeForMatching(m.nome_venda) === normalizedName
         );
 
         if (existingMapping) {
@@ -62,8 +74,9 @@ export function CMVSalesProcessor() {
           };
         }
 
+        // Check direct match with CMV items (normalized)
         const directMatch = cmvItems.find(i => 
-          i.nome.toLowerCase() === salesItem.nome.toLowerCase()
+          normalizeForMatching(i.nome) === normalizedName
         );
 
         if (directMatch) {
@@ -78,6 +91,9 @@ export function CMVSalesProcessor() {
           };
         }
 
+        // Item needs mapping - register as pending
+        unmappedToRegister.push(salesItem.nome);
+
         return {
           salesItem,
           cmvItemId: null,
@@ -91,9 +107,22 @@ export function CMVSalesProcessor() {
 
       setProcessedItems(processed);
 
+      // Register unmapped items to pending queue
+      for (const itemName of unmappedToRegister) {
+        try {
+          await addPendingItem.mutateAsync({
+            nome_venda_original: itemName,
+            loja_id: effectiveUnidadeId || undefined,
+          });
+        } catch (error) {
+          // Silently fail - item may already exist
+          console.log("Item already in pending:", itemName);
+        }
+      }
+
       const unmappedCount = processed.filter(p => p.needsMapping).length;
       if (unmappedCount > 0) {
-        toast.info(`${unmappedCount} item(s) precisam ser mapeados`);
+        toast.warning(`${unmappedCount} item(s) pendentes de vínculo - acesse a Central de Vínculos`);
       }
     }
     e.target.value = "";

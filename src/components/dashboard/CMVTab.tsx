@@ -1,11 +1,11 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   CMVItemForm, 
   CMVInventoryForm, 
-  CMVSalesMappingList,
+  CMVSalesMappingHub,
   CMVNFeProcessor,
   CMVSalesProcessor,
   CMVPriceHistory,
@@ -17,10 +17,13 @@ import {
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
+import { useCMVPendingItems } from "@/hooks/useCMVPendingItems";
+import { Badge } from "@/components/ui/badge";
 
 export function CMVTab() {
   const { isAdmin, isGerenteUnidade } = useUserProfile();
   const { effectiveUnidadeId } = useUnidade();
+  const { pendingItems } = useCMVPendingItems();
 
   // Both admin and gerente can access operational features
   const canAccessOperational = isAdmin || isGerenteUnidade;
@@ -47,7 +50,7 @@ export function CMVTab() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="operacional" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-4xl">
           <TabsTrigger value="operacional" className="flex items-center gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Operacional</span>
@@ -63,6 +66,15 @@ export function CMVTab() {
           <TabsTrigger value="saidas" className="flex items-center gap-1.5">
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">Saídas</span>
+          </TabsTrigger>
+          <TabsTrigger value="vinculos" className="flex items-center gap-1.5 relative">
+            <Link2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Vínculos</span>
+            {pendingItems.length > 0 && (
+              <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 text-xs px-1">
+                {pendingItems.length}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="configuracoes" className="flex items-center gap-1.5">
             <Settings className="h-4 w-4" />
@@ -199,7 +211,21 @@ export function CMVTab() {
           )}
         </TabsContent>
 
-        {/* ====== ABA 5: CONFIGURAÇÕES (Cadastro + Mapeamentos + Preços) ====== */}
+        {/* ====== ABA 5: VÍNCULOS (Central de Mapeamentos) ====== */}
+        <TabsContent value="vinculos" className="space-y-6">
+          {isAdmin ? (
+            <CMVSalesMappingHub />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Link2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Apenas administradores podem gerenciar vínculos</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* ====== ABA 6: CONFIGURAÇÕES (Cadastro + Preços) ====== */}
         <TabsContent value="configuracoes" className="space-y-6">
           {isAdmin ? (
             <div className="space-y-6">
@@ -210,21 +236,14 @@ export function CMVTab() {
                     <Package className="h-4 w-4 mr-2" />
                     Cadastro de Itens
                   </TabsTrigger>
-                  <TabsTrigger value="mapeamentos" className="flex-1">
-                    Mapeamentos
-                  </TabsTrigger>
                   <TabsTrigger value="historico" className="flex-1">
                     <History className="h-4 w-4 mr-2" />
-                    Preços
+                    Histórico de Preços
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="cadastro">
                   <CMVItemForm />
-                </TabsContent>
-
-                <TabsContent value="mapeamentos">
-                  <CMVSalesMappingList />
                 </TabsContent>
 
                 <TabsContent value="historico">

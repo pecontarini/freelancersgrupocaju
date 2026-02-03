@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCMVItems, useCMVSalesMappings } from "@/hooks/useCMV";
+import { useCMVPendingItems, normalizeItemName } from "@/hooks/useCMVPendingItems";
 
 interface CMVSalesMappingModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function CMVSalesMappingModal({
 }: CMVSalesMappingModalProps) {
   const { items } = useCMVItems();
   const { addMapping } = useCMVSalesMappings();
+  const { removePendingItem } = useCMVPendingItems();
   
   const [selectedItemId, setSelectedItemId] = useState("");
   const [multiplicador, setMultiplicador] = useState("1");
@@ -51,6 +53,14 @@ export function CMVSalesMappingModal({
       multiplicador: parseFloat(multiplicador) || 1,
       notas: notas || undefined,
     });
+
+    // Remove from pending queue
+    try {
+      const normalized = normalizeItemName(unknownItemName);
+      await removePendingItem.mutateAsync(normalized);
+    } catch (e) {
+      // Item might not be in pending queue
+    }
 
     setSelectedItemId("");
     setMultiplicador("1");

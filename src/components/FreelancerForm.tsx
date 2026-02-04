@@ -135,16 +135,25 @@ export function FreelancerForm() {
       form.setValue("nome_completo", result.nome_completo);
       form.setValue("chave_pix", result.chave_pix);
       
+      const filledFields = new Set<string>(["nome_completo", "chave_pix"]);
+      
       // Check if the function exists in options before setting
       const funcaoExists = funcoes.some(f => f.nome === result.funcao);
       if (funcaoExists) {
         form.setValue("funcao", result.funcao);
-        setAutoFilledFields(new Set(["nome_completo", "chave_pix", "funcao"]));
-      } else {
-        setAutoFilledFields(new Set(["nome_completo", "chave_pix"]));
+        filledFields.add("funcao");
       }
+      
+      // Check if the gerencia exists in options before setting
+      const gerenciaExists = gerencias.some(g => g.nome === result.gerencia);
+      if (gerenciaExists) {
+        form.setValue("gerencia", result.gerencia);
+        filledFields.add("gerencia");
+      }
+      
+      setAutoFilledFields(filledFields);
     }
-  }, [lookupFreelancerByCpf, form, funcoes]);
+  }, [lookupFreelancerByCpf, form, funcoes, gerencias]);
 
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCurrencyInput(e.target.value);
@@ -264,8 +273,18 @@ export function FreelancerForm() {
             {/* Gerência */}
             <div className="space-y-2">
               <Label htmlFor="gerencia">Gerência</Label>
-              <Select onValueChange={(val) => form.setValue("gerencia", val)} disabled={isLoadingGerencias}>
-                <SelectTrigger className="input-focus-ring">
+              <Select 
+                onValueChange={(val) => {
+                  form.setValue("gerencia", val);
+                  handleFieldChange("gerencia");
+                }} 
+                disabled={isLoadingGerencias}
+                value={form.watch("gerencia") || undefined}
+              >
+                <SelectTrigger className={cn(
+                  "input-focus-ring",
+                  autoFilledFields.has("gerencia") && "border-green-500 bg-green-50 dark:bg-green-950/20"
+                )}>
                   <SelectValue placeholder={isLoadingGerencias ? "Carregando..." : "Selecione"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,6 +295,9 @@ export function FreelancerForm() {
                   ))}
                 </SelectContent>
               </Select>
+              {autoFilledFields.has("gerencia") && (
+                <p className="text-xs text-green-600">Última gerência preenchida automaticamente</p>
+              )}
               {form.formState.errors.gerencia && (
                 <p className="text-sm text-destructive">{form.formState.errors.gerencia.message}</p>
               )}

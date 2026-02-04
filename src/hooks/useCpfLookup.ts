@@ -5,6 +5,7 @@ import { toast } from "sonner";
 interface FreelancerLookupResult {
   nome_completo: string;
   funcao: string;
+  gerencia: string;
   chave_pix: string;
 }
 
@@ -30,7 +31,7 @@ export function useCpfLookup() {
       // Query for the most recent entry with this CPF
       const { data, error } = await supabase
         .from("freelancer_entries")
-        .select("nome_completo, funcao, chave_pix, created_at")
+        .select("nome_completo, funcao, gerencia, chave_pix, created_at")
         .eq("cpf", cpf)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -48,6 +49,7 @@ export function useCpfLookup() {
         return {
           nome_completo: data.nome_completo,
           funcao: data.funcao,
+          gerencia: data.gerencia,
           chave_pix: data.chave_pix,
         };
       }

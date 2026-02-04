@@ -114,6 +114,60 @@ export type Database = {
           },
         ]
       }
+      audit_upload_logs: {
+        Row: {
+          audit_id: string | null
+          created_at: string
+          failure_count: number | null
+          global_score: number | null
+          id: string
+          loja_id: string
+          uploaded_by: string
+          uploader_name: string | null
+          uploader_role: string | null
+          viewed_by_admin: boolean | null
+        }
+        Insert: {
+          audit_id?: string | null
+          created_at?: string
+          failure_count?: number | null
+          global_score?: number | null
+          id?: string
+          loja_id: string
+          uploaded_by: string
+          uploader_name?: string | null
+          uploader_role?: string | null
+          viewed_by_admin?: boolean | null
+        }
+        Update: {
+          audit_id?: string | null
+          created_at?: string
+          failure_count?: number | null
+          global_score?: number | null
+          id?: string
+          loja_id?: string
+          uploaded_by?: string
+          uploader_name?: string | null
+          uploader_role?: string | null
+          viewed_by_admin?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_upload_logs_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "supervision_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_upload_logs_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       avaliacoes: {
         Row: {
           cargo_id: string

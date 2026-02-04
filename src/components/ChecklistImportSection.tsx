@@ -157,13 +157,17 @@ export function ChecklistImportSection() {
         }
       }
 
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || null;
+
       // Create audit record
       const audit = await createAudit({
         loja_id: selectedLojaId,
         audit_date: extractedData.audit_date || format(new Date(), "yyyy-MM-dd"),
         global_score: extractedData.global_score || 0,
         pdf_url: pdfUrl,
-        created_by: (await supabase.auth.getUser()).data.user?.id || null,
+        created_by: userId,
       });
 
       // Create failure records
@@ -183,6 +187,20 @@ export function ChecklistImportSection() {
         }));
 
         await createFailures(failureRecords);
+      }
+
+      // Log the upload for admin notification (especially for gerentes)
+      if (userId) {
+        const uploaderRole = isAdmin ? "admin" : isGerenteUnidade ? "gerente_unidade" : "user";
+        await supabase.from("audit_upload_logs").insert({
+          audit_id: audit.id,
+          loja_id: selectedLojaId,
+          uploaded_by: userId,
+          uploader_name: profile?.full_name || user?.email || "Desconhecido",
+          uploader_role: uploaderRole,
+          global_score: extractedData.global_score,
+          failure_count: extractedData.failures?.length || 0,
+        });
       }
 
       toast({
@@ -223,9 +241,9 @@ export function ChecklistImportSection() {
       <CardContent className="space-y-4">
         {/* Manager info alert */}
         {isGerenteUnidade && !isAdmin && (
-          <Alert className="border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/50">
-            <Info className="h-4 w-4 text-sky-600" />
-            <AlertDescription className="text-sky-700 dark:text-sky-300">
+          <Alert className="border-primary/20 bg-primary/5">
+            <Info className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-muted-foreground">
               O upload será registrado com sua identificação para controle do Admin Master.
             </AlertDescription>
           </Alert>
@@ -340,7 +358,7 @@ export function ChecklistImportSection() {
             )}
 
             {extractedData.failures?.length === 0 && (
-              <div className="flex items-center gap-2 text-emerald-600">
+              <div className="flex items-center gap-2 text-primary">
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm font-medium">Nenhuma não conformidade detectada</span>
               </div>

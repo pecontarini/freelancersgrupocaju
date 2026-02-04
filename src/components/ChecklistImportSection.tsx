@@ -1,14 +1,17 @@
-import { useState, useRef } from "react";
-import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, ClipboardList } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, ClipboardList, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSupervisionAudits } from "@/hooks/useSupervisionAudits";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -27,12 +30,23 @@ export function ChecklistImportSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { options: lojas } = useConfigLojas();
   const { createAudit, createFailures } = useSupervisionAudits();
+  const { isAdmin, isGerenteUnidade, unidades, profile } = useUserProfile();
+
+  // For gerentes, only show their assigned stores
+  const availableLojas = isAdmin ? lojas : unidades;
 
   const [selectedLojaId, setSelectedLojaId] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+
+  // Auto-select the first available store for gerentes
+  useEffect(() => {
+    if (isGerenteUnidade && !isAdmin && availableLojas.length > 0 && !selectedLojaId) {
+      setSelectedLojaId(availableLojas[0].id);
+    }
+  }, [isGerenteUnidade, isAdmin, availableLojas, selectedLojaId]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -207,6 +221,16 @@ export function ChecklistImportSection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Manager info alert */}
+        {isGerenteUnidade && !isAdmin && (
+          <Alert className="border-sky-200 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/50">
+            <Info className="h-4 w-4 text-sky-600" />
+            <AlertDescription className="text-sky-700 dark:text-sky-300">
+              O upload será registrado com sua identificação para controle do Admin Master.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Store selector */}
         <div className="space-y-2">
           <label className="text-sm font-medium uppercase">Unidade</label>
@@ -215,7 +239,7 @@ export function ChecklistImportSection() {
               <SelectValue placeholder="Selecione a unidade" />
             </SelectTrigger>
             <SelectContent>
-              {lojas.map((loja) => (
+              {availableLojas.map((loja) => (
                 <SelectItem key={loja.id} value={loja.id}>
                   {loja.nome}
                 </SelectItem>

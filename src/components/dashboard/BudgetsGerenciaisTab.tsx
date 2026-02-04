@@ -11,7 +11,7 @@ import {
   Trash2,
   FileText,
 } from "lucide-react";
-import { format, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
+import { format, isWithinInterval, parseISO, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -84,15 +84,47 @@ export function BudgetsGerenciaisTab({
     ? getBudgetForStoreMonth(effectiveStoreId, getCurrentMonthYear())
     : undefined;
 
-  // Helper function to check if date is within range
+  // Calculate effective date range: use filter dates or default to current month
+  const effectiveDateRange = useMemo(() => {
+    const now = new Date();
+    const hasDateFilter = filters.dateStart || filters.dateEnd;
+    
+    if (hasDateFilter) {
+      return {
+        start: filters.dateStart ? startOfDay(filters.dateStart) : new Date(0),
+        end: filters.dateEnd ? endOfDay(filters.dateEnd) : new Date(9999, 11, 31),
+        isCustomRange: true,
+        label: "",
+      };
+    }
+    
+    // Default: current month (day 1 to today)
+    return {
+      start: startOfMonth(now),
+      end: endOfDay(now),
+      isCustomRange: false,
+      label: format(now, "MMMM/yyyy", { locale: ptBR }),
+    };
+  }, [filters.dateStart, filters.dateEnd]);
+
+  // Generate the period display label
+  const periodDisplayLabel = useMemo(() => {
+    if (effectiveDateRange.isCustomRange) {
+      const startStr = filters.dateStart 
+        ? format(filters.dateStart, "dd/MM/yyyy", { locale: ptBR }) 
+        : "...";
+      const endStr = filters.dateEnd 
+        ? format(filters.dateEnd, "dd/MM/yyyy", { locale: ptBR }) 
+        : "...";
+      return `${startStr} a ${endStr}`;
+    }
+    return `Acumulado - ${effectiveDateRange.label.charAt(0).toUpperCase() + effectiveDateRange.label.slice(1)}`;
+  }, [effectiveDateRange, filters.dateStart, filters.dateEnd]);
+
+  // Helper function to check if date is within effective range
   const isInDateRange = (dateStr: string) => {
-    if (!filters.dateStart && !filters.dateEnd) return true;
-    
     const date = parseISO(dateStr);
-    const start = filters.dateStart ? startOfDay(filters.dateStart) : new Date(0);
-    const end = filters.dateEnd ? endOfDay(filters.dateEnd) : new Date(9999, 11, 31);
-    
-    return isWithinInterval(date, { start, end });
+    return isWithinInterval(date, { start: effectiveDateRange.start, end: effectiveDateRange.end });
   };
 
   // Filter entries by all criteria
@@ -226,14 +258,17 @@ export function BudgetsGerenciaisTab({
     end: filters.dateEnd ? format(filters.dateEnd, "yyyy-MM-dd") : null,
   };
 
-  // Check if filters are active
-  const hasActiveFilters = !!(
+  // Check if filters are active (excluding date as it has smart default)
+  const hasSearchOrFunctionFilters = !!(
     filters.searchTerm ||
     filters.lojaId ||
-    filters.funcoes.length > 0 ||
-    filters.dateStart ||
-    filters.dateEnd
+    filters.funcoes.length > 0
   );
+  
+  const hasDateFilter = !!(filters.dateStart || filters.dateEnd);
+  
+  // Combined flag for backwards compatibility with existing UI logic
+  const hasActiveFilters = hasSearchOrFunctionFilters || hasDateFilter;
 
   return (
     <div className="space-y-6 fade-in">
@@ -269,24 +304,22 @@ export function BudgetsGerenciaisTab({
         selectedUnidadeId={selectedUnidadeId}
       />
 
-      {/* Summary Cards - Reflect filtered data */}
+      {/* Summary Cards - Show accumulated values by default (current month) */}
       <div className="grid gap-4 md:grid-cols-4">
-        {/* Freelancers - Filtered Total */}
+        {/* Freelancers - Accumulated Total */}
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              {hasActiveFilters ? "Freelancers (Filtrados)" : "Freelancers Hoje"}
+              {hasSearchOrFunctionFilters ? "Freelancers (Filtrados)" : periodDisplayLabel.includes("Acumulado") ? "Freelancers" : "Freelancers (Período)"}
             </CardTitle>
             <Users className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(hasActiveFilters ? filteredFreelancerTotal : todayFreelancerTotal)}
+              {formatCurrency(filteredFreelancerTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {hasActiveFilters 
-                ? `${filteredFreelancers.length} lançamento(s)` 
-                : `${todayFreelancers.length} escalado(s) hoje`}
+              {filteredFreelancers.length} lançamento(s)
             </p>
           </CardContent>
         </Card>
@@ -295,18 +328,16 @@ export function BudgetsGerenciaisTab({
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              {hasActiveFilters ? "Operacional (Filtrado)" : "Operacional Hoje"}
+              {hasSearchOrFunctionFilters ? "Operacional (Filtrado)" : periodDisplayLabel.includes("Acumulado") ? "Operacional" : "Operacional (Período)"}
             </CardTitle>
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(hasActiveFilters ? filteredExpenseTotal : todayExpenseTotal)}
+              {formatCurrency(filteredExpenseTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {hasActiveFilters 
-                ? `${filteredExpenses.length} despesa(s)` 
-                : `${todayExpenses.length} despesa(s) hoje`}
+              {filteredExpenses.length} despesa(s)
             </p>
           </CardContent>
         </Card>
@@ -315,18 +346,16 @@ export function BudgetsGerenciaisTab({
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              {hasActiveFilters ? "Manutenção (Filtrada)" : "Manutenção Hoje"}
+              {hasSearchOrFunctionFilters ? "Manutenção (Filtrada)" : periodDisplayLabel.includes("Acumulado") ? "Manutenção" : "Manutenção (Período)"}
             </CardTitle>
-            <Wrench className="h-4 w-4 text-orange-500" />
+            <Wrench className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(hasActiveFilters ? filteredMaintenanceTotal : todayMaintenanceTotal)}
+              {formatCurrency(filteredMaintenanceTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {hasActiveFilters 
-                ? `${filteredMaintenance.length} serviço(s)` 
-                : `${todayMaintenance.length} serviço(s) hoje`}
+              {filteredMaintenance.length} serviço(s)
             </p>
           </CardContent>
         </Card>
@@ -335,23 +364,36 @@ export function BudgetsGerenciaisTab({
         <Card className="rounded-2xl shadow-card bg-gradient-to-br from-primary/10 to-primary/5">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
-              {hasActiveFilters ? "Total Filtrado" : "Total do Dia"}
+              {hasSearchOrFunctionFilters ? "Total Filtrado" : periodDisplayLabel.includes("Acumulado") ? "Total Acumulado" : "Total (Período)"}
             </CardTitle>
-            {(hasActiveFilters ? filteredTotal : todayTotal) > avgDailyBudget ? (
-              <TrendingUp className="h-4 w-4 text-red-500" />
+            {filteredTotal > avgDailyBudget * (effectiveDateRange.isCustomRange ? 1 : new Date().getDate()) ? (
+              <TrendingUp className="h-4 w-4 text-destructive" />
             ) : (
               <TrendingDown className="h-4 w-4 text-emerald-500" />
             )}
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(hasActiveFilters ? filteredTotal : todayTotal)}
+              {formatCurrency(filteredTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
               Meta diária: {formatCurrency(avgDailyBudget)}
             </p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Period Information Banner */}
+      <div className="flex items-center justify-center gap-2 rounded-lg bg-muted/50 px-4 py-2 text-sm text-muted-foreground">
+        <Calendar className="h-4 w-4" />
+        <span>
+          <strong className="text-foreground">{periodDisplayLabel}</strong>
+          {!effectiveDateRange.isCustomRange && (
+            <span className="ml-1">
+              (Dia 01 a {format(new Date(), "dd/MM/yyyy", { locale: ptBR })})
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Daily Budget Consumption Bar */}
@@ -525,7 +567,7 @@ export function BudgetsGerenciaisTab({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base uppercase">
             <div className="flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-orange-500" />
+              <Wrench className="h-5 w-5 text-amber-500" />
               <span>Budget de Manutenção (Mês)</span>
             </div>
             <Badge
@@ -584,7 +626,7 @@ export function BudgetsGerenciaisTab({
                     className="flex items-center justify-between rounded-xl bg-muted/50 p-4 transition-colors hover:bg-muted"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/10 text-orange-500">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-500">
                         <Wrench className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -605,7 +647,7 @@ export function BudgetsGerenciaisTab({
                           <ExternalLink className="h-4 w-4" />
                         </a>
                       )}
-                      <p className="font-semibold text-orange-600">
+                      <p className="font-semibold text-amber-600">
                         {formatCurrency(entry.valor)}
                       </p>
                       <MaintenanceSingleExportButton entry={entry} />

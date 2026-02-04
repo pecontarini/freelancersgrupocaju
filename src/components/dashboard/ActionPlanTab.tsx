@@ -52,6 +52,7 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { SegmentedScoreCard } from "@/components/audit/SegmentedScoreCard";
 
 // Brand detection based on store name prefixes
 const BRAND_PREFIXES: Record<string, string> = {
@@ -366,6 +367,14 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
           </div>
         </div>
       </div>
+
+      {/* Segmented Scores Card - Show when a store is selected */}
+      {effectiveLojaId && (
+        <SegmentedScoreCard 
+          lojaId={effectiveLojaId} 
+          lojaName={getLojaName(effectiveLojaId)}
+        />
+      )}
 
       {/* KPI Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">

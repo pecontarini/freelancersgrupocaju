@@ -115,17 +115,19 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
     return null;
   }, [selectedLojaId, isGerenteUnidade, unidades]);
 
-  // Calculate recurrence info with 30-day window
+  // Calculate recurrence info with 60-day window
   const recurrenceMap = useMemo(() => {
-    const thirtyDaysAgo = subDays(new Date(), 30);
+    const sixtyDaysAgo = subDays(new Date(), 60);
     const recentFailures = failures.filter(
-      (f) => new Date(f.created_at) >= thirtyDaysAgo
+      (f) => new Date(f.created_at) >= sixtyDaysAgo
     );
 
     const map: Record<string, SupervisionFailure[]> = {};
     
     recentFailures.forEach((failure) => {
-      const itemKey = `${failure.loja_id}-item-${failure.item_name}`;
+      // Normalize item name for better matching (trim, lowercase)
+      const normalizedItemName = failure.item_name.trim().toLowerCase();
+      const itemKey = `${failure.loja_id}-item-${normalizedItemName}`;
       if (!map[itemKey]) map[itemKey] = [];
       map[itemKey].push(failure);
     });
@@ -134,12 +136,14 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
   }, [failures]);
 
   const isRecurringEnhanced = (failure: SupervisionFailure): boolean => {
-    const itemKey = `${failure.loja_id}-item-${failure.item_name}`;
+    const normalizedItemName = failure.item_name.trim().toLowerCase();
+    const itemKey = `${failure.loja_id}-item-${normalizedItemName}`;
     return (recurrenceMap[itemKey]?.length || 0) > 1;
   };
 
   const getRecurrenceInfo = (failure: SupervisionFailure) => {
-    const itemKey = `${failure.loja_id}-item-${failure.item_name}`;
+    const normalizedItemName = failure.item_name.trim().toLowerCase();
+    const itemKey = `${failure.loja_id}-item-${normalizedItemName}`;
     const history = recurrenceMap[itemKey] || [];
     return {
       count: history.length,
@@ -189,8 +193,17 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
       result = result.filter((f) => isRecurringEnhanced(f));
     }
 
+    // Sort by recurrence count when showing only recurring (highest frequency first)
+    if (showOnlyRecurring) {
+      result = result.sort((a, b) => {
+        const countA = getRecurrenceInfo(a).count;
+        const countB = getRecurrenceInfo(b).count;
+        return countB - countA;
+      });
+    }
+
     return result;
-  }, [failures, effectiveLojaId, statusFilter, showOnlyRecurring, currentMonthAuditIds, isGerenteUnidade, unidades]);
+  }, [failures, effectiveLojaId, statusFilter, showOnlyRecurring, currentMonthAuditIds, isGerenteUnidade, unidades, recurrenceMap]);
 
   // Group stores by brand
   const groupedLojas = useMemo(() => {
@@ -531,9 +544,9 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
                         <div className="flex items-start gap-2 flex-wrap">
                           <p className="font-medium text-sm leading-tight">{failure.item_name}</p>
                           {recurring && (
-                            <Badge variant="destructive" className="flex-shrink-0 text-xs gap-1">
+                            <Badge variant="destructive" className="flex-shrink-0 text-xs gap-1 animate-pulse">
                               <RefreshCw className="h-3 w-3" />
-                              Reincidente: {recurrenceInfo.count}x
+                              🔁 RECORRENTE: {recurrenceInfo.count}x
                             </Badge>
                           )}
                         </div>
@@ -576,16 +589,19 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
                               </Button>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="mt-2" onClick={(e) => e.stopPropagation()}>
-                              <div className="border-l-2 border-muted pl-3 space-y-2">
+                              <div className="border-l-2 border-destructive/30 pl-3 space-y-2">
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  🔁 Este item apareceu <strong className="text-destructive">{recurrenceInfo.count}x</strong> nos últimos 60 dias
+                                </p>
                                 {recurrenceInfo.history
                                   .filter((h) => h.id !== failure.id)
                                   .slice(0, 5)
                                   .map((historyItem) => (
                                     <div
                                       key={historyItem.id}
-                                      className="text-xs p-2 rounded-lg bg-muted/50"
+                                      className="text-xs p-3 rounded-lg bg-muted/50 border border-border/50"
                                     >
-                                      <div className="flex items-center gap-2 mb-1">
+                                      <div className="flex items-center justify-between mb-2">
                                         <Badge
                                           variant={
                                             historyItem.status === "validated"
@@ -597,17 +613,35 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
                                           className="text-[10px] h-5"
                                         >
                                           {historyItem.status === "validated"
-                                            ? "Validado"
+                                            ? "✓ Validado"
                                             : historyItem.status === "resolved"
-                                            ? "Corrigido"
-                                            : "Pendente"}
+                                            ? "⏳ Corrigido"
+                                            : "⚠ Pendente"}
                                         </Badge>
-                                        <span className="text-muted-foreground">
+                                        <span className="text-muted-foreground flex items-center gap-1">
+                                          <Calendar className="h-3 w-3" />
                                           {format(new Date(historyItem.created_at), "dd/MM/yyyy", {
                                             locale: ptBR,
                                           })}
                                         </span>
                                       </div>
+                                      {/* Show resolution photo link if available */}
+                                      {historyItem.resolution_photo_url && (
+                                        <a
+                                          href={historyItem.resolution_photo_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="flex items-center gap-1 text-primary hover:underline"
+                                        >
+                                          <Camera className="h-3 w-3" />
+                                          Ver foto da correção anterior
+                                        </a>
+                                      )}
+                                      {historyItem.resolved_at && (
+                                        <p className="text-muted-foreground mt-1">
+                                          Corrigido em {format(new Date(historyItem.resolved_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                                        </p>
+                                      )}
                                     </div>
                                   ))}
                               </div>

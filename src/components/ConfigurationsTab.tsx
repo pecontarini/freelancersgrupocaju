@@ -17,7 +17,7 @@ export function ConfigurationsTab() {
   const lojas = useConfigLojas();
   const funcoes = useConfigFuncoes();
   const gerencias = useConfigGerencias();
-  const { isAdmin } = useUserProfile();
+  const { isAdmin, isGerenteUnidade } = useUserProfile();
 
   return (
     <div className="space-y-6">
@@ -51,8 +51,8 @@ export function ConfigurationsTab() {
         <GoogleSheetsSync />
       )}
 
-      {/* Checklist Import - Admin Only */}
-      {isAdmin && (
+      {/* Checklist Import - Admin + Gerente Unidade */}
+      {(isAdmin || isGerenteUnidade) && (
         <ChecklistImportSection />
       )}
 

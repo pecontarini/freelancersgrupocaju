@@ -20,8 +20,15 @@ export type AuditSector =
   | 'sushi'
   | 'estoque'
   | 'recebimento'
+  | 'dml'
+  | 'producao'
   | 'salao'
   | 'recepcao'
+  | 'area_comum'
+  | 'brinquedoteca'
+  | 'banheiros'
+  | 'fachada'
+  | 'manutencao'
   | 'apv'
   | 'delivery'
   | 'expedicao'
@@ -89,6 +96,20 @@ export const SECTOR_POSITION_MAP: Record<AuditSector, {
     displayName: 'Recebimento',
     keywords: ['recebimento', 'fornecedor', 'nota fiscal', 'entrada', 'conferência'],
   },
+  dml: {
+    primaryChief: null,
+    responsibleManager: 'gerente_back',
+    areaType: 'back',
+    displayName: 'DML',
+    keywords: ['dml', 'depósito material limpeza', 'produtos químicos', 'material de limpeza'],
+  },
+  producao: {
+    primaryChief: 'chefe_cozinha',
+    responsibleManager: 'gerente_back',
+    areaType: 'back',
+    displayName: 'Produção',
+    keywords: ['produção', 'pré-preparo', 'mise en place', 'porcionamento'],
+  },
 
   // FRONT Area Sectors
   salao: {
@@ -104,6 +125,41 @@ export const SECTOR_POSITION_MAP: Record<AuditSector, {
     areaType: 'front',
     displayName: 'Recepção',
     keywords: ['recepção', 'hostess', 'entrada', 'fila', 'reserva'],
+  },
+  area_comum: {
+    primaryChief: 'chefe_salao',
+    responsibleManager: 'gerente_front',
+    areaType: 'front',
+    displayName: 'Área Comum',
+    keywords: ['área comum', 'corredor', 'escada', 'elevador', 'hall'],
+  },
+  brinquedoteca: {
+    primaryChief: 'chefe_salao',
+    responsibleManager: 'gerente_front',
+    areaType: 'front',
+    displayName: 'Brinquedoteca',
+    keywords: ['brinquedoteca', 'espaço kids', 'criança', 'playground', 'recreação'],
+  },
+  banheiros: {
+    primaryChief: null,
+    responsibleManager: 'gerente_front',
+    areaType: 'front',
+    displayName: 'Banheiros',
+    keywords: ['banheiro', 'sanitário', 'wc', 'toalete', 'lavabo'],
+  },
+  fachada: {
+    primaryChief: null,
+    responsibleManager: 'gerente_front',
+    areaType: 'front',
+    displayName: 'Fachada',
+    keywords: ['fachada', 'letreiro', 'luminoso', 'entrada principal', 'calçada', 'estacionamento'],
+  },
+  manutencao: {
+    primaryChief: null,
+    responsibleManager: 'gerente_front',
+    areaType: 'front',
+    displayName: 'Manutenção',
+    keywords: ['manutenção', 'ar condicionado', 'elétrica', 'hidráulica', 'reparo', 'equipamento'],
   },
   apv: {
     primaryChief: 'chefe_apv',
@@ -145,7 +201,7 @@ export const SECTOR_POSITION_MAP: Record<AuditSector, {
     responsibleManager: 'gerente_back',
     areaType: 'back',
     displayName: 'Outros',
-    keywords: ['banheiro', 'sanitário', 'wc', 'higiene', 'limpeza'],
+    keywords: ['higiene', 'limpeza', 'outros'],
   },
 };
 

@@ -1,0 +1,1 @@
+export { SegmentedScoreCard } from "./SegmentedScoreCard";

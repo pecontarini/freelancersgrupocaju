@@ -65,6 +65,12 @@ const menuItems = [
     description: "Análise de não conformidades",
   },
   {
+    title: "PLANO DE AÇÃO",
+    id: "planoacao",
+    icon: AlertTriangle,
+    description: "Correção de não conformidades",
+  },
+  {
     title: "CMV (UNITÁRIOS)",
     id: "cmv",
     icon: Package,

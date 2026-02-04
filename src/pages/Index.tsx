@@ -13,6 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
+import { ActionPlanTab } from "@/components/dashboard/ActionPlanTab";
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
@@ -35,6 +36,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
+  },
+  planoacao: {
+    title: "Plano de Ação",
+    subtitle: "Correção de não conformidades de auditoria",
   },
   cx: {
     title: "Dores da Operação",
@@ -187,6 +192,10 @@ const Index = () => {
             selectedUnidadeId={selectedUnidadeId} 
             isAdmin={isAdmin} 
           />
+        );
+      case "planoacao":
+        return (
+          <ActionPlanTab selectedUnidadeId={selectedUnidadeId} />
         );
       case "cx":
         return isAdmin ? <AdminCXDashboard /> : null;

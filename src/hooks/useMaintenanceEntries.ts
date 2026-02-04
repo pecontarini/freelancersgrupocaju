@@ -66,13 +66,19 @@ export function useMaintenanceEntries() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Maintenance entry added successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
-      toast.success("Manutenção cadastrada com sucesso!");
+      toast.success("Manutenção cadastrada com sucesso!", {
+        description: `${data.fornecedor} - R$ ${data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        duration: 5000,
+      });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error("Error adding maintenance entry:", error);
-      toast.error("Erro ao cadastrar manutenção");
+      toast.error("Erro ao cadastrar manutenção", {
+        description: error.message || "Verifique sua conexão e tente novamente.",
+      });
     },
   });
 

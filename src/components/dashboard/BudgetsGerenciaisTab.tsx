@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Trash2,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 import { format, isWithinInterval, parseISO, startOfDay, endOfDay, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -92,16 +93,16 @@ export function BudgetsGerenciaisTab({
     if (hasDateFilter) {
       return {
         start: filters.dateStart ? startOfDay(filters.dateStart) : new Date(0),
-        end: filters.dateEnd ? endOfDay(filters.dateEnd) : new Date(9999, 11, 31),
+        end: filters.dateEnd ? endOfDay(filters.dateEnd) : endOfDay(now),
         isCustomRange: true,
         label: "",
       };
     }
     
-    // Default: current month (day 1 to today)
+    // Default: current month (day 1 to END OF MONTH to ensure all entries are visible)
     return {
       start: startOfMonth(now),
-      end: endOfDay(now),
+      end: endOfMonth(now),
       isCustomRange: false,
       label: format(now, "MMMM/yyyy", { locale: ptBR }),
     };
@@ -270,6 +271,18 @@ export function BudgetsGerenciaisTab({
   // Combined flag for backwards compatibility with existing UI logic
   const hasActiveFilters = hasSearchOrFunctionFilters || hasDateFilter;
 
+  // Check if there are no results in current filter but entries exist overall
+  const hasEntriesOutsideFilter = useMemo(() => {
+    const noFilteredResults = filteredFreelancers.length === 0 && 
+                              filteredMaintenance.length === 0 && 
+                              filteredExpenses.length === 0;
+    const hasAnyEntries = freelancerEntries.length > 0 || 
+                          maintenanceEntries.length > 0 || 
+                          operationalExpenses.length > 0;
+    return noFilteredResults && hasAnyEntries && !hasDateFilter;
+  }, [filteredFreelancers, filteredMaintenance, filteredExpenses, 
+      freelancerEntries, maintenanceEntries, operationalExpenses, hasDateFilter]);
+
   return (
     <div className="space-y-6 fade-in">
       {/* Date Header */}
@@ -303,6 +316,21 @@ export function BudgetsGerenciaisTab({
         onFiltersChange={setFilters}
         selectedUnidadeId={selectedUnidadeId}
       />
+
+      {/* Alert when no entries in current month but entries exist in other periods */}
+      {hasEntriesOutsideFilter && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/20">
+          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-800 dark:text-amber-200">
+              Nenhum lançamento no mês atual
+            </p>
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              Existem registros em outros períodos. Use o filtro de datas para visualizar lançamentos de outros meses ou verifique a data ao fazer novos lançamentos.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards - Show accumulated values by default (current month) */}
       <div className="grid gap-4 md:grid-cols-4">

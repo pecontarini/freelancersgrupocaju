@@ -18,6 +18,7 @@ import {
   Beer,
   Loader2,
   ClipboardList,
+  Upload,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,6 +37,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -44,9 +46,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useSupervisionAudits, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { SectorBadgeCompact } from "@/components/dashboard/SectorResponsibilityBadges";
+import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { 
   SECTOR_POSITION_MAP, 
   categorizeItemToSector,
@@ -249,21 +259,43 @@ export function AuditDiagnosticDashboard({
           </div>
         </div>
 
-        {isAdmin && (
-          <Select value={brandFilter} onValueChange={setBrandFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Filtrar marca" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as Marcas</SelectItem>
-              <SelectItem value="caminito">Caminito</SelectItem>
-              <SelectItem value="nazo">Nazo</SelectItem>
-              <SelectItem value="caju">Caju</SelectItem>
-              <SelectItem value="fosters">FOSTERS BURGUER</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Upload Button - Available for Admin and Managers */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="default" className="gap-2">
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Upload Auditoria</span>
+                <span className="sm:hidden">Upload</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg uppercase">
+                  <ClipboardList className="h-5 w-5 text-primary" />
+                  Importar Checklist de Supervisão
+                </DialogTitle>
+              </DialogHeader>
+              <ChecklistImportSection />
+            </DialogContent>
+          </Dialog>
+
+          {isAdmin && (
+            <Select value={brandFilter} onValueChange={setBrandFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Filtrar marca" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Marcas</SelectItem>
+                <SelectItem value="caminito">Caminito</SelectItem>
+                <SelectItem value="nazo">Nazo</SelectItem>
+                <SelectItem value="caju">Caju</SelectItem>
+                <SelectItem value="fosters">FOSTERS BURGUER</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* KPI Summary Cards */}

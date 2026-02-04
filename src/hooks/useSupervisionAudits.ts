@@ -59,10 +59,18 @@ export function useSupervisionAudits(lojaId?: string | null, monthYear?: string)
     enabled: true,
   });
 
+  // Fetch failures with 60-day window for recurrence analysis
   const { data: failures = [], isLoading: isLoadingFailures } = useQuery({
     queryKey: ["supervision-failures", lojaId],
     queryFn: async () => {
-      let query = supabase.from("supervision_failures").select("*");
+      // Get failures from the last 60 days for recurrence detection
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+      
+      let query = supabase
+        .from("supervision_failures")
+        .select("*")
+        .gte("created_at", sixtyDaysAgo.toISOString());
       
       if (lojaId) {
         query = query.eq("loja_id", lojaId);

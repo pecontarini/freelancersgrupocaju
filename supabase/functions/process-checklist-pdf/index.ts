@@ -42,7 +42,7 @@ Analise este PDF de auditoria de supervisão e extraia os seguintes dados em for
   "unit_name": "<nome da unidade/loja auditada>",
   "area_scores": [
     {
-      "area_name": "<nome da área/setor (ex: BAR, COZINHA, SALÃO, APV, etc)>",
+      "area_name": "<nome da área/setor>",
       "score": <nota percentual da área>,
       "total_items": <total de itens avaliados na área>,
       "conforming_items": <itens conformes>
@@ -51,20 +51,40 @@ Analise este PDF de auditoria de supervisão e extraia os seguintes dados em for
   "failures": [
     {
       "item_name": "<nome do item não conforme>",
-      "category": "<categoria/área do item - IMPORTANTE: identifique se é BAR, COZINHA, COZINHA QUENTE, PARRILLA, SUSHI, ESTOQUE, RECEBIMENTO, SALÃO, RECEPÇÃO, APV, DELIVERY, EXPEDIÇÃO, CAIXA, ADMINISTRATIVO ou outro>"
+      "category": "<categoria/área do item conforme lista abaixo>"
     }
   ]
 }
 
+CATEGORIAS VÁLIDAS PARA CLASSIFICAÇÃO:
+=== SETOR FRONT (Gerente de Front) ===
+- SALÃO (Chefe de Salão): mesas, cadeiras, atendimento, ambiente, decoração, garçons
+- DELIVERY (Chefe de APV): entregas, iFood, aplicativos, motoboys, expedição
+- ASG (Chefe de APV): auxiliar serviços gerais, limpeza geral
+- MANUTENÇÃO (Chefe de APV): ar condicionado, elétrica, hidráulica, equipamentos
+- BRINQUEDOTECA (Chefe de APV): espaço kids, recreação infantil
+- RECEPÇÃO (Chefe de APV): hostess, entrada, fila, reservas
+- LAVAGEM (Chefe de APV): área de lavagem, louças, copa
+- DOCUMENTOS (Chefe de APV): alvarás, licenças, certificados, registros
+- ÁREA COMUM: corredores, banheiros, fachada, estacionamento
+
+=== SETOR BACK (Gerente de Back) ===
+- BAR (Chefe de Bar): bebidas, drinks, gelo, bartender
+- COZINHA QUENTE (Chef de Cozinha): fogão, forno, fritadeira, cocção
+- SALADAS/SOBREMESAS (Chef de Cozinha): frios, confeitaria, frutas
+- PARRILLA (Chefe de Parrilla): churrasqueira, grelha, carnes
+- SUSHI (Chefe de Sushi): culinária japonesa, peixe cru
+- ESTOQUE: armazenamento, validade, recebimento, fornecedores
+- DML: depósito material limpeza, produtos químicos
+
 Instruções:
 1. A nota global geralmente aparece como percentual de conformidade ou nota final
-2. Extraia TODAS as áreas/setores com suas notas individuais (ex: BAR 95%, COZINHA 88%, SALÃO 92%)
+2. Extraia TODAS as áreas/setores com suas notas individuais
 3. Extraia TODOS os itens marcados como "Não", "Não Conforme", "NC", "Reprovado" ou similares
-4. Para cada falha, identifique a área/setor correspondente na categoria
+4. Para cada falha, classifique na categoria mais apropriada da lista acima
 5. Identifique a unidade pelo nome da loja ou estabelecimento
-6. As áreas típicas são: BAR, COZINHA, COZINHA QUENTE, PARRILLA, SUSHI, ESTOQUE, RECEBIMENTO, SALÃO, RECEPÇÃO, APV, DELIVERY, EXPEDIÇÃO, CAIXA, ADMINISTRATIVO
-7. Se não encontrar algum dado, use null
-8. Retorne APENAS o JSON, sem explicações adicionais`;
+6. Se não encontrar algum dado, use null
+7. Retorne APENAS o JSON, sem explicações adicionais`;
 
     const messages: any[] = [
       { role: "system", content: extractionPrompt },

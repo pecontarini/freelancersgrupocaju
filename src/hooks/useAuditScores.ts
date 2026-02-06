@@ -6,7 +6,17 @@ import {
   AreaType,
   LeadershipPosition,
   POSITION_LABELS,
+  AuditSector,
+  getResponsibilitySummary,
 } from "@/lib/sectorPositionMapping";
+
+export interface ChiefScoreData {
+  position: LeadershipPosition;
+  label: string;
+  sectors: AuditSector[];
+  failedCount: number;
+  score: number;
+}
 
 export interface SegmentedScores {
   general: number | null;
@@ -14,7 +24,8 @@ export interface SegmentedScores {
   back: number | null;
   frontItems: { total: number; passed: number; failed: number };
   backItems: { total: number; passed: number; failed: number };
-  sectorBreakdown: Record<string, { score: number; failedCount: number; totalCount: number }>;
+  sectorBreakdown: Record<string, { score: number; failedCount: number; totalCount: number; displayName: string }>;
+  chiefScores: ChiefScoreData[];
 }
 
 export interface AuditScoreData {
@@ -27,6 +38,7 @@ export interface AuditScoreData {
 
 /**
  * Calculate segmented audit scores (General, Front, Back) from supervision audit data
+ * Also calculates individual chief scores based on their responsible sectors
  * 
  * @param lojaId - The store ID to calculate scores for
  * @param monthYear - Optional month/year filter (YYYY-MM format)
@@ -48,6 +60,7 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
           frontItems: { total: 0, passed: 0, failed: 0 },
           backItems: { total: 0, passed: 0, failed: 0 },
           sectorBreakdown: {},
+          chiefScores: [],
         },
         frontResponsible: { position: 'gerente_front' as LeadershipPosition, label: POSITION_LABELS['gerente_front'] },
         backResponsible: { position: 'gerente_back' as LeadershipPosition, label: POSITION_LABELS['gerente_back'] },
@@ -65,6 +78,7 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
         ...failure,
         sector,
         areaType: sectorConfig.areaType,
+        primaryChief: sectorConfig.primaryChief,
       };
     });
 
@@ -73,7 +87,7 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
     const backFailures = categorizedFailures.filter((f) => f.areaType === 'back');
 
     // Build sector breakdown
-    const sectorBreakdown: Record<string, { score: number; failedCount: number; totalCount: number }> = {};
+    const sectorBreakdown: Record<string, { score: number; failedCount: number; totalCount: number; displayName: string }> = {};
     
     Object.entries(SECTOR_POSITION_MAP).forEach(([sectorKey, config]) => {
       const sectorFailures = categorizedFailures.filter((f) => f.sector === sectorKey);
@@ -85,7 +99,46 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
         score: failedCount > 0 ? Math.max(0, 100 - (failedCount * 10)) : 100, // Rough estimate
         failedCount,
         totalCount: failedCount, // Only have failure data
+        displayName: config.displayName,
       };
+    });
+
+    // Calculate chief scores
+    const responsibilitySummary = getResponsibilitySummary();
+    const chiefScores: ChiefScoreData[] = [];
+
+    // Calculate scores for each chief based on their assigned sectors
+    const chiefPositions: LeadershipPosition[] = [
+      'chefe_salao', 'chefe_apv', 'chefe_bar', 'chefe_cozinha', 'chefe_parrilla', 'chefe_sushi'
+    ];
+
+    chiefPositions.forEach((position) => {
+      const sectors = responsibilitySummary[position].directSectors;
+      if (sectors.length === 0) return;
+
+      const chiefFailures = categorizedFailures.filter((f) => 
+        f.primaryChief === position
+      );
+
+      const failedCount = chiefFailures.length;
+      // Estimate score based on failures - fewer failures = higher score
+      const score = failedCount === 0 ? 100 : Math.max(0, 100 - (failedCount * 8));
+
+      chiefScores.push({
+        position,
+        label: POSITION_LABELS[position],
+        sectors: sectors as AuditSector[],
+        failedCount,
+        score: Math.round(score * 10) / 10,
+      });
+    });
+
+    // Sort chief scores by area type (front first) then by score
+    chiefScores.sort((a, b) => {
+      const areaA = responsibilitySummary[a.position].areaType;
+      const areaB = responsibilitySummary[b.position].areaType;
+      if (areaA !== areaB) return areaA === 'front' ? -1 : 1;
+      return b.score - a.score;
     });
 
     // Calculate segmented scores
@@ -147,6 +200,7 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
           failed: backFailures.length,
         },
         sectorBreakdown,
+        chiefScores,
       },
       frontResponsible: { position: 'gerente_front' as LeadershipPosition, label: POSITION_LABELS['gerente_front'] },
       backResponsible: { position: 'gerente_back' as LeadershipPosition, label: POSITION_LABELS['gerente_back'] },
@@ -189,6 +243,7 @@ export function useNetworkAuditScores(monthYear?: string) {
           ...failure,
           sector,
           areaType: sectorConfig.areaType,
+          primaryChief: sectorConfig.primaryChief,
         };
       });
 
@@ -212,6 +267,33 @@ export function useNetworkAuditScores(monthYear?: string) {
         }
       }
 
+      // Calculate chief scores for this store
+      const responsibilitySummary = getResponsibilitySummary();
+      const chiefScores: ChiefScoreData[] = [];
+      const chiefPositions: LeadershipPosition[] = [
+        'chefe_salao', 'chefe_apv', 'chefe_bar', 'chefe_cozinha', 'chefe_parrilla', 'chefe_sushi'
+      ];
+
+      chiefPositions.forEach((position) => {
+        const sectors = responsibilitySummary[position].directSectors;
+        if (sectors.length === 0) return;
+
+        const chiefFailures = categorizedFailures.filter((f) => 
+          f.primaryChief === position
+        );
+
+        const failedCount = chiefFailures.length;
+        const score = failedCount === 0 ? 100 : Math.max(0, 100 - (failedCount * 8));
+
+        chiefScores.push({
+          position,
+          label: POSITION_LABELS[position],
+          sectors: sectors as AuditSector[],
+          failedCount,
+          score: Math.round(score * 10) / 10,
+        });
+      });
+
       scores.set(storeId, {
         general: audit.global_score,
         front: frontScore,
@@ -219,6 +301,7 @@ export function useNetworkAuditScores(monthYear?: string) {
         frontItems: { total: frontFailures.length, passed: 0, failed: frontFailures.length },
         backItems: { total: backFailures.length, passed: 0, failed: backFailures.length },
         sectorBreakdown: {},
+        chiefScores,
       });
     });
 

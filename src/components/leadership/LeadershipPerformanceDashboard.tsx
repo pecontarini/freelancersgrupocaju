@@ -130,7 +130,7 @@ export function LeadershipPerformanceDashboard({
     return result;
   }, [failures, relevantAuditIds, selectedUnidadeId]);
 
-  // Calculate area scores (FRONT vs BACK)
+  // Calculate area scores (FRONT vs BACK) using REAL database data
   const areaScores = useMemo(() => {
     const frontSectors = getSectorsForArea("front");
     const backSectors = getSectorsForArea("back");
@@ -138,6 +138,7 @@ export function LeadershipPerformanceDashboard({
     let frontFailures = 0;
     let backFailures = 0;
 
+    // Count real failures by sector from the database
     filteredFailures.forEach((f) => {
       const sector = categorizeItemToSector(f.item_name, f.category);
       if (frontSectors.includes(sector)) {
@@ -147,45 +148,51 @@ export function LeadershipPerformanceDashboard({
       }
     });
 
-    // Calculate total audit count for the period
-    const totalAudits = filteredAudits.length;
-    const estimatedItemsPerAudit = 50; // Estimated items per audit area
-
-    // Calculate scores based on failure ratio
-    const frontTotalEstimated = totalAudits * estimatedItemsPerAudit;
-    const backTotalEstimated = totalAudits * estimatedItemsPerAudit;
-
-    const frontScore = frontTotalEstimated > 0 
-      ? Math.max(0, Math.min(100, 100 - (frontFailures / frontTotalEstimated * 100)))
-      : 100;
-    const backScore = backTotalEstimated > 0 
-      ? Math.max(0, Math.min(100, 100 - (backFailures / backTotalEstimated * 100)))
-      : 100;
-
-    // Use actual audit scores if available
+    // Calculate average global score from REAL audit data
     const avgGlobalScore = filteredAudits.length > 0 
       ? filteredAudits.reduce((sum, a) => sum + a.global_score, 0) / filteredAudits.length 
       : 0;
 
+    const totalFailures = frontFailures + backFailures;
+    
+    // Calculate proportional scores based on failure distribution
+    // If no failures, both areas get the global score
+    let frontScore = avgGlobalScore;
+    let backScore = avgGlobalScore;
+
+    if (totalFailures > 0) {
+      // Distribute penalty proportionally to failure count
+      const frontPenaltyRatio = frontFailures / totalFailures;
+      const backPenaltyRatio = backFailures / totalFailures;
+      const globalPenalty = 100 - avgGlobalScore;
+      
+      // Apply weighted penalties - area with more failures gets more penalty
+      frontScore = frontFailures === 0 ? 100 : Math.max(0, 100 - (globalPenalty * frontPenaltyRatio * 2));
+      backScore = backFailures === 0 ? 100 : Math.max(0, 100 - (globalPenalty * backPenaltyRatio * 2));
+    }
+
     return {
       front: {
-        score: filteredAudits.length > 0 ? Math.round(avgGlobalScore * (1 - frontFailures / (frontFailures + backFailures + 1))) : 0,
+        score: Math.round(frontScore),
         failures: frontFailures,
-        tier: getTierFromScore(avgGlobalScore),
+        tier: getTierFromScore(frontScore),
+        auditCount: filteredAudits.length,
       },
       back: {
-        score: filteredAudits.length > 0 ? Math.round(avgGlobalScore * (1 - backFailures / (frontFailures + backFailures + 1))) : 0,
+        score: Math.round(backScore),
         failures: backFailures,
-        tier: getTierFromScore(avgGlobalScore),
+        tier: getTierFromScore(backScore),
+        auditCount: filteredAudits.length,
       },
       global: {
         score: Math.round(avgGlobalScore),
         tier: getTierFromScore(avgGlobalScore),
+        auditCount: filteredAudits.length,
       }
     };
   }, [filteredAudits, filteredFailures]);
 
-  // Calculate individual leadership scores
+  // Calculate individual leadership scores using REAL database data
   const leadershipScores = useMemo(() => {
     const scores: LeadershipScore[] = [];
     const positions: LeadershipPosition[] = [
@@ -199,8 +206,16 @@ export function LeadershipPerformanceDashboard({
       "chefe_sushi",
     ];
 
+    // Get global average score from real audits
+    const avgGlobalScore = filteredAudits.length > 0 
+      ? filteredAudits.reduce((sum, a) => sum + a.global_score, 0) / filteredAudits.length 
+      : 0;
+
+    // Count total failures for weight calculation
+    const totalSystemFailures = filteredFailures.length;
+
     positions.forEach((position) => {
-      // Find sectors for this position
+      // Find sectors for this position based on responsibility mapping
       const positionSectors: AuditSector[] = [];
       Object.entries(SECTOR_POSITION_MAP).forEach(([sector, config]) => {
         if (config.primaryChief === position || 
@@ -211,7 +226,7 @@ export function LeadershipPerformanceDashboard({
 
       if (positionSectors.length === 0) return;
 
-      // Count failures in these sectors
+      // Count REAL failures from database in these sectors
       let failureCount = 0;
       filteredFailures.forEach((f) => {
         const sector = categorizeItemToSector(f.item_name, f.category);
@@ -224,18 +239,29 @@ export function LeadershipPerformanceDashboard({
         ? "front" as AreaType 
         : "back" as AreaType;
 
-      // Calculate score based on failures
-      const estimatedTotal = filteredAudits.length * positionSectors.length * 5; // Estimated items
-      const score = estimatedTotal > 0 
-        ? Math.max(0, Math.min(100, 100 - (failureCount / estimatedTotal * 500)))
-        : 100;
+      // Calculate score based on real failure proportion
+      // Leaders with no failures get 100%, others get penalized proportionally
+      let score = 100;
+      if (totalSystemFailures > 0 && failureCount > 0) {
+        // Calculate penalty based on failure weight
+        const failureRatio = failureCount / totalSystemFailures;
+        const globalPenalty = 100 - avgGlobalScore;
+        // Apply weighted penalty - leaders with more failures get more penalty
+        score = Math.max(0, 100 - (globalPenalty * failureRatio * 8));
+      } else if (filteredAudits.length > 0 && failureCount === 0) {
+        // No failures for this leader = perfect score
+        score = 100;
+      } else if (filteredAudits.length === 0) {
+        // No audits in period = no data
+        score = 0;
+      }
 
       scores.push({
         position,
         name: POSITION_LABELS[position],
         score: Math.round(score),
         failureCount,
-        totalItems: estimatedTotal,
+        totalItems: filteredAudits.length * positionSectors.length,
         tier: getTierFromScore(score),
         areaType,
         sectors: positionSectors,
@@ -335,11 +361,14 @@ export function LeadershipPerformanceDashboard({
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-4xl font-bold ${getScoreColor(areaScores.front.score)}`}>
+              <p className={`text-4xl font-bold ${getScoreColor(areaScores.front.score)}`}>
                   {areaScores.front.score}%
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {areaScores.front.failures} não conformidades
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {areaScores.front.auditCount} auditoria(s) no período
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -392,11 +421,14 @@ export function LeadershipPerformanceDashboard({
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-4xl font-bold ${getScoreColor(areaScores.back.score)}`}>
+              <p className={`text-4xl font-bold ${getScoreColor(areaScores.back.score)}`}>
                   {areaScores.back.score}%
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {areaScores.back.failures} não conformidades
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {areaScores.back.auditCount} auditoria(s) no período
                 </p>
               </div>
               <div className="flex flex-col gap-2">

@@ -7,18 +7,23 @@ import {
   Crown,
   Medal,
   Trophy,
-  ChevronRight,
   Loader2,
   BarChart3,
+  UtensilsCrossed,
+  Wine,
+  Flame,
+  Fish,
+  ConciergeBell,
+  ClipboardList,
+  UserCircle,
+  ChefHat,
+  type LucideIcon,
 } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
@@ -34,14 +39,24 @@ import { generateLeadershipPDF, generateConsolidatedPDF } from "@/lib/leadership
 import {
   SECTOR_POSITION_MAP,
   POSITION_LABELS,
-  POSITION_COLORS,
   categorizeItemToSector,
   getSectorsForArea,
-  getChiefsForArea,
   type LeadershipPosition,
   type AreaType,
   type AuditSector,
 } from "@/lib/sectorPositionMapping";
+
+// Clean icon mapping for each position
+const POSITION_ICONS: Record<LeadershipPosition, LucideIcon> = {
+  gerente_front: UserCircle,
+  gerente_back: ChefHat,
+  chefe_salao: ConciergeBell,
+  chefe_apv: ClipboardList,
+  chefe_bar: Wine,
+  chefe_cozinha: UtensilsCrossed,
+  chefe_parrilla: Flame,
+  chefe_sushi: Fish,
+};
 
 interface LeadershipPerformanceDashboardProps {
   selectedUnidadeId: string | null;
@@ -69,25 +84,25 @@ function getTierFromScore(score: number): "ouro" | "prata" | "bronze" | "red_fla
 function getTierConfig(tier: "ouro" | "prata" | "bronze" | "red_flag") {
   switch (tier) {
     case "ouro":
-      return { label: "Ouro", icon: Crown, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-950/30" };
+      return { label: "Ouro", icon: Crown, color: "text-primary", bg: "bg-primary/10" };
     case "prata":
-      return { label: "Prata", icon: Medal, color: "text-slate-400", bg: "bg-slate-50 dark:bg-slate-950/30" };
+      return { label: "Prata", icon: Medal, color: "text-muted-foreground", bg: "bg-muted" };
     case "bronze":
-      return { label: "Bronze", icon: Trophy, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-950/30" };
+      return { label: "Bronze", icon: Trophy, color: "text-foreground", bg: "bg-muted/50" };
     case "red_flag":
       return { label: "Crítico", icon: TrendingUp, color: "text-destructive", bg: "bg-destructive/10" };
   }
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 95) return "text-emerald-600";
-  if (score >= 85) return "text-amber-600";
+  if (score >= 95) return "text-primary";
+  if (score >= 85) return "text-muted-foreground";
   return "text-destructive";
 }
 
 function getScoreBgColor(score: number): string {
-  if (score >= 95) return "bg-emerald-500";
-  if (score >= 85) return "bg-amber-500";
+  if (score >= 95) return "bg-primary";
+  if (score >= 85) return "bg-muted-foreground";
   return "bg-destructive";
 }
 
@@ -343,57 +358,52 @@ export function LeadershipPerformanceDashboard({
       {/* Executive Level - Area Cards */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* FRONT Card */}
-        <Card className={`rounded-2xl shadow-card border-l-4 ${
-          areaScores.front.score >= 95 ? "border-l-emerald-500" :
-          areaScores.front.score >= 85 ? "border-l-amber-500" : "border-l-destructive"
-        }`}>
-          <CardHeader className="pb-2">
+        <Card className="rounded-2xl border bg-card">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold uppercase flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
-                Média Unidade FRONT
-              </CardTitle>
-              <Badge variant="outline" className="uppercase">
-                Gerentes
-              </Badge>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                  <UserCircle className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+                    Área Front
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">Gerentes & Salão</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleExportConsolidatedPDF("front")}
+                className="h-8 px-2"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-0">
+            <div className="flex items-end justify-between">
               <div>
-              <p className={`text-4xl font-bold ${getScoreColor(areaScores.front.score)}`}>
+                <p className={`text-3xl font-bold ${getScoreColor(areaScores.front.score)}`}>
                   {areaScores.front.score}%
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {areaScores.front.failures} não conformidades
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {areaScores.front.auditCount} auditoria(s) no período
+                <p className="text-xs text-muted-foreground mt-1">
+                  {areaScores.front.failures} falhas · {areaScores.front.auditCount} auditoria(s)
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
-                {(() => {
-                  const config = getTierConfig(areaScores.front.tier);
-                  const Icon = config.icon;
-                  return (
-                    <Badge className={`${config.bg} ${config.color} border-0`}>
-                      <Icon className="h-3 w-3 mr-1" />
-                      {config.label}
-                    </Badge>
-                  );
-                })()}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportConsolidatedPDF("front")}
-                  className="gap-1"
-                >
-                  <FileText className="h-3 w-3" />
-                  PDF
-                </Button>
-              </div>
+              {(() => {
+                const config = getTierConfig(areaScores.front.tier);
+                const Icon = config.icon;
+                return (
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${config.bg}`}>
+                    <Icon className={`h-3.5 w-3.5 ${config.color}`} />
+                    <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+                  </div>
+                );
+              })()}
             </div>
-            <div className="mt-4 h-2 rounded-full bg-muted overflow-hidden">
+            <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all ${getScoreBgColor(areaScores.front.score)}`}
                 style={{ width: `${areaScores.front.score}%` }}
@@ -403,57 +413,52 @@ export function LeadershipPerformanceDashboard({
         </Card>
 
         {/* BACK Card */}
-        <Card className={`rounded-2xl shadow-card border-l-4 ${
-          areaScores.back.score >= 95 ? "border-l-emerald-500" :
-          areaScores.back.score >= 85 ? "border-l-amber-500" : "border-l-destructive"
-        }`}>
-          <CardHeader className="pb-2">
+        <Card className="rounded-2xl border bg-card">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold uppercase flex items-center gap-2">
-                <Users className="h-5 w-5 text-orange-500" />
-                Média Unidade BACK
-              </CardTitle>
-              <Badge variant="outline" className="uppercase">
-                Chefes
-              </Badge>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
+                  <ChefHat className="h-5 w-5 text-foreground" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+                    Área Back
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">Chefes & Cozinha</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleExportConsolidatedPDF("back")}
+                className="h-8 px-2"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
+          <CardContent className="pt-0">
+            <div className="flex items-end justify-between">
               <div>
-              <p className={`text-4xl font-bold ${getScoreColor(areaScores.back.score)}`}>
+                <p className={`text-3xl font-bold ${getScoreColor(areaScores.back.score)}`}>
                   {areaScores.back.score}%
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {areaScores.back.failures} não conformidades
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {areaScores.back.auditCount} auditoria(s) no período
+                <p className="text-xs text-muted-foreground mt-1">
+                  {areaScores.back.failures} falhas · {areaScores.back.auditCount} auditoria(s)
                 </p>
               </div>
-              <div className="flex flex-col gap-2">
-                {(() => {
-                  const config = getTierConfig(areaScores.back.tier);
-                  const Icon = config.icon;
-                  return (
-                    <Badge className={`${config.bg} ${config.color} border-0`}>
-                      <Icon className="h-3 w-3 mr-1" />
-                      {config.label}
-                    </Badge>
-                  );
-                })()}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleExportConsolidatedPDF("back")}
-                  className="gap-1"
-                >
-                  <FileText className="h-3 w-3" />
-                  PDF
-                </Button>
-              </div>
+              {(() => {
+                const config = getTierConfig(areaScores.back.tier);
+                const Icon = config.icon;
+                return (
+                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${config.bg}`}>
+                    <Icon className={`h-3.5 w-3.5 ${config.color}`} />
+                    <span className={`text-xs font-medium ${config.color}`}>{config.label}</span>
+                  </div>
+                );
+              })()}
             </div>
-            <div className="mt-4 h-2 rounded-full bg-muted overflow-hidden">
+            <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all ${getScoreBgColor(areaScores.back.score)}`}
                 style={{ width: `${areaScores.back.score}%` }}
@@ -463,107 +468,156 @@ export function LeadershipPerformanceDashboard({
         </Card>
       </div>
 
-      {/* Leadership Ranking Table */}
-      <Card className="rounded-2xl shadow-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base uppercase">
-            <Award className="h-5 w-5 text-primary" />
+      {/* Leadership Ranking */}
+      <Card className="rounded-2xl border bg-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium uppercase text-muted-foreground">
+            <Award className="h-4 w-4" />
             Ranking de Liderança
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {leadershipScores.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhuma auditoria encontrada no período selecionado</p>
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Nenhuma auditoria encontrada no período</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Líder</TableHead>
-                    <TableHead>Cargo / Setor</TableHead>
-                    <TableHead className="text-center">Nota Média</TableHead>
-                    <TableHead className="text-center">Selo</TableHead>
-                    <TableHead className="text-right">Ação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leadershipScores.map((leader, index) => {
-                    const tierConfig = getTierConfig(leader.tier);
-                    const TierIcon = tierConfig.icon;
-                    return (
-                      <TableRow key={leader.position} className="hover:bg-muted/50">
-                        <TableCell className="font-bold text-muted-foreground">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                              <AvatarFallback 
-                                style={{ backgroundColor: POSITION_COLORS[leader.position] }}
-                                className="text-white text-xs"
-                              >
-                                {leader.name.split(" ").map(n => n[0]).join("").substring(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium">{leader.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {leader.failureCount} não conformidades
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="uppercase text-xs">
-                            {leader.areaType === "front" ? "FRONT" : "BACK"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className={`text-xl font-bold ${getScoreColor(leader.score)}`}>
-                            {leader.score}%
+            <div className="space-y-2">
+              {leadershipScores.map((leader, index) => {
+                const tierConfig = getTierConfig(leader.tier);
+                const TierIcon = tierConfig.icon;
+                const PositionIcon = POSITION_ICONS[leader.position];
+                const isTopPerformer = index === 0;
+                
+                return (
+                  <div 
+                    key={leader.position} 
+                    className={`flex items-center gap-4 p-3 rounded-xl transition-colors hover:bg-muted/50 ${
+                      isTopPerformer ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    {/* Rank */}
+                    <div className="w-6 text-center">
+                      <span className={`text-sm font-medium ${
+                        isTopPerformer ? "text-primary" : "text-muted-foreground"
+                      }`}>
+                        {index + 1}
+                      </span>
+                    </div>
+
+                    {/* Icon */}
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${
+                      leader.areaType === "front" ? "bg-primary/10" : "bg-muted"
+                    }`}>
+                      <PositionIcon className={`h-4 w-4 ${
+                        leader.areaType === "front" ? "text-primary" : "text-foreground"
+                      }`} />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{leader.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground uppercase">
+                          {leader.areaType}
+                        </span>
+                        {leader.failureCount > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            · {leader.failureCount} falha(s)
                           </span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={`${tierConfig.bg} ${tierConfig.color} border-0`}>
-                            <TierIcon className="h-3 w-3 mr-1" />
-                            {tierConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleExportIndividualPDF(leader)}
-                            className="gap-1"
-                          >
-                            <FileText className="h-4 w-4" />
-                            PDF Performance
-                            <ChevronRight className="h-3 w-3" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Score */}
+                    <div className="text-right">
+                      <p className={`text-lg font-bold ${getScoreColor(leader.score)}`}>
+                        {leader.score}%
+                      </p>
+                    </div>
+
+                    {/* Tier Badge */}
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${tierConfig.bg}`}>
+                      <TierIcon className={`h-3 w-3 ${tierConfig.color}`} />
+                    </div>
+
+                    {/* Action */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleExportIndividualPDF(leader)}
+                      className="h-8 w-8 shrink-0"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Period Summary */}
-      <div className="text-center text-sm text-muted-foreground">
-        <p>
-          Período: {dateRange.from ? format(dateRange.from, "dd/MM/yyyy", { locale: ptBR }) : "—"} 
-          {" a "} 
-          {dateRange.to ? format(dateRange.to, "dd/MM/yyyy", { locale: ptBR }) : "—"}
-          {" • "}
-          {filteredAudits.length} auditoria(s) analisada(s)
-        </p>
+      {/* Summary Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="rounded-2xl border bg-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <BarChart3 className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{areaScores.global.score}%</p>
+                <p className="text-xs text-muted-foreground uppercase">Média Global</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <Users className="h-4 w-4 text-foreground" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{filteredAudits.length}</p>
+                <p className="text-xs text-muted-foreground uppercase">Auditorias</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-destructive/10">
+                <TrendingUp className="h-4 w-4 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{filteredFailures.length}</p>
+                <p className="text-xs text-muted-foreground uppercase">Falhas Totais</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl border bg-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                <Crown className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">
+                  {leadershipScores.filter(l => l.tier === "ouro").length}
+                </p>
+                <p className="text-xs text-muted-foreground uppercase">Líderes Ouro</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

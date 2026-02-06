@@ -14,6 +14,7 @@ import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTa
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 import { ActionPlanTab } from "@/components/dashboard/ActionPlanTab";
+import { LeadershipPerformanceDashboard } from "@/components/leadership";
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
@@ -40,6 +41,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   planoacao: {
     title: "Plano de Ação",
     subtitle: "Correção de não conformidades de auditoria",
+  },
+  performance: {
+    title: "Performance Liderança",
+    subtitle: "Diagnóstico hierárquico por responsável",
   },
   cx: {
     title: "Dores da Operação",
@@ -196,6 +201,13 @@ const Index = () => {
       case "planoacao":
         return (
           <ActionPlanTab selectedUnidadeId={selectedUnidadeId} />
+        );
+      case "performance":
+        return (
+          <LeadershipPerformanceDashboard 
+            selectedUnidadeId={selectedUnidadeId}
+            isAdmin={isAdmin}
+          />
         );
       case "cx":
         return isAdmin ? <AdminCXDashboard /> : null;

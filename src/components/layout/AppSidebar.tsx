@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 
 import {
@@ -69,6 +70,12 @@ const menuItems = [
     id: "planoacao",
     icon: AlertTriangle,
     description: "Correção de não conformidades",
+  },
+  {
+    title: "PERFORMANCE LIDERANÇA",
+    id: "performance",
+    icon: BarChart3,
+    description: "Diagnóstico por responsável",
   },
   {
     title: "CMV (UNITÁRIOS)",

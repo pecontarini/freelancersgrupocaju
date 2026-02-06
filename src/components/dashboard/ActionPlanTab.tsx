@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,12 +48,13 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
-import { useSupervisionAudits, SupervisionFailure } from "@/hooks/useSupervisionAudits";
+import { useSupervisionAudits, SupervisionFailure, DateRangeFilter } from "@/hooks/useSupervisionAudits";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { SegmentedScoreCard } from "@/components/audit/SegmentedScoreCard";
+import { DateRangeFilter as DateRangeFilterComponent } from "@/components/action-plan/DateRangeFilter";
 
 // Brand detection based on store name prefixes
 const BRAND_PREFIXES: Record<string, string> = {
@@ -86,6 +88,23 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
   const [selectedLojaId, setSelectedLojaId] = useState<string | null>(selectedUnidadeId || null);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "resolved">("pending");
   const [showOnlyRecurring, setShowOnlyRecurring] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    // Default to current month
+    const today = new Date();
+    return {
+      from: startOfMonth(today),
+      to: endOfMonth(today),
+    };
+  });
+
+  // Convert DateRange to hook format
+  const dateRangeFilter: DateRangeFilter | undefined = useMemo(() => {
+    if (!dateRange?.from) return undefined;
+    return {
+      from: dateRange.from,
+      to: dateRange.to,
+    };
+  }, [dateRange]);
 
   // Modal states
   const [selectedFailure, setSelectedFailure] = useState<SupervisionFailure | null>(null);
@@ -97,7 +116,7 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
   const [solution, setSolution] = useState("");
   const [expandedHistories, setExpandedHistories] = useState<Set<string>>(new Set());
 
-  // Fetch supervision data
+  // Fetch supervision data with date range filter
   const {
     failures,
     audits,
@@ -107,7 +126,7 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
     resolveFailure,
     validateFailure,
     isRecurring,
-  } = useSupervisionAudits(selectedLojaId);
+  } = useSupervisionAudits(selectedLojaId, undefined, dateRangeFilter);
 
   // Auto-select single store for managers
   const effectiveLojaId = useMemo(() => {
@@ -154,18 +173,28 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
     };
   };
 
-  // Filter failures based on current month
-  const currentMonthStart = startOfMonth(new Date());
-  const currentMonthEnd = endOfMonth(new Date());
-
-  const currentMonthAuditIds = useMemo(() => {
+  // Filter audit IDs based on date range (already filtered via hook, but for extra safety)
+  const relevantAuditIds = useMemo(() => {
+    if (dateRange?.from) {
+      return audits
+        .filter((a) => {
+          const auditDate = new Date(a.audit_date);
+          const afterStart = auditDate >= dateRange.from!;
+          const beforeEnd = !dateRange.to || auditDate <= dateRange.to;
+          return afterStart && beforeEnd;
+        })
+        .map((a) => a.id);
+    }
+    // Fallback: current month
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthEnd = endOfMonth(new Date());
     return audits
       .filter((a) => {
         const auditDate = new Date(a.audit_date);
         return auditDate >= currentMonthStart && auditDate <= currentMonthEnd;
       })
       .map((a) => a.id);
-  }, [audits, currentMonthStart, currentMonthEnd]);
+  }, [audits, dateRange]);
 
   // Apply all filters
   const filteredFailures = useMemo(() => {
@@ -179,8 +208,8 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
       result = result.filter((f) => unidadeIds.includes(f.loja_id));
     }
 
-    // Filter by current month audits
-    result = result.filter((f) => currentMonthAuditIds.includes(f.audit_id));
+    // Filter by audits in the selected date range
+    result = result.filter((f) => relevantAuditIds.includes(f.audit_id));
 
     // Status filter
     if (statusFilter === "pending") {
@@ -204,7 +233,7 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
     }
 
     return result;
-  }, [failures, effectiveLojaId, statusFilter, showOnlyRecurring, currentMonthAuditIds, isGerenteUnidade, unidades, recurrenceMap]);
+  }, [failures, effectiveLojaId, statusFilter, showOnlyRecurring, relevantAuditIds, isGerenteUnidade, unidades, recurrenceMap]);
 
   // Group stores by brand
   const groupedLojas = useMemo(() => {
@@ -332,9 +361,19 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
     setSelectedLojaId(null);
     setStatusFilter("pending");
     setShowOnlyRecurring(false);
+    // Reset to current month
+    const today = new Date();
+    setDateRange({
+      from: startOfMonth(today),
+      to: endOfMonth(today),
+    });
   };
 
-  const hasActiveFilters = selectedLojaId !== null || statusFilter !== "pending" || showOnlyRecurring;
+  const isDefaultDateRange = dateRange?.from && dateRange?.to && 
+    dateRange.from.getTime() === startOfMonth(new Date()).getTime() &&
+    dateRange.to.getTime() === endOfMonth(new Date()).getTime();
+
+  const hasActiveFilters = selectedLojaId !== null || statusFilter !== "pending" || showOnlyRecurring || !isDefaultDateRange;
 
   // KPI counts
   const pendingCount = filteredFailures.filter((f) => f.status === "pending").length;
@@ -362,7 +401,9 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
               Plano de Ação
             </h2>
             <p className="text-muted-foreground">
-              {format(new Date(), "MMMM yyyy", { locale: ptBR })} • Não conformidades de auditoria
+              {dateRange?.from && dateRange?.to
+                ? `${format(dateRange.from, "dd/MM/yyyy")} - ${format(dateRange.to, "dd/MM/yyyy")}`
+                : format(new Date(), "MMMM yyyy", { locale: ptBR })} • Não conformidades de auditoria
             </p>
           </div>
         </div>
@@ -494,6 +535,12 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
               </Label>
             </div>
 
+            {/* Date Range Filter */}
+            <DateRangeFilterComponent
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
+
             {/* Clear filters */}
             {hasActiveFilters && (
               <Button
@@ -516,7 +563,7 @@ export function ActionPlanTab({ selectedUnidadeId }: ActionPlanTabProps) {
               <CheckCircle className="h-12 w-12 text-emerald-500 mb-4" />
               <h3 className="font-medium text-lg">Nenhuma pendência</h3>
               <p className="text-muted-foreground text-sm">
-                Não há itens para os filtros selecionados neste mês.
+                Não há itens para os filtros selecionados no período.
               </p>
             </div>
           ) : (

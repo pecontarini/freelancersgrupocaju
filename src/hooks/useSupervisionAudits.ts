@@ -31,12 +31,21 @@ export interface SupervisionFailure {
   updated_at: string;
 }
 
-export function useSupervisionAudits(lojaId?: string | null, monthYear?: string) {
+export interface DateRangeFilter {
+  from?: Date;
+  to?: Date;
+}
+
+export function useSupervisionAudits(
+  lojaId?: string | null, 
+  monthYear?: string,
+  dateRange?: DateRangeFilter
+) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: audits = [], isLoading: isLoadingAudits } = useQuery({
-    queryKey: ["supervision-audits", lojaId, monthYear],
+    queryKey: ["supervision-audits", lojaId, monthYear, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
       let query = supabase.from("supervision_audits").select("*");
       
@@ -44,7 +53,16 @@ export function useSupervisionAudits(lojaId?: string | null, monthYear?: string)
         query = query.eq("loja_id", lojaId);
       }
       
-      if (monthYear) {
+      // Date range filter takes precedence over monthYear
+      if (dateRange?.from) {
+        const startDate = dateRange.from.toISOString().split("T")[0];
+        query = query.gte("audit_date", startDate);
+        
+        if (dateRange.to) {
+          const endDate = dateRange.to.toISOString().split("T")[0];
+          query = query.lte("audit_date", endDate);
+        }
+      } else if (monthYear) {
         const [year, month] = monthYear.split("-");
         const startDate = `${year}-${month}-01`;
         const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split("T")[0];
@@ -59,18 +77,31 @@ export function useSupervisionAudits(lojaId?: string | null, monthYear?: string)
     enabled: true,
   });
 
-  // Fetch failures with 60-day window for recurrence analysis
+  // Fetch failures - use date range if provided, otherwise 60-day window for recurrence
   const { data: failures = [], isLoading: isLoadingFailures } = useQuery({
-    queryKey: ["supervision-failures", lojaId],
+    queryKey: ["supervision-failures", lojaId, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      // Get failures from the last 60 days for recurrence detection
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-      
       let query = supabase
         .from("supervision_failures")
-        .select("*")
-        .gte("created_at", sixtyDaysAgo.toISOString());
+        .select("*");
+      
+      // If date range is provided, use it; otherwise default to 60 days for recurrence
+      if (dateRange?.from) {
+        const startDate = dateRange.from.toISOString();
+        query = query.gte("created_at", startDate);
+        
+        if (dateRange.to) {
+          // Add 1 day to include the entire end date
+          const endDate = new Date(dateRange.to);
+          endDate.setDate(endDate.getDate() + 1);
+          query = query.lt("created_at", endDate.toISOString());
+        }
+      } else {
+        // Default: 60 days for recurrence detection
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        query = query.gte("created_at", sixtyDaysAgo.toISOString());
+      }
       
       if (lojaId) {
         query = query.eq("loja_id", lojaId);

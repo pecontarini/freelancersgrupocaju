@@ -1388,6 +1388,7 @@ export type Database = {
           audit_id: string
           category: string | null
           created_at: string
+          detalhes_falha: string | null
           id: string
           is_recurring: boolean
           item_name: string
@@ -1397,6 +1398,7 @@ export type Database = {
           resolved_by: string | null
           status: string
           updated_at: string
+          url_foto_evidencia: string | null
           validated_at: string | null
           validated_by: string | null
         }
@@ -1404,6 +1406,7 @@ export type Database = {
           audit_id: string
           category?: string | null
           created_at?: string
+          detalhes_falha?: string | null
           id?: string
           is_recurring?: boolean
           item_name: string
@@ -1413,6 +1416,7 @@ export type Database = {
           resolved_by?: string | null
           status?: string
           updated_at?: string
+          url_foto_evidencia?: string | null
           validated_at?: string | null
           validated_by?: string | null
         }
@@ -1420,6 +1424,7 @@ export type Database = {
           audit_id?: string
           category?: string | null
           created_at?: string
+          detalhes_falha?: string | null
           id?: string
           is_recurring?: boolean
           item_name?: string
@@ -1429,6 +1434,7 @@ export type Database = {
           resolved_by?: string | null
           status?: string
           updated_at?: string
+          url_foto_evidencia?: string | null
           validated_at?: string | null
           validated_by?: string | null
         }

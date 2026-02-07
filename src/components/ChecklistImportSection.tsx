@@ -22,6 +22,8 @@ interface ExtractedData {
   failures: Array<{
     item_name: string;
     category: string | null;
+    detalhes_falha?: string | null;
+    url_foto_evidencia?: string | null;
   }>;
 }
 
@@ -184,6 +186,8 @@ export function ChecklistImportSection() {
           resolved_by: null,
           validated_at: null,
           validated_by: null,
+          detalhes_falha: failure.detalhes_falha || null,
+          url_foto_evidencia: failure.url_foto_evidencia || null,
         }));
 
         await createFailures(failureRecords);

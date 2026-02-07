@@ -29,6 +29,9 @@ export interface SupervisionFailure {
   validated_by: string | null;
   created_at: string;
   updated_at: string;
+  // New fields for detailed failure info
+  detalhes_falha: string | null;
+  url_foto_evidencia: string | null;
 }
 
 export interface DateRangeFilter {

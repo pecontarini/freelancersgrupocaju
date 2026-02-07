@@ -287,13 +287,13 @@ export function LeadershipPerformanceDashboard({
     return scores.sort((a, b) => b.score - a.score);
   }, [filteredAudits, filteredFailures]);
 
-  const handleExportIndividualPDF = (leader: LeadershipScore) => {
+  const handleExportIndividualPDF = async (leader: LeadershipScore) => {
     const leaderFailures = filteredFailures.filter((f) => {
       const sector = categorizeItemToSector(f.item_name, f.category);
       return leader.sectors.includes(sector);
     });
 
-    generateLeadershipPDF({
+    await generateLeadershipPDF({
       leaderName: leader.name,
       position: leader.position,
       score: leader.score,
@@ -304,7 +304,7 @@ export function LeadershipPerformanceDashboard({
     });
   };
 
-  const handleExportConsolidatedPDF = (areaType: AreaType) => {
+  const handleExportConsolidatedPDF = async (areaType: AreaType) => {
     const areaSectors = getSectorsForArea(areaType);
     const areaFailures = filteredFailures.filter((f) => {
       const sector = categorizeItemToSector(f.item_name, f.category);
@@ -313,7 +313,7 @@ export function LeadershipPerformanceDashboard({
 
     const areaLeaders = leadershipScores.filter((l) => l.areaType === areaType);
 
-    generateConsolidatedPDF({
+    await generateConsolidatedPDF({
       areaType,
       areaScore: areaType === "front" ? areaScores.front.score : areaScores.back.score,
       leaders: areaLeaders,

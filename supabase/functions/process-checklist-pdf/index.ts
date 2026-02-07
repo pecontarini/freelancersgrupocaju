@@ -34,7 +34,7 @@ serve(async (req) => {
 
     const extractionPrompt = `Você é um especialista em análise de relatórios de supervisão do Checklist Fácil.
     
-Analise este PDF de auditoria de supervisão e extraia os seguintes dados em formato JSON:
+Analise este PDF/planilha de auditoria de supervisão e extraia os seguintes dados em formato JSON:
 
 {
   "global_score": <número entre 0 e 100 representando a nota global/percentual de conformidade>,
@@ -51,7 +51,9 @@ Analise este PDF de auditoria de supervisão e extraia os seguintes dados em for
   "failures": [
     {
       "item_name": "<nome do item não conforme>",
-      "category": "<categoria/área do item conforme lista abaixo>"
+      "category": "<categoria/área do item conforme lista abaixo>",
+      "detalhes_falha": "<texto do campo 'Comentário do item' ou 'Observação' que explica o problema encontrado>",
+      "url_foto_evidencia": "<primeiro link/URL válido encontrado no campo 'Imagens' ou 'Fotos' ou 'Evidências'>"
     }
   ]
 }
@@ -77,14 +79,16 @@ CATEGORIAS VÁLIDAS PARA CLASSIFICAÇÃO:
 - ESTOQUE: armazenamento, validade, recebimento, fornecedores
 - DML: depósito material limpeza, produtos químicos
 
-Instruções:
+INSTRUÇÕES CRÍTICAS:
 1. A nota global geralmente aparece como percentual de conformidade ou nota final
 2. Extraia TODAS as áreas/setores com suas notas individuais
 3. Extraia TODOS os itens marcados como "Não", "Não Conforme", "NC", "Reprovado" ou similares
 4. Para cada falha, classifique na categoria mais apropriada da lista acima
-5. Identifique a unidade pelo nome da loja ou estabelecimento
-6. Se não encontrar algum dado, use null
-7. Retorne APENAS o JSON, sem explicações adicionais`;
+5. MUITO IMPORTANTE: Capture o campo "Comentário do item" ou "Observação" que descreve o problema - salve em detalhes_falha
+6. MUITO IMPORTANTE: Se houver coluna "Imagens" ou "Fotos" com URLs, extraia o PRIMEIRO link válido (http/https) e salve em url_foto_evidencia
+7. Identifique a unidade pelo nome da loja ou estabelecimento
+8. Se não encontrar algum dado, use null
+9. Retorne APENAS o JSON, sem explicações adicionais`;
 
     const messages: any[] = [
       { role: "system", content: extractionPrompt },

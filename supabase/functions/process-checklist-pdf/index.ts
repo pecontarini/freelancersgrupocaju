@@ -86,9 +86,10 @@ INSTRUÇÕES CRÍTICAS:
 4. Para cada falha, classifique na categoria mais apropriada da lista acima
 5. MUITO IMPORTANTE: Capture o campo "Comentário do item" ou "Observação" que descreve o problema - salve em detalhes_falha
 6. MUITO IMPORTANTE: Se houver coluna "Imagens" ou "Fotos" com URLs, extraia o PRIMEIRO link válido (http/https) e salve em url_foto_evidencia
-7. Identifique a unidade pelo nome da loja ou estabelecimento
-8. Se não encontrar algum dado, use null
-9. Retorne APENAS o JSON, sem explicações adicionais`;
+7. Se o texto do item vier com um comentário entre parênteses (ex: "Pergunta...? (gordura acumulada)"), separe: item_name = "Pergunta..." e detalhes_falha = "gordura acumulada"
+8. Identifique a unidade pelo nome da loja ou estabelecimento
+9. Se não encontrar algum dado, use null
+10. Retorne APENAS o JSON, sem explicações adicionais`;
 
     const messages: any[] = [
       { role: "system", content: extractionPrompt },
@@ -135,7 +136,7 @@ INSTRUÇÕES CRÍTICAS:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages,
       }),
     });

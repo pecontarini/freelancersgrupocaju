@@ -11,9 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSupervisionAudits } from "@/hooks/useSupervisionAudits";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useUnidade } from "@/contexts/UnidadeContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { normalizeExtractedFailures, parseChecklistSpreadsheet } from "@/lib/checklistSpreadsheetParser";
 
 interface ExtractedData {
   global_score: number | null;
@@ -54,30 +54,39 @@ export function ChecklistImportSection() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== "application/pdf") {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const isPdf = ext === "pdf";
+    const isSpreadsheet = ext === "xlsx" || ext === "xls" || ext === "csv";
+
+    if (!isPdf && !isSpreadsheet) {
       toast({
         title: "Formato inválido",
-        description: "Por favor, selecione um arquivo PDF.",
+        description: "Envie um PDF, XLSX/XLS ou CSV do Checklist Fácil.",
         variant: "destructive",
       });
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 15 * 1024 * 1024) {
       toast({
         title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 10MB.",
+        description: "O arquivo deve ter no máximo 15MB.",
         variant: "destructive",
       });
       return;
     }
 
-    setPdfFile(file);
+    setPdfFile(isPdf ? file : null);
     setExtractedData(null);
-    await processFile(file);
+
+    if (isPdf) {
+      await processPdfFile(file);
+    } else {
+      await processSpreadsheetFile(file);
+    }
   };
 
-  const processFile = async (file: File) => {
+  const processPdfFile = async (file: File) => {
     setIsProcessing(true);
     setProgress(10);
 
@@ -96,32 +105,56 @@ export function ChecklistImportSection() {
 
       setProgress(30);
 
-      // Call AI extraction edge function
+      // Call AI extraction backend function
       const { data, error } = await supabase.functions.invoke("process-checklist-pdf", {
         body: { pdfBase64: base64 },
       });
 
       setProgress(80);
 
-      if (error) {
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.error || "Falha na extração de dados");
 
-      if (!data.success) {
-        throw new Error(data.error || "Falha na extração de dados");
-      }
+      const normalizedFailures = normalizeExtractedFailures(data.data.failures || []);
+      setExtractedData({ ...data.data, failures: normalizedFailures });
 
-      setExtractedData(data.data);
       setProgress(100);
-
       toast({
-        title: "PDF processado com sucesso",
-        description: `Extraídos ${data.data.failures?.length || 0} itens não conformes.`,
+        title: "Arquivo processado com sucesso",
+        description: `Extraídos ${normalizedFailures.length} itens não conformes.`,
       });
     } catch (error) {
       console.error("Error processing PDF:", error);
       toast({
-        title: "Erro ao processar PDF",
+        title: "Erro ao processar arquivo",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const processSpreadsheetFile = async (file: File) => {
+    setIsProcessing(true);
+    setProgress(15);
+
+    try {
+      setProgress(35);
+      const data = await parseChecklistSpreadsheet(file);
+      setProgress(90);
+
+      setExtractedData(data);
+      setProgress(100);
+
+      toast({
+        title: "Planilha processada com sucesso",
+        description: `Extraídos ${data.failures?.length || 0} itens não conformes.`,
+      });
+    } catch (error) {
+      console.error("Error processing spreadsheet:", error);
+      toast({
+        title: "Erro ao processar planilha",
         description: error instanceof Error ? error.message : "Erro desconhecido",
         variant: "destructive",
       });
@@ -239,7 +272,7 @@ export function ChecklistImportSection() {
           Importar Checklist de Supervisão
         </CardTitle>
         <CardDescription>
-          Faça upload de PDFs do Checklist Fácil para extração automática de dados.
+          Faça upload do PDF ou exportação CSV/XLSX do Checklist Fácil para capturar nota, comentários e evidências.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -279,7 +312,7 @@ export function ChecklistImportSection() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept=".pdf,.xlsx,.xls,.csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
             onChange={handleFileSelect}
             disabled={isProcessing}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
@@ -292,10 +325,10 @@ export function ChecklistImportSection() {
             )}
             <div>
               <p className="font-medium">
-                {isProcessing ? "Processando PDF..." : "Clique ou arraste um PDF"}
+                {isProcessing ? "Processando arquivo..." : "Clique ou arraste o arquivo"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Máximo 10MB • Checklist Fácil
+                PDF, CSV ou XLSX • Máximo 15MB • Checklist Fácil
               </p>
             </div>
           </div>
@@ -306,7 +339,7 @@ export function ChecklistImportSection() {
           <div className="space-y-2">
             <Progress value={progress} className="h-2" />
             <p className="text-xs text-muted-foreground text-center">
-              {progress < 30 ? "Preparando arquivo..." : progress < 80 ? "Extraindo dados com IA..." : "Finalizando..."}
+              {progress < 30 ? "Preparando arquivo..." : progress < 80 ? "Extraindo dados..." : "Finalizando..."}
             </p>
           </div>
         )}

@@ -377,6 +377,30 @@ export type Database = {
           },
         ]
       }
+      cmv_ignored_items: {
+        Row: {
+          created_at: string
+          id: string
+          ignored_by: string | null
+          item_name: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ignored_by?: string | null
+          item_name: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ignored_by?: string | null
+          item_name?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       cmv_inventory: {
         Row: {
           cmv_item_id: string
@@ -602,6 +626,7 @@ export type Database = {
           cmv_item_id: string
           created_at: string
           id: string
+          is_global: boolean
           multiplicador: number
           nome_venda: string
           notas: string | null
@@ -611,6 +636,7 @@ export type Database = {
           cmv_item_id: string
           created_at?: string
           id?: string
+          is_global?: boolean
           multiplicador?: number
           nome_venda: string
           notas?: string | null
@@ -620,6 +646,7 @@ export type Database = {
           cmv_item_id?: string
           created_at?: string
           id?: string
+          is_global?: boolean
           multiplicador?: number
           nome_venda?: string
           notas?: string | null

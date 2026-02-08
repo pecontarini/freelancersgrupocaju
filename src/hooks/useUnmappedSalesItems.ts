@@ -13,6 +13,7 @@ export interface UnmappedSalesItem {
 
 /**
  * Find sales items that don't have a mapping to inventory items
+ * Excludes: already mapped items and ignored items
  */
 export function useUnmappedSalesItems(unitId?: string) {
   return useQuery({
@@ -27,6 +28,17 @@ export function useUnmappedSalesItems(unitId?: string) {
 
       const mappedNames = new Set(
         (mappings || []).map(m => m.nome_venda.toUpperCase().trim())
+      );
+
+      // Get all ignored items
+      const { data: ignoredItems, error: ignoredError } = await supabase
+        .from("cmv_ignored_items")
+        .select("item_name");
+
+      if (ignoredError) throw ignoredError;
+
+      const ignoredNames = new Set(
+        (ignoredItems || []).map(i => i.item_name.toUpperCase().trim())
       );
 
       // Get all unique sales items from daily_sales
@@ -52,8 +64,8 @@ export function useUnmappedSalesItems(unitId?: string) {
       for (const sale of sales || []) {
         const name = sale.item_name.toUpperCase().trim();
         
-        // Skip if already mapped
-        if (mappedNames.has(name)) continue;
+        // Skip if already mapped OR ignored
+        if (mappedNames.has(name) || ignoredNames.has(name)) continue;
 
         const existing = itemsMap.get(name);
         if (existing) {

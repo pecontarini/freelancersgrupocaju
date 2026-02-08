@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link2, Search, Package, Sparkles, Check, Loader2, ChevronRight } from "lucide-react";
+import { Link2, Search, Package, Sparkles, Check, Loader2, ChevronRight, EyeOff, Globe } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUnmappedSalesItems, UnmappedSalesItem } from "@/hooks/useUnmappedSalesItems";
 import { useCMVItems } from "@/hooks/useCMV";
 import { useCMVSalesMappings } from "@/hooks/useCMV";
+import { useCMVIgnoredItems } from "@/hooks/useCMVIgnoredItems";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { toast } from "sonner";
 import { formatDate } from "@/lib/formatters";
@@ -37,6 +38,7 @@ interface MappingFormState {
   selectedItems: Set<string>;
   targetItemId: string | null;
   multiplier: string;
+  isGlobal: boolean;
 }
 
 export function CMVProductMappingHub() {
@@ -44,14 +46,17 @@ export function CMVProductMappingHub() {
   const { data: unmappedItems = [], isLoading: loadingUnmapped, refetch } = useUnmappedSalesItems(effectiveUnidadeId || undefined);
   const { items: inventoryItems, isLoading: loadingInventory } = useCMVItems();
   const { addMapping } = useCMVSalesMappings();
+  const { ignoreItem } = useCMVIgnoredItems();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [formState, setFormState] = useState<MappingFormState>({
     selectedItems: new Set(),
     targetItemId: null,
     multiplier: "1",
+    isGlobal: true, // Default to global for convenience
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isIgnoring, setIsIgnoring] = useState(false);
   const [openCombobox, setOpenCombobox] = useState(false);
 
   // Filter unmapped items by search
@@ -116,6 +121,7 @@ export function CMVProductMappingHub() {
           nome_venda: itemName,
           cmv_item_id: formState.targetItemId!,
           multiplicador: multiplier,
+          is_global: formState.isGlobal,
         })
       );
 
@@ -130,12 +136,44 @@ export function CMVProductMappingHub() {
         selectedItems: new Set(),
         targetItemId: null,
         multiplier: "1",
+        isGlobal: true,
       });
       refetch();
     } catch (error) {
       toast.error("Erro ao salvar vínculos");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Handle ignoring selected items
+  const handleIgnoreItems = async () => {
+    if (formState.selectedItems.size === 0) {
+      toast.error("Selecione itens para ignorar");
+      return;
+    }
+
+    setIsIgnoring(true);
+
+    try {
+      const promises = Array.from(formState.selectedItems).map(itemName =>
+        ignoreItem.mutateAsync({ itemName, reason: "Não impacta CMV de Carnes" })
+      );
+
+      await Promise.all(promises);
+
+      toast.success(`${formState.selectedItems.size} item(s) marcado(s) como ignorado(s)`);
+
+      // Reset selection and refresh
+      setFormState(prev => ({
+        ...prev,
+        selectedItems: new Set(),
+      }));
+      refetch();
+    } catch (error) {
+      // Individual errors already shown by hook
+    } finally {
+      setIsIgnoring(false);
     }
   };
 
@@ -352,28 +390,74 @@ export function CMVProductMappingHub() {
               />
             </div>
 
-            {/* Save Button */}
-            <Button
-              onClick={handleSaveMapping}
-              disabled={
-                formState.selectedItems.size === 0 ||
-                !formState.targetItemId ||
-                isSaving
-              }
-              className="w-full"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <Link2 className="mr-2 h-4 w-4" />
-                  Vincular {formState.selectedItems.size > 0 && `(${formState.selectedItems.size})`}
-                </>
-              )}
-            </Button>
+            {/* Global Checkbox */}
+            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+              <Checkbox
+                id="isGlobal"
+                checked={formState.isGlobal}
+                onCheckedChange={(checked) => 
+                  setFormState(prev => ({ ...prev, isGlobal: checked === true }))
+                }
+              />
+              <div className="flex-1">
+                <Label htmlFor="isGlobal" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Globe className="h-4 w-4 text-primary" />
+                  Aplicar para TODAS as unidades
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Outras lojas usarão este vínculo automaticamente
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              {/* Save Mapping Button */}
+              <Button
+                onClick={handleSaveMapping}
+                disabled={
+                  formState.selectedItems.size === 0 ||
+                  !formState.targetItemId ||
+                  isSaving
+                }
+                className="w-full"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Vincular {formState.selectedItems.size > 0 && `(${formState.selectedItems.size})`}
+                  </>
+                )}
+              </Button>
+
+              {/* Ignore Button */}
+              <Button
+                variant="outline"
+                onClick={handleIgnoreItems}
+                disabled={formState.selectedItems.size === 0 || isIgnoring}
+                className="w-full text-muted-foreground"
+              >
+                {isIgnoring ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Ignorando...
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="mr-2 h-4 w-4" />
+                    Ignorar Selecionados
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                Use para itens que não impactam CMV (bebidas, taxas, etc.)
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

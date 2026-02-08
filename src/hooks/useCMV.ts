@@ -144,10 +144,17 @@ export function useCMVSalesMappings() {
       cmv_item_id: string;
       multiplicador: number;
       notas?: string;
+      is_global?: boolean;
     }) => {
       const { data, error } = await supabase
         .from("cmv_sales_mappings")
-        .insert(mapping)
+        .insert({
+          nome_venda: mapping.nome_venda,
+          cmv_item_id: mapping.cmv_item_id,
+          multiplicador: mapping.multiplicador,
+          notas: mapping.notas,
+          is_global: mapping.is_global ?? false,
+        })
         .select()
         .single();
       if (error) throw error;

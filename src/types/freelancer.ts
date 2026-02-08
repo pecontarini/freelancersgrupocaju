@@ -34,7 +34,7 @@ export interface FilterState {
   loja: string;
 }
 
-export type AppRole = 'admin' | 'gerente_unidade';
+export type AppRole = 'admin' | 'partner' | 'gerente_unidade';
 
 export interface UserProfile {
   id: string;

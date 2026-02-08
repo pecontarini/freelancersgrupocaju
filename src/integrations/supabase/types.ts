@@ -742,6 +742,187 @@ export type Database = {
           },
         ]
       }
+      leadership_calculation_log: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          loja_id: string | null
+          month_year: string | null
+          positions_updated: number | null
+          started_at: string
+          status: string
+          stores_updated: number | null
+          trigger_audit_id: string | null
+          trigger_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          loja_id?: string | null
+          month_year?: string | null
+          positions_updated?: number | null
+          started_at?: string
+          status?: string
+          stores_updated?: number | null
+          trigger_audit_id?: string | null
+          trigger_type: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          loja_id?: string | null
+          month_year?: string | null
+          positions_updated?: number | null
+          started_at?: string
+          status?: string
+          stores_updated?: number | null
+          trigger_audit_id?: string | null
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leadership_calculation_log_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leadership_calculation_log_trigger_audit_id_fkey"
+            columns: ["trigger_audit_id"]
+            isOneToOne: false
+            referencedRelation: "supervision_audits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leadership_performance_scores: {
+        Row: {
+          breakdown: Json | null
+          calculated_at: string
+          created_at: string
+          final_score: number | null
+          id: string
+          loja_id: string
+          month_year: string
+          needs_review: boolean | null
+          position_code: string
+          review_reasons: Json | null
+          tier: string | null
+          total_audits: number | null
+          updated_at: string
+        }
+        Insert: {
+          breakdown?: Json | null
+          calculated_at?: string
+          created_at?: string
+          final_score?: number | null
+          id?: string
+          loja_id: string
+          month_year: string
+          needs_review?: boolean | null
+          position_code: string
+          review_reasons?: Json | null
+          tier?: string | null
+          total_audits?: number | null
+          updated_at?: string
+        }
+        Update: {
+          breakdown?: Json | null
+          calculated_at?: string
+          created_at?: string
+          final_score?: number | null
+          id?: string
+          loja_id?: string
+          month_year?: string
+          needs_review?: boolean | null
+          position_code?: string
+          review_reasons?: Json | null
+          tier?: string | null
+          total_audits?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leadership_performance_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leadership_store_scores: {
+        Row: {
+          back_failures: number | null
+          back_score: number | null
+          back_tier: string | null
+          calculated_at: string
+          created_at: string
+          front_failures: number | null
+          front_score: number | null
+          front_tier: string | null
+          general_score: number | null
+          general_tier: string | null
+          id: string
+          loja_id: string
+          month_year: string
+          total_audits: number | null
+          total_failures: number | null
+          updated_at: string
+        }
+        Insert: {
+          back_failures?: number | null
+          back_score?: number | null
+          back_tier?: string | null
+          calculated_at?: string
+          created_at?: string
+          front_failures?: number | null
+          front_score?: number | null
+          front_tier?: string | null
+          general_score?: number | null
+          general_tier?: string | null
+          id?: string
+          loja_id: string
+          month_year: string
+          total_audits?: number | null
+          total_failures?: number | null
+          updated_at?: string
+        }
+        Update: {
+          back_failures?: number | null
+          back_score?: number | null
+          back_tier?: string | null
+          calculated_at?: string
+          created_at?: string
+          front_failures?: number | null
+          front_score?: number | null
+          front_tier?: string | null
+          general_score?: number | null
+          general_tier?: string | null
+          id?: string
+          loja_id?: string
+          month_year?: string
+          total_audits?: number | null
+          total_failures?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leadership_store_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_budgets: {
         Row: {
           budget_mensal: number

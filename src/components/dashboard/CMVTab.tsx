@@ -15,8 +15,10 @@ import {
   CMVDailyCountForm,
   CMVPeriodAudit,
   CMVSalesImporter,
-  CMVProductMappingHub
+  CMVProductMappingHub,
+  CMVUnmappedAlert
 } from "@/components/cmv";
+import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useCMVPendingItems } from "@/hooks/useCMVPendingItems";
@@ -26,9 +28,17 @@ export function CMVTab() {
   const { isAdmin, isGerenteUnidade } = useUserProfile();
   const { effectiveUnidadeId } = useUnidade();
   const { pendingItems } = useCMVPendingItems();
+  const { data: unmappedItems = [] } = useUnmappedSalesItems(effectiveUnidadeId || undefined);
 
   // Both admin and gerente can access operational features
   const canAccessOperational = isAdmin || isGerenteUnidade;
+  
+  // Function to switch to Vinculos tab (used by alert)
+  const handleNavigateToMapping = () => {
+    // This will be handled by the Tabs component's value
+    const vinculosTab = document.querySelector('[data-state="inactive"][value="vinculos"]') as HTMLButtonElement;
+    if (vinculosTab) vinculosTab.click();
+  };
 
   return (
     <div className="space-y-6 fade-in">
@@ -72,9 +82,9 @@ export function CMVTab() {
           <TabsTrigger value="vinculos" className="flex items-center gap-1.5 relative">
             <Link2 className="h-4 w-4" />
             <span className="hidden sm:inline">Vínculos</span>
-            {pendingItems.length > 0 && (
+            {unmappedItems.length > 0 && (
               <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 text-xs px-1">
-                {pendingItems.length}
+                {unmappedItems.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -96,29 +106,34 @@ export function CMVTab() {
             </Card>
           ) : canAccessOperational ? (
             <div className="space-y-6">
+              {/* Alert for unmapped items */}
+              {unmappedItems.length > 0 && (
+                <CMVUnmappedAlert onNavigateToMapping={handleNavigateToMapping} />
+              )}
+
               {/* Guide Card */}
-              <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+              <Card className="border-primary/20 bg-primary/5">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <ClipboardCheck className="h-5 w-5 text-blue-600" />
+                    <ClipboardCheck className="h-5 w-5 text-primary" />
                     Fluxo de Trabalho
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground space-y-2">
                   <div className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">1</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
                     <p><strong>Contagem Diária:</strong> Registre a contagem física todos os dias (salva o custo vigente).</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">2</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
                     <p><strong>Entradas (NFe):</strong> Faça upload das notas fiscais para registrar recebimentos.</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">3</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
                     <p><strong>Saídas (Vendas):</strong> Processe relatórios de vendas para baixa teórica do estoque.</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-xs font-bold">4</span>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">4</span>
                     <p><strong>Auditoria:</strong> Selecione um período para calcular divergências e prejuízos.</p>
                   </div>
                 </CardContent>

@@ -7,6 +7,7 @@ export interface UserProfileData {
   profile: UserProfile | null;
   roles: AppRole[];
   isAdmin: boolean;
+  isPartner: boolean;
   isGerenteUnidade: boolean;
   unidades: ConfigOption[];
 }
@@ -22,6 +23,7 @@ export function useUserProfile() {
           profile: null,
           roles: [],
           isAdmin: false,
+          isPartner: false,
           isGerenteUnidade: false,
           unidades: [],
         };
@@ -52,6 +54,7 @@ export function useUserProfile() {
 
       const roles = (rolesData?.map((r) => r.role) || []) as AppRole[];
       const isAdmin = roles.includes("admin");
+      const isPartner = roles.includes("partner");
       const isGerenteUnidade = roles.includes("gerente_unidade");
 
       // Fetch user stores (multi-loja support)
@@ -77,6 +80,7 @@ export function useUserProfile() {
         profile: profileData as UserProfile | null,
         roles,
         isAdmin,
+        isPartner,
         isGerenteUnidade,
         unidades,
       };
@@ -89,6 +93,7 @@ export function useUserProfile() {
     profile: data?.profile || null,
     roles: data?.roles || [],
     isAdmin: data?.isAdmin || false,
+    isPartner: data?.isPartner || false,
     isGerenteUnidade: data?.isGerenteUnidade || false,
     unidades: data?.unidades || [],
     // Backwards compatibility - first unidade

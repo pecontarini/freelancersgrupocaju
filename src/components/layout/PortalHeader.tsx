@@ -16,11 +16,11 @@ export function PortalHeader({
   selectedUnidadeId,
   onUnidadeChange,
 }: PortalHeaderProps) {
-  const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
+  const { isAdmin, isPartner, isGerenteUnidade, unidades } = useUserProfile();
   const isMobile = useIsMobile();
 
   const showUnidadeSelector =
-    isAdmin || (isGerenteUnidade && unidades.length > 1);
+    isAdmin || isPartner || (isGerenteUnidade && unidades.length > 1);
 
   // Mobile layout - more compact
   if (isMobile) {
@@ -42,8 +42,8 @@ export function PortalHeader({
           />
         )}
 
-        {/* Single store indicator for gerente */}
-        {isGerenteUnidade && !isAdmin && unidades.length === 1 && (
+        {/* Single store indicator for gerente or partner */}
+        {(isGerenteUnidade || isPartner) && !isAdmin && unidades.length === 1 && (
           <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
             <span className="font-medium text-sm">{unidades[0]?.nome}</span>
           </div>
@@ -74,8 +74,8 @@ export function PortalHeader({
         />
       )}
 
-      {/* Single store indicator for gerente */}
-      {isGerenteUnidade && !isAdmin && unidades.length === 1 && (
+      {/* Single store indicator for gerente or partner */}
+      {(isGerenteUnidade || isPartner) && !isAdmin && unidades.length === 1 && (
         <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
           <span className="font-medium">{unidades[0]?.nome}</span>
         </div>

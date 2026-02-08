@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Edit2, Store, Shield, Loader2, X, Plus } from "lucide-react";
+import { Users, Edit2, Store, Shield, Loader2, X, Plus, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,15 +180,16 @@ export function UserManagement() {
   const handleSaveUser = () => {
     if (!editingUser) return;
 
-    if (selectedRole === "gerente_unidade" && selectedStoreIds.length === 0) {
-      toast.error("Selecione pelo menos uma loja para o gerente.");
+    // Partner and Gerente both need at least one store
+    if ((selectedRole === "gerente_unidade" || selectedRole === "partner") && selectedStoreIds.length === 0) {
+      toast.error("Selecione pelo menos uma loja.");
       return;
     }
 
     updateUserRole.mutate({
       userId: editingUser.id,
       role: selectedRole,
-      storeIds: selectedRole === "gerente_unidade" ? selectedStoreIds : [],
+      storeIds: (selectedRole === "gerente_unidade" || selectedRole === "partner") ? selectedStoreIds : [],
     });
   };
 
@@ -208,6 +209,14 @@ export function UserManagement() {
         <Badge className="bg-primary">
           <Shield className="mr-1 h-3 w-3" />
           Admin
+        </Badge>
+      );
+    }
+    if (roles.includes("partner")) {
+      return (
+        <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
+          <Briefcase className="mr-1 h-3 w-3" />
+          Sócio
         </Badge>
       );
     }
@@ -342,6 +351,12 @@ export function UserManagement() {
                         Admin (Acesso Total)
                       </span>
                     </SelectItem>
+                    <SelectItem value="partner">
+                      <span className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4" />
+                        Sócio Proprietário
+                      </span>
+                    </SelectItem>
                     <SelectItem value="gerente_unidade">
                       <span className="flex items-center gap-2">
                         <Store className="h-4 w-4" />
@@ -352,7 +367,7 @@ export function UserManagement() {
                 </Select>
               </div>
 
-              {selectedRole === "gerente_unidade" && (
+              {(selectedRole === "gerente_unidade" || selectedRole === "partner") && (
                 <div className="space-y-2">
                   <Label>Lojas Atribuídas</Label>
                   

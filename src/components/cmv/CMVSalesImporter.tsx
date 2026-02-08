@@ -1,10 +1,23 @@
 import { useState, useRef } from "react";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { useDailySales, parseCSVSales, SalesImportResult } from "@/hooks/useDailySales";
+import { useDailySales, parseCSVSales, parseExcelSales, SalesImportResult } from "@/hooks/useDailySales";
+
+const ACCEPTED_EXTENSIONS = [".csv", ".xls", ".xlsx"];
+const ACCEPTED_MIME_TYPES = [
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+];
+
+function getFileType(file: File): "csv" | "excel" | null {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".csv")) return "csv";
+  if (name.endsWith(".xls") || name.endsWith(".xlsx")) return "excel";
+  return null;
+}
 
 export function CMVSalesImporter() {
   const { effectiveUnidadeId } = useUnidade();
@@ -22,8 +35,9 @@ export function CMVSalesImporter() {
       return;
     }
 
-    if (!file.name.endsWith(".csv")) {
-      setError("Apenas arquivos CSV são aceitos");
+    const fileType = getFileType(file);
+    if (!fileType) {
+      setError("Formato não suportado. Aceitos: CSV, XLS, XLSX");
       return;
     }
 
@@ -32,8 +46,15 @@ export function CMVSalesImporter() {
     setResult(null);
 
     try {
-      const text = await file.text();
-      const rows = parseCSVSales(text);
+      let rows;
+      
+      if (fileType === "csv") {
+        const text = await file.text();
+        rows = parseCSVSales(text);
+      } else {
+        const buffer = await file.arrayBuffer();
+        rows = parseExcelSales(buffer);
+      }
 
       if (rows.length === 0) {
         throw new Error("Nenhum registro válido encontrado no arquivo");
@@ -87,11 +108,11 @@ export function CMVSalesImporter() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileSpreadsheet className="h-5 w-5" />
-          Importar Vendas (CSV)
+          Importar Vendas (CSV / Excel)
         </CardTitle>
         <CardDescription>
-          Faça upload do relatório de vendas. O sistema agrupa itens por data e 
-          usa UPSERT para evitar duplicidade.
+          Faça upload do relatório de vendas. Suporta CSV, XLS e XLSX.
+          O sistema agrupa itens por data e usa UPSERT para evitar duplicidade.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -113,7 +134,7 @@ export function CMVSalesImporter() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xls,.xlsx"
             className="hidden"
             onChange={handleInputChange}
             disabled={isProcessing}
@@ -127,12 +148,17 @@ export function CMVSalesImporter() {
           ) : (
             <div className="flex flex-col items-center gap-2">
               <Upload className="h-10 w-10 text-muted-foreground" />
-              <p className="font-medium">Arraste o arquivo CSV aqui</p>
+              <p className="font-medium">Arraste o arquivo aqui</p>
               <p className="text-sm text-muted-foreground">
                 ou clique para selecionar
               </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Colunas esperadas: dt_contabil, material_descr, qtd
+              <div className="flex gap-2 mt-2">
+                <span className="text-xs bg-muted px-2 py-0.5 rounded">CSV</span>
+                <span className="text-xs bg-muted px-2 py-0.5 rounded">XLS</span>
+                <span className="text-xs bg-muted px-2 py-0.5 rounded">XLSX</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Colunas: dt_contabil, material_descr, qtd
               </p>
             </div>
           )}

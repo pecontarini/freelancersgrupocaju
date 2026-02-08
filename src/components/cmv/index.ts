@@ -11,3 +11,4 @@ export { CMVPeriodOpening } from "./CMVPeriodOpening";
 export { CMVUnitHeader } from "./CMVUnitHeader";
 export { CMVDailyCountForm } from "./CMVDailyCountForm";
 export { CMVPeriodAudit } from "./CMVPeriodAudit";
+export { CMVSalesImporter } from "./CMVSalesImporter";

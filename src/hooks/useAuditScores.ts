@@ -1,3 +1,9 @@
+// ============================================
+// useAuditScores - LEGACY HOOK
+// This hook is maintained for backward compatibility.
+// For new features, use useLeadershipPerformance instead.
+// ============================================
+
 import { useMemo } from "react";
 import { useSupervisionAudits, SupervisionAudit, SupervisionFailure } from "./useSupervisionAudits";
 import { 
@@ -9,6 +15,14 @@ import {
   AuditSector,
   getResponsibilitySummary,
 } from "@/lib/sectorPositionMapping";
+
+// Re-export the new performance system
+export { 
+  useLeadershipPerformance, 
+  useNetworkLeadershipPerformance,
+  getPositionPerformance,
+  formatPositionLabel,
+} from "./useLeadershipPerformance";
 
 export interface ChiefScoreData {
   position: LeadershipPosition;
@@ -40,6 +54,7 @@ export interface AuditScoreData {
  * Calculate segmented audit scores (General, Front, Back) from supervision audit data
  * Also calculates individual chief scores based on their responsible sectors
  * 
+ * @deprecated Use useLeadershipPerformance for new features
  * @param lojaId - The store ID to calculate scores for
  * @param monthYear - Optional month/year filter (YYYY-MM format)
  */
@@ -215,6 +230,7 @@ export function useAuditScores(lojaId?: string | null, monthYear?: string): Audi
 
 /**
  * Get all audit scores for multiple stores (network view)
+ * @deprecated Use useNetworkLeadershipPerformance for new features with proper weighted averages
  */
 export function useNetworkAuditScores(monthYear?: string) {
   const { audits, failures, isLoadingAudits, isLoadingFailures } = useSupervisionAudits(null, monthYear);

@@ -1,63 +1,72 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { SupervisionFailure } from "@/hooks/useSupervisionAudits";
-import { PDF_BRAND } from "@/lib/pdf/grupoCajuPdfTheme";
+import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
 import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
-// Constants for layout
-const CARD_MARGIN = 20; // mm
-const CARD_PADDING = 8;
-const CARD_BORDER_COLOR: [number, number, number] = [229, 231, 235]; // #E5E7EB
-const ACTION_BOX_HEIGHT = 25; // mm for manual writing
+/**
+ * GRUPO CAJU - CORPORATE OCCURRENCE CARDS
+ * 
+ * Professional, minimalist cards for audit non-conformities.
+ * - Clean bordered boxes
+ * - No placeholders for empty fields
+ * - Consistent spacing and typography
+ */
+
+// Layout Constants
+const CARD_MARGIN = PDF_LAYOUT.margin;
+const CARD_GAP = 8;
+const CARD_PADDING = 10;
+const ACTION_BOX_HEIGHT = 22;
 
 /**
- * Parses item name to extract the base name and any parenthetical details
+ * Parse item details from failure record
  */
-function parseItemDetails(failure: SupervisionFailure): { item: string; details: string } {
+function parseItemDetails(failure: SupervisionFailure): { item: string; details: string | null } {
   const rawItem = (failure.item_name || "Item não identificado").trim();
   
-  // Check if there's a parenthetical detail in the item name
+  // Extract parenthetical details from item name
   const parenMatch = rawItem.match(/^(.*?)(?:\s*\(([^)]+)\)\s*)$/);
   const item = (parenMatch?.[1] || rawItem).trim() || "Item não identificado";
   const detailsFromName = (parenMatch?.[2] || "").trim();
   
-  // Priority: explicit detalhes_falha > parenthetical detail > default
-  const details = (
-    failure.detalhes_falha ||
-    detailsFromName ||
-    "Sem observação registrada"
-  ).trim();
+  // Priority: explicit details > parenthetical > null
+  const details = failure.detalhes_falha?.trim() || detailsFromName || null;
   
   return { item, details };
 }
 
 /**
- * Calculate card height before drawing to enable proper page breaks
+ * Calculate card height for page break decisions
  */
 function calculateCardHeight(
   doc: jsPDF,
   failure: SupervisionFailure,
-  contentWidth: number
+  contentWidth: number,
+  hasImage: boolean
 ): number {
   const { details } = parseItemDetails(failure);
   
-  // Header height
-  const headerHeight = 12;
+  const headerHeight = 16;
+  let bodyHeight = 0;
   
-  // Body: observation text height (60% of content width)
-  const obsWidth = (contentWidth - CARD_PADDING * 3) * 0.6 - 4;
-  doc.setFontSize(9);
-  const obsLines = doc.splitTextToSize(details, obsWidth);
-  const obsTextHeight = Math.max(40, obsLines.length * 4.5 + 16); // min 40mm for image
+  if (details || hasImage) {
+    if (details) {
+      doc.setFontSize(9);
+      const textWidth = hasImage ? (contentWidth - CARD_PADDING * 3) * 0.58 : contentWidth - CARD_PADDING * 2;
+      const lines = doc.splitTextToSize(details, textWidth);
+      bodyHeight = Math.max(lines.length * 4.5 + 12, hasImage ? 45 : 20);
+    } else if (hasImage) {
+      bodyHeight = 45;
+    }
+  }
   
-  // Action box (fixed height)
   const actionHeight = ACTION_BOX_HEIGHT + 8;
   
-  return CARD_PADDING + headerHeight + obsTextHeight + actionHeight + CARD_PADDING;
+  return CARD_PADDING + headerHeight + bodyHeight + actionHeight + CARD_PADDING;
 }
 
 /**
- * Draw occurrence card with structured layout using autoTable-like grid
+ * Draw a single occurrence card
  */
 export async function drawOccurrenceCard(
   doc: jsPDF,
@@ -71,189 +80,201 @@ export async function drawOccurrenceCard(
   }
 ): Promise<{ nextY: number; pageBreak: boolean }> {
   const { failure, index, x, y, width, maxPageY } = params;
-  const contentWidth = width;
+  const { item, details } = parseItemDetails(failure);
   
-  // Pre-calculate card height
-  const cardHeight = calculateCardHeight(doc, failure, contentWidth);
+  const hasImage = !!(failure.url_foto_evidencia?.startsWith("http"));
+  const cardHeight = calculateCardHeight(doc, failure, width, hasImage);
   
-  // Check if we need a page break
+  // Check for page break
   if (y + cardHeight > maxPageY) {
     return { nextY: y, pageBreak: true };
   }
 
-  const { item, details } = parseItemDetails(failure);
-
-  // ===== CARD CONTAINER (Bordered Box) =====
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...CARD_BORDER_COLOR);
+  // ===== CARD CONTAINER =====
+  doc.setFillColor(...PDF_COLORS.white);
+  doc.setDrawColor(...PDF_COLORS.gray200);
   doc.setLineWidth(0.5);
   doc.roundedRect(x, y, width, cardHeight, 2, 2, "FD");
 
   let currentY = y + CARD_PADDING;
 
-  // ===== HEADER ROW =====
-  const headerHeight = 10;
+  // ===== HEADER: Number + Item Name + Status =====
   
-  // Left: Number badge + Item name
-  const badgeRadius = 4;
-  doc.setFillColor(...PDF_BRAND.primary);
-  doc.circle(x + CARD_PADDING + badgeRadius, currentY + badgeRadius, badgeRadius, "F");
+  // Number badge (institutional red)
+  const badgeSize = 7;
+  doc.setFillColor(...PDF_COLORS.institutional);
+  doc.circle(x + CARD_PADDING + badgeSize / 2, currentY + badgeSize / 2, badgeSize / 2, "F");
+  
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(255, 255, 255);
-  doc.text(String(index + 1), x + CARD_PADDING + badgeRadius, currentY + badgeRadius + 2, { align: "center" });
-  
-  // Item name (bold, 11pt)
-  const itemX = x + CARD_PADDING + badgeRadius * 2 + 6;
-  const itemMaxWidth = width * 0.65;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(0, 0, 0);
-  const itemLines = doc.splitTextToSize(item, itemMaxWidth);
-  doc.text(itemLines[0] || item, itemX, currentY + 6);
-  
-  // Right: Status tags
-  const tagX = x + width - CARD_PADDING;
-  
-  // Category tag
-  const category = (failure.category || "GERAL").toUpperCase();
-  doc.setFillColor(241, 245, 249);
-  const catWidth = doc.getTextWidth(category) + 6;
-  doc.roundedRect(tagX - catWidth - 4, currentY, catWidth + 4, 7, 1, 1, "F");
   doc.setFontSize(7);
+  doc.setTextColor(...PDF_COLORS.white);
+  doc.text(String(index + 1), x + CARD_PADDING + badgeSize / 2, currentY + badgeSize / 2 + 2, { align: "center" });
+  
+  // Item name (bold)
+  const itemX = x + CARD_PADDING + badgeSize + 5;
+  const maxItemWidth = width * 0.6;
+  
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(71, 85, 105);
-  doc.text(category, tagX - catWidth / 2 - 2, currentY + 5, { align: "center" });
+  doc.setFontSize(10);
+  doc.setTextColor(...PDF_COLORS.graphite);
+  
+  const itemLines = doc.splitTextToSize(item, maxItemWidth);
+  doc.text(itemLines[0], itemX, currentY + 5);
+  
+  // Tags (right side)
+  const tagY = currentY;
+  let tagX = x + width - CARD_PADDING;
   
   // Recurring badge
   if (failure.is_recurring) {
-    const recurX = tagX - catWidth - 35;
-    doc.setFillColor(254, 226, 226);
-    doc.roundedRect(recurX, currentY, 28, 7, 1, 1, "F");
+    const recurText = "REINCIDENTE";
     doc.setFontSize(6);
-    doc.setTextColor(185, 28, 28);
-    doc.text("⚠ REINCIDENTE", recurX + 14, currentY + 5, { align: "center" });
+    const recurWidth = doc.getTextWidth(recurText) + 8;
+    
+    doc.setFillColor(...PDF_COLORS.dangerLight);
+    doc.roundedRect(tagX - recurWidth, tagY, recurWidth, 6, 1, 1, "F");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...PDF_COLORS.danger);
+    doc.text(recurText, tagX - recurWidth / 2, tagY + 4.5, { align: "center" });
+    
+    tagX -= recurWidth + 4;
   }
   
-  currentY += headerHeight + 4;
+  // Category badge
+  if (failure.category) {
+    const catText = failure.category.toUpperCase();
+    doc.setFontSize(6);
+    const catWidth = Math.max(doc.getTextWidth(catText) + 8, 25);
+    
+    doc.setFillColor(...PDF_COLORS.gray100);
+    doc.roundedRect(tagX - catWidth, tagY, catWidth, 6, 1, 1, "F");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...PDF_COLORS.gray600);
+    doc.text(catText, tagX - catWidth / 2, tagY + 4.5, { align: "center" });
+  }
   
-  // Separator line
-  doc.setDrawColor(...CARD_BORDER_COLOR);
-  doc.setLineWidth(0.3);
+  currentY += 12;
+  
+  // Thin separator
+  doc.setDrawColor(...PDF_COLORS.gray200);
+  doc.setLineWidth(0.2);
   doc.line(x + CARD_PADDING, currentY, x + width - CARD_PADDING, currentY);
-  currentY += 4;
+  currentY += 6;
 
-  // ===== BODY: Two columns (60% obs + 40% image) =====
+  // ===== BODY: Observation + Image =====
   const bodyStartY = currentY;
-  const leftColWidth = (width - CARD_PADDING * 3) * 0.6;
-  const rightColWidth = (width - CARD_PADDING * 3) * 0.4;
-  const rightColX = x + CARD_PADDING + leftColWidth + CARD_PADDING;
   
-  // Left column: Observation
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text("OBSERVAÇÃO:", x + CARD_PADDING, currentY + 4);
-  
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(30, 41, 59);
-  const obsLines = doc.splitTextToSize(details, leftColWidth - 4);
-  doc.text(obsLines, x + CARD_PADDING, currentY + 10);
-  
-  const obsEndY = currentY + 10 + obsLines.length * 4.5;
-
-  // Right column: Image placeholder
-  const imageSize = Math.min(rightColWidth - 4, 38);
-  const imageX = rightColX + (rightColWidth - imageSize) / 2;
-  const imageY = bodyStartY;
-  
-  const evidenceUrl = failure.url_foto_evidencia || "";
-  let imageAdded = false;
-
-  if (evidenceUrl.startsWith("http")) {
-    try {
-      imageAdded = await addImageFromUrl(doc, evidenceUrl, imageX, imageY, imageSize, imageSize);
-    } catch {
-      imageAdded = false;
+  if (details || hasImage) {
+    if (hasImage) {
+      // Two columns: 58% text, 42% image
+      const leftWidth = (width - CARD_PADDING * 3) * 0.58;
+      const rightWidth = (width - CARD_PADDING * 3) * 0.42;
+      const imageX = x + CARD_PADDING + leftWidth + CARD_PADDING;
+      const imageSize = Math.min(rightWidth, 38);
+      
+      // Left column: Observation
+      if (details) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...PDF_COLORS.gray500);
+        doc.text("Observação", x + CARD_PADDING, currentY + 3);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...PDF_COLORS.graphite);
+        const obsLines = doc.splitTextToSize(details, leftWidth - 4);
+        doc.text(obsLines, x + CARD_PADDING, currentY + 10);
+        
+        currentY += 10 + obsLines.length * 4.5;
+      }
+      
+      // Right column: Image
+      const imageY = bodyStartY;
+      let imageAdded = false;
+      
+      try {
+        imageAdded = await addImageFromUrl(
+          doc,
+          failure.url_foto_evidencia!,
+          imageX,
+          imageY,
+          imageSize,
+          imageSize
+        );
+      } catch {
+        imageAdded = false;
+      }
+      
+      if (imageAdded) {
+        // Subtle border around image
+        doc.setDrawColor(...PDF_COLORS.gray300);
+        doc.setLineWidth(0.3);
+        doc.rect(imageX, imageY, imageSize, imageSize);
+      }
+      
+      currentY = Math.max(currentY, imageY + imageSize + 4);
+      
+    } else if (details) {
+      // Full width observation
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(...PDF_COLORS.gray500);
+      doc.text("Observação", x + CARD_PADDING, currentY + 3);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...PDF_COLORS.graphite);
+      const obsLines = doc.splitTextToSize(details, width - CARD_PADDING * 2 - 4);
+      doc.text(obsLines, x + CARD_PADDING, currentY + 10);
+      
+      currentY += 10 + obsLines.length * 4.5 + 4;
     }
   }
 
-  if (!imageAdded) {
-    // Placeholder box
-    doc.setFillColor(243, 244, 246);
-    doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(imageX, imageY, imageSize, imageSize, 2, 2, "FD");
-    
-    // Placeholder text
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(156, 163, 175);
-    doc.text("Sem", imageX + imageSize / 2, imageY + imageSize / 2 - 2, { align: "center" });
-    doc.text("Imagem", imageX + imageSize / 2, imageY + imageSize / 2 + 4, { align: "center" });
-  } else {
-    // Image border
-    doc.setDrawColor(209, 213, 219);
-    doc.setLineWidth(0.3);
-    doc.rect(imageX, imageY, imageSize, imageSize);
-  }
-
-  // Link under image
-  if (evidenceUrl.startsWith("http")) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.setTextColor(59, 130, 246);
-    doc.textWithLink("Ver foto original →", imageX + imageSize / 2, imageY + imageSize + 4, { 
-      url: evidenceUrl,
-      align: "center"
-    });
-  }
-
-  currentY = Math.max(obsEndY, imageY + imageSize + 8) + 6;
-
-  // ===== FOOTER: Action box (dashed border) =====
-  doc.setDrawColor(156, 163, 175);
-  doc.setLineWidth(0.3);
-  // Draw dashed rectangle
+  // ===== FOOTER: Action Box =====
+  currentY += 4;
+  
   const actionBoxX = x + CARD_PADDING;
   const actionBoxWidth = width - CARD_PADDING * 2;
   
-  // Dashed border using setLineDashPattern if available, else solid
+  // Light dashed border
+  doc.setFillColor(...PDF_COLORS.gray50);
+  doc.setDrawColor(...PDF_COLORS.gray300);
+  doc.setLineWidth(0.3);
+  
+  // Use dashed pattern if available
   try {
     (doc as any).setLineDashPattern([2, 2], 0);
   } catch {
-    // Fallback to solid if dashed not supported
+    // Solid fallback
   }
   
-  doc.setFillColor(250, 250, 250);
   doc.roundedRect(actionBoxX, currentY, actionBoxWidth, ACTION_BOX_HEIGHT, 1.5, 1.5, "FD");
   
-  // Reset line dash
+  // Reset dash
   try {
     (doc as any).setLineDashPattern([], 0);
   } catch {
     // Ignore
   }
   
-  // Action label
+  // Label
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(75, 85, 99);
-  doc.text("AÇÃO CORRETIVA / PRAZO:", actionBoxX + 4, currentY + 5);
+  doc.setFontSize(7);
+  doc.setTextColor(...PDF_COLORS.gray500);
+  doc.text("AÇÃO CORRETIVA / PRAZO", actionBoxX + 4, currentY + 5);
   
   // Writing guide lines
-  doc.setDrawColor(229, 231, 235);
-  doc.setLineWidth(0.15);
-  const lineSpacing = 5;
-  for (let i = 1; i <= 3; i++) {
-    const lineY = currentY + 8 + i * lineSpacing;
-    if (lineY < currentY + ACTION_BOX_HEIGHT - 2) {
-      doc.line(actionBoxX + 4, lineY, actionBoxX + actionBoxWidth - 4, lineY);
-    }
+  doc.setDrawColor(...PDF_COLORS.gray200);
+  doc.setLineWidth(0.1);
+  
+  for (let lineY = currentY + 10; lineY < currentY + ACTION_BOX_HEIGHT - 3; lineY += 5) {
+    doc.line(actionBoxX + 4, lineY, actionBoxX + actionBoxWidth - 4, lineY);
   }
 
-  return { nextY: y + cardHeight + 6, pageBreak: false };
+  return { nextY: y + cardHeight + CARD_GAP, pageBreak: false };
 }
 
 /**
@@ -263,13 +284,12 @@ export async function drawOccurrenceCards(
   doc: jsPDF,
   failures: SupervisionFailure[],
   startY: number,
-  onNewPage: () => number // Returns startY for new page
+  onNewPage: () => number
 ): Promise<number> {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = CARD_MARGIN;
-  const cardWidth = pageWidth - margin * 2;
-  const maxY = pageHeight - 25; // Leave space for footer
+  const cardWidth = pageWidth - CARD_MARGIN * 2;
+  const maxY = pageHeight - 20; // Footer space
 
   let y = startY;
 
@@ -277,7 +297,7 @@ export async function drawOccurrenceCards(
     const result = await drawOccurrenceCard(doc, {
       failure: failures[i],
       index: i,
-      x: margin,
+      x: CARD_MARGIN,
       y,
       width: cardWidth,
       maxPageY: maxY,
@@ -286,7 +306,7 @@ export async function drawOccurrenceCards(
     if (result.pageBreak) {
       doc.addPage();
       y = onNewPage();
-      i--; // Retry this card on the new page
+      i--; // Retry this card
       continue;
     }
 
@@ -294,4 +314,32 @@ export async function drawOccurrenceCards(
   }
 
   return y;
+}
+
+/**
+ * Get critical points from failures for executive summary
+ */
+export function extractCriticalPoints(failures: SupervisionFailure[]): string[] {
+  // Get recurring items first, then by category count
+  const recurring = failures.filter(f => f.is_recurring).map(f => parseItemDetails(f).item);
+  const categories = failures.reduce((acc, f) => {
+    const cat = f.category || "Geral";
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const topCategories = Object.entries(categories)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([cat, count]) => `${cat}: ${count} ocorrência(s)`);
+  
+  const points: string[] = [];
+  
+  if (recurring.length > 0) {
+    points.push(`Reincidências: ${recurring.slice(0, 3).join(", ")}`);
+  }
+  
+  points.push(...topCategories);
+  
+  return points;
 }

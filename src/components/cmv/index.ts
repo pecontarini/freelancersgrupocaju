@@ -12,3 +12,4 @@ export { CMVUnitHeader } from "./CMVUnitHeader";
 export { CMVDailyCountForm } from "./CMVDailyCountForm";
 export { CMVPeriodAudit } from "./CMVPeriodAudit";
 export { CMVSalesImporter } from "./CMVSalesImporter";
+export { CMVProductMappingHub } from "./CMVProductMappingHub";

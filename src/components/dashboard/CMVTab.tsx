@@ -14,7 +14,8 @@ import {
   CMVUnitHeader,
   CMVDailyCountForm,
   CMVPeriodAudit,
-  CMVSalesImporter
+  CMVSalesImporter,
+  CMVProductMappingHub
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -217,15 +218,15 @@ export function CMVTab() {
           )}
         </TabsContent>
 
-        {/* ====== ABA 5: VÍNCULOS (Central de Mapeamentos) ====== */}
+        {/* ====== ABA 5: VÍNCULOS (Central de Mapeamentos De-Para) ====== */}
         <TabsContent value="vinculos" className="space-y-6">
-          {isAdmin ? (
-            <CMVSalesMappingHub />
+          {canAccessOperational ? (
+            <CMVProductMappingHub />
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <Link2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Apenas administradores podem gerenciar vínculos</p>
+                <p>Apenas administradores e gerentes podem gerenciar vínculos</p>
               </CardContent>
             </Card>
           )}

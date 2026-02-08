@@ -1,0 +1,426 @@
+import { useState, useMemo } from "react";
+import { Link2, Search, Package, Sparkles, Check, Loader2, ChevronRight } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUnmappedSalesItems, UnmappedSalesItem } from "@/hooks/useUnmappedSalesItems";
+import { useCMVItems } from "@/hooks/useCMV";
+import { useCMVSalesMappings } from "@/hooks/useCMV";
+import { useUnidade } from "@/contexts/UnidadeContext";
+import { toast } from "sonner";
+import { formatDate } from "@/lib/formatters";
+
+interface MappingFormState {
+  selectedItems: Set<string>;
+  targetItemId: string | null;
+  multiplier: string;
+}
+
+export function CMVProductMappingHub() {
+  const { effectiveUnidadeId } = useUnidade();
+  const { data: unmappedItems = [], isLoading: loadingUnmapped, refetch } = useUnmappedSalesItems(effectiveUnidadeId || undefined);
+  const { items: inventoryItems, isLoading: loadingInventory } = useCMVItems();
+  const { addMapping } = useCMVSalesMappings();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [formState, setFormState] = useState<MappingFormState>({
+    selectedItems: new Set(),
+    targetItemId: null,
+    multiplier: "1",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [openCombobox, setOpenCombobox] = useState(false);
+
+  // Filter unmapped items by search
+  const filteredUnmapped = useMemo(() => {
+    if (!searchQuery) return unmappedItems;
+    const query = searchQuery.toUpperCase();
+    return unmappedItems.filter(item => item.item_name.includes(query));
+  }, [unmappedItems, searchQuery]);
+
+  // Active inventory items
+  const activeInventoryItems = useMemo(() => {
+    return inventoryItems.filter(item => item.ativo);
+  }, [inventoryItems]);
+
+  // Selected target item details
+  const selectedTargetItem = useMemo(() => {
+    if (!formState.targetItemId) return null;
+    return inventoryItems.find(i => i.id === formState.targetItemId);
+  }, [formState.targetItemId, inventoryItems]);
+
+  const handleSelectItem = (itemName: string) => {
+    setFormState(prev => {
+      const newSelected = new Set(prev.selectedItems);
+      if (newSelected.has(itemName)) {
+        newSelected.delete(itemName);
+      } else {
+        newSelected.add(itemName);
+      }
+      return { ...prev, selectedItems: newSelected };
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (formState.selectedItems.size === filteredUnmapped.length) {
+      setFormState(prev => ({ ...prev, selectedItems: new Set() }));
+    } else {
+      setFormState(prev => ({
+        ...prev,
+        selectedItems: new Set(filteredUnmapped.map(i => i.item_name)),
+      }));
+    }
+  };
+
+  const handleSaveMapping = async () => {
+    if (formState.selectedItems.size === 0 || !formState.targetItemId) {
+      toast.error("Selecione itens de venda e um item de estoque");
+      return;
+    }
+
+    const multiplier = parseFloat(formState.multiplier.replace(",", "."));
+    if (isNaN(multiplier) || multiplier <= 0) {
+      toast.error("Multiplicador deve ser um número positivo");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Save all mappings (optimistic - show success immediately)
+      const promises = Array.from(formState.selectedItems).map(itemName =>
+        addMapping.mutateAsync({
+          nome_venda: itemName,
+          cmv_item_id: formState.targetItemId!,
+          multiplicador: multiplier,
+        })
+      );
+
+      await Promise.all(promises);
+
+      toast.success(
+        `${formState.selectedItems.size} item(s) vinculado(s) a "${selectedTargetItem?.nome}"`
+      );
+
+      // Reset form and refresh list
+      setFormState({
+        selectedItems: new Set(),
+        targetItemId: null,
+        multiplier: "1",
+      });
+      refetch();
+    } catch (error) {
+      toast.error("Erro ao salvar vínculos");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isLoading = loadingUnmapped || loadingInventory;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="mt-2 text-muted-foreground">Carregando...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            Mapeamento de Produtos (De-Para)
+          </CardTitle>
+          <CardDescription>
+            Vincule itens de venda aos itens de estoque. Selecione múltiplos itens 
+            para aplicar o mesmo vínculo em massa.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* Main Content - Split Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left Panel - Unmapped Items */}
+        <Card className="flex flex-col">
+          <CardHeader className="pb-3 border-b">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">
+                Itens de Venda Sem Vínculo
+                {unmappedItems.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {unmappedItems.length}
+                  </Badge>
+                )}
+              </CardTitle>
+              {filteredUnmapped.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="text-xs"
+                >
+                  {formState.selectedItems.size === filteredUnmapped.length
+                    ? "Desmarcar todos"
+                    : "Selecionar todos"}
+                </Button>
+              )}
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar itens..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 p-0">
+            <ScrollArea className="h-[400px]">
+              {filteredUnmapped.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Check className="h-12 w-12 mx-auto mb-2 text-primary/50" />
+                  <p className="font-medium">Todos os itens estão vinculados!</p>
+                  <p className="text-sm">Importe mais vendas para ver novos itens aqui.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredUnmapped.map(item => (
+                    <UnmappedItemRow
+                      key={item.item_name}
+                      item={item}
+                      isSelected={formState.selectedItems.has(item.item_name)}
+                      onSelect={() => handleSelectItem(item.item_name)}
+                    />
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Right Panel - Mapping Form */}
+        <Card>
+          <CardHeader className="pb-3 border-b">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Vincular ao Estoque
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4 space-y-6">
+            {/* Selected Items Summary */}
+            <div>
+              <Label className="text-sm font-medium">Itens Selecionados</Label>
+              {formState.selectedItems.size === 0 ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Selecione itens na lista à esquerda
+                </p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-1.5 max-h-24 overflow-auto">
+                  {Array.from(formState.selectedItems).slice(0, 10).map(name => (
+                    <Badge key={name} variant="secondary" className="text-xs">
+                      {name.length > 25 ? name.substring(0, 25) + "..." : name}
+                    </Badge>
+                  ))}
+                  {formState.selectedItems.size > 10 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{formState.selectedItems.size - 10} mais
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Arrow Indicator */}
+            <div className="flex justify-center">
+              <ChevronRight className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+
+            {/* Target Item Selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Item de Estoque (Destino)</Label>
+              <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openCombobox}
+                    className="w-full justify-between"
+                  >
+                    {selectedTargetItem ? (
+                      <span className="truncate">{selectedTargetItem.nome}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Selecionar item de estoque...</span>
+                    )}
+                    <Package className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar item..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {activeInventoryItems.map(item => (
+                          <CommandItem
+                            key={item.id}
+                            value={item.nome}
+                            onSelect={() => {
+                              setFormState(prev => ({
+                                ...prev,
+                                targetItemId: item.id,
+                              }));
+                              setOpenCombobox(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                formState.targetItemId === item.id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              }`}
+                            />
+                            <span>{item.nome}</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {item.unidade}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Multiplier */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium">Multiplicador (Fator)</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-muted-foreground cursor-help">(?)</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">
+                        Quanto do item de estoque é consumido para 1 venda?
+                        <br />
+                        Ex: Se cada "Bife Ancho" usa 0.35kg, coloque 0.35
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={formState.multiplier}
+                onChange={e => setFormState(prev => ({ ...prev, multiplier: e.target.value }))}
+                placeholder="1.0"
+                className="max-w-[150px]"
+              />
+            </div>
+
+            {/* Save Button */}
+            <Button
+              onClick={handleSaveMapping}
+              disabled={
+                formState.selectedItems.size === 0 ||
+                !formState.targetItemId ||
+                isSaving
+              }
+              className="w-full"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Vincular {formState.selectedItems.size > 0 && `(${formState.selectedItems.size})`}
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Sub-component for unmapped item row
+function UnmappedItemRow({
+  item,
+  isSelected,
+  onSelect,
+}: {
+  item: UnmappedSalesItem;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${
+        isSelected ? "bg-primary/5" : ""
+      }`}
+      onClick={onSelect}
+    >
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={onSelect}
+        onClick={e => e.stopPropagation()}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm truncate">{item.item_name}</span>
+          {item.is_new && (
+            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 gap-0.5">
+              <Sparkles className="h-2.5 w-2.5" />
+              NOVO
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <span>{item.total_quantity.toFixed(0)} vendas</span>
+          <span>•</span>
+          <span>{item.days_count} dias</span>
+          <span>•</span>
+          <span>Desde {formatDate(item.first_seen)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}

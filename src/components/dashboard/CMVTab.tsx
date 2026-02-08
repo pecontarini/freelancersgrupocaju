@@ -13,7 +13,8 @@ import {
   CMVPeriodOpening,
   CMVUnitHeader,
   CMVDailyCountForm,
-  CMVPeriodAudit
+  CMVPeriodAudit,
+  CMVSalesImporter
 } from "@/components/cmv";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -189,23 +190,28 @@ export function CMVTab() {
                 <p className="text-sm">Para processar baixa de vendas</p>
               </CardContent>
             </Card>
-          ) : isAdmin ? (
+          ) : canAccessOperational ? (
             <div className="space-y-4">
               <Alert>
                 <ShoppingCart className="h-4 w-4" />
                 <AlertTitle>Processar Relatório de Vendas</AlertTitle>
                 <AlertDescription>
-                  Faça upload do relatório de vendas para dar baixa teórica no estoque.
-                  Os itens serão mapeados automaticamente usando as configurações de mapeamento.
+                  Faça upload do relatório de vendas (CSV ou PDF) para dar baixa teórica no estoque.
+                  O sistema usa UPSERT para evitar duplicidade de registros.
                 </AlertDescription>
               </Alert>
+              
+              {/* New CSV Importer */}
+              <CMVSalesImporter />
+              
+              {/* Legacy PDF Processor (kept for compatibility) */}
               <CMVSalesProcessor />
             </div>
           ) : (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 <ShoppingCart className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Apenas administradores podem processar relatórios de vendas</p>
+                <p>Apenas administradores e gerentes podem processar relatórios de vendas</p>
               </CardContent>
             </Card>
           )}

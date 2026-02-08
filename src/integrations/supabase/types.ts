@@ -689,6 +689,44 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_sales: {
+        Row: {
+          created_at: string
+          id: string
+          item_name: string
+          quantity: number
+          sale_date: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_name: string
+          quantity?: number
+          sale_date: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_name?: string
+          quantity?: number
+          sale_date?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_sales_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freelancer_entries: {
         Row: {
           chave_pix: string

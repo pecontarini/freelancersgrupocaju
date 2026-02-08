@@ -87,60 +87,79 @@ export async function generateLeadershipPDF(params: LeadershipPDFParams): Promis
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 12;
 
-  // ===== COVER =====
+  // ===== COVER PAGE =====
   addGrupoCajuHeader(doc, {
     title: "FICHA DE OCORRÊNCIAS",
-    subtitle: "Checklist de Supervisão • Guia Visual de Correção",
+    subtitle: "Checklist de Supervisão • Guia de Correção",
     unitName,
-    rightTag: `${Math.round(score)}% • ${getTierEmoji(tier)} ${getTierLabel(tier)}`,
+    rightTag: `${Math.round(score)}%`,
   });
 
   const scoreColor = getScoreColor(score);
 
-  // Leader info box
-  const boxY = 44;
-  doc.setDrawColor(...PDF_BRAND.border);
+  // Leader info card
+  const infoY = 46;
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(margin, boxY, pageWidth - margin * 2, 34, 3, 3, "FD");
+  doc.setDrawColor(...PDF_BRAND.border);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(margin, infoY, pageWidth - margin * 2, 36, 3, 3, "FD");
 
+  // Leader name
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(14);
   doc.setTextColor(30, 41, 59);
-  doc.text(leaderName, margin + 4, boxY + 10);
+  doc.text(leaderName.toUpperCase(), margin + 6, infoY + 12);
 
+  // Position
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...PDF_BRAND.secondaryText);
-  doc.text(`Cargo: ${POSITION_LABELS[position]}`, margin + 4, boxY + 17);
-  doc.text(`Período: ${formatPeriod(dateRange)}`, margin + 4, boxY + 23);
-  doc.text(`Não conformidades: ${failures.length}`, margin + 4, boxY + 29);
+  doc.text(`Cargo: ${POSITION_LABELS[position]}`, margin + 6, infoY + 20);
 
-  // Score badge (right)
+  // Period
+  doc.text(`Período: ${formatPeriod(dateRange)}`, margin + 6, infoY + 26);
+
+  // Failure count
+  doc.text(`Não conformidades: ${failures.length} item(s)`, margin + 6, infoY + 32);
+
+  // Score badge (right side)
+  const badgeW = 50;
+  const badgeH = 26;
+  const badgeX = pageWidth - margin - badgeW - 6;
+  const badgeY = infoY + 5;
+  
   doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-  doc.roundedRect(pageWidth - margin - 50, boxY + 6, 46, 22, 3, 3, "F");
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 3, 3, "F");
+  
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(`${Math.round(score)}%`, pageWidth - margin - 27, boxY + 15, { align: "center" });
-  doc.setFontSize(8);
-  doc.text(`${getTierEmoji(tier)} ${getTierLabel(tier)}`, pageWidth - margin - 27, boxY + 21, { align: "center" });
+  doc.setFontSize(16);
+  doc.text(`${Math.round(score)}%`, badgeX + badgeW / 2, badgeY + 11, { align: "center" });
+  
+  doc.setFontSize(9);
+  doc.text(`${getTierEmoji(tier)} ${getTierLabel(tier)}`, badgeX + badgeW / 2, badgeY + 20, { align: "center" });
 
-  // ===== OCCURRENCES =====
-  addSectionHeader(doc, "Não conformidades do setor", 84);
+  // ===== OCCURRENCES SECTION =====
+  addSectionHeader(doc, "Não conformidades identificadas", 88);
 
-  let y = 95;
+  let y = 100;
   const cardX = margin;
   const cardW = pageWidth - margin * 2;
-  const maxY = pageHeight - 24;
+  const maxY = pageHeight - 20;
 
   if (failures.length === 0) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...PDF_BRAND.secondaryText);
-    doc.text("✅ Nenhuma não conformidade registrada no período.", margin, y);
-    y += 10;
+    // Success message
+    doc.setFillColor(236, 253, 245);
+    doc.setDrawColor(16, 185, 129);
+    doc.roundedRect(margin, y, cardW, 20, 3, 3, "FD");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(16, 185, 129);
+    doc.text("✅ Parabéns! Nenhuma não conformidade registrada no período.", margin + 6, y + 12);
+    y += 28;
   } else {
     for (let i = 0; i < failures.length; i++) {
       const res = await drawOccurrenceCard(doc, {
@@ -156,12 +175,12 @@ export async function generateLeadershipPDF(params: LeadershipPDFParams): Promis
         doc.addPage();
         addGrupoCajuHeader(doc, {
           title: "FICHA DE OCORRÊNCIAS",
-          subtitle: "Checklist de Supervisão • Continuação",
+          subtitle: `${leaderName} • Continuação`,
           unitName,
         });
-        addSectionHeader(doc, "Não conformidades do setor", 44);
-        y = 55;
-        i--; // retry same card on new page
+        addSectionHeader(doc, "Não conformidades (continuação)", 44);
+        y = 56;
+        i--; // Retry same card on new page
         continue;
       }
 
@@ -169,38 +188,59 @@ export async function generateLeadershipPDF(params: LeadershipPDFParams): Promis
     }
   }
 
-  // ===== SIGNATURES =====
-  if (y > pageHeight - 65) {
+  // ===== SIGNATURE SECTION =====
+  const signatureNeedsNewPage = y > pageHeight - 60;
+  
+  if (signatureNeedsNewPage) {
     doc.addPage();
     addGrupoCajuHeader(doc, {
-      title: "ASSINATURAS",
-      subtitle: "Responsabilidade e ciência",
+      title: "TERMO DE CIÊNCIA",
+      subtitle: "Responsabilidade sobre correções",
       unitName,
     });
-    y = 55;
+    y = 50;
   } else {
-    y += 8;
+    y += 10;
   }
 
-  addSectionHeader(doc, "Assinaturas", y);
-  y += 16;
+  addSectionHeader(doc, "Assinaturas e ciência", y);
+  y += 14;
 
-  doc.setDrawColor(120, 120, 120);
+  // Signature boxes
+  const sigBoxW = (pageWidth - margin * 3) / 2;
+  const sigBoxH = 28;
+
+  // Left signature (Responsável)
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...PDF_BRAND.border);
+  doc.roundedRect(margin, y, sigBoxW, sigBoxH, 2, 2, "FD");
+  
+  doc.setDrawColor(150, 150, 150);
   doc.setLineWidth(0.2);
-  doc.line(margin + 5, y + 20, margin + 75, y + 20);
-  doc.line(pageWidth - margin - 75, y + 20, pageWidth - margin - 5, y + 20);
-
+  doc.line(margin + 8, y + 18, margin + sigBoxW - 8, y + 18);
+  
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...PDF_BRAND.secondaryText);
-  doc.text("Assinatura do Responsável", margin + 40, y + 25, { align: "center" });
-  doc.text("Assinatura do Gestor", pageWidth - margin - 40, y + 25, { align: "center" });
-
   doc.setFontSize(7);
-  doc.text("Data: ____/____/________", margin + 40, y + 32, { align: "center" });
-  doc.text("Data: ____/____/________", pageWidth - margin - 40, y + 32, { align: "center" });
+  doc.setTextColor(...PDF_BRAND.secondaryText);
+  doc.text("Assinatura do Responsável", margin + sigBoxW / 2, y + 23, { align: "center" });
+  doc.text("Data: ___/___/______", margin + sigBoxW / 2, y + 27, { align: "center" });
 
-  // Footer on every page
+  // Right signature (Gestor)
+  const rightSigX = margin * 2 + sigBoxW;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...PDF_BRAND.border);
+  doc.roundedRect(rightSigX, y, sigBoxW, sigBoxH, 2, 2, "FD");
+  
+  doc.setDrawColor(150, 150, 150);
+  doc.line(rightSigX + 8, y + 18, rightSigX + sigBoxW - 8, y + 18);
+  
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...PDF_BRAND.secondaryText);
+  doc.text("Assinatura do Gestor", rightSigX + sigBoxW / 2, y + 23, { align: "center" });
+  doc.text("Data: ___/___/______", rightSigX + sigBoxW / 2, y + 27, { align: "center" });
+
+  // ===== FOOTER ON ALL PAGES =====
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);
@@ -217,7 +257,7 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  const margin = 12;
 
   const areaLabel = areaType === "front" ? "FRONT" : "BACK";
 
@@ -228,16 +268,16 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
     rightTag: `${Math.round(areaScore)}%`,
   });
 
-  // Score badge
+  // Area score banner
   const scoreColor = getScoreColor(areaScore);
   doc.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
-  doc.roundedRect(margin, 44, pageWidth - margin * 2, 14, 3, 3, "F");
+  doc.roundedRect(margin, 46, pageWidth - margin * 2, 12, 2, 2, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text(`MÉDIA ${areaLabel}: ${Math.round(areaScore)}%`, margin + 4, 53);
+  doc.text(`MÉDIA ${areaLabel}: ${Math.round(areaScore)}%`, margin + 6, 54);
 
-  // Leaders table
+  // Leaders summary table
   const leaderTableData = leaders.map((l) => [
     l.name,
     POSITION_LABELS[l.position] || l.position,
@@ -248,30 +288,31 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
 
   autoTable(doc, {
     startY: 64,
-    head: [["Líder", "Cargo", "Nota", "Selo", "Falhas"]],
+    head: [["LÍDER", "CARGO", "NOTA", "SELO", "FALHAS"]],
     body: leaderTableData,
     theme: "striped",
     headStyles: {
       fillColor: PDF_BRAND.primary,
       textColor: 255,
-      fontSize: 9,
+      fontSize: 8,
       fontStyle: "bold",
     },
     bodyStyles: { fontSize: 9 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
     margin: { left: margin, right: margin },
     columnStyles: {
-      0: { cellWidth: 55 },
-      1: { cellWidth: 55 },
-      2: { cellWidth: 18 },
-      3: { cellWidth: 32 },
-      4: { cellWidth: 18 },
+      0: { cellWidth: 50 },
+      1: { cellWidth: 50 },
+      2: { cellWidth: 20 },
+      3: { cellWidth: 30 },
+      4: { cellWidth: 20 },
     },
   });
 
   const finalY = (doc as any).lastAutoTable?.finalY || 120;
 
-  // Failures by sector
-  addSectionHeader(doc, "Falhas por setor", finalY + 8);
+  // Failures by sector summary
+  addSectionHeader(doc, "Resumo por setor", finalY + 8);
 
   const sectorCounts: Record<string, number> = {};
   failures.forEach((f) => {
@@ -287,38 +328,38 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
   if (sectorTableData.length > 0) {
     autoTable(doc, {
       startY: finalY + 18,
-      head: [["Setor", "Não Conformidades"]],
+      head: [["SETOR", "NÃO CONFORMIDADES"]],
       body: sectorTableData,
       theme: "plain",
       headStyles: {
         fillColor: [241, 245, 249],
         textColor: [30, 41, 59],
-        fontSize: 9,
+        fontSize: 8,
         fontStyle: "bold",
       },
       bodyStyles: { fontSize: 9 },
       margin: { left: margin, right: margin },
       columnStyles: {
-        0: { cellWidth: 120 },
-        1: { cellWidth: 40 },
+        0: { cellWidth: 110 },
+        1: { cellWidth: 50 },
       },
     });
   }
 
-  // Detailed cards
+  // Detailed occurrence cards
   if (failures.length > 0) {
     doc.addPage();
     addGrupoCajuHeader(doc, {
       title: `DETALHAMENTO • ${areaLabel}`,
-      subtitle: "Cards de ocorrência por não conformidade",
+      subtitle: "Fichas de ocorrência individuais",
       unitName,
     });
-    addSectionHeader(doc, "Não conformidades", 44);
+    addSectionHeader(doc, "Não conformidades detalhadas", 44);
 
-    let y = 55;
+    let y = 56;
     const cardX = margin;
     const cardW = pageWidth - margin * 2;
-    const maxY = pageHeight - 24;
+    const maxY = pageHeight - 20;
 
     for (let i = 0; i < failures.length; i++) {
       const res = await drawOccurrenceCard(doc, {
@@ -337,8 +378,8 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
           subtitle: "Continuação",
           unitName,
         });
-        addSectionHeader(doc, "Não conformidades", 44);
-        y = 55;
+        addSectionHeader(doc, "Não conformidades (continuação)", 44);
+        y = 56;
         i--;
         continue;
       }
@@ -347,6 +388,7 @@ export async function generateConsolidatedPDF(params: ConsolidatedPDFParams): Pr
     }
   }
 
+  // Footer on all pages
   const totalPages = doc.getNumberOfPages();
   for (let p = 1; p <= totalPages; p++) {
     doc.setPage(p);

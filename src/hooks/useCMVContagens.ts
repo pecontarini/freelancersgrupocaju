@@ -164,121 +164,86 @@ export function useCMVContagens(lojaId?: string, startDate?: string, endDate?: s
   };
 }
 
+export interface AuditPeriodRow {
+  item_id: string;
+  item_name: string;
+  categoria: string;
+  unidade: string;
+  initial_stock: number;
+  initial_cost: number;
+  purchases_qty: number;
+  sales_consumption: number;
+  theoretical_final: number;
+  real_final_stock: number;
+  final_cost: number;
+  divergence: number;
+  financial_loss: number;
+  has_initial_count: boolean;
+  has_final_count: boolean;
+}
+
 export function useCMVAuditPeriod(lojaId?: string, startDate?: string, endDate?: string) {
-  // Get initial count (start date)
-  const initialCountQuery = useQuery({
-    queryKey: ["cmv-audit-initial", lojaId, startDate],
+  // Check if initial counts exist for start date
+  const initialCheckQuery = useQuery({
+    queryKey: ["cmv-audit-initial-check", lojaId, startDate],
     queryFn: async () => {
-      if (!lojaId || !startDate) return [];
-      
-      const { data, error } = await supabase
+      if (!lojaId || !startDate) return 0;
+      const { count, error } = await supabase
         .from("cmv_contagens")
-        .select(`
-          *,
-          cmv_items (
-            id,
-            nome,
-            unidade,
-            categoria,
-            peso_padrao_g,
-            preco_custo_atual
-          )
-        `)
+        .select("*", { count: "exact", head: true })
         .eq("loja_id", lojaId)
         .eq("data_contagem", startDate);
-
       if (error) throw error;
-      return data;
+      return count || 0;
     },
     enabled: !!lojaId && !!startDate,
   });
 
-  // Get final count (end date)
-  const finalCountQuery = useQuery({
-    queryKey: ["cmv-audit-final", lojaId, endDate],
+  // Check if final counts exist for end date
+  const finalCheckQuery = useQuery({
+    queryKey: ["cmv-audit-final-check", lojaId, endDate],
     queryFn: async () => {
-      if (!lojaId || !endDate) return [];
-      
-      const { data, error } = await supabase
+      if (!lojaId || !endDate) return 0;
+      const { count, error } = await supabase
         .from("cmv_contagens")
-        .select(`
-          *,
-          cmv_items (
-            id,
-            nome,
-            unidade,
-            categoria,
-            peso_padrao_g,
-            preco_custo_atual
-          )
-        `)
+        .select("*", { count: "exact", head: true })
         .eq("loja_id", lojaId)
         .eq("data_contagem", endDate);
-
       if (error) throw error;
-      return data;
+      return count || 0;
     },
     enabled: !!lojaId && !!endDate,
   });
 
-  // Get entries (NFe) in period
-  const entriesQuery = useQuery({
-    queryKey: ["cmv-audit-entries", lojaId, startDate, endDate],
+  // Main audit calculation via DB function
+  const auditQuery = useQuery({
+    queryKey: ["cmv-audit-calculate", lojaId, startDate, endDate],
     queryFn: async () => {
       if (!lojaId || !startDate || !endDate) return [];
-      
-      const { data, error } = await supabase
-        .from("cmv_movements")
-        .select(`
-          *,
-          cmv_items (
-            id,
-            nome
-          )
-        `)
-        .eq("loja_id", lojaId)
-        .eq("tipo_movimento", "entrada")
-        .gte("data_movimento", startDate)
-        .lte("data_movimento", endDate);
-
+      const { data, error } = await supabase.rpc("calculate_audit_period", {
+        p_loja_id: lojaId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
       if (error) throw error;
-      return data;
+      return (data || []) as AuditPeriodRow[];
     },
-    enabled: !!lojaId && !!startDate && !!endDate,
-  });
-
-  // Get sales (exits) in period
-  const salesQuery = useQuery({
-    queryKey: ["cmv-audit-sales", lojaId, startDate, endDate],
-    queryFn: async () => {
-      if (!lojaId || !startDate || !endDate) return [];
-      
-      const { data, error } = await supabase
-        .from("cmv_movements")
-        .select(`
-          *,
-          cmv_items (
-            id,
-            nome
-          )
-        `)
-        .eq("loja_id", lojaId)
-        .eq("tipo_movimento", "saida")
-        .gte("data_movimento", startDate)
-        .lte("data_movimento", endDate);
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!lojaId && !!startDate && !!endDate,
+    enabled: !!lojaId && !!startDate && !!endDate
+      && (initialCheckQuery.data ?? 0) > 0
+      && (finalCheckQuery.data ?? 0) > 0,
   });
 
   return {
-    initialCounts: initialCountQuery.data || [],
-    finalCounts: finalCountQuery.data || [],
-    entries: entriesQuery.data || [],
-    sales: salesQuery.data || [],
-    isLoading: initialCountQuery.isLoading || finalCountQuery.isLoading || 
-               entriesQuery.isLoading || salesQuery.isLoading,
+    auditData: auditQuery.data || [],
+    hasInitialCounts: (initialCheckQuery.data ?? 0) > 0,
+    hasFinalCounts: (finalCheckQuery.data ?? 0) > 0,
+    initialCountsLoading: initialCheckQuery.isLoading,
+    finalCountsLoading: finalCheckQuery.isLoading,
+    isLoading: auditQuery.isLoading || initialCheckQuery.isLoading || finalCheckQuery.isLoading,
+    // Legacy exports for backward compatibility
+    initialCounts: [],
+    finalCounts: [],
+    entries: [],
+    sales: [],
   };
 }

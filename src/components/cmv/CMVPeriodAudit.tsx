@@ -25,8 +25,8 @@ import {
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { useCMVItems } from "@/hooks/useCMV";
-import { useCMVAuditPeriod } from "@/hooks/useCMVContagens";
+
+import { useCMVAuditPeriod, type AuditPeriodRow } from "@/hooks/useCMVContagens";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import {
   BarChart,
@@ -44,6 +44,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
+// AuditItem is now derived from AuditPeriodRow (DB function)
 interface AuditItem {
   itemId: string;
   itemName: string;
@@ -57,6 +58,8 @@ interface AuditItem {
   divergence: number;
   divergenceValue: number;
   divergencePercent: number;
+  hasInitialCount: boolean;
+  hasFinalCount: boolean;
 }
 
 type PerformanceTier = "ouro" | "prata" | "bronze" | "critico";
@@ -124,7 +127,6 @@ function getPerformanceTier(divergencePercent: number): PerformanceTier {
 
 export function CMVPeriodAudit() {
   const { effectiveUnidadeId } = useUnidade();
-  const { items: cmvItems } = useCMVItems();
   
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -132,55 +134,38 @@ export function CMVPeriodAudit() {
   const startDateStr = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
   const endDateStr = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
-  const { initialCounts, finalCounts, entries, sales, isLoading } = useCMVAuditPeriod(
+  const { auditData: dbAuditData, hasInitialCounts, hasFinalCounts, isLoading } = useCMVAuditPeriod(
     effectiveUnidadeId || undefined,
     startDateStr,
     endDateStr
   );
 
   const auditData = useMemo((): AuditItem[] => {
-    if (!startDate || !endDate || initialCounts.length === 0) return [];
+    if (!startDate || !endDate || dbAuditData.length === 0) return [];
 
-    const activeItems = cmvItems.filter(item => item.ativo);
-    
-    return activeItems.map(item => {
-      const initial = initialCounts.find(c => c.cmv_item_id === item.id);
-      const final = finalCounts.find(c => c.cmv_item_id === item.id);
-      
-      const itemEntries = entries.filter(e => e.cmv_item_id === item.id);
-      const itemSales = sales.filter(s => s.cmv_item_id === item.id);
-      
-      const totalEntries = itemEntries.reduce((sum, e) => sum + Number(e.quantidade), 0);
-      const totalSales = itemSales.reduce((sum, s) => sum + Number(s.quantidade), 0);
-      
-      const initialCount = initial?.quantidade || 0;
-      const initialCost = initial?.preco_custo_snapshot || item.preco_custo_atual;
-      const actualFinal = final?.quantidade || 0;
-      const finalCost = final?.preco_custo_snapshot || item.preco_custo_atual;
-      
-      const expectedFinal = initialCount + totalEntries - totalSales;
-      const divergence = expectedFinal - actualFinal;
-      const divergenceValue = divergence * finalCost;
-      const divergencePercent = expectedFinal > 0 ? (Math.abs(divergence) / expectedFinal) * 100 : 0;
+    return dbAuditData.map((row: AuditPeriodRow) => {
+      const divergence = Number(row.divergence);
+      const theoreticalFinal = Number(row.theoretical_final);
+      const divergencePercent = theoreticalFinal > 0 ? (Math.abs(divergence) / theoreticalFinal) * 100 : 0;
 
       return {
-        itemId: item.id,
-        itemName: item.nome,
-        initialCount,
-        initialCost,
-        entries: totalEntries,
-        sales: totalSales,
-        expectedFinal,
-        actualFinal,
-        finalCost,
+        itemId: row.item_id,
+        itemName: row.item_name,
+        initialCount: Number(row.initial_stock),
+        initialCost: Number(row.initial_cost),
+        entries: Number(row.purchases_qty),
+        sales: Number(row.sales_consumption),
+        expectedFinal: Number(row.theoretical_final),
+        actualFinal: Number(row.real_final_stock),
+        finalCost: Number(row.final_cost),
         divergence,
-        divergenceValue,
+        divergenceValue: Number(row.financial_loss),
         divergencePercent,
+        hasInitialCount: row.has_initial_count,
+        hasFinalCount: row.has_final_count,
       };
-    }).filter(item => 
-      item.initialCount > 0 || item.entries > 0 || item.actualFinal > 0
-    );
-  }, [cmvItems, initialCounts, finalCounts, entries, sales, startDate, endDate]);
+    });
+  }, [dbAuditData, startDate, endDate]);
 
   // Calculate summary with performance tier
   const summary = useMemo(() => {
@@ -342,7 +327,7 @@ export function CMVPeriodAudit() {
     doc.save(`auditoria-cmv-${storeName}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
   };
 
-  const canAudit = startDate && endDate && initialCounts.length > 0;
+  const canAudit = startDate && endDate && hasInitialCounts && hasFinalCounts;
   const seal = canAudit ? PERFORMANCE_SEALS[summary.performanceTier] : null;
   const SealIcon = seal?.icon;
 
@@ -427,12 +412,22 @@ export function CMVPeriodAudit() {
             )}
           </div>
 
-          {startDate && endDate && initialCounts.length === 0 && !isLoading && (
+          {startDate && endDate && !isLoading && !hasInitialCounts && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Não há contagem registrada na data inicial ({format(startDate, "dd/MM/yyyy")}). 
+                Falta contagem no dia {format(startDate, "dd/MM/yyyy")}. 
                 Registre uma contagem física nesta data para iniciar a auditoria.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {startDate && endDate && !isLoading && hasInitialCounts && !hasFinalCounts && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Falta contagem no dia {format(endDate, "dd/MM/yyyy")}. 
+                Registre uma contagem física nesta data para concluir a auditoria.
               </AlertDescription>
             </Alert>
           )}

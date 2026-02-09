@@ -1759,6 +1759,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_audit_period: {
+        Args: { p_end_date: string; p_loja_id: string; p_start_date: string }
+        Returns: {
+          categoria: string
+          divergence: number
+          final_cost: number
+          financial_loss: number
+          has_final_count: boolean
+          has_initial_count: boolean
+          initial_cost: number
+          initial_stock: number
+          item_id: string
+          item_name: string
+          purchases_qty: number
+          real_final_stock: number
+          sales_consumption: number
+          theoretical_final: number
+          unidade: string
+        }[]
+      }
       get_user_unidade_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

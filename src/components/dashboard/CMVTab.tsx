@@ -16,7 +16,8 @@ import {
   CMVPeriodAudit,
   CMVSalesImporter,
   CMVProductMappingHub,
-  CMVUnmappedAlert
+  CMVUnmappedAlert,
+  CMVSalesDashboard
 } from "@/components/cmv";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -216,6 +217,9 @@ export function CMVTab() {
                   O sistema usa UPSERT para evitar duplicidade de registros.
                 </AlertDescription>
               </Alert>
+              
+              {/* Sales Dashboard */}
+              <CMVSalesDashboard />
               
               {/* New CSV Importer */}
               <CMVSalesImporter />

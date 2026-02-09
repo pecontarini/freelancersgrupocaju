@@ -8,6 +8,7 @@ export interface DailySale {
   sale_date: string;
   item_name: string;
   quantity: number;
+  total_amount: number;
   unit_id: string;
   created_at: string;
   updated_at: string;
@@ -39,6 +40,7 @@ export interface ParsedSaleRow {
   sale_date: string;
   item_name: string;
   quantity: number;
+  total_amount: number;
 }
 
 /**
@@ -160,6 +162,7 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleResult {
   const dateIndex = findColumnIndex(headers, "dt_contabil", "dtcontabil", "data", "date");
   const itemIndex = findColumnIndex(headers, "material_descr", "materialdescr", "descr", "item", "produto", "material");
   const qtyIndex = findColumnIndex(headers, "qtd", "quantidade", "qty", "quantity");
+  const amountIndex = findColumnIndex(headers, "vl_tot", "vltot", "valor_total", "valortotal", "total", "amount");
   
   if (dateIndex === -1) {
     throw new Error(`Coluna de data não encontrada. Esperado: dt_contabil. Colunas: ${headers.join(", ")}`);
@@ -182,7 +185,8 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleResult {
     const rawDate = row[dateIndex];
     const rawItem = row[itemIndex];
     const rawQty = row[qtyIndex];
-    const rawDataStr = `Data=${String(rawDate ?? "")}, Item=${String(rawItem ?? "")}, Qtd=${String(rawQty ?? "")}`;
+    const rawAmount = amountIndex !== -1 ? row[amountIndex] : 0;
+    const rawDataStr = `Data=${String(rawDate ?? "")}, Item=${String(rawItem ?? "")}, Qtd=${String(rawQty ?? "")}, Valor=${String(rawAmount ?? "")}`;
     
     const itemName = rawItem ? String(rawItem).toUpperCase().trim() : null;
     
@@ -203,10 +207,13 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleResult {
       continue;
     }
     
+    const totalAmount = parseQuantity(rawAmount) ?? 0;
+    
     rows.push({
       sale_date: saleDate,
       item_name: itemName,
       quantity: qty,
+      total_amount: totalAmount,
     });
   }
   
@@ -228,6 +235,7 @@ export function parseCSVSales(csvContent: string): ParsedSaleResult {
   const dateIndex = findColumnIndex(headers, "dt_contabil", "data", "date");
   const itemIndex = findColumnIndex(headers, "material_descr", "descr", "item", "produto");
   const qtyIndex = findColumnIndex(headers, "qtd", "quantidade", "qty");
+  const amountIndex = findColumnIndex(headers, "vl_tot", "vltot", "valor_total", "valortotal", "total", "amount");
 
   if (dateIndex === -1 || itemIndex === -1 || qtyIndex === -1) {
     throw new Error(
@@ -249,6 +257,7 @@ export function parseCSVSales(csvContent: string): ParsedSaleResult {
     const rawDate = values[dateIndex];
     const rawItem = values[itemIndex];
     const rawQty = values[qtyIndex];
+    const rawAmount = amountIndex !== -1 ? values[amountIndex] : "0";
     const rawDataStr = `Data=${rawDate ?? ""}, Item=${rawItem ?? ""}, Qtd=${rawQty ?? ""}`;
 
     const itemName = rawItem ? rawItem.toUpperCase().trim() : null;
@@ -270,10 +279,13 @@ export function parseCSVSales(csvContent: string): ParsedSaleResult {
       continue;
     }
 
+    const totalAmount = parseQuantity(rawAmount) ?? 0;
+
     rows.push({
       sale_date: saleDate,
       item_name: itemName,
       quantity: qty,
+      total_amount: totalAmount,
     });
   }
 
@@ -292,6 +304,7 @@ export function aggregateSales(rows: ParsedSaleRow[]): ParsedSaleRow[] {
 
     if (existing) {
       existing.quantity += row.quantity;
+      existing.total_amount += row.total_amount;
     } else {
       map.set(key, { ...row });
     }
@@ -381,11 +394,13 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
         sale_date: string;
         item_name: string;
         quantity: number;
+        total_amount: number;
         unit_id: string;
       }> = [];
       const toUpdate: Array<{
         id: string;
         quantity: number;
+        total_amount: number;
         item_name: string;
         sale_date: string;
       }> = [];
@@ -396,6 +411,7 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
           toUpdate.push({
             id: existingMap.get(key)!,
             quantity: row.quantity,
+            total_amount: row.total_amount,
             item_name: row.item_name,
             sale_date: row.sale_date,
           });
@@ -404,6 +420,7 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
             sale_date: row.sale_date,
             item_name: row.item_name,
             quantity: row.quantity,
+            total_amount: row.total_amount,
             unit_id: unitId,
           });
         }
@@ -439,7 +456,7 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
       for (const update of toUpdate) {
         const { error: updateError } = await supabase
           .from("daily_sales")
-          .update({ quantity: update.quantity })
+          .update({ quantity: update.quantity, total_amount: update.total_amount } as any)
           .eq("id", update.id);
         if (updateError) {
           dbErrors.push({

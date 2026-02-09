@@ -1,9 +1,18 @@
 import { useState, useRef } from "react";
-import { Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useUnidade } from "@/contexts/UnidadeContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useDailySales, parseCSVSales, parseExcelSales, SalesImportResult } from "@/hooks/useDailySales";
 import { CMVImportSummaryModal } from "./CMVImportSummaryModal";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const ACCEPTED_EXTENSIONS = [".csv", ".xls", ".xlsx"];
 const ACCEPTED_MIME_TYPES = [
@@ -21,14 +30,37 @@ function getFileType(file: File): "csv" | "excel" | null {
 
 export function CMVSalesImporter() {
   const { effectiveUnidadeId } = useUnidade();
+  const { isAdmin, isPartner } = useUserProfile();
   const { importSales } = useDailySales(effectiveUnidadeId || undefined);
+  const queryClient = useQueryClient();
   
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [result, setResult] = useState<SalesImportResult | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const canClearSales = isAdmin || isPartner;
+
+  const handleClearSales = async () => {
+    if (!effectiveUnidadeId) return;
+    setIsClearing(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from("daily_sales")
+        .delete()
+        .eq("unit_id", effectiveUnidadeId);
+      if (deleteError) throw deleteError;
+      queryClient.invalidateQueries({ queryKey: ["daily-sales"] });
+      toast({ title: "Base de vendas limpa com sucesso", description: "Seus vínculos foram preservados. Pode iniciar a nova importação." });
+    } catch (err) {
+      toast({ title: "Erro ao limpar vendas", description: err instanceof Error ? err.message : "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   const handleFile = async (file: File) => {
     if (!effectiveUnidadeId) {
@@ -169,6 +201,31 @@ export function CMVSalesImporter() {
             <p><strong>Modo Bruto:</strong> Todas as linhas com nome de item são importadas, incluindo qtd zero.</p>
             <p>Ao final, um relatório mostra exatamente quantas linhas foram processadas vs. falharam.</p>
           </div>
+          {canClearSales && effectiveUnidadeId && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full" disabled={isClearing}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {isClearing ? "Limpando..." : "Limpar Histórico de Vendas"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Atenção: Ação Irreversível</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Isso apagará TODAS as vendas importadas desta unidade. O cálculo do CMV será zerado.
+                    Os vínculos de produtos (De-Para) SERÃO MANTIDOS. Deseja continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearSales} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Sim, apagar vendas
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </CardContent>
       </Card>
 

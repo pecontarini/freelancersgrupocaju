@@ -13,11 +13,26 @@ export interface DailySale {
   updated_at: string;
 }
 
+export interface ParseFailure {
+  line: number;
+  rawData: string;
+  reason: string;
+}
+
+export interface ParsedSaleResult {
+  rows: ParsedSaleRow[];
+  failures: ParseFailure[];
+  totalLines: number;
+}
+
 export interface SalesImportResult {
   dateRange: { start: string; end: string };
   inserted: number;
   updated: number;
   total: number;
+  failures: ParseFailure[];
+  totalFileLines: number;
+  dbErrors: ParseFailure[];
 }
 
 export interface ParsedSaleRow {
@@ -90,16 +105,16 @@ function parseDate(value: unknown): string | null {
  * Parse quantity from various formats
  */
 function parseQuantity(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || value === "") return 0;
   
   if (typeof value === "number") {
-    return value === 0 ? null : value;
+    return value;
   }
   
   const strValue = String(value).trim().replace(",", ".");
   const num = parseFloat(strValue);
   
-  return isNaN(num) || num === 0 ? null : num;
+  return isNaN(num) ? null : num;
 }
 
 /**
@@ -122,16 +137,14 @@ function findColumnIndex(headers: string[], ...patterns: string[]): number {
 /**
  * Parse Excel file (.xlsx, .xls) from ArrayBuffer
  */
-export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleRow[] {
+export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleResult {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   
-  // Get first sheet
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("Arquivo Excel vazio");
   
   const sheet = workbook.Sheets[sheetName];
   
-  // Convert to JSON with header row as array of arrays
   const jsonData = XLSX.utils.sheet_to_json(sheet, { 
     header: 1,
     raw: true,
@@ -142,10 +155,8 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleRow[] {
     throw new Error("Arquivo Excel deve ter pelo menos uma linha de cabeçalho e uma de dados");
   }
   
-  // First row is headers
   const headers = (jsonData[0] || []).map(h => String(h || ""));
   
-  // Find column indices
   const dateIndex = findColumnIndex(headers, "dt_contabil", "dtcontabil", "data", "date");
   const itemIndex = findColumnIndex(headers, "material_descr", "materialdescr", "descr", "item", "produto", "material");
   const qtyIndex = findColumnIndex(headers, "qtd", "quantidade", "qty", "quantity");
@@ -161,22 +172,36 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleRow[] {
   }
   
   const rows: ParsedSaleRow[] = [];
+  const failures: ParseFailure[] = [];
+  const totalLines = jsonData.length - 1; // exclude header
   
-  // Process data rows (skip header)
   for (let i = 1; i < jsonData.length; i++) {
     const row = jsonData[i];
-    if (!row || row.length === 0) continue;
+    if (!row || row.every(cell => cell === null || cell === undefined || String(cell).trim() === "")) continue;
     
     const rawDate = row[dateIndex];
     const rawItem = row[itemIndex];
     const rawQty = row[qtyIndex];
+    const rawDataStr = `Data=${String(rawDate ?? "")}, Item=${String(rawItem ?? "")}, Qtd=${String(rawQty ?? "")}`;
     
-    const saleDate = parseDate(rawDate);
-    const qty = parseQuantity(rawQty);
     const itemName = rawItem ? String(rawItem).toUpperCase().trim() : null;
     
-    // Skip invalid rows (missing data or zero quantity)
-    if (!saleDate || !itemName || qty === null) continue;
+    if (!itemName) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Nome do item vazio" });
+      continue;
+    }
+    
+    const saleDate = parseDate(rawDate);
+    if (!saleDate) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Data inválida ou ausente" });
+      continue;
+    }
+    
+    const qty = parseQuantity(rawQty);
+    if (qty === null) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Quantidade não numérica" });
+      continue;
+    }
     
     rows.push({
       sale_date: saleDate,
@@ -185,18 +210,17 @@ export function parseExcelSales(buffer: ArrayBuffer): ParsedSaleRow[] {
     });
   }
   
-  return rows;
+  return { rows, failures, totalLines };
 }
 
 /**
  * Parse CSV content from sales report
  * Expected columns: dt_contabil, material_descr, qtd
  */
-export function parseCSVSales(csvContent: string): ParsedSaleRow[] {
+export function parseCSVSales(csvContent: string): ParsedSaleResult {
   const lines = csvContent.split(/\r?\n/).filter(line => line.trim());
-  if (lines.length < 2) return [];
+  if (lines.length < 2) return { rows: [], failures: [], totalLines: 0 };
 
-  // Find header row and column indices
   const headerLine = lines[0];
   const separator = headerLine.includes(";") ? ";" : ",";
   const headers = headerLine.split(separator).map(h => h.trim().replace(/"/g, ""));
@@ -213,6 +237,8 @@ export function parseCSVSales(csvContent: string): ParsedSaleRow[] {
   }
 
   const rows: ParsedSaleRow[] = [];
+  const failures: ParseFailure[] = [];
+  const totalLines = lines.length - 1;
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
@@ -223,12 +249,26 @@ export function parseCSVSales(csvContent: string): ParsedSaleRow[] {
     const rawDate = values[dateIndex];
     const rawItem = values[itemIndex];
     const rawQty = values[qtyIndex];
+    const rawDataStr = `Data=${rawDate ?? ""}, Item=${rawItem ?? ""}, Qtd=${rawQty ?? ""}`;
 
-    const saleDate = parseDate(rawDate);
-    const qty = parseQuantity(rawQty);
     const itemName = rawItem ? rawItem.toUpperCase().trim() : null;
     
-    if (!saleDate || !itemName || qty === null) continue;
+    if (!itemName) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Nome do item vazio" });
+      continue;
+    }
+
+    const saleDate = parseDate(rawDate);
+    if (!saleDate) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Data inválida ou ausente" });
+      continue;
+    }
+
+    const qty = parseQuantity(rawQty);
+    if (qty === null) {
+      failures.push({ line: i + 1, rawData: rawDataStr, reason: "Quantidade não numérica" });
+      continue;
+    }
 
     rows.push({
       sale_date: saleDate,
@@ -237,7 +277,7 @@ export function parseCSVSales(csvContent: string): ParsedSaleRow[] {
     });
   }
 
-  return rows;
+  return { rows, failures, totalLines };
 }
 
 /**
@@ -292,24 +332,35 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
     mutationFn: async ({
       unitId,
       rows,
+      parseFailures = [],
+      totalFileLines = 0,
     }: {
       unitId: string;
       rows: ParsedSaleRow[];
+      parseFailures?: ParseFailure[];
+      totalFileLines?: number;
     }): Promise<SalesImportResult> => {
-      // Aggregate sales first
       const aggregated = aggregateSales(rows);
+      const dbErrors: ParseFailure[] = [];
+
       if (aggregated.length === 0) {
-        throw new Error("Nenhum registro válido encontrado no arquivo");
+        return {
+          dateRange: { start: "", end: "" },
+          inserted: 0,
+          updated: 0,
+          total: 0,
+          failures: parseFailures,
+          totalFileLines,
+          dbErrors,
+        };
       }
 
-      // Get date range
       const dates = aggregated.map(r => r.sale_date).sort();
       const dateRange = {
         start: dates[0],
         end: dates[dates.length - 1],
       };
 
-      // Check existing records for this date range
       const { data: existing, error: fetchError } = await supabase
         .from("daily_sales")
         .select("id, sale_date, item_name")
@@ -319,7 +370,6 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
 
       if (fetchError) throw fetchError;
 
-      // Build a set of existing keys for quick lookup
       const existingKeys = new Set(
         (existing || []).map(e => `${e.sale_date}|${e.item_name}`)
       );
@@ -327,7 +377,6 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
         (existing || []).map(e => [`${e.sale_date}|${e.item_name}`, e.id])
       );
 
-      // Separate inserts and updates
       const toInsert: Array<{
         sale_date: string;
         item_name: string;
@@ -337,6 +386,8 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
       const toUpdate: Array<{
         id: string;
         quantity: number;
+        item_name: string;
+        sale_date: string;
       }> = [];
 
       for (const row of aggregated) {
@@ -345,6 +396,8 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
           toUpdate.push({
             id: existingMap.get(key)!,
             quantity: row.quantity,
+            item_name: row.item_name,
+            sale_date: row.sale_date,
           });
         } else {
           toInsert.push({
@@ -356,7 +409,9 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
         }
       }
 
-      // Perform inserts in batches
+      let insertedCount = 0;
+
+      // Perform inserts in batches — capture errors per batch
       if (toInsert.length > 0) {
         const batchSize = 500;
         for (let i = 0; i < toInsert.length; i += batchSize) {
@@ -364,24 +419,47 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
           const { error: insertError } = await supabase
             .from("daily_sales")
             .insert(batch);
-          if (insertError) throw insertError;
+          if (insertError) {
+            for (const item of batch) {
+              dbErrors.push({
+                line: 0,
+                rawData: `Data=${item.sale_date}, Item=${item.item_name}, Qtd=${item.quantity}`,
+                reason: `Erro DB INSERT: ${insertError.message}`,
+              });
+            }
+          } else {
+            insertedCount += batch.length;
+          }
         }
       }
 
-      // Perform updates in batches
+      let updatedCount = 0;
+
+      // Perform updates — capture errors individually
       for (const update of toUpdate) {
         const { error: updateError } = await supabase
           .from("daily_sales")
           .update({ quantity: update.quantity })
           .eq("id", update.id);
-        if (updateError) throw updateError;
+        if (updateError) {
+          dbErrors.push({
+            line: 0,
+            rawData: `Data=${update.sale_date}, Item=${update.item_name}, Qtd=${update.quantity}`,
+            reason: `Erro DB UPDATE: ${updateError.message}`,
+          });
+        } else {
+          updatedCount++;
+        }
       }
 
       return {
         dateRange,
-        inserted: toInsert.length,
-        updated: toUpdate.length,
+        inserted: insertedCount,
+        updated: updatedCount,
         total: aggregated.length,
+        failures: parseFailures,
+        totalFileLines,
+        dbErrors,
       };
     },
     onSuccess: (result) => {

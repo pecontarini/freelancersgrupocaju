@@ -1,9 +1,9 @@
 import { useState, useRef } from "react";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useDailySales, parseCSVSales, parseExcelSales, SalesImportResult } from "@/hooks/useDailySales";
+import { CMVImportSummaryModal } from "./CMVImportSummaryModal";
 
 const ACCEPTED_EXTENSIONS = [".csv", ".xls", ".xlsx"];
 const ACCEPTED_MIME_TYPES = [
@@ -26,6 +26,7 @@ export function CMVSalesImporter() {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<SalesImportResult | null>(null);
+  const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,26 +47,25 @@ export function CMVSalesImporter() {
     setResult(null);
 
     try {
-      let rows;
+      let parseResult;
       
       if (fileType === "csv") {
         const text = await file.text();
-        rows = parseCSVSales(text);
+        parseResult = parseCSVSales(text);
       } else {
         const buffer = await file.arrayBuffer();
-        rows = parseExcelSales(buffer);
-      }
-
-      if (rows.length === 0) {
-        throw new Error("Nenhum registro válido encontrado no arquivo");
+        parseResult = parseExcelSales(buffer);
       }
 
       const importResult = await importSales.mutateAsync({
         unitId: effectiveUnidadeId,
-        rows,
+        rows: parseResult.rows,
+        parseFailures: parseResult.failures,
+        totalFileLines: parseResult.totalLines,
       });
 
       setResult(importResult);
+      setShowModal(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao processar arquivo");
     } finally {
@@ -98,108 +98,87 @@ export function CMVSalesImporter() {
     }
   };
 
-  const formatDateBR = (dateStr: string): string => {
-    const [year, month, day] = dateStr.split("-");
-    return `${day}/${month}/${year}`;
-  };
-
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5" />
-          Importar Vendas (CSV / Excel)
-        </CardTitle>
-        <CardDescription>
-          Faça upload do relatório de vendas. Suporta CSV, XLS e XLSX.
-          O sistema agrupa itens por data e usa UPSERT para evitar duplicidade.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Drop Zone */}
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          className={`
-            border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer
-            ${isDragging 
-              ? "border-primary bg-primary/5" 
-              : "border-muted-foreground/25 hover:border-primary/50"
-            }
-            ${isProcessing ? "pointer-events-none opacity-50" : ""}
-          `}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xls,.xlsx"
-            className="hidden"
-            onChange={handleInputChange}
-            disabled={isProcessing}
-          />
-          
-          {isProcessing ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-10 w-10 text-primary animate-spin" />
-              <p className="text-sm text-muted-foreground">Processando arquivo...</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <Upload className="h-10 w-10 text-muted-foreground" />
-              <p className="font-medium">Arraste o arquivo aqui</p>
-              <p className="text-sm text-muted-foreground">
-                ou clique para selecionar
-              </p>
-              <div className="flex gap-2 mt-2">
-                <span className="text-xs bg-muted px-2 py-0.5 rounded">CSV</span>
-                <span className="text-xs bg-muted px-2 py-0.5 rounded">XLS</span>
-                <span className="text-xs bg-muted px-2 py-0.5 rounded">XLSX</span>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5" />
+            Importar Vendas (CSV / Excel)
+          </CardTitle>
+          <CardDescription>
+            Faça upload do relatório de vendas. Suporta CSV, XLS e XLSX.
+            Modo bruto: todas as linhas com nome de item válido são processadas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer
+              ${isDragging 
+                ? "border-primary bg-primary/5" 
+                : "border-muted-foreground/25 hover:border-primary/50"
+              }
+              ${isProcessing ? "pointer-events-none opacity-50" : ""}
+            `}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xls,.xlsx"
+              className="hidden"
+              onChange={handleInputChange}
+              disabled={isProcessing}
+            />
+            
+            {isProcessing ? (
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                <p className="text-sm text-muted-foreground">Processando arquivo...</p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Colunas: dt_contabil, material_descr, qtd
-              </p>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Upload className="h-10 w-10 text-muted-foreground" />
+                <p className="font-medium">Arraste o arquivo aqui</p>
+                <p className="text-sm text-muted-foreground">
+                  ou clique para selecionar
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded">CSV</span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded">XLS</span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded">XLSX</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Colunas: dt_contabil, material_descr, qtd
+                </p>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+              <strong>Erro:</strong> {error}
             </div>
           )}
-        </div>
 
-        {/* Success Result */}
-        {result && (
-          <Alert className="border-emerald-500/30 bg-emerald-500/10">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <AlertTitle>Importação Concluída</AlertTitle>
-            <AlertDescription>
-              <p>
-                <strong>Período:</strong> {formatDateBR(result.dateRange.start)} a{" "}
-                {formatDateBR(result.dateRange.end)}
-              </p>
-              <p className="mt-1">
-                <strong>{result.inserted}</strong> novos registros criados,{" "}
-                <strong>{result.updated}</strong> registros atualizados.
-              </p>
-              <p className="text-sm mt-1 opacity-75">
-                Total processado: {result.total} itens únicos (agrupados por data)
-              </p>
-            </AlertDescription>
-          </Alert>
-        )}
+          <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
+            <p><strong>Modo Bruto:</strong> Todas as linhas com nome de item são importadas, incluindo qtd zero.</p>
+            <p>Ao final, um relatório mostra exatamente quantas linhas foram processadas vs. falharam.</p>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Error */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Erro na Importação</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Help Info */}
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-          <p><strong>Dica:</strong> Você pode reimportar o mesmo arquivo ou o mês inteiro para corrigir dados passados.</p>
-          <p>O sistema identifica registros existentes pela combinação (Data + Item) e atualiza a quantidade.</p>
-        </div>
-      </CardContent>
-    </Card>
+      {result && (
+        <CMVImportSummaryModal
+          open={showModal}
+          onOpenChange={setShowModal}
+          result={result}
+        />
+      )}
+    </>
   );
 }

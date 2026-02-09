@@ -723,6 +723,7 @@ export type Database = {
           item_name: string
           quantity: number
           sale_date: string
+          total_amount: number | null
           unit_id: string
           updated_at: string
         }
@@ -732,6 +733,7 @@ export type Database = {
           item_name: string
           quantity?: number
           sale_date: string
+          total_amount?: number | null
           unit_id: string
           updated_at?: string
         }
@@ -741,6 +743,7 @@ export type Database = {
           item_name?: string
           quantity?: number
           sale_date?: string
+          total_amount?: number | null
           unit_id?: string
           updated_at?: string
         }

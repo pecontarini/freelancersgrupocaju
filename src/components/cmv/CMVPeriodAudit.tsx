@@ -20,7 +20,10 @@ import {
   Award,
   Medal,
   Trophy,
-  AlertCircle
+  AlertCircle,
+  PackagePlus,
+  MousePointerClick,
+  DollarSign
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -28,6 +31,8 @@ import { cn } from "@/lib/utils";
 
 import { useCMVAuditPeriod, type AuditPeriodRow } from "@/hooks/useCMVContagens";
 import { useUnidade } from "@/contexts/UnidadeContext";
+import { AuditEntriesModal } from "./AuditEntriesModal";
+import { AuditSalesModal } from "./AuditSalesModal";
 import {
   BarChart,
   Bar,
@@ -131,6 +136,12 @@ export function CMVPeriodAudit() {
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
+  const [drilldown, setDrilldown] = useState<{
+    type: "entries" | "sales";
+    itemId: string;
+    itemName: string;
+  } | null>(null);
+
   const startDateStr = startDate ? format(startDate, "yyyy-MM-dd") : undefined;
   const endDateStr = endDate ? format(endDate, "yyyy-MM-dd") : undefined;
 
@@ -178,11 +189,19 @@ export function CMVPeriodAudit() {
       ? ((auditData.length - itemsWithDivergence) / auditData.length) * 100 
       : 100;
     
-    // Calculate overall divergence percentage for KPI seal
     const overallDivergencePercent = totalExpected > 0 
       ? (totalDivergence / totalExpected) * 100 
       : 0;
     const performanceTier = getPerformanceTier(overallDivergencePercent);
+
+    // Period financial totals
+    const totalPurchasesValue = auditData.reduce((sum, item) => sum + item.entries * item.initialCost, 0);
+    const totalSalesValue = auditData.reduce((sum, item) => sum + item.sales * item.initialCost, 0);
+    const totalInitialValue = auditData.reduce((sum, item) => sum + item.initialCount * item.initialCost, 0);
+    const totalFinalValue = auditData.reduce((sum, item) => sum + item.actualFinal * item.finalCost, 0);
+    const cmvTeoricoPercent = totalSalesValue > 0 && totalInitialValue > 0
+      ? ((totalInitialValue + totalPurchasesValue - totalFinalValue) / (totalSalesValue || 1)) * 100
+      : 0;
 
     return {
       totalDivergence,
@@ -193,6 +212,9 @@ export function CMVPeriodAudit() {
       periodDays: startDate && endDate ? differenceInDays(endDate, startDate) + 1 : 0,
       overallDivergencePercent,
       performanceTier,
+      totalPurchasesValue,
+      totalSalesValue,
+      cmvTeoricoPercent,
     };
   }, [auditData, startDate, endDate]);
 
@@ -466,57 +488,43 @@ export function CMVPeriodAudit() {
         </Card>
       )}
 
-      {/* Summary Cards */}
+      {/* Period Summary Header */}
       {canAudit && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-blue-500" />
-                <span className="text-sm text-muted-foreground">Itens Auditados</span>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <h3 className="font-semibold text-lg">
+                Período Auditado: {startDate ? format(startDate, "dd/MM/yyyy") : ""} a {endDate ? format(endDate, "dd/MM/yyyy") : ""}
+              </h3>
+              <Badge variant="secondary">{summary.periodDays} dias</Badge>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total de Compras</p>
+                <p className="text-xl font-bold font-mono">R$ {summary.totalPurchasesValue.toFixed(2)}</p>
               </div>
-              <p className="text-2xl font-bold mt-2">{auditData.length}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                <span className="text-sm text-muted-foreground">Com Divergência</span>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Vendas (Carnes)</p>
+                <p className="text-xl font-bold font-mono">R$ {summary.totalSalesValue.toFixed(2)}</p>
               </div>
-              <p className="text-2xl font-bold mt-2">{summary.itemsWithDivergence}</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-red-500" />
-                <span className="text-sm text-muted-foreground">Prejuízo Total</span>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Prejuízo Total</p>
+                <p className="text-xl font-bold font-mono text-destructive">R$ {summary.totalLoss.toFixed(2)}</p>
               </div>
-              <p className="text-2xl font-bold mt-2 text-destructive">
-                R$ {summary.totalLoss.toFixed(2)}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-sm text-muted-foreground">Acuracidade</span>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Divergência Geral</p>
+                <p className={cn(
+                  "text-xl font-bold font-mono",
+                  summary.overallDivergencePercent <= 1.5 ? "text-green-600" :
+                  summary.overallDivergencePercent <= 4 ? "text-yellow-600" : "text-destructive"
+                )}>
+                  {summary.overallDivergencePercent.toFixed(2)}%
+                </p>
               </div>
-              <p className={cn(
-                "text-2xl font-bold mt-2",
-                summary.accuracy >= 95 ? "text-green-600" : 
-                summary.accuracy >= 85 ? "text-yellow-600" : "text-destructive"
-              )}>
-                {summary.accuracy.toFixed(1)}%
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Charts Section */}
@@ -630,14 +638,20 @@ export function CMVPeriodAudit() {
         </div>
       )}
 
-      {/* Detailed Results */}
+      {/* Detailed Results with Drill-down */}
       {canAudit && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Conciliação Detalhada
-            </CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                Conciliação Detalhada
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <MousePointerClick className="h-3 w-3" />
+                Clique nos valores de Entradas ou Vendas para ver os detalhes
+              </p>
+            </div>
             <Button variant="outline" size="sm" onClick={exportPDF}>
               <FileDown className="h-4 w-4 mr-2" />
               Exportar PDF
@@ -653,14 +667,14 @@ export function CMVPeriodAudit() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-center">Inicial</TableHead>
-                      <TableHead className="text-center">+ Entradas</TableHead>
-                      <TableHead className="text-center">- Saídas</TableHead>
-                      <TableHead className="text-center">= Esperado</TableHead>
-                      <TableHead className="text-center">Real</TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="text-center">Estoque Inicial</TableHead>
+                      <TableHead className="text-center">(+) Entradas</TableHead>
+                      <TableHead className="text-center">(-) Vendas Teóricas</TableHead>
+                      <TableHead className="text-center">(=) Estoque Ideal</TableHead>
+                      <TableHead className="text-center">Estoque Real</TableHead>
                       <TableHead className="text-center">Divergência</TableHead>
-                      <TableHead className="text-right">Valor (R$)</TableHead>
+                      <TableHead className="text-right">Prejuízo R$</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -668,8 +682,26 @@ export function CMVPeriodAudit() {
                       <TableRow key={item.itemId}>
                         <TableCell className="font-medium">{item.itemName}</TableCell>
                         <TableCell className="text-center">{item.initialCount}</TableCell>
-                        <TableCell className="text-center text-green-600">+{item.entries}</TableCell>
-                        <TableCell className="text-center text-orange-600">-{item.sales}</TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => setDrilldown({ type: "entries", itemId: item.itemId, itemName: item.itemName })}
+                            className="inline-flex items-center gap-1 text-green-600 hover:text-green-700 hover:underline cursor-pointer font-mono transition-colors"
+                          >
+                            +{item.entries}
+                            <PackagePlus className="h-3 w-3 opacity-50" />
+                          </button>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => setDrilldown({ type: "sales", itemId: item.itemId, itemName: item.itemName })}
+                            className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-700 hover:underline cursor-pointer font-mono transition-colors"
+                          >
+                            -{item.sales}
+                            <ShoppingCart className="h-3 w-3 opacity-50" />
+                          </button>
+                        </TableCell>
                         <TableCell className="text-center font-medium">{item.expectedFinal}</TableCell>
                         <TableCell className="text-center">{item.actualFinal}</TableCell>
                         <TableCell className="text-center">
@@ -697,7 +729,7 @@ export function CMVPeriodAudit() {
                           item.divergenceValue < 0 ? "text-green-600" : ""
                         )}>
                           {item.divergenceValue > 0 ? "-" : item.divergenceValue < 0 ? "+" : ""}
-                          {Math.abs(item.divergenceValue).toFixed(2)}
+                          R$ {Math.abs(item.divergenceValue).toFixed(2)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -714,6 +746,30 @@ export function CMVPeriodAudit() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Drill-down Modals */}
+      {drilldown?.type === "entries" && startDateStr && endDateStr && effectiveUnidadeId && (
+        <AuditEntriesModal
+          open={true}
+          onOpenChange={(open) => !open && setDrilldown(null)}
+          itemId={drilldown.itemId}
+          itemName={drilldown.itemName}
+          lojaId={effectiveUnidadeId}
+          startDate={startDateStr}
+          endDate={endDateStr}
+        />
+      )}
+      {drilldown?.type === "sales" && startDateStr && endDateStr && effectiveUnidadeId && (
+        <AuditSalesModal
+          open={true}
+          onOpenChange={(open) => !open && setDrilldown(null)}
+          itemId={drilldown.itemId}
+          itemName={drilldown.itemName}
+          lojaId={effectiveUnidadeId}
+          startDate={startDateStr}
+          endDate={endDateStr}
+        />
       )}
     </div>
   );

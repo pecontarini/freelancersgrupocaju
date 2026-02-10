@@ -115,7 +115,11 @@ export function TeamManagement() {
   }
 
   async function handleSubmit() {
-    if (!unidadeId || !name.trim()) {
+    if (!unidadeId) {
+      toast.error("Selecione uma unidade antes de cadastrar.");
+      return;
+    }
+    if (!name.trim()) {
       toast.error("Nome é obrigatório.");
       return;
     }

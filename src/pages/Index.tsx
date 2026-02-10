@@ -19,7 +19,7 @@ import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
 import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
-import { StaffingMatrixConfig } from "@/components/escalas/StaffingMatrixConfig";
+import { EscalasTab } from "@/components/escalas/EscalasTab";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
@@ -65,7 +65,7 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   },
   escalas: {
     title: "Escalas",
-    subtitle: "Matriz de efetivo mínimo por setor e turno",
+    subtitle: "Construtor de escalas com validação CLT e compliance POP",
   },
 };
 
@@ -219,7 +219,7 @@ const Index = () => {
       case "cmv":
         return <CMVTab />;
       case "escalas":
-        return <StaffingMatrixConfig />;
+        return <EscalasTab />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

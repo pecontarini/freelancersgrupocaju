@@ -764,6 +764,7 @@ export type Database = {
           gender: string
           id: string
           job_title: string | null
+          job_title_id: string | null
           name: string
           phone: string | null
           unit_id: string
@@ -775,6 +776,7 @@ export type Database = {
           gender?: string
           id?: string
           job_title?: string | null
+          job_title_id?: string | null
           name: string
           phone?: string | null
           unit_id: string
@@ -786,12 +788,20 @@ export type Database = {
           gender?: string
           id?: string
           job_title?: string | null
+          job_title_id?: string | null
           name?: string
           phone?: string | null
           unit_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "employees_job_title_id_fkey"
+            columns: ["job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employees_unit_id_fkey"
             columns: ["unit_id"]
@@ -848,6 +858,35 @@ export type Database = {
           {
             foreignKeyName: "freelancer_entries_loja_id_fkey"
             columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_titles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_titles_unit_id_fkey"
+            columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
@@ -1540,6 +1579,42 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sector_job_titles: {
+        Row: {
+          created_at: string
+          id: string
+          job_title_id: string
+          sector_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_title_id: string
+          sector_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_title_id?: string
+          sector_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_job_titles_job_title_id_fkey"
+            columns: ["job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sector_job_titles_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
             referencedColumns: ["id"]
           },
         ]

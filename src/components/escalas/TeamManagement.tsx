@@ -42,23 +42,14 @@ import {
   useDeleteEmployee,
   type Employee,
 } from "@/hooks/useEmployees";
+import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { toast } from "sonner";
 
-const JOB_TITLES = [
-  "Garçom",
-  "Cozinheiro",
-  "Auxiliar de Cozinha",
-  "Parrillero",
-  "Bartender",
-  "Hostess",
-  "Caixa",
-  "ASG",
-  "Sushiman",
-  "Chefe de Salão",
-  "Chefe de Cozinha",
-  "Chefe de Bar",
-  "Gerente",
+const DEFAULT_JOB_TITLES = [
+  "Garçom", "Cozinheiro", "Auxiliar de Cozinha", "Parrillero",
+  "Bartender", "Hostess", "Caixa", "ASG", "Sushiman",
+  "Chefe de Salão", "Chefe de Cozinha", "Chefe de Bar", "Gerente",
 ];
 
 function formatPhone(value: string): string {
@@ -71,9 +62,17 @@ function formatPhone(value: string): string {
 export function TeamManagement() {
   const { effectiveUnidadeId: unidadeId } = useUnidade();
   const { data: employees = [], isLoading } = useEmployees(unidadeId);
+  const { data: dbJobTitles = [] } = useJobTitles(unidadeId);
   const addEmployee = useAddEmployee();
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
+  const upsertJobTitle = useUpsertJobTitle();
+
+  // Merge DB titles with defaults (deduplicated)
+  const allJobTitleNames = Array.from(new Set([
+    ...dbJobTitles.map((jt) => jt.name),
+    ...DEFAULT_JOB_TITLES,
+  ])).sort();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -99,7 +98,7 @@ export function TeamManagement() {
     setName(emp.name);
     setGender(emp.gender);
     setPhone(emp.phone || "");
-    const predefined = JOB_TITLES.find((j) => j === emp.job_title);
+    const predefined = allJobTitleNames.find((j) => j === emp.job_title);
     if (predefined) {
       setJobTitle(predefined);
       setCustomJobTitle("");
@@ -125,6 +124,17 @@ export function TeamManagement() {
       jobTitle === "__custom__" ? customJobTitle : jobTitle || undefined;
     const cleanPhone = phone.replace(/\D/g, "") || undefined;
 
+    // Upsert job title to get ID
+    let resolvedJobTitleId: string | undefined;
+    if (resolvedTitle) {
+      try {
+        const jt = await upsertJobTitle.mutateAsync({ name: resolvedTitle, unit_id: unidadeId });
+        resolvedJobTitleId = jt.id;
+      } catch {
+        // Continue without job_title_id if upsert fails
+      }
+    }
+
     if (editingEmployee) {
       await updateEmployee.mutateAsync({
         id: editingEmployee.id,
@@ -132,6 +142,7 @@ export function TeamManagement() {
         gender,
         phone: cleanPhone,
         job_title: resolvedTitle,
+        job_title_id: resolvedJobTitleId,
       });
     } else {
       await addEmployee.mutateAsync({
@@ -140,6 +151,7 @@ export function TeamManagement() {
         gender,
         phone: cleanPhone,
         job_title: resolvedTitle,
+        job_title_id: resolvedJobTitleId,
       });
     }
 
@@ -202,7 +214,7 @@ export function TeamManagement() {
                       <SelectValue placeholder="Selecione o cargo" />
                     </SelectTrigger>
                     <SelectContent>
-                      {JOB_TITLES.map((t) => (
+                      {allJobTitleNames.map((t) => (
                         <SelectItem key={t} value={t}>
                           {t}
                         </SelectItem>

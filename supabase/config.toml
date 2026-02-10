@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.parse-staff-list]
 verify_jwt = false
+
+[functions.extract-team-data]
+verify_jwt = false

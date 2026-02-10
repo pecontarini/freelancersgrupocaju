@@ -10,6 +10,8 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MobileScheduler } from "./MobileScheduler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +98,17 @@ function POPBar({
 }
 
 export function WeeklyScheduler() {
+  const isMobile = useIsMobile();
+
+  // Mobile: render single-day view
+  if (isMobile) {
+    return <MobileScheduler />;
+  }
+
+  return <DesktopScheduler />;
+}
+
+function DesktopScheduler() {
   const lojas = useConfigLojas();
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
   const [selectedSector, setSelectedSector] = useState<string | null>(null);

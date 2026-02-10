@@ -32,9 +32,9 @@ import {
   Trash2,
   Phone,
   Loader2,
-  Upload,
   Users,
 } from "lucide-react";
+import { BulkImportTab } from "./BulkImportTab";
 import {
   useEmployees,
   useAddEmployee,
@@ -259,16 +259,11 @@ export function TeamManagement() {
                 </Button>
               </TabsContent>
 
-              <TabsContent value="import" className="pt-4">
-                <div className="flex flex-col items-center gap-4 py-8 text-center">
-                  <Upload className="h-12 w-12 text-muted-foreground" />
-                  <p className="text-muted-foreground text-sm">
-                    Importação em massa via planilha estará disponível em breve.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Formato esperado: Nome, Cargo, Telefone, Gênero (M/F)
-                  </p>
-                </div>
+              <TabsContent value="import">
+                <BulkImportTab
+                  unitId={unidadeId}
+                  onDone={() => setDialogOpen(false)}
+                />
               </TabsContent>
             </Tabs>
           </DialogContent>

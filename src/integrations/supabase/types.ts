@@ -1329,6 +1329,97 @@ export type Database = {
           },
         ]
       }
+      schedule_attendance: {
+        Row: {
+          attendance_date: string
+          created_at: string
+          employee_id: string
+          id: string
+          justificativa: string | null
+          notas: string | null
+          remanejado_de_sector_id: string | null
+          remanejado_para_sector_id: string | null
+          schedule_id: string
+          sector_id: string
+          shift_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attendance_date: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          justificativa?: string | null
+          notas?: string | null
+          remanejado_de_sector_id?: string | null
+          remanejado_para_sector_id?: string | null
+          schedule_id: string
+          sector_id: string
+          shift_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attendance_date?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          justificativa?: string | null
+          notas?: string | null
+          remanejado_de_sector_id?: string | null
+          remanejado_para_sector_id?: string | null
+          schedule_id?: string
+          sector_id?: string
+          shift_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_remanejado_de_sector_id_fkey"
+            columns: ["remanejado_de_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_remanejado_para_sector_id_fkey"
+            columns: ["remanejado_para_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: true
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           created_at: string

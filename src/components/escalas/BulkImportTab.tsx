@@ -123,11 +123,11 @@ function parseSpreadsheet(file: File): Promise<ParsedEmployee[]> {
   });
 }
 
-async function parseWithAI(file: File): Promise<ParsedEmployee[]> {
+async function extractWithAI(file: File): Promise<ParsedEmployee[]> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const { data, error } = await supabase.functions.invoke("parse-staff-list", {
+  const { data, error } = await supabase.functions.invoke("extract-team-data", {
     body: formData,
   });
 
@@ -137,8 +137,8 @@ async function parseWithAI(file: File): Promise<ParsedEmployee[]> {
   }
 
   return (data.employees as any[]).map((e) => ({
-    name: String(e.name || "").trim(),
-    job_title: String(e.role || e.job_title || "").trim(),
+    name: String(e.full_name || e.name || "").trim(),
+    job_title: String(e.job_title || e.role || "").trim(),
     phone: normalizePhone(String(e.phone || "")),
   }));
 }
@@ -162,10 +162,8 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       let result: ParsedEmployee[];
 
-      if (["xlsx", "xls", "csv"].includes(ext)) {
-        result = await parseSpreadsheet(file);
-      } else if (["pdf", "png", "jpg", "jpeg"].includes(ext)) {
-        result = await parseWithAI(file);
+      if (["xlsx", "xls", "csv", "pdf", "png", "jpg", "jpeg"].includes(ext)) {
+        result = await extractWithAI(file);
       } else {
         toast.error("Formato não suportado.");
         return;

@@ -274,10 +274,10 @@ export function TeamManagement() {
                 <Button
                   className="w-full"
                   onClick={handleSubmit}
-                  disabled={isSaving || !name.trim()}
+                  disabled={isSaving || !name.trim() || !unidadeId}
                 >
                   {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {editingEmployee ? "Salvar Alterações" : "Cadastrar"}
+                  {!unidadeId ? "Selecione uma unidade" : editingEmployee ? "Salvar Alterações" : "Cadastrar"}
                 </Button>
               </TabsContent>
 

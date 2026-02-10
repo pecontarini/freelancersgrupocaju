@@ -33,6 +33,7 @@ import {
   Phone,
   Loader2,
   Users,
+  AlertCircle,
 } from "lucide-react";
 import { BulkImportTab } from "./BulkImportTab";
 import {
@@ -62,17 +63,23 @@ function formatPhone(value: string): string {
 }
 
 export function TeamManagement() {
-  const { effectiveUnidadeId: unidadeId } = useUnidade();
+  const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isPartner } = useUserProfile();
   const lojas = useConfigLojas();
-  const { data: employees = [], isLoading } = useEmployees(unidadeId);
-  const { data: dbJobTitles = [] } = useJobTitles(unidadeId);
+
+  // Local override for unit — used when admin/partner needs to pick a unit inside the dialog
+  const [dialogUnitId, setDialogUnitId] = useState<string | null>(null);
+  const needsUnitSelector = isAdmin || isPartner;
+
+  // The active unit: context unit for managers, dialog-selected for admins
+  const activeUnitId = needsUnitSelector ? (dialogUnitId || effectiveUnidadeId) : effectiveUnidadeId;
+
+  const { data: employees = [], isLoading } = useEmployees(activeUnitId);
+  const { data: dbJobTitles = [] } = useJobTitles(activeUnitId);
   const addEmployee = useAddEmployee();
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
   const upsertJobTitle = useUpsertJobTitle();
-
-  const showUnitSelector = isAdmin || isPartner;
 
   // Merge DB titles with defaults (deduplicated)
   const allJobTitleNames = Array.from(new Set([
@@ -112,6 +119,10 @@ export function TeamManagement() {
       setJobTitle("__custom__");
       setCustomJobTitle(emp.job_title || "");
     }
+    // When editing, set the dialog unit to the employee's unit
+    if (needsUnitSelector) {
+      setDialogUnitId(emp.unit_id);
+    }
     setDialogOpen(true);
   }
 
@@ -121,7 +132,7 @@ export function TeamManagement() {
   }
 
   async function handleSubmit() {
-    if (!unidadeId) {
+    if (!activeUnitId) {
       toast.error("Selecione uma unidade antes de cadastrar.");
       return;
     }
@@ -134,42 +145,77 @@ export function TeamManagement() {
       jobTitle === "__custom__" ? customJobTitle : jobTitle || undefined;
     const cleanPhone = phone.replace(/\D/g, "") || undefined;
 
-    // Upsert job title to get ID
-    let resolvedJobTitleId: string | undefined;
-    if (resolvedTitle) {
-      try {
-        const jt = await upsertJobTitle.mutateAsync({ name: resolvedTitle, unit_id: unidadeId });
-        resolvedJobTitleId = jt.id;
-      } catch {
-        // Continue without job_title_id if upsert fails
+    try {
+      // Upsert job title to get ID
+      let resolvedJobTitleId: string | undefined;
+      if (resolvedTitle && activeUnitId) {
+        try {
+          const jt = await upsertJobTitle.mutateAsync({ name: resolvedTitle, unit_id: activeUnitId });
+          resolvedJobTitleId = jt.id;
+        } catch {
+          // Continue without job_title_id if upsert fails
+        }
       }
-    }
 
-    if (editingEmployee) {
-      await updateEmployee.mutateAsync({
-        id: editingEmployee.id,
-        name: name.trim(),
-        gender,
-        phone: cleanPhone,
-        job_title: resolvedTitle,
-        job_title_id: resolvedJobTitleId,
-      });
-    } else {
-      await addEmployee.mutateAsync({
-        unit_id: unidadeId,
-        name: name.trim(),
-        gender,
-        phone: cleanPhone,
-        job_title: resolvedTitle,
-        job_title_id: resolvedJobTitleId,
-      });
-    }
+      if (editingEmployee) {
+        await updateEmployee.mutateAsync({
+          id: editingEmployee.id,
+          name: name.trim(),
+          gender,
+          phone: cleanPhone,
+          job_title: resolvedTitle,
+          job_title_id: resolvedJobTitleId,
+        });
+      } else {
+        await addEmployee.mutateAsync({
+          unit_id: activeUnitId,
+          name: name.trim(),
+          gender,
+          phone: cleanPhone,
+          job_title: resolvedTitle,
+          job_title_id: resolvedJobTitleId,
+        });
+      }
 
-    setDialogOpen(false);
-    resetForm();
+      setDialogOpen(false);
+      resetForm();
+    } catch (err: any) {
+      console.error("Erro ao salvar funcionário:", err);
+      toast.error("Erro ao salvar: " + (err?.message || "Tente novamente."));
+    }
   }
 
   const isSaving = addEmployee.isPending || updateEmployee.isPending;
+
+  // Unit selector component for admin/partner
+  const UnitSelector = () => {
+    if (!needsUnitSelector) return null;
+    return (
+      <div className="space-y-1.5 pb-2">
+        <Label className="text-xs font-medium text-muted-foreground">
+          Unidade de destino *
+        </Label>
+        <Select value={dialogUnitId || ""} onValueChange={setDialogUnitId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione a unidade" />
+          </SelectTrigger>
+          <SelectContent>
+            {lojas.options.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {!activeUnitId && (
+          <div className="flex items-center gap-1.5 text-xs text-destructive mt-1">
+            <AlertCircle className="h-3 w-3" />
+            <span>Selecione uma unidade para continuar</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -194,6 +240,10 @@ export function TeamManagement() {
                 {editingEmployee ? "Editar Funcionário" : "Adicionar Funcionário"}
               </DialogTitle>
             </DialogHeader>
+
+            {/* Shared unit selector at the top of the dialog */}
+            <UnitSelector />
+
             <Tabs defaultValue="manual">
               <TabsList className="w-full">
                 <TabsTrigger value="manual" className="flex-1">
@@ -274,19 +324,18 @@ export function TeamManagement() {
                 <Button
                   className="w-full"
                   onClick={handleSubmit}
-                  disabled={isSaving || !name.trim() || !unidadeId}
+                  disabled={isSaving || !name.trim() || !activeUnitId}
                 >
                   {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {!unidadeId ? "Selecione uma unidade" : editingEmployee ? "Salvar Alterações" : "Cadastrar"}
+                  {!activeUnitId ? "Selecione uma unidade" : editingEmployee ? "Salvar Alterações" : "Cadastrar"}
                 </Button>
               </TabsContent>
 
               <TabsContent value="import">
                 <BulkImportTab
-                  unitId={unidadeId}
+                  unitId={activeUnitId}
                   onDone={() => setDialogOpen(false)}
-                  showUnitSelector={showUnitSelector}
-                  availableUnits={lojas.options}
+                  showUnitSelector={false}
                 />
               </TabsContent>
             </Tabs>

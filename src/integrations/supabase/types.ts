@@ -757,6 +757,44 @@ export type Database = {
           },
         ]
       }
+      employees: {
+        Row: {
+          active: boolean
+          created_at: string
+          gender: string
+          id: string
+          name: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          gender?: string
+          id?: string
+          name: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          gender?: string
+          id?: string
+          name?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freelancer_entries: {
         Row: {
           chave_pix: string
@@ -1294,6 +1332,7 @@ export type Database = {
       schedules: {
         Row: {
           created_at: string
+          employee_id: string | null
           id: string
           schedule_date: string
           sector_id: string
@@ -1304,6 +1343,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          employee_id?: string | null
           id?: string
           schedule_date: string
           sector_id: string
@@ -1314,6 +1354,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          employee_id?: string | null
           id?: string
           schedule_date?: string
           sector_id?: string
@@ -1323,6 +1364,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "schedules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "schedules_sector_id_fkey"
             columns: ["sector_id"]
@@ -1934,6 +1982,15 @@ export type Database = {
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
         Returns: boolean
+      }
+      validate_schedule_clt: {
+        Args: {
+          p_employee_id: string
+          p_schedule_date: string
+          p_sector_id: string
+          p_shift_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {

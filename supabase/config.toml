@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.send-shift-reminders]
 verify_jwt = false
+
+[functions.confirm-shift]
+verify_jwt = false

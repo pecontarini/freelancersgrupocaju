@@ -1473,7 +1473,10 @@ export type Database = {
       }
       schedules: {
         Row: {
+          confirmation_responded_at: string | null
+          confirmation_status: string | null
           created_at: string
+          denial_reason: string | null
           employee_id: string | null
           id: string
           schedule_date: string
@@ -1484,7 +1487,10 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          confirmation_responded_at?: string | null
+          confirmation_status?: string | null
           created_at?: string
+          denial_reason?: string | null
           employee_id?: string | null
           id?: string
           schedule_date: string
@@ -1495,7 +1501,10 @@ export type Database = {
           user_id: string
         }
         Update: {
+          confirmation_responded_at?: string | null
+          confirmation_status?: string | null
           created_at?: string
+          denial_reason?: string | null
           employee_id?: string | null
           id?: string
           schedule_date?: string

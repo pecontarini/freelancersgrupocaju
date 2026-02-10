@@ -1161,6 +1161,57 @@ export type Database = {
           },
         ]
       }
+      notification_logs: {
+        Row: {
+          channel: string
+          created_at: string
+          employee_id: string
+          id: string
+          message_body: string | null
+          notification_date: string
+          schedule_id: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          message_body?: string | null
+          notification_date?: string
+          schedule_id: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          message_body?: string | null
+          notification_date?: string
+          schedule_id?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_logs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nps_targets: {
         Row: {
           created_at: string

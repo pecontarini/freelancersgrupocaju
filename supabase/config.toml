@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.confirm-shift]
 verify_jwt = false
+
+[functions.parse-staff-list]
+verify_jwt = false

@@ -28,11 +28,13 @@ import {
   AlertTriangle,
   Brain,
   Users,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAddEmployee } from "@/hooks/useEmployees";
 import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
+import * as XLSX from "xlsx";
 
 const ACCEPT = ".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg";
 
@@ -74,6 +76,79 @@ function assessConfidence(emp: { name: string; job_title: string; phone: string 
   };
 }
 
+// --- Local SheetJS parsing for Excel/CSV ---
+const NAME_COLS = ["nome", "name", "nome_completo", "full_name", "funcionario", "colaborador", "nome completo"];
+const ROLE_COLS = ["cargo", "role", "funcao", "função", "job_title", "job", "profissão", "profissao"];
+const PHONE_COLS = ["telefone", "phone", "celular", "whatsapp", "fone", "tel"];
+
+function findColumn(headers: string[], candidates: string[]): number {
+  const normalized = headers.map((h) => (h || "").toString().toLowerCase().trim());
+  for (const c of candidates) {
+    const idx = normalized.indexOf(c);
+    if (idx >= 0) return idx;
+  }
+  // Fuzzy: check if header includes candidate
+  for (const c of candidates) {
+    const idx = normalized.findIndex((h) => h.includes(c));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function parseSpreadsheetLocally(file: File): Promise<ParsedEmployee[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+        if (rows.length < 2) {
+          reject(new Error("Planilha vazia ou sem dados suficientes."));
+          return;
+        }
+
+        const headers = rows[0].map((h) => String(h));
+        const nameIdx = findColumn(headers, NAME_COLS);
+        const roleIdx = findColumn(headers, ROLE_COLS);
+        const phoneIdx = findColumn(headers, PHONE_COLS);
+
+        if (nameIdx === -1) {
+          reject(new Error("Coluna de nome não encontrada. Use: Nome, Funcionário ou Colaborador."));
+          return;
+        }
+
+        const employees: ParsedEmployee[] = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          const name = String(row[nameIdx] || "").trim();
+          if (!name || name.length < 2) continue;
+
+          const job_title = roleIdx >= 0 ? String(row[roleIdx] || "").trim() : "";
+          const phone = phoneIdx >= 0 ? normalizePhone(String(row[phoneIdx] || "")) : "";
+
+          employees.push({
+            name,
+            job_title,
+            phone,
+            confidence: assessConfidence({ name, job_title, phone }),
+          });
+        }
+
+        resolve(employees);
+      } catch (err) {
+        reject(new Error("Erro ao ler planilha: " + (err as Error).message));
+      }
+    };
+    reader.onerror = () => reject(new Error("Erro ao ler o arquivo."));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// --- AI extraction for PDF/Image ---
 async function extractWithAI(file: File): Promise<ParsedEmployee[]> {
   const formData = new FormData();
   formData.append("file", file);
@@ -188,6 +263,8 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
   const [parsed, setParsed] = useState<ParsedEmployee[] | null>(null);
   const [fileName, setFileName] = useState("");
 
+  const [processingMode, setProcessingMode] = useState<"local" | "ai" | null>(null);
+
   const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     setParsed(null);
@@ -201,7 +278,17 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
         return;
       }
 
-      const result = await extractWithAI(file);
+      let result: ParsedEmployee[];
+
+      // Excel/CSV: process locally with SheetJS (fast, no AI cost)
+      if (["xlsx", "xls", "csv"].includes(ext)) {
+        setProcessingMode("local");
+        result = await parseSpreadsheetLocally(file);
+      } else {
+        // PDF/Image: send to AI edge function
+        setProcessingMode("ai");
+        result = await extractWithAI(file);
+      }
 
       if (result.length === 0) {
         toast.warning("Nenhum funcionário encontrado no arquivo.");
@@ -226,6 +313,7 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
       toast.error(err.message || "Erro ao processar arquivo.");
     } finally {
       setProcessing(false);
+      setProcessingMode(null);
     }
   }, []);
 
@@ -313,12 +401,25 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
     }
   };
 
-  // --- Render: AI Processing ---
+  // --- Render: Processing ---
   if (processing) {
     return (
       <div className="pt-4">
         <div className="rounded-lg border-2 border-dashed border-primary/30 bg-primary/5">
-          <AILoader fileName={fileName} />
+          {processingMode === "ai" ? (
+            <AILoader fileName={fileName} />
+          ) : (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <Zap className="h-10 w-10 text-primary" />
+              <p className="text-sm font-medium text-foreground">
+                Processando <span className="text-primary">{fileName}</span> localmente...
+              </p>
+              <Progress value={60} className="h-1.5 w-48" />
+              <p className="text-[11px] text-muted-foreground/60">
+                Leitura direta via SheetJS — sem custo de IA
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -508,10 +609,13 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
           <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
           <div className="text-xs text-muted-foreground space-y-1">
             <p>
-              <strong>Todos os formatos:</strong> A IA analisa o documento e extrai nome, cargo e telefone automaticamente.
+              <strong>Excel/CSV:</strong> Leitura local instantânea via SheetJS — busca colunas de nome, cargo e telefone automaticamente.
             </p>
             <p>
-              Campos com baixa confiança serão destacados em <span className="text-yellow-600 dark:text-yellow-400 font-medium">amarelo</span> para revisão.
+              <strong>PDF/Imagem:</strong> Processamento via IA para extrair dados de documentos visuais.
+            </p>
+            <p>
+              Campos com baixa confiança serão destacados em <span className="text-yellow-600 dark:text-yellow-400 font-medium">amarelo</span> para revisão antes da importação.
             </p>
           </div>
         </div>

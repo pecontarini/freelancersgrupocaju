@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings2, CalendarDays } from "lucide-react";
+import { Settings2, CalendarDays, ClipboardCheck } from "lucide-react";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { WeeklyScheduler } from "./WeeklyScheduler";
+import { OperationalDashboard } from "./OperationalDashboard";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function EscalasTab() {
@@ -16,6 +17,10 @@ export function EscalasTab() {
           <CalendarDays className="h-4 w-4" />
           Montar Escala
         </TabsTrigger>
+        <TabsTrigger value="quadro" className="gap-1.5">
+          <ClipboardCheck className="h-4 w-4" />
+          Quadro Digital
+        </TabsTrigger>
         <TabsTrigger value="matrix" className="gap-1.5">
           <Settings2 className="h-4 w-4" />
           Matriz POP
@@ -23,6 +28,9 @@ export function EscalasTab() {
       </TabsList>
       <TabsContent value="scheduler">
         <WeeklyScheduler />
+      </TabsContent>
+      <TabsContent value="quadro">
+        <OperationalDashboard />
       </TabsContent>
       <TabsContent value="matrix">
         <StaffingMatrixConfig />

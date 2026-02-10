@@ -1291,6 +1291,83 @@ export type Database = {
           },
         ]
       }
+      schedules: {
+        Row: {
+          created_at: string
+          id: string
+          schedule_date: string
+          sector_id: string
+          shift_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          schedule_date: string
+          sector_id: string
+          shift_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          schedule_date?: string
+          sector_id?: string
+          shift_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedules_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sectors: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sectors_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sheets_sources: {
         Row: {
           ativo: boolean
@@ -1397,6 +1474,33 @@ export type Database = {
           },
         ]
       }
+      shifts: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          name: string
+          start_time: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          name: string
+          start_time: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          name?: string
+          start_time?: string
+          type?: string
+        }
+        Relationships: []
+      }
       sincronizacoes_sheets: {
         Row: {
           completed_at: string | null
@@ -1440,6 +1544,44 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staffing_matrix: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          id: string
+          required_count: number
+          sector_id: string
+          shift_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          id?: string
+          required_count?: number
+          sector_id: string
+          shift_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          required_count?: number
+          sector_id?: string
+          shift_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staffing_matrix_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
             referencedColumns: ["id"]
           },
         ]

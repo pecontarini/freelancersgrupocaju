@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   AlertTriangle,
   BarChart3,
+  CalendarClock,
 } from "lucide-react";
 
 import {
@@ -82,6 +83,12 @@ const menuItems = [
     id: "cmv",
     icon: Package,
     description: "Controle de insumos",
+  },
+  {
+    title: "ESCALAS",
+    id: "escalas",
+    icon: CalendarClock,
+    description: "Matriz de efetivo mínimo",
   },
 ];
 

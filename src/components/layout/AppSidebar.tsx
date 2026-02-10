@@ -14,6 +14,7 @@ import {
   BarChart3,
   CalendarClock,
 } from "lucide-react";
+import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
 import {
   Sidebar,
@@ -118,6 +119,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { isAdmin, unidades, profile } = useUserProfile();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { data: confirmations } = usePendingConfirmations();
+  const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
   const handleTabClick = (tabId: string) => {
     onTabChange(tabId);
@@ -161,10 +164,15 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                     onClick={() => handleTabClick(item.id)}
                     isActive={activeTab === item.id}
                     tooltip={item.title}
-                    className="group transition-all duration-200"
+                    className="group transition-all duration-200 relative"
                   >
                     <item.icon className="h-4 w-4 transition-colors group-hover:text-primary" />
                     <span className="font-medium">{item.title}</span>
+                    {item.id === "escalas" && escalaPending > 0 && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground px-1">
+                        {escalaPending}
+                      </span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

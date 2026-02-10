@@ -20,6 +20,7 @@ import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab
 import { RedeTab } from "@/components/dashboard/RedeTab";
 import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
+import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
@@ -185,12 +186,15 @@ const Index = () => {
     switch (activeTab) {
       case "budgets":
         return (
-          <BudgetsGerenciaisTab
-            freelancerEntries={filteredEntries}
-            operationalExpenses={filteredOperationalExpenses}
-            maintenanceEntries={filteredMaintenanceEntries}
-            selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
-          />
+          <div className="space-y-4">
+            <TeamReadinessCard onNavigate={() => setActiveTab("escalas")} />
+            <BudgetsGerenciaisTab
+              freelancerEntries={filteredEntries}
+              operationalExpenses={filteredOperationalExpenses}
+              maintenanceEntries={filteredMaintenanceEntries}
+              selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
+            />
+          </div>
         );
       case "remuneracao":
         return (

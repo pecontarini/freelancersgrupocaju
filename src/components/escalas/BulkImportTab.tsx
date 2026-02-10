@@ -58,6 +58,10 @@ export interface ParsedEmployee {
 interface BulkImportTabProps {
   unitId: string | null;
   onDone: () => void;
+  /** If true, show a unit selector (for admin/partner users) */
+  showUnitSelector?: boolean;
+  /** All available units for the selector */
+  availableUnits?: { id: string; nome: string }[];
 }
 
 function normalizePhone(raw: string): string {
@@ -245,7 +249,10 @@ function ConfidenceInput({
   );
 }
 
-export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
+export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, availableUnits }: BulkImportTabProps) {
+  const [overrideUnitId, setOverrideUnitId] = useState<string | null>(null);
+  const unitId = overrideUnitId || propUnitId;
+
   const addEmployee = useAddEmployee();
   const upsertJobTitle = useUpsertJobTitle();
   const { data: dbJobTitles = [] } = useJobTitles(unitId);
@@ -566,18 +573,42 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
   }
 
   // --- Render: Upload Area ---
+  const uploadDisabled = !unitId;
+
   return (
-    <div className="pt-4">
+    <div className="pt-4 space-y-4">
+      {/* Unit selector for admin/partner */}
+      {showUnitSelector && availableUnits && availableUnits.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">
+            Unidade de destino *
+          </label>
+          <Select value={overrideUnitId || ""} onValueChange={setOverrideUnitId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a unidade" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableUnits.map((u) => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div
-        className={`relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors cursor-pointer ${
-          dragActive
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50"
+        className={`relative flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 transition-colors ${
+          uploadDisabled
+            ? "border-muted/50 bg-muted/20 opacity-60 cursor-not-allowed"
+            : dragActive
+            ? "border-primary bg-primary/5 cursor-pointer"
+            : "border-muted-foreground/25 hover:border-muted-foreground/50 cursor-pointer"
         }`}
-        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+        onDragOver={(e) => { e.preventDefault(); if (!uploadDisabled) setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
-        onDrop={onDrop}
-        onClick={() => fileRef.current?.click()}
+        onDrop={(e) => { if (!uploadDisabled) onDrop(e); else e.preventDefault(); }}
+        onClick={() => { if (!uploadDisabled) fileRef.current?.click(); }}
         role="button"
         tabIndex={0}
       >

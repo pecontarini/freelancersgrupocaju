@@ -44,6 +44,8 @@ import {
 } from "@/hooks/useEmployees";
 import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
 import { useUnidade } from "@/contexts/UnidadeContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { toast } from "sonner";
 
 const DEFAULT_JOB_TITLES = [
@@ -61,12 +63,16 @@ function formatPhone(value: string): string {
 
 export function TeamManagement() {
   const { effectiveUnidadeId: unidadeId } = useUnidade();
+  const { isAdmin, isPartner } = useUserProfile();
+  const lojas = useConfigLojas();
   const { data: employees = [], isLoading } = useEmployees(unidadeId);
   const { data: dbJobTitles = [] } = useJobTitles(unidadeId);
   const addEmployee = useAddEmployee();
   const updateEmployee = useUpdateEmployee();
   const deleteEmployee = useDeleteEmployee();
   const upsertJobTitle = useUpsertJobTitle();
+
+  const showUnitSelector = isAdmin || isPartner;
 
   // Merge DB titles with defaults (deduplicated)
   const allJobTitleNames = Array.from(new Set([
@@ -279,6 +285,8 @@ export function TeamManagement() {
                 <BulkImportTab
                   unitId={unidadeId}
                   onDone={() => setDialogOpen(false)}
+                  showUnitSelector={showUnitSelector}
+                  availableUnits={lojas.options}
                 />
               </TabsContent>
             </Tabs>

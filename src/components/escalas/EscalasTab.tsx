@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings2, CalendarDays, ClipboardCheck, Users, ShieldCheck } from "lucide-react";
+import { Settings2, CalendarDays, ClipboardCheck, Users, ShieldCheck, Briefcase } from "lucide-react";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { WeeklyScheduler } from "./WeeklyScheduler";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { TeamManagement } from "./TeamManagement";
+import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -43,6 +44,13 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           Equipe
         </TabsTrigger>
         {(isAdmin) && (
+          <TabsTrigger value="cargos-setores" className="gap-1.5">
+            <Briefcase className="h-4 w-4" />
+            <span className="hidden sm:inline">Cargos e Setores</span>
+            <span className="sm:hidden">Cargos</span>
+          </TabsTrigger>
+        )}
+        {(isAdmin) && (
           <TabsTrigger value="matrix" className="gap-1.5">
             <Settings2 className="h-4 w-4" />
             <span className="hidden sm:inline">Configurações (Matriz)</span>
@@ -60,6 +68,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="equipe">
         <TeamManagement />
       </TabsContent>
+      {(isAdmin) && (
+        <TabsContent value="cargos-setores">
+          <SectorJobTitleMapping />
+        </TabsContent>
+      )}
       {(isAdmin) && (
         <TabsContent value="matrix">
           <StaffingMatrixConfig />

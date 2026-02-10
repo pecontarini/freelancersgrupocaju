@@ -8,6 +8,7 @@ import { UnidadeProvider } from "@/contexts/UnidadeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ConfirmShift from "./pages/ConfirmShift";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,12 @@ function App() {
               <Sonner />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route
+                  path="/confirm-shift/:scheduleId"
+                  element={
+                    <ConfirmShift />
+                  }
+                />
                 <Route
                   path="/"
                   element={

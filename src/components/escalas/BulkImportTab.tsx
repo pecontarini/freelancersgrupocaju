@@ -359,9 +359,16 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   };
 
   const handleConfirm = async () => {
-    if (!unitId || !parsed?.length) return;
+    if (!unitId) {
+      toast.error("Selecione uma unidade antes de importar.");
+      return;
+    }
+    if (!parsed?.length) return;
     const validRows = parsed.filter((e) => e.name.trim());
-    if (validRows.length === 0) return;
+    if (validRows.length === 0) {
+      toast.error("Nenhum funcionário válido para importar.");
+      return;
+    }
 
     setSaving(true);
 

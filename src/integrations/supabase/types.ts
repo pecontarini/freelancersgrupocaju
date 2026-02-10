@@ -763,7 +763,9 @@ export type Database = {
           created_at: string
           gender: string
           id: string
+          job_title: string | null
           name: string
+          phone: string | null
           unit_id: string
           updated_at: string
         }
@@ -772,7 +774,9 @@ export type Database = {
           created_at?: string
           gender?: string
           id?: string
+          job_title?: string | null
           name: string
+          phone?: string | null
           unit_id: string
           updated_at?: string
         }
@@ -781,7 +785,9 @@ export type Database = {
           created_at?: string
           gender?: string
           id?: string
+          job_title?: string | null
           name?: string
+          phone?: string | null
           unit_id?: string
           updated_at?: string
         }

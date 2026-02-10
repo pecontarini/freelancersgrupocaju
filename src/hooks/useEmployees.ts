@@ -9,6 +9,7 @@ export interface Employee {
   gender: "M" | "F";
   phone: string | null;
   job_title: string | null;
+  job_title_id: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ export function useAddEmployee() {
       gender: "M" | "F";
       phone?: string;
       job_title?: string;
+      job_title_id?: string;
     }) => {
       const { error } = await supabase.from("employees").insert(params);
       if (error) throw error;
@@ -62,6 +64,7 @@ export function useUpdateEmployee() {
       gender?: "M" | "F";
       phone?: string;
       job_title?: string;
+      job_title_id?: string;
     }) => {
       const { id, ...updates } = params;
       const { error } = await supabase.from("employees").update(updates).eq("id", id);

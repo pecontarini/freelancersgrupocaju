@@ -32,23 +32,14 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAddEmployee } from "@/hooks/useEmployees";
+import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
 
 const ACCEPT = ".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg";
 
-const JOB_TITLES = [
-  "Garçom",
-  "Cozinheiro",
-  "Auxiliar de Cozinha",
-  "Parrillero",
-  "Bartender",
-  "Hostess",
-  "Caixa",
-  "ASG",
-  "Sushiman",
-  "Chefe de Salão",
-  "Chefe de Cozinha",
-  "Chefe de Bar",
-  "Gerente",
+const DEFAULT_JOB_TITLES = [
+  "Garçom", "Cozinheiro", "Auxiliar de Cozinha", "Parrillero",
+  "Bartender", "Hostess", "Caixa", "ASG", "Sushiman",
+  "Chefe de Salão", "Chefe de Cozinha", "Chefe de Bar", "Gerente",
 ];
 
 export interface ParsedEmployee {
@@ -181,7 +172,15 @@ function ConfidenceInput({
 
 export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
   const addEmployee = useAddEmployee();
+  const upsertJobTitle = useUpsertJobTitle();
+  const { data: dbJobTitles = [] } = useJobTitles(unitId);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Merge DB titles with defaults
+  const allJobTitleNames = Array.from(new Set([
+    ...dbJobTitles.map((jt) => jt.name),
+    ...DEFAULT_JOB_TITLES,
+  ])).sort();
 
   const [dragActive, setDragActive] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -277,12 +276,22 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
 
       for (const emp of validRows) {
         try {
+          // Resolve job_title_id
+          let jobTitleId: string | undefined;
+          if (emp.job_title && unitId) {
+            try {
+              const jt = await upsertJobTitle.mutateAsync({ name: emp.job_title, unit_id: unitId });
+              jobTitleId = jt.id;
+            } catch { /* continue without */ }
+          }
+
           await addEmployee.mutateAsync({
             unit_id: unitId,
             name: emp.name.trim(),
             gender: "M" as const,
             phone: emp.phone.replace(/\D/g, "") || undefined,
             job_title: emp.job_title || undefined,
+            job_title_id: jobTitleId,
           });
           success++;
         } catch {
@@ -377,7 +386,7 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
                   <TableCell className="py-1.5">
                     <div className={!emp.confidence.job_title ? "ring-1 ring-yellow-400 rounded-md" : ""}>
                       <Select
-                        value={JOB_TITLES.includes(emp.job_title) ? emp.job_title : "__custom__"}
+                        value={allJobTitleNames.includes(emp.job_title) ? emp.job_title : "__custom__"}
                         onValueChange={(v) =>
                           updateRow(idx, "job_title", v === "__custom__" ? emp.job_title : v)
                         }
@@ -386,7 +395,7 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
                           <SelectValue placeholder="Cargo" />
                         </SelectTrigger>
                         <SelectContent>
-                          {JOB_TITLES.map((t) => (
+                          {allJobTitleNames.map((t) => (
                             <SelectItem key={t} value={t}>
                               {t}
                             </SelectItem>
@@ -395,7 +404,7 @@ export function BulkImportTab({ unitId, onDone }: BulkImportTabProps) {
                         </SelectContent>
                       </Select>
                     </div>
-                    {!JOB_TITLES.includes(emp.job_title) && emp.job_title !== "" && (
+                    {!allJobTitleNames.includes(emp.job_title) && emp.job_title !== "" && (
                       <Input
                         value={emp.job_title}
                         onChange={(e) => updateRow(idx, "job_title", e.target.value)}

@@ -13,11 +13,14 @@ import {
   CheckCircle2,
   Clock,
   Users,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -52,6 +55,7 @@ import {
   useAddSchedule,
   useRemoveSchedule,
 } from "@/hooks/useSchedules";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 
 export function MobileScheduler() {
   const lojas = useConfigLojas();
@@ -61,7 +65,7 @@ export function MobileScheduler() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerSectorId, setDrawerSectorId] = useState<string | null>(null);
   const [empSearch, setEmpSearch] = useState("");
-
+  const [showAllRoles, setShowAllRoles] = useState(false);
   const dateStr = format(currentDate, "yyyy-MM-dd");
 
   const { data: sectors = [] } = useSectors(selectedUnit);
@@ -77,6 +81,9 @@ export function MobileScheduler() {
 
   const addSchedule = useAddSchedule();
   const removeSchedule = useRemoveSchedule();
+
+  // Sector job title mappings
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorIds);
 
   const shiftTypes = useMemo(() => [...new Set(shifts.map((s) => s.type))], [shifts]);
   const currentShift = shifts.find((s) => s.type === selectedShiftType);
@@ -124,15 +131,31 @@ export function MobileScheduler() {
     );
   }, [schedules, dateStr, currentShift]);
 
-  // Available employees for drawer
+  // Allowed job title IDs for the drawer's sector
+  const drawerAllowedJTIds = useMemo(() => {
+    if (!drawerSectorId) return new Set<string>();
+    return new Set(
+      sectorJobTitles
+        .filter((sjt) => sjt.sector_id === drawerSectorId)
+        .map((sjt) => sjt.job_title_id)
+    );
+  }, [sectorJobTitles, drawerSectorId]);
+
+  const hasSectorMapping = drawerAllowedJTIds.size > 0;
+
+  // Available employees for drawer (filtered by sector job titles)
   const availableEmployees = useMemo(() => {
     const search = empSearch.toLowerCase().trim();
     return employees.filter((e) => {
       if (scheduledEmployeeIds.has(e.id)) return false;
       if (search && !e.name.toLowerCase().includes(search)) return false;
+      // Apply job title filter unless showing all or no mapping configured
+      if (!showAllRoles && hasSectorMapping) {
+        if (!e.job_title_id || !drawerAllowedJTIds.has(e.job_title_id)) return false;
+      }
       return true;
     });
-  }, [employees, scheduledEmployeeIds, empSearch]);
+  }, [employees, scheduledEmployeeIds, empSearch, showAllRoles, hasSectorMapping, drawerAllowedJTIds]);
 
   const handleAssign = (employeeId: string) => {
     if (!currentShift || !drawerSectorId) return;
@@ -158,6 +181,7 @@ export function MobileScheduler() {
   const openAddDrawer = (sectorId: string) => {
     setDrawerSectorId(sectorId);
     setEmpSearch("");
+    setShowAllRoles(false);
     setDrawerOpen(true);
   };
 
@@ -468,6 +492,16 @@ export function MobileScheduler() {
               />
             </div>
 
+            {/* Show all roles toggle */}
+            {hasSectorMapping && (
+              <div className="flex items-center gap-2">
+                <Switch id="show-all-mobile" checked={showAllRoles} onCheckedChange={setShowAllRoles} />
+                <Label htmlFor="show-all-mobile" className="text-xs text-muted-foreground cursor-pointer">
+                  Mostrar todos os cargos
+                </Label>
+              </div>
+            )}
+
             {/* Shift info */}
             {currentShift && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
@@ -482,11 +516,35 @@ export function MobileScheduler() {
             {/* Employee list */}
             <div className="space-y-1.5 pb-4">
               {availableEmployees.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-6">
-                  {empSearch
-                    ? "Nenhum funcionário encontrado."
-                    : "Todos os funcionários já estão escalados."}
-                </p>
+                <div className="text-center py-6 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {empSearch
+                      ? "Nenhum funcionário encontrado."
+                      : !showAllRoles && hasSectorMapping
+                      ? "Nenhum funcionário com cargo vinculado a este setor."
+                      : "Todos os funcionários já estão escalados."}
+                  </p>
+                  {!empSearch && !showAllRoles && hasSectorMapping && (
+                    <div className="flex flex-col items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowAllRoles(true)}>
+                        Mostrar todos os cargos
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          const tabTrigger = document.querySelector('[value="cargos-setores"]') as HTMLElement;
+                          tabTrigger?.click();
+                        }}
+                      >
+                        <Settings className="h-3 w-3" />
+                        Configurar Cargos deste Setor
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 availableEmployees.map((emp) => (
                   <button

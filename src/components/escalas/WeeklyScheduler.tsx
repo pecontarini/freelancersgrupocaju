@@ -46,10 +46,13 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useEmployees, useAddEmployee } from "@/hooks/useEmployees";
 import { useSchedulesBySector, useAddSchedule, useRemoveSchedule } from "@/hooks/useSchedules";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -137,8 +140,19 @@ function DesktopScheduler() {
   const addSchedule = useAddSchedule();
   const removeSchedule = useRemoveSchedule();
 
+  // Job-title filtering
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(selectedSector ? [selectedSector] : []);
+  const [showAllRoles, setShowAllRoles] = useState(false);
+
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
   const currentShift = shifts.find((s) => s.type === selectedShiftType);
+
+  // Filter employees by sector's allowed job titles
+  const filteredEmployees = useMemo(() => {
+    if (showAllRoles || sectorJobTitles.length === 0) return employees;
+    const allowedIds = new Set(sectorJobTitles.map((sjt) => sjt.job_title_id));
+    return employees.filter((e) => e.job_title_id && allowedIds.has(e.job_title_id));
+  }, [employees, sectorJobTitles, showAllRoles]);
 
   // POP targets for current sector/shift
   const getTarget = (dayOfWeek: number) => {
@@ -354,14 +368,42 @@ function DesktopScheduler() {
         {selectedSector && currentShift && (
           <Card>
             <CardContent className="pt-4 px-2">
+              {/* Show all toggle */}
+              {sectorJobTitles.length > 0 && (
+                <div className="flex items-center gap-2 mb-3 px-2">
+                  <Switch id="show-all-desktop" checked={showAllRoles} onCheckedChange={setShowAllRoles} />
+                  <Label htmlFor="show-all-desktop" className="text-xs text-muted-foreground cursor-pointer">
+                    Mostrar todos os cargos
+                  </Label>
+                </div>
+              )}
+
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
-              ) : employees.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhum funcionário cadastrado. Clique em "Funcionário" para adicionar.
-                </p>
+              ) : filteredEmployees.length === 0 ? (
+                <div className="text-center py-8 space-y-3">
+                  <p className="text-muted-foreground text-sm">
+                    {employees.length === 0
+                      ? 'Nenhum funcionário cadastrado. Clique em "Funcionário" para adicionar.'
+                      : "Nenhum funcionário com cargo vinculado a este setor."}
+                  </p>
+                  {employees.length > 0 && !showAllRoles && (
+                    <div className="flex flex-col items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setShowAllRoles(true)}>
+                        Mostrar todos os cargos
+                      </Button>
+                      <Button variant="link" size="sm" className="text-xs" onClick={() => {
+                        // Navigate to cargos-setores tab
+                        const tabTrigger = document.querySelector('[value="cargos-setores"]') as HTMLElement;
+                        tabTrigger?.click();
+                      }}>
+                        Configurar Cargos deste Setor →
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -381,7 +423,7 @@ function DesktopScheduler() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees.map((emp) => (
+                      {filteredEmployees.map((emp) => (
                         <TableRow key={emp.id}>
                           <TableCell className="font-medium sticky left-0 bg-background z-10">
                             <div className="flex items-center gap-1.5">

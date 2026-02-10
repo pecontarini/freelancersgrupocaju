@@ -113,7 +113,8 @@ Deno.serve(async (req) => {
       const message =
         `Olá ${employeeName}! Confirme sua escala de amanhã (${dateFormatted}) ` +
         `no setor ${sectorName} - ${shiftName}. ` +
-        `Acesse: ${appUrl}`;
+        `✅ Confirmar: ${appUrl}/confirm-shift/${sched.id}?action=confirm ` +
+        `❌ Não posso: ${appUrl}/confirm-shift/${sched.id}?action=deny`;
 
       // Placeholder phone — in production, join with a profiles/contacts table
       const phone = "5500000000000";

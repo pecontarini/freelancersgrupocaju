@@ -1,4 +1,5 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock } from "lucide-react";
+import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
   Sheet,
@@ -21,12 +22,14 @@ const navItems = [
   { id: "budgets", label: "Budgets", icon: Wallet },
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
-  { id: "planoacao", label: "Plano", icon: FileCheck },
+  { id: "escalas", label: "Escalas", icon: CalendarClock },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
   const { signOut } = useAuth();
   const { isAdmin, profile } = useUserProfile();
+  const { data: confirmations } = usePendingConfirmations();
+  const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
   return (
     <>
@@ -106,13 +109,20 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={cn(
-                  "flex flex-1 flex-col items-center justify-center gap-1 transition-colors min-h-[56px]",
+                  "relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors min-h-[56px]",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                <div className="relative">
+                  <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                  {item.id === "escalas" && escalaPending > 0 && (
+                    <span className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground px-0.5">
+                      {escalaPending}
+                    </span>
+                  )}
+                </div>
                 <span className={cn(
                   "text-[10px] font-medium uppercase tracking-wide",
                   isActive && "font-bold"

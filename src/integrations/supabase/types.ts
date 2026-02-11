@@ -716,6 +716,41 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_budgets: {
+        Row: {
+          budget_amount: number
+          created_at: string
+          date: string
+          id: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          budget_amount?: number
+          created_at?: string
+          date: string
+          id?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          budget_amount?: number
+          created_at?: string
+          date?: string
+          id?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_sales: {
         Row: {
           created_at: string
@@ -761,6 +796,7 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          default_rate: number | null
           gender: string
           id: string
           job_title: string | null
@@ -769,10 +805,12 @@ export type Database = {
           phone: string | null
           unit_id: string
           updated_at: string
+          worker_type: Database["public"]["Enums"]["worker_type"]
         }
         Insert: {
           active?: boolean
           created_at?: string
+          default_rate?: number | null
           gender?: string
           id?: string
           job_title?: string | null
@@ -781,10 +819,12 @@ export type Database = {
           phone?: string | null
           unit_id: string
           updated_at?: string
+          worker_type?: Database["public"]["Enums"]["worker_type"]
         }
         Update: {
           active?: boolean
           created_at?: string
+          default_rate?: number | null
           gender?: string
           id?: string
           job_title?: string | null
@@ -793,6 +833,7 @@ export type Database = {
           phone?: string | null
           unit_id?: string
           updated_at?: string
+          worker_type?: Database["public"]["Enums"]["worker_type"]
         }
         Relationships: [
           {
@@ -1518,43 +1559,58 @@ export type Database = {
       }
       schedules: {
         Row: {
+          agreed_rate: number | null
+          break_duration: number
           confirmation_responded_at: string | null
           confirmation_status: string | null
           created_at: string
           denial_reason: string | null
           employee_id: string | null
+          end_time: string | null
           id: string
           schedule_date: string
+          schedule_type: Database["public"]["Enums"]["schedule_type"]
           sector_id: string
           shift_id: string
+          start_time: string | null
           status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          agreed_rate?: number | null
+          break_duration?: number
           confirmation_responded_at?: string | null
           confirmation_status?: string | null
           created_at?: string
           denial_reason?: string | null
           employee_id?: string | null
+          end_time?: string | null
           id?: string
           schedule_date: string
+          schedule_type?: Database["public"]["Enums"]["schedule_type"]
           sector_id: string
           shift_id: string
+          start_time?: string | null
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          agreed_rate?: number | null
+          break_duration?: number
           confirmation_responded_at?: string | null
           confirmation_status?: string | null
           created_at?: string
           denial_reason?: string | null
           employee_id?: string | null
+          end_time?: string | null
           id?: string
           schedule_date?: string
+          schedule_type?: Database["public"]["Enums"]["schedule_type"]
           sector_id?: string
           shift_id?: string
+          start_time?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -2244,8 +2300,10 @@ export type Database = {
         | "gerente_back"
         | "chefia_front"
         | "chefia_back"
+      schedule_type: "working" | "off" | "vacation" | "sick_leave"
       sector_type: "salao" | "back" | "apv" | "delivery"
       setor_back: "cozinha" | "bar" | "parrilla" | "sushi"
+      worker_type: "clt" | "freelancer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2393,8 +2451,10 @@ export const Constants = {
         "chefia_front",
         "chefia_back",
       ],
+      schedule_type: ["working", "off", "vacation", "sick_leave"],
       sector_type: ["salao", "back", "apv", "delivery"],
       setor_back: ["cozinha", "bar", "parrilla", "sushi"],
+      worker_type: ["clt", "freelancer"],
     },
   },
 } as const

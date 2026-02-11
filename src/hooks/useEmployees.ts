@@ -11,6 +11,8 @@ export interface Employee {
   job_title: string | null;
   job_title_id: string | null;
   active: boolean;
+  worker_type: "clt" | "freelancer";
+  default_rate: number;
   created_at: string;
   updated_at: string;
 }

@@ -9,11 +9,17 @@ import {
   Pencil,
   Loader2,
   Coffee,
+  Users,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -38,7 +44,8 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
-import { useSectors } from "@/hooks/useStaffingMatrix";
+import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
 import { formatCurrency } from "@/lib/formatters";
@@ -50,14 +57,6 @@ const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 function getWeekDays(baseDate: Date): Date[] {
   const start = startOfWeek(baseDate, { weekStartsOn: 1 });
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
-}
-
-interface CellData {
-  schedule: ManualSchedule | null;
-  employeeId: string;
-  employeeName: string;
-  isFreelancer: boolean;
-  date: string;
 }
 
 export function ManualScheduleGrid() {
@@ -73,10 +72,24 @@ export function ManualScheduleGrid() {
   const weekStart = format(weekDays[0], "yyyy-MM-dd");
   const weekEnd = format(weekDays[6], "yyyy-MM-dd");
 
+  // Sector selection
+  const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
+  const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
+  const [showAllEmployees, setShowAllEmployees] = useState(false);
+
+  // Auto-select first sector when sectors load
+  const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
+
+  // Sector job title mappings
+  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorIds);
+
+  // Staffing matrix for POP
+  const { data: staffingMatrix = [] } = useStaffingMatrix(sectorIds);
+
   const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
   const { data: schedules = [], isLoading: loadingSch } = useManualSchedules(selectedUnit, weekStart, weekEnd);
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
-  const { data: sectors = [] } = useSectors(selectedUnit);
   const upsertBudget = useUpsertDailyBudget();
   const copyDay = useCopyPreviousDay();
 
@@ -101,7 +114,53 @@ export function ManualScheduleGrid() {
   const [editingBudgetDate, setEditingBudgetDate] = useState<string | null>(null);
   const [budgetValue, setBudgetValue] = useState("");
 
-  const defaultSectorId = sectors.length > 0 ? sectors[0].id : "";
+  // Filter employees by sector's linked job titles
+  const sectorLinkedJobTitleIds = useMemo(() => {
+    if (!activeSectorId) return new Set<string>();
+    return new Set(
+      sectorJobTitles
+        .filter((sjt) => sjt.sector_id === activeSectorId)
+        .map((sjt) => sjt.job_title_id)
+    );
+  }, [sectorJobTitles, activeSectorId]);
+
+  const filteredEmployees = useMemo(() => {
+    const active = employees.filter(Boolean);
+    if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) {
+      // If no mappings exist or "show all" is on, show everyone
+      return active;
+    }
+    return active.filter((emp) => emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id));
+  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds]);
+
+  // Sort: CLT first, then freelancers
+  const sortedEmployees = useMemo(() => {
+    return [...filteredEmployees].sort((a, b) => {
+      const aType = a.worker_type || "clt";
+      const bType = b.worker_type || "clt";
+      if (aType === bType) return a.name.localeCompare(b.name);
+      return aType === "clt" ? -1 : 1;
+    });
+  }, [filteredEmployees]);
+
+  // POP helpers
+  function getPopTarget(dayOfWeek: number, shiftType: string): number {
+    if (!activeSectorId) return 0;
+    const entry = staffingMatrix.find(
+      (m) => m.sector_id === activeSectorId && m.day_of_week === dayOfWeek && m.shift_type === shiftType
+    );
+    return entry?.required_count ?? 0;
+  }
+
+  function getScheduledCount(dateStr: string): number {
+    if (!activeSectorId) return 0;
+    return schedules.filter(
+      (s) =>
+        s.schedule_date === dateStr &&
+        s.sector_id === activeSectorId &&
+        s.schedule_type === "working"
+    ).length;
+  }
 
   function getScheduleForCell(employeeId: string, dateStr: string): ManualSchedule | undefined {
     return schedules.find(
@@ -125,9 +184,9 @@ export function ManualScheduleGrid() {
       open: true,
       employeeId: emp.id,
       employeeName: emp.name,
-      isFreelancer: (emp as any).worker_type === "freelancer",
+      isFreelancer: emp.worker_type === "freelancer",
       date: dateStr,
-      sectorId: existing?.sector_id || defaultSectorId,
+      sectorId: existing?.sector_id || activeSectorId || "",
       existing,
     });
   }
@@ -152,17 +211,8 @@ export function ManualScheduleGrid() {
     setCurrentWeekBase((prev) => addDays(prev, dir * 7));
   };
 
-  const isLoading = loadingEmp || loadingSch;
-
-  // Sort employees: CLT first, then freelancers
-  const sortedEmployees = useMemo(() => {
-    return [...employees].sort((a, b) => {
-      const aType = (a as any).worker_type || "clt";
-      const bType = (b as any).worker_type || "clt";
-      if (aType === bType) return a.name.localeCompare(b.name);
-      return aType === "clt" ? -1 : 1;
-    });
-  }, [employees]);
+  const isLoading = loadingEmp || loadingSch || loadingSectors;
+  const hasSectorMappings = sectorLinkedJobTitleIds.size > 0;
 
   return (
     <div className="space-y-4 fade-in">
@@ -176,10 +226,10 @@ export function ManualScheduleGrid() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4 flex flex-wrap items-end gap-3">
-          {(isAdmin || isPartner) && (
+      {/* Unit selector for admin/partner */}
+      {(isAdmin || isPartner) && (
+        <Card>
+          <CardContent className="pt-4 flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Unidade</label>
               <Select value={selectedUnit || ""} onValueChange={setLocalUnitId}>
@@ -193,165 +243,237 @@ export function ManualScheduleGrid() {
                 </SelectContent>
               </Select>
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Week Navigation */}
-      {selectedUnit && (
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="font-semibold text-sm">
-            {format(weekDays[0], "dd MMM", { locale: ptBR })} — {format(weekDays[6], "dd MMM yyyy", { locale: ptBR })}
-          </span>
-          <Button variant="outline" size="icon" onClick={() => navigateWeek(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      {/* Grid */}
-      {selectedUnit && (
-        <Card>
-          <CardContent className="pt-4 px-0">
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : sortedEmployees.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <p>Nenhum funcionário cadastrado. Adicione na aba "Equipe".</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[160px] sticky left-0 bg-background z-20 border-r">
-                        Funcionário
-                      </TableHead>
-                      {weekDays.map((day, i) => {
-                        const dateStr = format(day, "yyyy-MM-dd");
-                        const budget = getBudgetForDay(dateStr);
-                        const spent = getFreelancerSpend(dateStr);
-                        return (
-                          <TableHead key={i} className="text-center min-w-[120px] p-1">
-                            <div className="space-y-0.5">
-                              <div className="font-semibold">{DAY_LABELS[i]}</div>
-                              <div className="text-[10px] font-normal text-muted-foreground">
-                                {format(day, "dd/MM")}
-                              </div>
-                              {/* Financial header */}
-                              <div className="text-[9px] font-normal space-y-0.5 mt-1">
-                                <div className="flex items-center justify-center gap-1">
-                                  <span className="text-muted-foreground">Verba:</span>
-                                  <span className="font-medium">{budget ? formatCurrency(budget.budget_amount) : "—"}</span>
-                                  <Popover
-                                    open={editingBudgetDate === dateStr}
-                                    onOpenChange={(o) => {
-                                      if (o) {
-                                        setEditingBudgetDate(dateStr);
-                                        setBudgetValue(String(budget?.budget_amount || ""));
-                                      } else {
-                                        setEditingBudgetDate(null);
-                                      }
-                                    }}
-                                  >
-                                    <PopoverTrigger asChild>
-                                      <button className="p-0.5 rounded hover:bg-muted">
-                                        <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-                                      </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-48 p-2" align="center">
-                                      <div className="space-y-2">
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          step={50}
-                                          value={budgetValue}
-                                          onChange={(e) => setBudgetValue(e.target.value)}
-                                          placeholder="Valor"
-                                          className="h-8 text-sm"
-                                        />
-                                        <Button size="sm" className="w-full h-7 text-xs" onClick={() => handleSaveBudget(dateStr)}>
-                                          Salvar
-                                        </Button>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                </div>
-                                {spent > 0 && (
-                                  <div className="text-orange-500 font-medium">
-                                    Gasto: {formatCurrency(spent)}
-                                  </div>
-                                )}
-                              </div>
-                              {/* Actions */}
-                              <div className="flex items-center justify-center gap-0.5 mt-1">
-                                <button
-                                  onClick={() => setFreelancerModal({ open: true, date: dateStr })}
-                                  className="p-0.5 rounded hover:bg-muted text-orange-500"
-                                  title="+ Freelancer"
-                                >
-                                  <UserPlus className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={() => handleCopyPreviousDay(dateStr)}
-                                  className="p-0.5 rounded hover:bg-muted text-muted-foreground"
-                                  title="Copiar dia anterior"
-                                  disabled={copyDay.isPending}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </div>
-                          </TableHead>
-                        );
-                      })}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedEmployees.map((emp) => {
-                      const isFreelancer = (emp as any).worker_type === "freelancer";
-                      return (
-                        <TableRow key={emp.id}>
-                          <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
-                            <div className="flex items-center gap-1.5">
-                              <span className="truncate max-w-[120px]">{emp.name}</span>
-                              {isFreelancer && (
-                                <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
-                                  FL
-                                </Badge>
-                              )}
-                            </div>
-                            {emp.job_title && (
-                              <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
-                            )}
-                          </TableCell>
-                          {weekDays.map((day, i) => {
-                            const dateStr = format(day, "yyyy-MM-dd");
-                            const schedule = getScheduleForCell(emp.id, dateStr);
-                            return (
-                              <TableCell
-                                key={i}
-                                className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                onClick={() => handleCellClick(emp, dateStr)}
-                              >
-                                <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} />
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </CardContent>
         </Card>
+      )}
+
+      {selectedUnit && (
+        <>
+          {/* Sector Tabs */}
+          {sectors.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <Tabs
+                value={activeSectorId || ""}
+                onValueChange={(v) => setSelectedSectorId(v)}
+                className="flex-1"
+              >
+                <TabsList className="flex-wrap h-auto gap-1">
+                  {sectors.map((sector) => (
+                    <TabsTrigger key={sector.id} value={sector.id} className="gap-1.5">
+                      <Users className="h-3.5 w-3.5" />
+                      {sector.name}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
+              {/* Show all toggle */}
+              {hasSectorMappings && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Switch
+                    id="show-all"
+                    checked={showAllEmployees}
+                    onCheckedChange={setShowAllEmployees}
+                  />
+                  <Label htmlFor="show-all" className="text-xs text-muted-foreground flex items-center gap-1 cursor-pointer">
+                    <Eye className="h-3 w-3" />
+                    Todos
+                  </Label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {sectors.length === 0 && !loadingSectors && (
+            <Card className="border-dashed">
+              <CardContent className="pt-6 text-center text-muted-foreground">
+                <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="font-medium">Nenhum setor cadastrado.</p>
+                <p className="text-xs mt-1">Configure setores na aba "Configurações" para usar a segmentação.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Week Navigation */}
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="font-semibold text-sm">
+              {format(weekDays[0], "dd MMM", { locale: ptBR })} — {format(weekDays[6], "dd MMM yyyy", { locale: ptBR })}
+            </span>
+            <Button variant="outline" size="icon" onClick={() => navigateWeek(1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Grid */}
+          <Card>
+            <CardContent className="pt-4 px-0">
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : sortedEmployees.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  {hasSectorMappings && !showAllEmployees ? (
+                    <>
+                      <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p>Nenhum funcionário vinculado a este setor.</p>
+                      <p className="text-xs mt-1">
+                        Configure os cargos do setor na aba{" "}
+                        <span className="font-medium text-foreground">"Cargos e Setores"</span>{" "}
+                        ou ative o toggle{" "}
+                        <span className="font-medium text-foreground">"Todos"</span>.
+                      </p>
+                    </>
+                  ) : (
+                    <p>Nenhum funcionário cadastrado. Adicione na aba "Equipe".</p>
+                  )}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[160px] sticky left-0 bg-background z-20 border-r">
+                          Funcionário
+                        </TableHead>
+                        {weekDays.map((day, i) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          const budget = getBudgetForDay(dateStr);
+                          const spent = getFreelancerSpend(dateStr);
+                          // POP: dayOfWeek (0=Sun, 1=Mon,...) but our array is Mon-first
+                          const jsDow = day.getDay(); // 0=Sun
+                          const popAlmoco = getPopTarget(jsDow, "almoco");
+                          const popJantar = getPopTarget(jsDow, "jantar");
+                          const popTotal = popAlmoco + popJantar;
+                          const scheduled = getScheduledCount(dateStr);
+
+                          return (
+                            <TableHead key={i} className="text-center min-w-[130px] p-1">
+                              <div className="space-y-0.5">
+                                <div className="font-semibold">{DAY_LABELS[i]}</div>
+                                <div className="text-[10px] font-normal text-muted-foreground">
+                                  {format(day, "dd/MM")}
+                                </div>
+
+                                {/* POP Indicator */}
+                                {activeSectorId && popTotal > 0 && (
+                                  <PopIndicator scheduled={scheduled} target={popTotal} />
+                                )}
+
+                                {/* Financial header */}
+                                <div className="text-[9px] font-normal space-y-0.5 mt-1">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="text-muted-foreground">Verba:</span>
+                                    <span className="font-medium">{budget ? formatCurrency(budget.budget_amount) : "—"}</span>
+                                    <Popover
+                                      open={editingBudgetDate === dateStr}
+                                      onOpenChange={(o) => {
+                                        if (o) {
+                                          setEditingBudgetDate(dateStr);
+                                          setBudgetValue(String(budget?.budget_amount || ""));
+                                        } else {
+                                          setEditingBudgetDate(null);
+                                        }
+                                      }}
+                                    >
+                                      <PopoverTrigger asChild>
+                                        <button className="p-0.5 rounded hover:bg-muted">
+                                          <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-48 p-2" align="center">
+                                        <div className="space-y-2">
+                                          <Input
+                                            type="number"
+                                            min={0}
+                                            step={50}
+                                            value={budgetValue}
+                                            onChange={(e) => setBudgetValue(e.target.value)}
+                                            placeholder="Valor"
+                                            className="h-8 text-sm"
+                                          />
+                                          <Button size="sm" className="w-full h-7 text-xs" onClick={() => handleSaveBudget(dateStr)}>
+                                            Salvar
+                                          </Button>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
+                                  {spent > 0 && (
+                                    <div className="text-orange-500 font-medium">
+                                      Gasto: {formatCurrency(spent)}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center justify-center gap-0.5 mt-1">
+                                  <button
+                                    onClick={() => setFreelancerModal({ open: true, date: dateStr })}
+                                    className="p-0.5 rounded hover:bg-muted text-orange-500"
+                                    title="+ Freelancer"
+                                  >
+                                    <UserPlus className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleCopyPreviousDay(dateStr)}
+                                    className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+                                    title="Copiar dia anterior"
+                                    disabled={copyDay.isPending}
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            </TableHead>
+                          );
+                        })}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedEmployees.map((emp) => {
+                        const isFreelancer = emp.worker_type === "freelancer";
+                        return (
+                          <TableRow key={emp.id}>
+                            <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate max-w-[120px]">{emp.name}</span>
+                                {isFreelancer && (
+                                  <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
+                                    FL
+                                  </Badge>
+                                )}
+                              </div>
+                              {emp.job_title && (
+                                <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
+                              )}
+                            </TableCell>
+                            {weekDays.map((day, i) => {
+                              const dateStr = format(day, "yyyy-MM-dd");
+                              const schedule = getScheduleForCell(emp.id, dateStr);
+                              return (
+                                <TableCell
+                                  key={i}
+                                  className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => handleCellClick(emp, dateStr)}
+                                >
+                                  <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Edit Modal */}
@@ -369,18 +491,60 @@ export function ManualScheduleGrid() {
       )}
 
       {/* Freelancer Modal */}
-      {freelancerModal && selectedUnit && (
+      {freelancerModal && selectedUnit && activeSectorId && (
         <FreelancerAddModal
           open={freelancerModal.open}
           onClose={() => setFreelancerModal(null)}
           unitId={selectedUnit}
-          sectorId={defaultSectorId}
+          sectorId={activeSectorId}
           date={freelancerModal.date}
         />
       )}
     </div>
   );
 }
+
+/* ─── POP Compliance Indicator ─── */
+
+function PopIndicator({ scheduled, target }: { scheduled: number; target: number }) {
+  const pct = target > 0 ? Math.min((scheduled / target) * 100, 150) : 0;
+  const isDeficit = scheduled < target;
+  const isExcess = scheduled > target;
+  const isIdeal = scheduled === target;
+
+  let colorClass = "text-green-600 dark:text-green-400";
+  let progressColor = "bg-green-500";
+  let label = "✓ Ideal";
+
+  if (isDeficit) {
+    colorClass = "text-red-600 dark:text-red-400";
+    progressColor = "bg-red-500";
+    label = `Faltam ${target - scheduled}`;
+  } else if (isExcess) {
+    colorClass = "text-yellow-600 dark:text-yellow-400";
+    progressColor = "bg-yellow-500";
+    label = `+${scheduled - target} extra`;
+  }
+
+  return (
+    <div className="space-y-0.5 mt-1">
+      <div className={`text-[9px] font-semibold ${colorClass}`}>
+        {scheduled}/{target} POP
+      </div>
+      <div className="mx-auto w-[80%]">
+        <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${progressColor}`}
+            style={{ width: `${Math.min(pct, 100)}%` }}
+          />
+        </div>
+      </div>
+      <div className={`text-[8px] ${colorClass}`}>{label}</div>
+    </div>
+  );
+}
+
+/* ─── Schedule Cell ─── */
 
 function ScheduleCell({
   schedule,

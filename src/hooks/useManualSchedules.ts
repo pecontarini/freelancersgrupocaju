@@ -63,10 +63,32 @@ export function useUpsertSchedule() {
       break_duration?: number;
       schedule_type: "working" | "off" | "vacation" | "sick_leave";
       agreed_rate?: number;
+      shift_type?: string;
     }) => {
+      // Find shift_id by shift_type if provided, otherwise default
+      let shiftId: string;
+      if (params.shift_type) {
+        const { data: matchedShifts } = await supabase
+          .from("shifts")
+          .select("id")
+          .eq("type", params.shift_type)
+          .limit(1);
+        if (matchedShifts && matchedShifts.length > 0) {
+          shiftId = matchedShifts[0].id;
+        } else {
+          const { data: anyShift } = await supabase.from("shifts").select("id").limit(1);
+          if (!anyShift || anyShift.length === 0) throw new Error("Nenhum turno cadastrado.");
+          shiftId = anyShift[0].id;
+        }
+      } else {
+        const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
+        if (!shifts || shifts.length === 0) throw new Error("Nenhum turno cadastrado.");
+        shiftId = shifts[0].id;
+      }
+
       const payload: any = {
         employee_id: params.employee_id,
-        user_id: params.employee_id, // legacy column
+        user_id: params.employee_id,
         schedule_date: params.schedule_date,
         sector_id: params.sector_id,
         status: "scheduled",
@@ -75,19 +97,8 @@ export function useUpsertSchedule() {
         end_time: params.end_time || null,
         break_duration: params.break_duration ?? 60,
         agreed_rate: params.agreed_rate ?? 0,
+        shift_id: shiftId,
       };
-
-      // We need a shift_id (required column). Get default shift.
-      const { data: shifts } = await supabase
-        .from("shifts")
-        .select("id")
-        .limit(1);
-
-      if (!shifts || shifts.length === 0) {
-        throw new Error("Nenhum turno cadastrado. Cadastre pelo menos um turno.");
-      }
-
-      payload.shift_id = shifts[0].id;
 
       if (params.id) {
         const { error } = await supabase

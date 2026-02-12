@@ -11,6 +11,8 @@ import {
   Coffee,
   Users,
   Eye,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
   SelectContent,
@@ -44,7 +47,7 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
-import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
+import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
@@ -76,6 +79,24 @@ export function ManualScheduleGrid() {
   const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [showAllEmployees, setShowAllEmployees] = useState(false);
+  const [selectedShiftType, setSelectedShiftType] = useState<string>("almoco");
+
+  // Shifts data
+  const { data: shifts = [] } = useShifts();
+  const shiftTypes = useMemo(() => [...new Set(shifts.map((s) => s.type))], [shifts]);
+  const shiftsByType = useMemo(() => {
+    const map = new Map<string, string[]>();
+    shifts.forEach((s) => {
+      const ids = map.get(s.type) || [];
+      ids.push(s.id);
+      map.set(s.type, ids);
+    });
+    return map;
+  }, [shifts]);
+  const activeShiftIds = useMemo(
+    () => new Set(shiftsByType.get(selectedShiftType) || []),
+    [shiftsByType, selectedShiftType]
+  );
 
   // Auto-select first sector when sectors load
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
@@ -101,6 +122,7 @@ export function ManualScheduleGrid() {
     isFreelancer: boolean;
     date: string;
     sectorId: string;
+    shiftType: string;
     existing: ManualSchedule | null;
   } | null>(null);
 
@@ -143,7 +165,6 @@ export function ManualScheduleGrid() {
     });
   }, [filteredEmployees]);
 
-  // POP helpers
   function getPopTarget(dayOfWeek: number, shiftType: string): number {
     if (!activeSectorId) return 0;
     const entry = staffingMatrix.find(
@@ -152,18 +173,30 @@ export function ManualScheduleGrid() {
     return entry?.required_count ?? 0;
   }
 
-  function getScheduledCount(dateStr: string): number {
+  function getScheduledCountByShift(dateStr: string, shiftType: string): number {
     if (!activeSectorId) return 0;
+    const ids = shiftsByType.get(shiftType) || [];
+    const shiftIdSet = new Set(ids);
     return schedules.filter(
       (s) =>
         s.schedule_date === dateStr &&
         s.sector_id === activeSectorId &&
-        s.schedule_type === "working"
+        s.schedule_type === "working" &&
+        shiftIdSet.has(s.shift_id)
     ).length;
   }
 
+  // Filter schedules displayed in grid by selected shift type
+  const filteredSchedules = useMemo(() => {
+    return schedules.filter((s) => {
+      // Non-working types (off, vacation, sick_leave) show in all shifts
+      if (s.schedule_type !== "working") return true;
+      return activeShiftIds.has(s.shift_id);
+    });
+  }, [schedules, activeShiftIds]);
+
   function getScheduleForCell(employeeId: string, dateStr: string): ManualSchedule | undefined {
-    return schedules.find(
+    return filteredSchedules.find(
       (s) => s.employee_id === employeeId && s.schedule_date === dateStr
     );
   }
@@ -187,6 +220,7 @@ export function ManualScheduleGrid() {
       isFreelancer: emp.worker_type === "freelancer",
       date: dateStr,
       sectorId: existing?.sector_id || activeSectorId || "",
+      shiftType: selectedShiftType,
       existing,
     });
   }
@@ -294,6 +328,34 @@ export function ManualScheduleGrid() {
             </Card>
           )}
 
+          {/* Shift Type Selector */}
+          {shiftTypes.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground">Turno:</span>
+              <ToggleGroup
+                type="single"
+                value={selectedShiftType}
+                onValueChange={(v) => v && setSelectedShiftType(v)}
+                className="gap-0 border rounded-lg"
+              >
+                {shiftTypes.map((st) => {
+                  const shiftLabel = shifts.find((s) => s.type === st)?.name || st;
+                  const Icon = st === "jantar" ? Moon : Sun;
+                  return (
+                    <ToggleGroupItem
+                      key={st}
+                      value={st}
+                      className="gap-1.5 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {shiftLabel}
+                    </ToggleGroupItem>
+                  );
+                })}
+              </ToggleGroup>
+            </div>
+          )}
+
           {/* Week Navigation */}
           <div className="flex items-center justify-between">
             <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)}>
@@ -343,12 +405,9 @@ export function ManualScheduleGrid() {
                           const dateStr = format(day, "yyyy-MM-dd");
                           const budget = getBudgetForDay(dateStr);
                           const spent = getFreelancerSpend(dateStr);
-                          // POP: dayOfWeek (0=Sun, 1=Mon,...) but our array is Mon-first
-                          const jsDow = day.getDay(); // 0=Sun
-                          const popAlmoco = getPopTarget(jsDow, "almoco");
-                          const popJantar = getPopTarget(jsDow, "jantar");
-                          const popTotal = popAlmoco + popJantar;
-                          const scheduled = getScheduledCount(dateStr);
+                          const jsDow = day.getDay();
+                          const popTarget = getPopTarget(jsDow, selectedShiftType);
+                          const scheduled = getScheduledCountByShift(dateStr, selectedShiftType);
 
                           return (
                             <TableHead key={i} className="text-center min-w-[130px] p-1">
@@ -358,9 +417,9 @@ export function ManualScheduleGrid() {
                                   {format(day, "dd/MM")}
                                 </div>
 
-                                {/* POP Indicator */}
-                                {activeSectorId && popTotal > 0 && (
-                                  <PopIndicator scheduled={scheduled} target={popTotal} />
+                                {/* POP Indicator per shift */}
+                                {activeSectorId && popTarget > 0 && (
+                                  <PopIndicator scheduled={scheduled} target={popTarget} />
                                 )}
 
                                 {/* Financial header */}
@@ -486,6 +545,7 @@ export function ManualScheduleGrid() {
           isFreelancer={editModal.isFreelancer}
           date={editModal.date}
           sectorId={editModal.sectorId}
+          shiftType={editModal.shiftType}
           existing={editModal.existing}
         />
       )}

@@ -30,6 +30,7 @@ interface ScheduleEditModalProps {
   isFreelancer: boolean;
   date: string; // YYYY-MM-DD
   sectorId: string;
+  shiftType: string;
   existing?: ManualSchedule | null;
 }
 
@@ -54,6 +55,7 @@ export function ScheduleEditModal({
   isFreelancer,
   date,
   sectorId,
+  shiftType,
   existing,
 }: ScheduleEditModalProps) {
   const upsert = useUpsertSchedule();
@@ -114,6 +116,7 @@ export function ScheduleEditModal({
       break_duration: breakDuration,
       schedule_type: "working",
       agreed_rate: parseFloat(agreedRate) || 0,
+      shift_type: shiftType,
     });
     onClose();
   }
@@ -129,6 +132,7 @@ export function ScheduleEditModal({
       end_time: null,
       break_duration: 0,
       agreed_rate: 0,
+      shift_type: shiftType,
     });
     onClose();
   }

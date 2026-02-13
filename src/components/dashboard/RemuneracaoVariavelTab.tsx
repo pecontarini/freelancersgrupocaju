@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ActionPlanDashboard } from "@/components/action-plan";
+
 import { AuditReportButton } from "@/components/AuditReportButton";
 import { CentralReclamacoes } from "@/components/complaints";
 import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
@@ -1124,7 +1124,5 @@ export function RemuneracaoVariavelTab({
         </CardContent>
       </Card>
 
-      {/* Action Plan Dashboard - Now with its own filters and URL sync */}
-      <ActionPlanDashboard />
     </div>;
 }

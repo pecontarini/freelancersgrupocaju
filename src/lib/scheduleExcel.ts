@@ -275,6 +275,12 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
         }
 
         // Row 1 = IDs (hidden), Row 2 = header, Rows 3+ = data
+        // Build name->meta map for robust lookup regardless of row order
+        const nameToMeta = new Map<string, typeof metaData[0]>();
+        for (const m of metaData) {
+          nameToMeta.set(m.employee_name.trim().toUpperCase(), m);
+        }
+
         const entries: ParsedScheduleEntry[] = [];
         const errors: ScheduleParseError[] = [];
         let workingCount = 0;
@@ -285,16 +291,15 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           const employeeName = String(row[0] || "").trim();
           if (!employeeName) continue;
 
-          // Find employee by name match (order-based from meta)
-          const empIndex = r - 3;
-          const empMeta = metaData[empIndex];
+          // Find employee by normalized name from __meta__ sheet
+          const empMeta = nameToMeta.get(employeeName.toUpperCase());
 
           if (!empMeta) {
             errors.push({
               row: r + 1,
               employeeName,
               dateLabel: "",
-              message: "Funcionário não encontrado no mapeamento. Não altere a ordem das linhas.",
+              message: "Funcionário não encontrado na aba __meta__. Verifique se o nome não foi alterado.",
             });
             continue;
           }

@@ -45,6 +45,7 @@ export function BudgetConfigSection() {
   const [maintenanceBudget, setMaintenanceBudget] = useState<string>("");
   const [uniformsBudget, setUniformsBudget] = useState<string>("");
   const [cleaningBudget, setCleaningBudget] = useState<string>("");
+  const [utensilsBudget, setUtensilsBudget] = useState<string>("");
 
   // Generate month options for the last 12 months and next 6 months
   const getMonthOptions = () => {
@@ -78,7 +79,7 @@ export function BudgetConfigSection() {
   };
 
   const calculateTotal = () => {
-    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget);
+    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget);
   };
 
   const handleSubmit = async () => {
@@ -88,8 +89,9 @@ export function BudgetConfigSection() {
     const maintenanceAmount = parseAmount(maintenanceBudget);
     const uniformsAmount = parseAmount(uniformsBudget);
     const cleaningAmount = parseAmount(cleaningBudget);
+    const utensilsAmount = parseAmount(utensilsBudget);
 
-    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0) return;
+    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0) return;
 
     await upsertBudget({
       store_id: selectedStoreId,
@@ -98,6 +100,7 @@ export function BudgetConfigSection() {
       maintenance_budget: maintenanceAmount,
       uniforms_budget: uniformsAmount,
       cleaning_budget: cleaningAmount,
+      utensils_budget: utensilsAmount,
     });
 
     setIsDialogOpen(false);
@@ -110,6 +113,7 @@ export function BudgetConfigSection() {
     setMaintenanceBudget("");
     setUniformsBudget("");
     setCleaningBudget("");
+    setUtensilsBudget("");
   };
 
   const handleDelete = async (budgetId: string) => {
@@ -262,6 +266,19 @@ export function BudgetConfigSection() {
                       onChange={(e) => setCleaningBudget(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="utensils-amount" className="flex items-center gap-1.5">
+                      <Wrench className="h-3.5 w-3.5 text-rose-500" />
+                      Utensílios
+                    </Label>
+                    <Input
+                      id="utensils-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={utensilsBudget}
+                      onChange={(e) => setUtensilsBudget(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded-lg bg-muted/50 p-3">
@@ -288,7 +305,7 @@ export function BudgetConfigSection() {
           </Dialog>
         </div>
         <CardDescription>
-          Defina orçamentos para Freelancers, Manutenção, Uniformes e Limpeza.
+        Defina orçamentos para Freelancers, Manutenção, Uniformes, Limpeza e Utensílios.
         </CardDescription>
       </CardHeader>
 
@@ -330,6 +347,12 @@ export function BudgetConfigSection() {
                       Limp.
                     </span>
                   </TableHead>
+                  <TableHead className="text-right">
+                    <span className="flex items-center justify-end gap-1">
+                      <Wrench className="h-3.5 w-3.5 text-rose-500" />
+                      Utens.
+                    </span>
+                  </TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
@@ -357,6 +380,9 @@ export function BudgetConfigSection() {
                     </TableCell>
                     <TableCell className="text-right text-cyan-600">
                       {formatCurrency(budget.cleaning_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-rose-600">
+                      {formatCurrency(budget.utensils_budget)}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
                       {formatCurrency(budget.total_budget)}

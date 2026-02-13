@@ -13,6 +13,7 @@ import {
   Eye,
   Sun,
   Moon,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,9 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
   SelectContent,
@@ -47,13 +46,14 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
-import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
+import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
 import { formatCurrency } from "@/lib/formatters";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { calculateDailyMetrics } from "@/lib/peakHours";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -79,26 +79,7 @@ export function ManualScheduleGrid() {
   const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [showAllEmployees, setShowAllEmployees] = useState(false);
-  const [selectedShiftType, setSelectedShiftType] = useState<string>("almoco");
 
-  // Shifts data
-  const { data: shifts = [] } = useShifts();
-  const shiftTypes = useMemo(() => [...new Set(shifts.map((s) => s.type))], [shifts]);
-  const shiftsByType = useMemo(() => {
-    const map = new Map<string, string[]>();
-    shifts.forEach((s) => {
-      const ids = map.get(s.type) || [];
-      ids.push(s.id);
-      map.set(s.type, ids);
-    });
-    return map;
-  }, [shifts]);
-  const activeShiftIds = useMemo(
-    () => new Set(shiftsByType.get(selectedShiftType) || []),
-    [shiftsByType, selectedShiftType]
-  );
-
-  // Auto-select first sector when sectors load
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
 
   // Sector job title mappings
@@ -122,7 +103,6 @@ export function ManualScheduleGrid() {
     isFreelancer: boolean;
     date: string;
     sectorId: string;
-    shiftType: string;
     existing: ManualSchedule | null;
   } | null>(null);
 
@@ -149,7 +129,6 @@ export function ManualScheduleGrid() {
   const filteredEmployees = useMemo(() => {
     const active = employees.filter(Boolean);
     if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) {
-      // If no mappings exist or "show all" is on, show everyone
       return active;
     }
     return active.filter((emp) => emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id));
@@ -165,6 +144,24 @@ export function ManualScheduleGrid() {
     });
   }, [filteredEmployees]);
 
+  // Build employee map for worker_type lookup
+  const employeeMap = useMemo(() => {
+    const m = new Map<string, string>();
+    employees.forEach((e) => m.set(e.id, e.worker_type || "clt"));
+    return m;
+  }, [employees]);
+
+  // Calculate daily metrics using time-intersection logic
+  function getDayMetrics(dateStr: string) {
+    const daySchedules = schedules
+      .filter((s) => s.schedule_date === dateStr && s.sector_id === activeSectorId)
+      .map((s) => ({
+        ...s,
+        worker_type: s.employee_id ? employeeMap.get(s.employee_id) || "clt" : "clt",
+      }));
+    return calculateDailyMetrics(daySchedules);
+  }
+
   function getPopTarget(dayOfWeek: number, shiftType: string): number {
     if (!activeSectorId) return 0;
     const entry = staffingMatrix.find(
@@ -173,42 +170,14 @@ export function ManualScheduleGrid() {
     return entry?.required_count ?? 0;
   }
 
-  function getScheduledCountByShift(dateStr: string, shiftType: string): number {
-    if (!activeSectorId) return 0;
-    const ids = shiftsByType.get(shiftType) || [];
-    const shiftIdSet = new Set(ids);
-    return schedules.filter(
-      (s) =>
-        s.schedule_date === dateStr &&
-        s.sector_id === activeSectorId &&
-        s.schedule_type === "working" &&
-        shiftIdSet.has(s.shift_id)
-    ).length;
-  }
-
-  // Filter schedules displayed in grid by selected shift type
-  const filteredSchedules = useMemo(() => {
-    return schedules.filter((s) => {
-      // Non-working types (off, vacation, sick_leave) show in all shifts
-      if (s.schedule_type !== "working") return true;
-      return activeShiftIds.has(s.shift_id);
-    });
-  }, [schedules, activeShiftIds]);
-
   function getScheduleForCell(employeeId: string, dateStr: string): ManualSchedule | undefined {
-    return filteredSchedules.find(
-      (s) => s.employee_id === employeeId && s.schedule_date === dateStr
+    return schedules.find(
+      (s) => s.employee_id === employeeId && s.schedule_date === dateStr && s.sector_id === activeSectorId
     );
   }
 
   function getBudgetForDay(dateStr: string) {
     return budgets.find((b) => b.date === dateStr);
-  }
-
-  function getFreelancerSpend(dateStr: string): number {
-    return schedules
-      .filter((s) => s.schedule_date === dateStr && s.agreed_rate > 0)
-      .reduce((sum, s) => sum + s.agreed_rate, 0);
   }
 
   function handleCellClick(emp: any, dateStr: string) {
@@ -220,7 +189,6 @@ export function ManualScheduleGrid() {
       isFreelancer: emp.worker_type === "freelancer",
       date: dateStr,
       sectorId: existing?.sector_id || activeSectorId || "",
-      shiftType: selectedShiftType,
       existing,
     });
   }
@@ -255,7 +223,7 @@ export function ManualScheduleGrid() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Editor de Escalas</h2>
           <p className="text-muted-foreground text-sm">
-            Lançamento manual de horários, folgas e freelancers.
+            Lançamento único por dia — o POP é calculado automaticamente pelo horário.
           </p>
         </div>
       </div>
@@ -301,7 +269,6 @@ export function ManualScheduleGrid() {
                 </TabsList>
               </Tabs>
 
-              {/* Show all toggle */}
               {hasSectorMappings && (
                 <div className="flex items-center gap-2 shrink-0">
                   <Switch
@@ -326,34 +293,6 @@ export function ManualScheduleGrid() {
                 <p className="text-xs mt-1">Configure setores na aba "Configurações" para usar a segmentação.</p>
               </CardContent>
             </Card>
-          )}
-
-          {/* Shift Type Selector */}
-          {shiftTypes.length > 0 && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">Turno:</span>
-              <ToggleGroup
-                type="single"
-                value={selectedShiftType}
-                onValueChange={(v) => v && setSelectedShiftType(v)}
-                className="gap-0 border rounded-lg"
-              >
-                {shiftTypes.map((st) => {
-                  const shiftLabel = shifts.find((s) => s.type === st)?.name || st;
-                  const Icon = st === "jantar" ? Moon : Sun;
-                  return (
-                    <ToggleGroupItem
-                      key={st}
-                      value={st}
-                      className="gap-1.5 px-4 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {shiftLabel}
-                    </ToggleGroupItem>
-                  );
-                })}
-              </ToggleGroup>
-            </div>
           )}
 
           {/* Week Navigation */}
@@ -404,29 +343,42 @@ export function ManualScheduleGrid() {
                         {weekDays.map((day, i) => {
                           const dateStr = format(day, "yyyy-MM-dd");
                           const budget = getBudgetForDay(dateStr);
-                          const spent = getFreelancerSpend(dateStr);
                           const jsDow = day.getDay();
-                          const popTarget = getPopTarget(jsDow, selectedShiftType);
-                          const scheduled = getScheduledCountByShift(dateStr, selectedShiftType);
+                          const popLunchTarget = getPopTarget(jsDow, "almoco");
+                          const popDinnerTarget = getPopTarget(jsDow, "jantar");
+                          const metrics = getDayMetrics(dateStr);
 
                           return (
-                            <TableHead key={i} className="text-center min-w-[130px] p-1">
+                            <TableHead key={i} className="text-center min-w-[140px] p-1">
                               <div className="space-y-0.5">
                                 <div className="font-semibold">{DAY_LABELS[i]}</div>
                                 <div className="text-[10px] font-normal text-muted-foreground">
                                   {format(day, "dd/MM")}
                                 </div>
 
-                                {/* POP Indicator per shift */}
-                                {activeSectorId && popTarget > 0 && (
-                                  <PopIndicator scheduled={scheduled} target={popTarget} />
+                                {/* Bloco A: Dual POP Indicators */}
+                                {activeSectorId && (
+                                  <div className="flex gap-1 justify-center mt-1">
+                                    <MiniPopBadge
+                                      icon={<Sun className="h-2.5 w-2.5" />}
+                                      scheduled={metrics.lunchCount}
+                                      target={popLunchTarget}
+                                      label="Alm"
+                                    />
+                                    <MiniPopBadge
+                                      icon={<Moon className="h-2.5 w-2.5" />}
+                                      scheduled={metrics.dinnerCount}
+                                      target={popDinnerTarget}
+                                      label="Jan"
+                                    />
+                                  </div>
                                 )}
 
-                                {/* Financial header */}
-                                <div className="text-[9px] font-normal space-y-0.5 mt-1">
-                                  <div className="flex items-center justify-center gap-1">
+                                {/* Bloco B: Financial Control */}
+                                <div className="text-[9px] font-normal space-y-0.5 mt-0.5">
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    <DollarSign className="h-2.5 w-2.5 text-muted-foreground" />
                                     <span className="text-muted-foreground">Verba:</span>
-                                    <span className="font-medium">{budget ? formatCurrency(budget.budget_amount) : "—"}</span>
                                     <Popover
                                       open={editingBudgetDate === dateStr}
                                       onOpenChange={(o) => {
@@ -439,8 +391,9 @@ export function ManualScheduleGrid() {
                                       }}
                                     >
                                       <PopoverTrigger asChild>
-                                        <button className="p-0.5 rounded hover:bg-muted">
-                                          <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                                        <button className="font-medium hover:underline inline-flex items-center gap-0.5">
+                                          {budget ? formatCurrency(budget.budget_amount) : "—"}
+                                          <Pencil className="h-2 w-2 text-muted-foreground" />
                                         </button>
                                       </PopoverTrigger>
                                       <PopoverContent className="w-48 p-2" align="center">
@@ -461,9 +414,13 @@ export function ManualScheduleGrid() {
                                       </PopoverContent>
                                     </Popover>
                                   </div>
-                                  {spent > 0 && (
-                                    <div className="text-orange-500 font-medium">
-                                      Gasto: {formatCurrency(spent)}
+                                  {metrics.freelancerCost > 0 && (
+                                    <div className={`font-medium ${
+                                      budget && metrics.freelancerCost > budget.budget_amount
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-green-600 dark:text-green-400"
+                                    }`}>
+                                      Gasto: {formatCurrency(metrics.freelancerCost)}
                                     </div>
                                   )}
                                 </div>
@@ -545,7 +502,6 @@ export function ManualScheduleGrid() {
           isFreelancer={editModal.isFreelancer}
           date={editModal.date}
           sectorId={editModal.sectorId}
-          shiftType={editModal.shiftType}
           existing={editModal.existing}
         />
       )}
@@ -564,42 +520,35 @@ export function ManualScheduleGrid() {
   );
 }
 
-/* ─── POP Compliance Indicator ─── */
+/* ─── Mini POP Badge (Almoço / Jantar) ─── */
 
-function PopIndicator({ scheduled, target }: { scheduled: number; target: number }) {
-  const pct = target > 0 ? Math.min((scheduled / target) * 100, 150) : 0;
+function MiniPopBadge({
+  icon,
+  scheduled,
+  target,
+  label,
+}: {
+  icon: React.ReactNode;
+  scheduled: number;
+  target: number;
+  label: string;
+}) {
   const isDeficit = scheduled < target;
   const isExcess = scheduled > target;
-  const isIdeal = scheduled === target;
 
-  let colorClass = "text-green-600 dark:text-green-400";
-  let progressColor = "bg-green-500";
-  let label = "✓ Ideal";
-
-  if (isDeficit) {
-    colorClass = "text-red-600 dark:text-red-400";
-    progressColor = "bg-red-500";
-    label = `Faltam ${target - scheduled}`;
+  let bgClass = "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
+  if (target === 0 && scheduled === 0) {
+    bgClass = "bg-muted text-muted-foreground";
+  } else if (isDeficit) {
+    bgClass = "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
   } else if (isExcess) {
-    colorClass = "text-yellow-600 dark:text-yellow-400";
-    progressColor = "bg-yellow-500";
-    label = `+${scheduled - target} extra`;
+    bgClass = "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
   }
 
   return (
-    <div className="space-y-0.5 mt-1">
-      <div className={`text-[9px] font-semibold ${colorClass}`}>
-        {scheduled}/{target} POP
-      </div>
-      <div className="mx-auto w-[80%]">
-        <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${progressColor}`}
-            style={{ width: `${Math.min(pct, 100)}%` }}
-          />
-        </div>
-      </div>
-      <div className={`text-[8px] ${colorClass}`}>{label}</div>
+    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`}>
+      {icon}
+      <span>{scheduled}/{target}</span>
     </div>
   );
 }

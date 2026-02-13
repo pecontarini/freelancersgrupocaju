@@ -30,7 +30,7 @@ interface ScheduleEditModalProps {
   isFreelancer: boolean;
   date: string; // YYYY-MM-DD
   sectorId: string;
-  shiftType: string;
+  shiftType?: string;
   existing?: ManualSchedule | null;
 }
 

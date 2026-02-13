@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { TrendingUp, Award, Target, Trophy, Medal, Star, AlertTriangle, Clock, Users, ChefHat, Filter, LayoutDashboard, UtensilsCrossed, Bike, Plus, Briefcase, Timer } from "lucide-react";
+import { TrendingUp, Award, Target, Trophy, Medal, Star, AlertTriangle, Clock, Users, ChefHat, Filter, UtensilsCrossed, Bike, Plus, Briefcase, Timer } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, ReferenceLine, Cell } from "recharts";
 import { ptBR } from "date-fns/locale";
@@ -20,8 +20,8 @@ import { ActionPlanDashboard } from "@/components/action-plan";
 import { AuditReportButton } from "@/components/AuditReportButton";
 import { CentralReclamacoes } from "@/components/complaints";
 import { ForecastingCard } from "@/components/dashboard/ForecastingCard";
-import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
-import { LeadershipRadar } from "@/components/dashboard/LeadershipRadar";
+
+
 import { WinsAlertsFeed } from "@/components/dashboard/WinsAlertsFeed";
 import { PerformanceEntryForm } from "@/components/dashboard/PerformanceEntryForm";
 import { PerformanceEntriesList } from "@/components/dashboard/PerformanceEntriesList";
@@ -547,9 +547,9 @@ export function RemuneracaoVariavelTab({
       {/* Wins & Alerts Feed - Activity Timeline */}
       <WinsAlertsFeed lojaId={selectedUnidadeId} showAllStores={isAdmin} />
 
-      {/* Strategic BI Section with Tabs */}
+       {/* Strategic BI Section with Tabs */}
       <Tabs defaultValue="forecast" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
           <TabsTrigger value="forecast" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             <span className="hidden sm:inline">Projeção</span>
@@ -557,14 +557,6 @@ export function RemuneracaoVariavelTab({
           <TabsTrigger value="rankings" className="flex items-center gap-2">
             <Trophy className="h-4 w-4" />
             <span className="hidden sm:inline">Rankings</span>
-          </TabsTrigger>
-          <TabsTrigger value="heatmap" className="flex items-center gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">Conformidade</span>
-          </TabsTrigger>
-          <TabsTrigger value="radar" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Competências</span>
           </TabsTrigger>
         </TabsList>
 
@@ -574,14 +566,6 @@ export function RemuneracaoVariavelTab({
 
         <TabsContent value="rankings" className="animate-fade-in">
           <RankingsTab />
-        </TabsContent>
-
-        <TabsContent value="heatmap" className="animate-fade-in">
-          <ComplianceHeatmap lojaId={selectedUnidadeId} />
-        </TabsContent>
-
-        <TabsContent value="radar" className="animate-fade-in">
-          <LeadershipRadar lojaId={selectedUnidadeId} />
         </TabsContent>
       </Tabs>
 

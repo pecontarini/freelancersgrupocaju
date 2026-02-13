@@ -114,6 +114,69 @@ export type Database = {
           },
         ]
       }
+      audit_sector_scores: {
+        Row: {
+          audit_date: string
+          audit_id: string
+          checklist_type: string
+          created_at: string
+          earned_points: number | null
+          id: string
+          item_count: number | null
+          loja_id: string
+          month_year: string
+          score: number
+          sector_code: string
+          total_points: number | null
+          updated_at: string
+        }
+        Insert: {
+          audit_date: string
+          audit_id: string
+          checklist_type: string
+          created_at?: string
+          earned_points?: number | null
+          id?: string
+          item_count?: number | null
+          loja_id: string
+          month_year: string
+          score?: number
+          sector_code: string
+          total_points?: number | null
+          updated_at?: string
+        }
+        Update: {
+          audit_date?: string
+          audit_id?: string
+          checklist_type?: string
+          created_at?: string
+          earned_points?: number | null
+          id?: string
+          item_count?: number | null
+          loja_id?: string
+          month_year?: string
+          score?: number
+          sector_code?: string
+          total_points?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_sector_scores_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "supervision_audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_sector_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_upload_logs: {
         Row: {
           audit_id: string | null

@@ -1,7 +1,7 @@
 // ============================================
-// LEADERSHIP PERFORMANCE CALCULATOR
-// Edge Function for continuous performance calculation
-// Triggered by: audit inserts, manual backfill, rule updates
+// LEADERSHIP PERFORMANCE CALCULATOR v2
+// "Média de Médias por Setor" engine
+// Uses audit_sector_scores as source of truth
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -16,24 +16,24 @@ const corsHeaders = {
 // ============================================
 
 type AuditChecklistType = 'SUPERVISOR' | 'FISCAL' | 'AUDITORIA_DE_ALIMENTOS';
-type LeadershipPositionCode = 
-  | 'chefe_salao' | 'chefe_apv' | 'chefe_parrilla' 
+type LeadershipPositionCode =
+  | 'chefe_salao' | 'chefe_apv' | 'chefe_parrilla'
   | 'chefe_bar' | 'chefe_cozinha' | 'gerente_back' | 'gerente_front';
-type AuditSectorCode = 
+type AuditSectorCode =
   | 'salao' | 'area_comum' | 'documentos' | 'lavagem' | 'delivery'
   | 'asg' | 'manutencao' | 'brinquedoteca' | 'recepcao'
   | 'estoque' | 'cozinha' | 'cozinha_quente' | 'saladas_sobremesas'
   | 'parrilla' | 'sushi' | 'bar' | 'dml' | 'outros';
 
-interface AuditScoreEntry {
+interface SectorScoreRow {
   id: string;
-  auditId: string;
-  lojaId: string;
-  sector: AuditSectorCode;
-  checklistType: AuditChecklistType;
+  audit_id: string;
+  loja_id: string;
+  sector_code: string;
+  checklist_type: string;
   score: number;
-  auditDate: string;
-  monthYear: string;
+  audit_date: string;
+  month_year: string;
 }
 
 interface PositionBreakdown {
@@ -41,6 +41,7 @@ interface PositionBreakdown {
   label: string;
   averageScore: number;
   weight: number;
+  sectorAverages: { sector: string; average: number; count: number }[];
   auditCount: number;
 }
 
@@ -59,6 +60,24 @@ const AUDIT_TYPE_LABELS: Record<AuditChecklistType, string> = {
   FISCAL: 'Fiscal',
   AUDITORIA_DE_ALIMENTOS: 'Auditoria de Alimentos',
 };
+
+const TIER_THRESHOLDS = [
+  { tier: 'ouro', minScore: 95 },
+  { tier: 'prata', minScore: 90 },
+  { tier: 'bronze', minScore: 85 },
+  { tier: 'red_flag', minScore: 0 },
+];
+
+function getTier(score: number): string {
+  for (const t of TIER_THRESHOLDS) {
+    if (score >= t.minScore) return t.tier;
+  }
+  return 'red_flag';
+}
+
+// ============================================
+// POSITION ROUTING RULES (Regra Mãe)
+// ============================================
 
 const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, {
   rules: Partial<Record<AuditChecklistType, AuditSectorCode[] | null>>;
@@ -122,37 +141,27 @@ const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, {
   },
 };
 
-const SECTOR_KEYWORDS: Record<AuditSectorCode, string[]> = {
-  salao: ['salão', 'salao', 'mesa', 'cadeira', 'atendimento', 'cardápio', 'cliente', 'ambiente', 'decoração', 'garçom', 'garcom'],
-  area_comum: ['área comum', 'area comum', 'corredor', 'escada', 'elevador', 'hall', 'banheiro', 'sanitário', 'sanitario', 'wc', 'toalete', 'lavabo', 'fachada', 'letreiro', 'luminoso', 'calçada', 'estacionamento'],
-  documentos: ['documentos', 'documento', 'alvará', 'alvara', 'licença', 'licenca', 'certificado', 'registro', 'fiscalização'],
-  lavagem: ['lavagem', 'lavar', 'louça', 'louca', 'copa', 'higienização louça', 'área de lavagem'],
-  delivery: ['delivery', 'ifood', 'entrega', 'aplicativo', 'motoboy', 'rappi', 'uber eats', 'expedição', 'expedicao'],
-  asg: ['asg', 'auxiliar serviços gerais', 'serviços gerais', 'limpeza geral', 'higienização'],
-  manutencao: ['manutenção', 'manutencao', 'ar condicionado', 'elétrica', 'eletrica', 'hidráulica', 'hidraulica', 'reparo', 'equipamento'],
-  brinquedoteca: ['brinquedoteca', 'espaço kids', 'espaco kids', 'criança', 'crianca', 'playground', 'recreação', 'recreacao'],
-  recepcao: ['recepção', 'recepcao', 'hostess', 'entrada', 'fila', 'reserva', 'espera'],
-  estoque: ['estoque', 'armazenamento', 'validade', 'etiqueta', 'organização', 'fifo', 'peps', 'depósito', 'deposito', 'recebimento', 'fornecedor', 'nota fiscal'],
-  cozinha: ['cozinha', 'preparo', 'alimento', 'temperatura', 'geladeira', 'freezer', 'manipulação', 'cocção'],
-  cozinha_quente: ['cozinha quente', 'fogão', 'fogao', 'forno', 'chapa', 'fritura', 'fritadeira', 'panela'],
-  saladas_sobremesas: ['salada', 'sobremesa', 'fria', 'cold', 'dessert', 'confeitaria', 'doce', 'fruta', 'verdura', 'legume'],
-  parrilla: ['parrilla', 'churrasqueira', 'grelhado', 'carne', 'brasa', 'parrillero', 'grelha', 'churrasco'],
-  sushi: ['sushi', 'japonês', 'japones', 'sashimi', 'temaki', 'oriental', 'peixe cru', 'niguiri'],
-  bar: ['bar', 'bebida', 'drink', 'coquetel', 'cerveja', 'vinho', 'gelo', 'bebidas', 'bartender'],
-  dml: ['dml', 'depósito material limpeza', 'produtos químicos', 'quimicos', 'material de limpeza', 'detergente', 'desinfetante'],
-  outros: ['higiene', 'outros', 'geral'],
+// Sector keywords for fallback categorization from failures
+const SECTOR_KEYWORDS: Record<string, string[]> = {
+  salao: ['salão', 'salao', 'mesa', 'cadeira', 'atendimento', 'cardápio', 'cliente', 'ambiente', 'garçom', 'garcom'],
+  area_comum: ['área comum', 'area comum', 'corredor', 'banheiro', 'sanitário', 'fachada', 'estacionamento'],
+  documentos: ['documentos', 'documento', 'alvará', 'licença', 'certificado'],
+  lavagem: ['lavagem', 'lavar', 'louça', 'louca', 'copa'],
+  delivery: ['delivery', 'ifood', 'entrega', 'motoboy', 'rappi'],
+  asg: ['asg', 'serviços gerais', 'limpeza geral', 'higienização'],
+  manutencao: ['manutenção', 'manutencao', 'ar condicionado', 'elétrica', 'hidráulica'],
+  brinquedoteca: ['brinquedoteca', 'espaço kids', 'criança', 'playground'],
+  recepcao: ['recepção', 'recepcao', 'hostess', 'entrada', 'reserva'],
+  estoque: ['estoque', 'armazenamento', 'validade', 'fifo', 'depósito', 'recebimento'],
+  cozinha: ['cozinha', 'preparo', 'alimento', 'temperatura', 'geladeira', 'freezer'],
+  cozinha_quente: ['cozinha quente', 'fogão', 'forno', 'chapa', 'fritura'],
+  saladas_sobremesas: ['salada', 'sobremesa', 'fria', 'confeitaria', 'doce', 'fruta', 'verdura'],
+  parrilla: ['parrilla', 'churrasqueira', 'grelhado', 'carne', 'brasa', 'grelha'],
+  sushi: ['sushi', 'japonês', 'sashimi', 'temaki', 'oriental'],
+  bar: ['bar', 'bebida', 'drink', 'coquetel', 'cerveja', 'vinho', 'bartender'],
+  dml: ['dml', 'material limpeza', 'produtos químicos', 'detergente'],
+  outros: ['outros', 'geral'],
 };
-
-const TIER_THRESHOLDS = [
-  { tier: 'ouro', minScore: 95 },
-  { tier: 'prata', minScore: 90 },
-  { tier: 'bronze', minScore: 85 },
-  { tier: 'red_flag', minScore: 0 },
-];
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
 
 function normalizeText(text: string): string {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -160,149 +169,95 @@ function normalizeText(text: string): string {
 
 function categorizeSector(itemName: string, category?: string | null): AuditSectorCode {
   const searchText = normalizeText(`${itemName} ${category || ''}`);
-
-  // Check category first (more accurate)
   if (category) {
-    const categoryLower = normalizeText(category);
-    for (const [sectorCode, keywords] of Object.entries(SECTOR_KEYWORDS)) {
-      const normalized = keywords.map(normalizeText);
-      if (normalized.some(kw => categoryLower.includes(kw))) {
-        return sectorCode as AuditSectorCode;
+    const catNorm = normalizeText(category);
+    for (const [code, keywords] of Object.entries(SECTOR_KEYWORDS)) {
+      if (keywords.map(normalizeText).some(kw => catNorm.includes(kw))) {
+        return code as AuditSectorCode;
       }
     }
   }
-
-  // Then check item name
-  for (const [sectorCode, keywords] of Object.entries(SECTOR_KEYWORDS)) {
-    const normalized = keywords.map(normalizeText);
-    if (normalized.some(kw => searchText.includes(kw))) {
-      return sectorCode as AuditSectorCode;
+  for (const [code, keywords] of Object.entries(SECTOR_KEYWORDS)) {
+    if (keywords.map(normalizeText).some(kw => searchText.includes(kw))) {
+      return code as AuditSectorCode;
     }
   }
-
   return 'outros';
 }
 
 function detectChecklistType(category?: string | null): AuditChecklistType {
-  const searchText = (category || '').toLowerCase();
-  if (searchText.includes('fiscal')) return 'FISCAL';
-  if (searchText.includes('alimento') || searchText.includes('food')) return 'AUDITORIA_DE_ALIMENTOS';
+  const text = (category || '').toLowerCase();
+  if (text.includes('fiscal')) return 'FISCAL';
+  if (text.includes('alimento') || text.includes('food')) return 'AUDITORIA_DE_ALIMENTOS';
   return 'SUPERVISOR';
 }
 
-function getTier(score: number): string {
-  for (const t of TIER_THRESHOLDS) {
-    if (score >= t.minScore) return t.tier;
-  }
-  return 'red_flag';
-}
+// ============================================
+// CORE: "Média de Médias por Setor" ENGINE
+// ============================================
 
-function isSectorValidForPosition(
+/**
+ * Calculate performance for a position using the "average of averages by sector" logic:
+ * 1. Filter sector scores valid for this position per checklist type
+ * 2. For each checklist type: average the scores of valid sectors  
+ * 3. Weighted average across checklist types (Supervisor×2, Fiscal×1, Alimentos×1)
+ */
+function calculatePositionFromSectorScores(
   position: LeadershipPositionCode,
-  sector: AuditSectorCode,
-  checklistType: AuditChecklistType
-): boolean {
+  sectorScores: SectorScoreRow[]
+): { finalScore: number | null; tier: string | null; breakdown: PositionBreakdown[]; totalAudits: number } {
   const rule = POSITION_ROUTING_RULES[position];
-  if (!rule) return false;
-  const validSectors = rule.rules[checklistType];
-  if (!validSectors) return false;
-  return validSectors.includes(sector);
-}
+  if (!rule) return { finalScore: null, tier: null, breakdown: [], totalAudits: 0 };
 
-function getValidChecklistTypesForPosition(position: LeadershipPositionCode): AuditChecklistType[] {
-  const rule = POSITION_ROUTING_RULES[position];
-  if (!rule) return [];
-  const types: AuditChecklistType[] = [];
-  for (const [type, sectors] of Object.entries(rule.rules)) {
-    if (sectors !== null && sectors !== undefined) {
-      types.push(type as AuditChecklistType);
+  const breakdown: PositionBreakdown[] = [];
+  let weightedSum = 0;
+  let totalWeight = 0;
+  let totalAudits = 0;
+
+  for (const [checklistType, validSectors] of Object.entries(rule.rules)) {
+    if (validSectors === null || validSectors === undefined) continue;
+
+    // Filter sector scores matching this checklist type AND valid sectors
+    const matchingScores = sectorScores.filter(
+      s => s.checklist_type === checklistType && validSectors.includes(s.sector_code as AuditSectorCode)
+    );
+
+    if (matchingScores.length === 0) continue;
+
+    // Step 1: Group by sector and calculate average per sector
+    const sectorGroups = new Map<string, number[]>();
+    for (const s of matchingScores) {
+      const existing = sectorGroups.get(s.sector_code) || [];
+      existing.push(s.score);
+      sectorGroups.set(s.sector_code, existing);
     }
-  }
-  return types;
-}
 
-// ============================================
-// CALCULATION ENGINE
-// ============================================
+    const sectorAverages: { sector: string; average: number; count: number }[] = [];
+    for (const [sector, scores] of sectorGroups) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      sectorAverages.push({ sector, average: avg, count: scores.length });
+    }
 
-function createScoreEntries(
-  audits: Array<{ id: string; loja_id: string; audit_date: string; global_score: number }>,
-  failures: Array<{ audit_id: string; loja_id: string; item_name: string; category?: string | null }>
-): AuditScoreEntry[] {
-  const entries: AuditScoreEntry[] = [];
+    // Step 2: Average across sectors (each sector counts equally)
+    const typeAverage = sectorAverages.reduce((sum, s) => sum + s.average, 0) / sectorAverages.length;
 
-  for (const audit of audits) {
-    const auditDate = new Date(audit.audit_date);
-    const monthYear = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
-    
-    // Detect checklist type from failures
-    const auditFailures = failures.filter(f => f.audit_id === audit.id);
-    const checklistType = detectChecklistType(auditFailures[0]?.category);
+    const weight = AUDIT_TYPE_WEIGHTS[checklistType as AuditChecklistType];
+    weightedSum += typeAverage * weight;
+    totalWeight += weight;
+    totalAudits += matchingScores.length;
 
-    // Use the REAL global_score from the PDF directly - ONE entry per audit
-    entries.push({
-      id: audit.id,
-      auditId: audit.id,
-      lojaId: audit.loja_id,
-      sector: 'outros', // Sector is irrelevant for whole-store audits
-      checklistType,
-      score: audit.global_score, // EXACT score from the PDF
-      auditDate: audit.audit_date,
-      monthYear,
+    breakdown.push({
+      checklistType: checklistType as AuditChecklistType,
+      label: AUDIT_TYPE_LABELS[checklistType as AuditChecklistType],
+      averageScore: typeAverage,
+      weight,
+      sectorAverages,
+      auditCount: matchingScores.length,
     });
   }
 
-  return entries;
-}
-
-function calculatePositionPerformance(
-  position: LeadershipPositionCode,
-  scores: AuditScoreEntry[]
-): { finalScore: number | null; tier: string | null; breakdown: PositionBreakdown[]; totalAudits: number } {
-  // Filter by checklist type only (not sector) since audits are whole-store
-  const validTypes = getValidChecklistTypesForPosition(position);
-  const validScores = scores.filter(entry => validTypes.includes(entry.checklistType));
-
-  // Group by checklist type
-  const groups = new Map<AuditChecklistType, AuditScoreEntry[]>();
-  for (const entry of validScores) {
-    const existing = groups.get(entry.checklistType) || [];
-    existing.push(entry);
-    groups.set(entry.checklistType, existing);
-  }
-
-  // Calculate averages per type
-  const typeAverages = new Map<AuditChecklistType, { average: number; count: number }>();
-  for (const [type, entries] of groups) {
-    const sum = entries.reduce((acc, e) => acc + e.score, 0);
-    typeAverages.set(type, { average: sum / entries.length, count: entries.length });
-  }
-
-  // Build breakdown
-  const breakdown: PositionBreakdown[] = validTypes
-    .map(type => {
-      const data = typeAverages.get(type);
-      return {
-        checklistType: type,
-        label: AUDIT_TYPE_LABELS[type],
-        averageScore: data?.average ?? 0,
-        weight: AUDIT_TYPE_WEIGHTS[type],
-        auditCount: data?.count ?? 0,
-      };
-    })
-    .filter(b => b.auditCount > 0);
-
-  // Calculate weighted average
-  let weightedSum = 0;
-  let totalWeight = 0;
-  for (const [type, { average }] of typeAverages) {
-    const weight = AUDIT_TYPE_WEIGHTS[type];
-    weightedSum += average * weight;
-    totalWeight += weight;
-  }
-
   if (totalWeight === 0) {
-    return { finalScore: null, tier: null, breakdown, totalAudits: validScores.length };
+    return { finalScore: null, tier: null, breakdown, totalAudits };
   }
 
   const finalScore = weightedSum / totalWeight;
@@ -310,8 +265,143 @@ function calculatePositionPerformance(
     finalScore,
     tier: getTier(finalScore),
     breakdown,
-    totalAudits: validScores.length,
+    totalAudits,
   };
+}
+
+// ============================================
+// BACKFILL: Generate sector scores from existing data
+// ============================================
+
+async function backfillSectorScores(
+  supabase: ReturnType<typeof createClient>,
+  lojaId?: string,
+  monthYear?: string
+) {
+  console.log('[backfill] Starting sector scores backfill...');
+
+  // Fetch audits
+  let auditsQuery = supabase.from('supervision_audits').select('id, loja_id, audit_date, global_score');
+  if (lojaId) auditsQuery = auditsQuery.eq('loja_id', lojaId);
+  if (monthYear) {
+    const [year, month] = monthYear.split('-');
+    const startDate = `${year}-${month}-01`;
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    auditsQuery = auditsQuery.gte('audit_date', startDate).lte('audit_date', `${year}-${month}-${lastDay}`);
+  }
+
+  const { data: audits, error: auditsError } = await auditsQuery;
+  if (auditsError) throw auditsError;
+  if (!audits || audits.length === 0) {
+    console.log('[backfill] No audits found');
+    return 0;
+  }
+
+  // Fetch failures for these audits
+  const auditIds = audits.map(a => a.id);
+  
+  // Batch fetch failures (handle >1000 audits)
+  let allFailures: Array<{ audit_id: string; loja_id: string; item_name: string; category: string | null }> = [];
+  for (let i = 0; i < auditIds.length; i += 500) {
+    const batch = auditIds.slice(i, i + 500);
+    const { data: failures, error: failuresError } = await supabase
+      .from('supervision_failures')
+      .select('audit_id, loja_id, item_name, category')
+      .in('audit_id', batch);
+    if (failuresError) throw failuresError;
+    allFailures = allFailures.concat(failures || []);
+  }
+
+  // Generate sector scores for each audit
+  const sectorScoreRows: Array<{
+    audit_id: string;
+    loja_id: string;
+    sector_code: string;
+    checklist_type: string;
+    score: number;
+    total_points: number;
+    earned_points: number;
+    item_count: number;
+    audit_date: string;
+    month_year: string;
+  }> = [];
+
+  for (const audit of audits) {
+    const auditDate = new Date(audit.audit_date);
+    const my = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
+    const auditFailures = allFailures.filter(f => f.audit_id === audit.id);
+    const checklistType = detectChecklistType(auditFailures[0]?.category);
+
+    // Categorize failures into sectors
+    const sectorFailureCounts = new Map<string, number>();
+    for (const f of auditFailures) {
+      const sector = categorizeSector(f.item_name, f.category);
+      sectorFailureCounts.set(sector, (sectorFailureCounts.get(sector) || 0) + 1);
+    }
+
+    if (sectorFailureCounts.size === 0) {
+      // No failures at all → whole audit scored at global_score, assign to 'outros'
+      sectorScoreRows.push({
+        audit_id: audit.id,
+        loja_id: audit.loja_id,
+        sector_code: 'outros',
+        checklist_type: checklistType,
+        score: audit.global_score,
+        total_points: 100,
+        earned_points: audit.global_score,
+        item_count: 1,
+        audit_date: audit.audit_date,
+        month_year: my,
+      });
+    } else {
+      // Distribute the global score proportionally across sectors
+      // Sectors with MORE failures get LOWER scores
+      const totalFailures = auditFailures.length;
+      
+      // Each sector gets a score based on its share of failures
+      // If global = 85% and sector has 60% of failures, that sector is worse
+      for (const [sector, failCount] of sectorFailureCounts) {
+        // Weighted failure proportion for this sector
+        const failureProportion = failCount / totalFailures;
+        // Total loss = 100 - global_score
+        const totalLoss = 100 - audit.global_score;
+        // This sector's estimated loss (proportional to its failure share)
+        // But we also adjust so average comes back to global_score
+        const sectorLoss = totalLoss * failureProportion * sectorFailureCounts.size;
+        const sectorScore = Math.max(0, Math.min(100, 100 - sectorLoss));
+
+        sectorScoreRows.push({
+          audit_id: audit.id,
+          loja_id: audit.loja_id,
+          sector_code: sector,
+          checklist_type: checklistType,
+          score: Math.round(sectorScore * 100) / 100,
+          total_points: 100,
+          earned_points: Math.round(sectorScore * 100) / 100,
+          item_count: failCount,
+          audit_date: audit.audit_date,
+          month_year: my,
+        });
+      }
+    }
+  }
+
+  // Upsert sector scores in batches
+  let inserted = 0;
+  for (let i = 0; i < sectorScoreRows.length; i += 200) {
+    const batch = sectorScoreRows.slice(i, i + 200);
+    const { error: upsertError } = await supabase
+      .from('audit_sector_scores')
+      .upsert(batch, { onConflict: 'audit_id,sector_code,checklist_type' });
+    if (upsertError) {
+      console.error('[backfill] Upsert error:', upsertError);
+    } else {
+      inserted += batch.length;
+    }
+  }
+
+  console.log(`[backfill] Inserted/updated ${inserted} sector scores from ${audits.length} audits`);
+  return inserted;
 }
 
 // ============================================
@@ -329,8 +419,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const body = await req.json();
-    const { 
-      action = 'calculate', // 'calculate' | 'backfill'
+    const {
+      action = 'calculate',
       loja_id,
       month_year,
       trigger_type = 'manual',
@@ -340,7 +430,7 @@ Deno.serve(async (req) => {
     console.log(`[calculate-leadership-performance] Action: ${action}, Store: ${loja_id || 'all'}, Month: ${month_year || 'all'}`);
 
     // Create calculation log entry
-    const { data: logEntry, error: logError } = await supabase
+    const { data: logEntry } = await supabase
       .from('leadership_calculation_log')
       .insert({
         loja_id: loja_id || null,
@@ -352,75 +442,50 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    if (logError) {
-      console.error('Failed to create log entry:', logError);
+    // Step 1: Backfill sector scores from existing audit data
+    if (action === 'backfill' || action === 'calculate') {
+      await backfillSectorScores(supabase, loja_id, month_year);
     }
 
-    // Fetch audits
-    let auditsQuery = supabase.from('supervision_audits').select('id, loja_id, audit_date, global_score');
-    if (loja_id) {
-      auditsQuery = auditsQuery.eq('loja_id', loja_id);
-    }
-    if (month_year) {
-      const [year, month] = month_year.split('-');
-      const startDate = `${year}-${month}-01`;
-      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-      const endDate = `${year}-${month}-${lastDay}`;
-      auditsQuery = auditsQuery.gte('audit_date', startDate).lte('audit_date', endDate);
-    }
+    // Step 2: Read sector scores
+    let scoresQuery = supabase.from('audit_sector_scores').select('*');
+    if (loja_id) scoresQuery = scoresQuery.eq('loja_id', loja_id);
+    if (month_year) scoresQuery = scoresQuery.eq('month_year', month_year);
 
-    const { data: audits, error: auditsError } = await auditsQuery;
-    if (auditsError) throw auditsError;
+    const { data: sectorScores, error: scoresError } = await scoresQuery;
+    if (scoresError) throw scoresError;
 
-    // Fetch failures
-    const auditIds = audits?.map(a => a.id) || [];
-    let failures: Array<{ audit_id: string; loja_id: string; item_name: string; category: string | null }> = [];
-    
-    if (auditIds.length > 0) {
-      const { data: failuresData, error: failuresError } = await supabase
-        .from('supervision_failures')
-        .select('audit_id, loja_id, item_name, category')
-        .in('audit_id', auditIds);
-      
-      if (failuresError) throw failuresError;
-      failures = failuresData || [];
-    }
-
-    // Create score entries
-    const scoreEntries = createScoreEntries(audits || [], failures);
-
-    // Group by store and month
-    const storeMonthGroups = new Map<string, AuditScoreEntry[]>();
-    for (const entry of scoreEntries) {
-      const key = `${entry.lojaId}|${entry.monthYear}`;
+    // Step 3: Group by store and month
+    const storeMonthGroups = new Map<string, SectorScoreRow[]>();
+    for (const score of (sectorScores || [])) {
+      const key = `${score.loja_id}|${score.month_year}`;
       const existing = storeMonthGroups.get(key) || [];
-      existing.push(entry);
+      existing.push(score as SectorScoreRow);
       storeMonthGroups.set(key, existing);
     }
 
-    // Calculate and upsert scores
+    // Step 4: Calculate and persist position scores
     const positions: LeadershipPositionCode[] = [
-      'chefe_salao', 'chefe_apv', 'chefe_parrilla', 
+      'chefe_salao', 'chefe_apv', 'chefe_parrilla',
       'chefe_bar', 'chefe_cozinha', 'gerente_front', 'gerente_back'
     ];
 
     let positionsUpdated = 0;
     let storesUpdated = 0;
 
-    for (const [key, entries] of storeMonthGroups) {
-      const [lojaId, monthYear] = key.split('|');
+    for (const [key, scores] of storeMonthGroups) {
+      const [storeId, monthYearKey] = key.split('|');
       storesUpdated++;
 
-      // Calculate position scores
+      // Calculate position scores using "Média de Médias por Setor"
       for (const position of positions) {
-        const result = calculatePositionPerformance(position, entries);
-        
-        // Upsert to leadership_performance_scores
+        const result = calculatePositionFromSectorScores(position, scores);
+
         const { error: upsertError } = await supabase
           .from('leadership_performance_scores')
           .upsert({
-            loja_id: lojaId,
-            month_year: monthYear,
+            loja_id: storeId,
+            month_year: monthYearKey,
             position_code: position,
             final_score: result.finalScore,
             tier: result.tier,
@@ -440,33 +505,58 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Calculate store-level scores using REAL global_scores directly
-      const storeAudits = (audits || []).filter(a => a.loja_id === lojaId);
-      const storeAuditScores = storeAudits.map(a => a.global_score);
-      const generalScore = storeAuditScores.length > 0 
-        ? storeAuditScores.reduce((a, b) => a + b, 0) / storeAuditScores.length 
+      // Calculate store-level scores
+      // General score = simple average of ALL sector scores (all types)
+      const allScoreValues = scores.map(s => s.score);
+      const generalScore = allScoreValues.length > 0
+        ? allScoreValues.reduce((a, b) => a + b, 0) / allScoreValues.length
         : null;
 
-      // Front/Back scores are the same as general for whole-store audits
-      const frontScore = generalScore;
-      const backScore = generalScore;
+      // Front/Back scores from their respective managers
+      const frontResult = calculatePositionFromSectorScores('gerente_front', scores);
+      const backResult = calculatePositionFromSectorScores('gerente_back', scores);
 
-      const storeFailures = failures.filter(f => f.loja_id === lojaId);
+      // Count failures per area
+      const frontSectors = new Set(POSITION_ROUTING_RULES.gerente_front.rules.SUPERVISOR || []);
+      const backSectors = new Set(POSITION_ROUTING_RULES.gerente_back.rules.SUPERVISOR || []);
+
+      // Get failure counts from supervision_failures for this store/month
+      const auditIds = [...new Set(scores.map(s => s.audit_id))];
+      let frontFailures = 0;
+      let backFailures = 0;
+      let totalFailures = 0;
+
+      if (auditIds.length > 0) {
+        const { data: failures } = await supabase
+          .from('supervision_failures')
+          .select('item_name, category')
+          .in('audit_id', auditIds.slice(0, 500));
+
+        if (failures) {
+          totalFailures = failures.length;
+          for (const f of failures) {
+            const sector = categorizeSector(f.item_name, f.category);
+            if (frontSectors.has(sector)) frontFailures++;
+            else if (backSectors.has(sector)) backFailures++;
+          }
+        }
+      }
+
       const { error: storeUpsertError } = await supabase
         .from('leadership_store_scores')
         .upsert({
-          loja_id: lojaId,
-          month_year: monthYear,
+          loja_id: storeId,
+          month_year: monthYearKey,
           general_score: generalScore,
-          front_score: frontScore,
-          back_score: backScore,
+          front_score: frontResult.finalScore,
+          back_score: backResult.finalScore,
           general_tier: generalScore !== null ? getTier(generalScore) : null,
-          front_tier: frontScore !== null ? getTier(frontScore) : null,
-          back_tier: backScore !== null ? getTier(backScore) : null,
-          total_audits: storeAudits.length,
-          total_failures: storeFailures.length,
-          front_failures: 0, // Will be populated when sector-specific audits are available
-          back_failures: 0,
+          front_tier: frontResult.tier,
+          back_tier: backResult.tier,
+          total_audits: auditIds.length,
+          total_failures: totalFailures,
+          front_failures: frontFailures,
+          back_failures: backFailures,
           calculated_at: new Date().toISOString(),
         }, {
           onConflict: 'loja_id,month_year',
@@ -490,24 +580,25 @@ Deno.serve(async (req) => {
         .eq('id', logEntry.id);
     }
 
-    return new Response(JSON.stringify({
+    const response = {
       success: true,
-      message: `Calculated performance for ${storesUpdated} store-months, ${positionsUpdated} position scores updated`,
+      action,
       storesProcessed: storesUpdated,
       positionsUpdated,
-      auditsProcessed: audits?.length || 0,
-    }), {
+      algorithm: 'media_de_medias_por_setor_v2',
+    };
+
+    console.log('[calculate-leadership-performance] Result:', response);
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (error) {
     console.error('[calculate-leadership-performance] Error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });

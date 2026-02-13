@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList } from "lucide-react";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
+import { D1ManagementPanel } from "./D1ManagementPanel";
 import { TeamManagement } from "./TeamManagement";
 import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
@@ -28,15 +29,20 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Editor de Escalas</span>
           <span className="sm:hidden">Escalas</span>
         </TabsTrigger>
-        <TabsTrigger value="quadro" className="gap-1.5 relative">
-          <ShieldCheck className="h-4 w-4" />
-          <span className="hidden sm:inline">Painel D-1</span>
+        <TabsTrigger value="d1" className="gap-1.5 relative">
+          <ClipboardList className="h-4 w-4" />
+          <span className="hidden sm:inline">Gestão D-1</span>
           <span className="sm:hidden">D-1</span>
           {hasRisk && (
             <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
               {confirmations!.pending + confirmations!.denied}
             </span>
           )}
+        </TabsTrigger>
+        <TabsTrigger value="quadro" className="gap-1.5">
+          <ShieldCheck className="h-4 w-4" />
+          <span className="hidden sm:inline">Quadro Operacional</span>
+          <span className="sm:hidden">Quadro</span>
         </TabsTrigger>
         <TabsTrigger value="equipe" className="gap-1.5">
           <Users className="h-4 w-4" />
@@ -60,6 +66,9 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
 
       <TabsContent value="scheduler">
         <ManualScheduleGrid />
+      </TabsContent>
+      <TabsContent value="d1">
+        <D1ManagementPanel />
       </TabsContent>
       <TabsContent value="quadro">
         <OperationalDashboard />

@@ -225,56 +225,31 @@ function getValidChecklistTypesForPosition(position: LeadershipPositionCode): Au
 // CALCULATION ENGINE
 // ============================================
 
-function createSectorLevelEntries(
+function createScoreEntries(
   audits: Array<{ id: string; loja_id: string; audit_date: string; global_score: number }>,
   failures: Array<{ audit_id: string; loja_id: string; item_name: string; category?: string | null }>
 ): AuditScoreEntry[] {
   const entries: AuditScoreEntry[] = [];
 
   for (const audit of audits) {
-    const auditFailures = failures.filter(f => f.audit_id === audit.id);
-    const sectorGroups = new Map<AuditSectorCode, number>();
-    
-    for (const failure of auditFailures) {
-      const sector = categorizeSector(failure.item_name, failure.category);
-      sectorGroups.set(sector, (sectorGroups.get(sector) || 0) + 1);
-    }
-
     const auditDate = new Date(audit.audit_date);
     const monthYear = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Detect checklist type from failures
+    const auditFailures = failures.filter(f => f.audit_id === audit.id);
     const checklistType = detectChecklistType(auditFailures[0]?.category);
-    const totalFailures = auditFailures.length;
 
-    for (const [sector, failureCount] of sectorGroups) {
-      const failureRatio = failureCount / Math.max(1, totalFailures);
-      const globalPenalty = 100 - audit.global_score;
-      const sectorPenalty = globalPenalty * failureRatio * 1.5;
-      const sectorScore = Math.max(0, Math.min(100, 100 - sectorPenalty));
-
-      entries.push({
-        id: `${audit.id}-${sector}`,
-        auditId: audit.id,
-        lojaId: audit.loja_id,
-        sector,
-        checklistType,
-        score: sectorScore,
-        auditDate: audit.audit_date,
-        monthYear,
-      });
-    }
-
-    if (sectorGroups.size === 0) {
-      entries.push({
-        id: `${audit.id}-global`,
-        auditId: audit.id,
-        lojaId: audit.loja_id,
-        sector: 'outros',
-        checklistType,
-        score: audit.global_score,
-        auditDate: audit.audit_date,
-        monthYear,
-      });
-    }
+    // Use the REAL global_score from the PDF directly - ONE entry per audit
+    entries.push({
+      id: audit.id,
+      auditId: audit.id,
+      lojaId: audit.loja_id,
+      sector: 'outros', // Sector is irrelevant for whole-store audits
+      checklistType,
+      score: audit.global_score, // EXACT score from the PDF
+      auditDate: audit.audit_date,
+      monthYear,
+    });
   }
 
   return entries;
@@ -284,9 +259,9 @@ function calculatePositionPerformance(
   position: LeadershipPositionCode,
   scores: AuditScoreEntry[]
 ): { finalScore: number | null; tier: string | null; breakdown: PositionBreakdown[]; totalAudits: number } {
-  const validScores = scores.filter(entry =>
-    isSectorValidForPosition(position, entry.sector, entry.checklistType)
-  );
+  // Filter by checklist type only (not sector) since audits are whole-store
+  const validTypes = getValidChecklistTypesForPosition(position);
+  const validScores = scores.filter(entry => validTypes.includes(entry.checklistType));
 
   // Group by checklist type
   const groups = new Map<AuditChecklistType, AuditScoreEntry[]>();
@@ -304,7 +279,6 @@ function calculatePositionPerformance(
   }
 
   // Build breakdown
-  const validTypes = getValidChecklistTypesForPosition(position);
   const breakdown: PositionBreakdown[] = validTypes
     .map(type => {
       const data = typeAverages.get(type);
@@ -413,7 +387,7 @@ Deno.serve(async (req) => {
     }
 
     // Create score entries
-    const scoreEntries = createSectorLevelEntries(audits || [], failures);
+    const scoreEntries = createScoreEntries(audits || [], failures);
 
     // Group by store and month
     const storeMonthGroups = new Map<string, AuditScoreEntry[]>();
@@ -466,26 +440,18 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Calculate store-level scores
-      const allScores = entries.map(e => e.score);
-      const generalScore = allScores.length > 0 
-        ? allScores.reduce((a, b) => a + b, 0) / allScores.length 
+      // Calculate store-level scores using REAL global_scores directly
+      const storeAudits = (audits || []).filter(a => a.loja_id === lojaId);
+      const storeAuditScores = storeAudits.map(a => a.global_score);
+      const generalScore = storeAuditScores.length > 0 
+        ? storeAuditScores.reduce((a, b) => a + b, 0) / storeAuditScores.length 
         : null;
 
-      const frontEntries = entries.filter(e => 
-        ['salao', 'area_comum', 'documentos', 'lavagem', 'delivery', 'asg', 'manutencao', 'brinquedoteca', 'recepcao'].includes(e.sector)
-      );
-      const backEntries = entries.filter(e => 
-        ['estoque', 'cozinha', 'cozinha_quente', 'saladas_sobremesas', 'parrilla', 'sushi', 'bar', 'dml'].includes(e.sector)
-      );
+      // Front/Back scores are the same as general for whole-store audits
+      const frontScore = generalScore;
+      const backScore = generalScore;
 
-      const frontScore = frontEntries.length > 0 
-        ? frontEntries.reduce((a, e) => a + e.score, 0) / frontEntries.length 
-        : null;
-      const backScore = backEntries.length > 0 
-        ? backEntries.reduce((a, e) => a + e.score, 0) / backEntries.length 
-        : null;
-
+      const storeFailures = failures.filter(f => f.loja_id === lojaId);
       const { error: storeUpsertError } = await supabase
         .from('leadership_store_scores')
         .upsert({
@@ -497,10 +463,10 @@ Deno.serve(async (req) => {
           general_tier: generalScore !== null ? getTier(generalScore) : null,
           front_tier: frontScore !== null ? getTier(frontScore) : null,
           back_tier: backScore !== null ? getTier(backScore) : null,
-          total_audits: audits?.filter(a => a.loja_id === lojaId).length || 0,
-          total_failures: failures.filter(f => f.loja_id === lojaId).length,
-          front_failures: failures.filter(f => f.loja_id === lojaId && frontEntries.some(fe => fe.auditId === f.audit_id)).length,
-          back_failures: failures.filter(f => f.loja_id === lojaId && backEntries.some(be => be.auditId === f.audit_id)).length,
+          total_audits: storeAudits.length,
+          total_failures: storeFailures.length,
+          front_failures: 0, // Will be populated when sector-specific audits are available
+          back_failures: 0,
           calculated_at: new Date().toISOString(),
         }, {
           onConflict: 'loja_id,month_year',

@@ -9,6 +9,7 @@
 export type AuditChecklistType = 
   | 'SUPERVISOR'
   | 'FISCAL'
+  | 'FISCAL_CPD'
   | 'AUDITORIA_DE_ALIMENTOS';
 
 /**
@@ -58,6 +59,7 @@ export type AuditSectorCode =
 export const AUDIT_TYPE_WEIGHTS: Record<AuditChecklistType, number> = {
   SUPERVISOR: 2,
   FISCAL: 1,
+  FISCAL_CPD: 2,
   AUDITORIA_DE_ALIMENTOS: 1,
 };
 
@@ -67,6 +69,7 @@ export const AUDIT_TYPE_WEIGHTS: Record<AuditChecklistType, number> = {
 export const AUDIT_TYPE_LABELS: Record<AuditChecklistType, string> = {
   SUPERVISOR: 'Supervisão',
   FISCAL: 'Fiscal',
+  FISCAL_CPD: 'Fiscal CPD',
   AUDITORIA_DE_ALIMENTOS: 'Auditoria de Alimentos',
 };
 

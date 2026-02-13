@@ -15,7 +15,7 @@ const corsHeaders = {
 // TYPES
 // ============================================
 
-type AuditChecklistType = 'SUPERVISOR' | 'FISCAL' | 'AUDITORIA_DE_ALIMENTOS';
+type AuditChecklistType = 'SUPERVISOR' | 'FISCAL' | 'FISCAL_CPD' | 'AUDITORIA_DE_ALIMENTOS';
 type LeadershipPositionCode =
   | 'chefe_salao' | 'chefe_apv' | 'chefe_parrilla'
   | 'chefe_bar' | 'chefe_cozinha' | 'gerente_back' | 'gerente_front';
@@ -52,12 +52,14 @@ interface PositionBreakdown {
 const AUDIT_TYPE_WEIGHTS: Record<AuditChecklistType, number> = {
   SUPERVISOR: 2,
   FISCAL: 1,
+  FISCAL_CPD: 2,
   AUDITORIA_DE_ALIMENTOS: 1,
 };
 
 const AUDIT_TYPE_LABELS: Record<AuditChecklistType, string> = {
   SUPERVISOR: 'Supervisão',
   FISCAL: 'Fiscal',
+  FISCAL_CPD: 'Fiscal CPD',
   AUDITORIA_DE_ALIMENTOS: 'Auditoria de Alimentos',
 };
 
@@ -127,6 +129,7 @@ const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, {
     rules: {
       SUPERVISOR: ['estoque', 'cozinha', 'sushi', 'parrilla', 'bar', 'dml'],
       FISCAL: ['estoque', 'cozinha', 'cozinha_quente', 'saladas_sobremesas', 'sushi', 'parrilla', 'bar', 'dml'],
+      FISCAL_CPD: ['estoque', 'cozinha', 'cozinha_quente', 'saladas_sobremesas', 'sushi', 'parrilla', 'bar', 'dml'],
       AUDITORIA_DE_ALIMENTOS: ['estoque', 'cozinha', 'sushi', 'parrilla', 'bar', 'dml'],
     },
     areaType: 'back',
@@ -135,6 +138,7 @@ const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, {
     rules: {
       SUPERVISOR: ['salao', 'area_comum', 'documentos', 'lavagem', 'delivery', 'asg', 'manutencao', 'brinquedoteca', 'recepcao'],
       FISCAL: ['salao', 'area_comum'],
+      FISCAL_CPD: ['salao', 'area_comum'],
       AUDITORIA_DE_ALIMENTOS: ['salao', 'area_comum', 'documentos', 'lavagem'],
     },
     areaType: 'front',
@@ -187,20 +191,25 @@ function categorizeSector(itemName: string, category?: string | null): AuditSect
 
 function detectChecklistType(category?: string | null): AuditChecklistType {
   const text = (category || '').toLowerCase();
+  if (text.includes('fiscal') && text.includes('cpd')) return 'FISCAL_CPD';
   if (text.includes('fiscal')) return 'FISCAL';
   if (text.includes('alimento') || text.includes('food')) return 'AUDITORIA_DE_ALIMENTOS';
   return 'SUPERVISOR';
 }
 
 // ============================================
-// CORE: "Média de Médias por Setor" ENGINE
+// CORE: Weighted Points Accumulation ENGINE
 // ============================================
 
 /**
- * Calculate performance for a position using the "average of averages by sector" logic:
- * 1. Filter sector scores valid for this position per checklist type
- * 2. For each checklist type: average the scores of valid sectors  
- * 3. Weighted average across checklist types (Supervisor×2, Fiscal×1, Alimentos×1)
+ * Calculate performance using weighted points accumulation:
+ * 1. For each audit score: audit_points = (score/100) * weight, max_points = weight
+ * 2. final_score = (sum_audit_points / sum_max_points) * 100
+ * 
+ * Example: Supervisor(w=2) at 80% + Fiscal(w=1) at 100%
+ *   points = (0.80*2) + (1.00*1) = 2.6
+ *   max    = 2 + 1 = 3.0
+ *   final  = (2.6/3.0)*100 = 86.66%
  */
 function calculatePositionFromSectorScores(
   position: LeadershipPositionCode,
@@ -210,41 +219,43 @@ function calculatePositionFromSectorScores(
   if (!rule) return { finalScore: null, tier: null, breakdown: [], totalAudits: 0 };
 
   const breakdown: PositionBreakdown[] = [];
-  let weightedSum = 0;
-  let totalWeight = 0;
+  let totalAuditPoints = 0;
+  let totalMaxPoints = 0;
   let totalAudits = 0;
 
   for (const [checklistType, validSectors] of Object.entries(rule.rules)) {
     if (validSectors === null || validSectors === undefined) continue;
 
-    // Filter sector scores matching this checklist type AND valid sectors
     const matchingScores = sectorScores.filter(
       s => s.checklist_type === checklistType && validSectors.includes(s.sector_code as AuditSectorCode)
     );
 
     if (matchingScores.length === 0) continue;
 
-    // Step 1: Group by sector and calculate average per sector
+    const weight = AUDIT_TYPE_WEIGHTS[checklistType as AuditChecklistType];
+
+    // Accumulate weighted points
+    let typeAuditPoints = 0;
+    let typeMaxPoints = 0;
     const sectorGroups = new Map<string, number[]>();
+
     for (const s of matchingScores) {
+      typeAuditPoints += (s.score / 100) * weight;
+      typeMaxPoints += 1.0 * weight;
       const existing = sectorGroups.get(s.sector_code) || [];
       existing.push(s.score);
       sectorGroups.set(s.sector_code, existing);
     }
 
+    const typeAverage = (typeAuditPoints / typeMaxPoints) * 100;
+    totalAuditPoints += typeAuditPoints;
+    totalMaxPoints += typeMaxPoints;
+    totalAudits += matchingScores.length;
+
     const sectorAverages: { sector: string; average: number; count: number }[] = [];
     for (const [sector, scores] of sectorGroups) {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      sectorAverages.push({ sector, average: avg, count: scores.length });
+      sectorAverages.push({ sector, average: scores.reduce((a, b) => a + b, 0) / scores.length, count: scores.length });
     }
-
-    // Step 2: Average across sectors (each sector counts equally)
-    const typeAverage = sectorAverages.reduce((sum, s) => sum + s.average, 0) / sectorAverages.length;
-
-    const weight = AUDIT_TYPE_WEIGHTS[checklistType as AuditChecklistType];
-    weightedSum += typeAverage * weight;
-    totalWeight += weight;
-    totalAudits += matchingScores.length;
 
     breakdown.push({
       checklistType: checklistType as AuditChecklistType,
@@ -256,11 +267,11 @@ function calculatePositionFromSectorScores(
     });
   }
 
-  if (totalWeight === 0) {
+  if (totalMaxPoints === 0) {
     return { finalScore: null, tier: null, breakdown, totalAudits };
   }
 
-  const finalScore = weightedSum / totalWeight;
+  const finalScore = (totalAuditPoints / totalMaxPoints) * 100;
   return {
     finalScore,
     tier: getTier(finalScore),
@@ -585,7 +596,7 @@ Deno.serve(async (req) => {
       action,
       storesProcessed: storesUpdated,
       positionsUpdated,
-      algorithm: 'media_de_medias_por_setor_v2',
+      algorithm: 'weighted_points_accumulation_v3',
     };
 
     console.log('[calculate-leadership-performance] Result:', response);

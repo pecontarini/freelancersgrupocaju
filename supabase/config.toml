@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.extract-team-data]
 verify_jwt = false
+
+[functions.scan-storage-fix-scores]
+verify_jwt = false

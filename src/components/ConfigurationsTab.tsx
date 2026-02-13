@@ -6,6 +6,7 @@ import { BonusConfigSection } from "@/components/BonusConfigSection";
 import { CargosConfigSection } from "@/components/CargosConfigSection";
 import { GoogleSheetsSync } from "@/components/GoogleSheetsSync";
 import { ChecklistImportSection } from "@/components/ChecklistImportSection";
+import { LegacySyncPanel } from "@/components/LegacySyncPanel";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useConfigLojas,
@@ -54,6 +55,11 @@ export function ConfigurationsTab() {
       {/* Checklist Import - Admin + Gerente Unidade */}
       {(isAdmin || isGerenteUnidade) && (
         <ChecklistImportSection />
+      )}
+
+      {/* PDF Miner / Legacy Sync - Admin Only */}
+      {isAdmin && (
+        <LegacySyncPanel />
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

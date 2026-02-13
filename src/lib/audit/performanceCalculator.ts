@@ -1,6 +1,6 @@
 // ============================================
-// PERFORMANCE CALCULATOR ENGINE
-// Implements weighted average calculation with official rules
+// PERFORMANCE CALCULATOR ENGINE v2
+// "Média de Médias por Setor" - Single source of truth
 // ============================================
 
 import {
@@ -19,9 +19,22 @@ import {
 
 import {
   getValidChecklistTypesForPosition,
-  isSectorValidForPosition,
   POSITION_ROUTING_RULES,
 } from './positionRoutingRules';
+
+/**
+ * Sector score entry from audit_sector_scores table
+ */
+export interface SectorScoreEntry {
+  id: string;
+  auditId: string;
+  lojaId: string;
+  sectorCode: AuditSectorCode;
+  checklistType: AuditChecklistType;
+  score: number;
+  auditDate: string;
+  monthYear: string;
+}
 
 /**
  * Categorize an item/category text into a sector based on keywords
@@ -35,7 +48,6 @@ export function categorizeSector(
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
 
-  // First check category if provided (more accurate)
   if (category) {
     const categoryLower = category
       .toLowerCase()
@@ -52,7 +64,6 @@ export function categorizeSector(
     }
   }
 
-  // Then check item name
   for (const [sectorCode, keywords] of Object.entries(SECTOR_KEYWORDS)) {
     const normalizedKeywords = keywords.map(kw =>
       kw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -73,180 +84,130 @@ export function detectChecklistType(
   metadata?: Record<string, unknown>
 ): AuditChecklistType | null {
   const searchText = (category || '').toLowerCase();
-
-  if (searchText.includes('fiscal')) {
-    return 'FISCAL';
-  }
-  if (searchText.includes('alimento') || searchText.includes('food')) {
-    return 'AUDITORIA_DE_ALIMENTOS';
-  }
-  if (searchText.includes('supervisor') || searchText.includes('supervisão')) {
-    return 'SUPERVISOR';
-  }
-
-  // Default to SUPERVISOR if no specific type detected
-  // This matches the current behavior where most audits are supervision audits
+  if (searchText.includes('fiscal')) return 'FISCAL';
+  if (searchText.includes('alimento') || searchText.includes('food')) return 'AUDITORIA_DE_ALIMENTOS';
+  if (searchText.includes('supervisor') || searchText.includes('supervisão')) return 'SUPERVISOR';
   return 'SUPERVISOR';
 }
 
 /**
- * Group scores by checklist type and calculate internal averages
- * Rule: If there's more than one audit of the same type in the same period,
- * calculate the internal average before applying weights
+ * CORE: Calculate position performance using "Média de Médias por Setor"
+ * 
+ * Algorithm:
+ * 1. For each checklist type valid for this position:
+ *    a. Filter sector scores matching valid sectors
+ *    b. Group by sector → average each sector
+ *    c. Average across sectors (each sector counts equally)
+ * 2. Weighted average across checklist types (Supervisor×2, Fiscal×1, Alimentos×1)
  */
-function groupAndAverageByType(
-  scores: AuditScoreEntry[]
-): Map<AuditChecklistType, { average: number; count: number; entries: AuditScoreEntry[] }> {
-  const groups = new Map<AuditChecklistType, AuditScoreEntry[]>();
-
-  for (const entry of scores) {
-    const existing = groups.get(entry.checklistType) || [];
-    existing.push(entry);
-    groups.set(entry.checklistType, existing);
-  }
-
-  const result = new Map<AuditChecklistType, { average: number; count: number; entries: AuditScoreEntry[] }>();
-
-  for (const [type, entries] of groups) {
-    const sum = entries.reduce((acc, e) => acc + e.score, 0);
-    const average = sum / entries.length;
-    result.set(type, { average, count: entries.length, entries });
-  }
-
-  return result;
-}
-
-/**
- * Calculate weighted average for a position
- * Formula: nota_final = soma(score × peso) / soma(peso)
- */
-function calculateWeightedAverage(
-  typeAverages: Map<AuditChecklistType, { average: number; count: number; entries: AuditScoreEntry[] }>
-): { score: number; totalWeight: number } | null {
+export function calculatePositionFromSectorScores(
+  position: LeadershipPositionCode,
+  sectorScores: SectorScoreEntry[]
+): PositionPerformanceResult {
+  const rule = POSITION_ROUTING_RULES[position];
+  const reviewReasons: string[] = [];
+  const breakdown: PositionPerformanceResult['breakdown'] = [];
   let weightedSum = 0;
   let totalWeight = 0;
+  let totalAudits = 0;
 
-  for (const [type, { average }] of typeAverages) {
-    const weight = AUDIT_TYPE_WEIGHTS[type];
-    weightedSum += average * weight;
+  for (const [checklistType, validSectors] of Object.entries(rule.rules)) {
+    if (validSectors === null || validSectors === undefined) continue;
+
+    // Filter scores matching this checklist type AND valid sectors
+    const matchingScores = sectorScores.filter(
+      s => s.checklistType === (checklistType as AuditChecklistType) &&
+           validSectors.includes(s.sectorCode)
+    );
+
+    if (matchingScores.length === 0) continue;
+
+    // Step 1: Group by sector and calculate average per sector
+    const sectorGroups = new Map<string, number[]>();
+    for (const s of matchingScores) {
+      const existing = sectorGroups.get(s.sectorCode) || [];
+      existing.push(s.score);
+      sectorGroups.set(s.sectorCode, existing);
+    }
+
+    // Step 2: Average across sectors (each sector counts equally)
+    let sectorAvgSum = 0;
+    let sectorCount = 0;
+    for (const [, scores] of sectorGroups) {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+      sectorAvgSum += avg;
+      sectorCount++;
+    }
+
+    const typeAverage = sectorAvgSum / sectorCount;
+    const weight = AUDIT_TYPE_WEIGHTS[checklistType as AuditChecklistType];
+    weightedSum += typeAverage * weight;
     totalWeight += weight;
+    totalAudits += matchingScores.length;
+
+    breakdown.push({
+      checklistType: checklistType as AuditChecklistType,
+      label: AUDIT_TYPE_LABELS[checklistType as AuditChecklistType],
+      averageScore: typeAverage,
+      weight,
+      auditCount: matchingScores.length,
+    });
   }
 
   if (totalWeight === 0) {
-    return null;
-  }
-
-  return {
-    score: weightedSum / totalWeight,
-    totalWeight,
-  };
-}
-
-/**
- * Filter scores that are valid for a specific position
- * Since audits are whole-store supervision audits (single global_score),
- * we only filter by checklistType (not sector) to avoid excluding valid audits.
- */
-function filterScoresForPosition(
-  scores: AuditScoreEntry[],
-  position: LeadershipPositionCode
-): AuditScoreEntry[] {
-  const validTypes = getValidChecklistTypesForPosition(position);
-  return scores.filter(entry => validTypes.includes(entry.checklistType));
-}
-
-/**
- * Calculate performance for a single position
- */
-export function calculatePositionPerformance(
-  position: LeadershipPositionCode,
-  allScores: AuditScoreEntry[]
-): PositionPerformanceResult {
-  const rule = POSITION_ROUTING_RULES[position];
-  const validScores = filterScoresForPosition(allScores, position);
-  const reviewReasons: string[] = [];
-
-  // Check for low confidence sectors
-  const lowConfidenceScores = allScores.filter(s => {
-    const { confidence } = categorizeSector(s.sector, null);
-    return confidence === 'low';
-  });
-
-  if (lowConfidenceScores.length > 0) {
-    reviewReasons.push(`${lowConfidenceScores.length} item(s) com setor não identificado com segurança`);
-  }
-
-  // Group and average by type
-  const typeAverages = groupAndAverageByType(validScores);
-
-  // Build breakdown
-  const validTypes = getValidChecklistTypesForPosition(position);
-  const breakdown = validTypes.map(type => {
-    const data = typeAverages.get(type);
     return {
-      checklistType: type,
-      label: AUDIT_TYPE_LABELS[type],
-      averageScore: data?.average ?? 0,
-      weight: AUDIT_TYPE_WEIGHTS[type],
-      auditCount: data?.count ?? 0,
+      position,
+      label: POSITION_LABELS[position],
+      finalScore: null,
+      tier: null,
+      breakdown,
+      totalAudits,
+      needsReview: false,
+      reviewReasons,
     };
-  }).filter(b => b.auditCount > 0); // Only include types with audits
+  }
 
-  // Calculate weighted average
-  const weightedResult = calculateWeightedAverage(typeAverages);
-
+  const finalScore = weightedSum / totalWeight;
   return {
     position,
     label: POSITION_LABELS[position],
-    finalScore: weightedResult?.score ?? null,
-    tier: weightedResult ? getTierForScore(weightedResult.score) : null,
+    finalScore,
+    tier: getTierForScore(finalScore),
     breakdown,
-    totalAudits: validScores.length,
+    totalAudits,
     needsReview: reviewReasons.length > 0,
     reviewReasons,
   };
 }
 
 /**
- * Calculate performance for all positions in a store for a given month
+ * Calculate performance for all positions using sector scores
  */
-export function calculateLeadershipPerformance(
+export function calculateLeadershipPerformanceFromSectors(
   lojaId: string,
   monthYear: string,
-  scores: AuditScoreEntry[]
+  sectorScores: SectorScoreEntry[]
 ): LeadershipPerformanceReport {
-  // Filter scores for the specific store and month
-  const filteredScores = scores.filter(
+  const filteredScores = sectorScores.filter(
     s => s.lojaId === lojaId && s.monthYear === monthYear
   );
 
-  // Calculate for all positions
   const positions: PositionPerformanceResult[] = [];
 
-  // Calculate chiefs first
+  // Chiefs
   const chiefPositions: LeadershipPositionCode[] = [
-    'chefe_salao',
-    'chefe_apv',
-    'chefe_parrilla',
-    'chefe_bar',
-    'chefe_cozinha',
+    'chefe_salao', 'chefe_apv', 'chefe_parrilla', 'chefe_bar', 'chefe_cozinha',
   ];
-
-  for (const position of chiefPositions) {
-    positions.push(calculatePositionPerformance(position, filteredScores));
+  for (const p of chiefPositions) {
+    positions.push(calculatePositionFromSectorScores(p, filteredScores));
   }
 
-  // Calculate managers
-  const managerPositions: LeadershipPositionCode[] = [
-    'gerente_front',
-    'gerente_back',
-  ];
-
-  for (const position of managerPositions) {
-    positions.push(calculatePositionPerformance(position, filteredScores));
+  // Managers
+  for (const p of ['gerente_front', 'gerente_back'] as LeadershipPositionCode[]) {
+    positions.push(calculatePositionFromSectorScores(p, filteredScores));
   }
 
-  // Calculate general score (simple average of all audits)
+  // General score = simple average of ALL sector scores
   let generalScore: number | null = null;
   if (filteredScores.length > 0) {
     const sum = filteredScores.reduce((acc, s) => acc + s.score, 0);
@@ -262,111 +223,87 @@ export function calculateLeadershipPerformance(
   };
 }
 
+// ============================================
+// LEGACY COMPATIBILITY
+// Keep old functions for backward compatibility during migration
+// ============================================
+
 /**
- * Convert supervision failures to audit score entries
- * This bridges the existing database structure to the new calculation system
+ * @deprecated Use calculatePositionFromSectorScores instead
  */
-export function convertAuditsToScoreEntries(
-  audits: Array<{
-    id: string;
-    loja_id: string;
-    audit_date: string;
-    global_score: number;
-  }>,
-  failures: Array<{
-    audit_id: string;
-    loja_id: string;
-    item_name: string;
-    category?: string | null;
-  }>
-): AuditScoreEntry[] {
-  const entries: AuditScoreEntry[] = [];
-
-  for (const audit of audits) {
-    // Get failures for this audit to determine sectors
-    const auditFailures = failures.filter(f => f.audit_id === audit.id);
-    
-    // Determine the dominant sector from failures
-    const sectorCounts = new Map<AuditSectorCode, number>();
-    
-    for (const failure of auditFailures) {
-      const { sector } = categorizeSector(failure.item_name, failure.category);
-      sectorCounts.set(sector, (sectorCounts.get(sector) || 0) + 1);
-    }
-
-    // Find the dominant sector
-    let dominantSector: AuditSectorCode = 'outros';
-    let maxCount = 0;
-    for (const [sector, count] of sectorCounts) {
-      if (count > maxCount) {
-        maxCount = count;
-        dominantSector = sector;
-      }
-    }
-
-    // Detect checklist type from first failure's category
-    const firstFailure = auditFailures[0];
-    const checklistType = detectChecklistType(firstFailure?.category) || 'SUPERVISOR';
-
-    // Create month-year string
-    const auditDate = new Date(audit.audit_date);
-    const monthYear = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
-
-    entries.push({
-      id: audit.id,
-      auditId: audit.id,
-      lojaId: audit.loja_id,
-      sector: dominantSector,
-      checklistType,
-      score: audit.global_score,
-      auditDate: audit.audit_date,
-      monthYear,
-    });
-  }
-
-  return entries;
+export function calculatePositionPerformance(
+  position: LeadershipPositionCode,
+  allScores: AuditScoreEntry[]
+): PositionPerformanceResult {
+  // Convert old format to sector scores and use new engine
+  const sectorScores: SectorScoreEntry[] = allScores.map(s => ({
+    id: s.id,
+    auditId: s.auditId,
+    lojaId: s.lojaId,
+    sectorCode: s.sector,
+    checklistType: s.checklistType,
+    score: s.score,
+    auditDate: s.auditDate,
+    monthYear: s.monthYear,
+  }));
+  return calculatePositionFromSectorScores(position, sectorScores);
 }
 
 /**
- * Convert audits to score entries using the ACTUAL global_score from each PDF.
- * Each audit = ONE score entry with the real score.
- * Checklist type is detected from failure categories when possible.
- * 
- * IMPORTANT: This uses global_score directly - NO synthetic/estimated scores.
+ * @deprecated Use calculateLeadershipPerformanceFromSectors instead
+ */
+export function calculateLeadershipPerformance(
+  lojaId: string,
+  monthYear: string,
+  scores: AuditScoreEntry[]
+): LeadershipPerformanceReport {
+  const sectorScores: SectorScoreEntry[] = scores.map(s => ({
+    id: s.id,
+    auditId: s.auditId,
+    lojaId: s.lojaId,
+    sectorCode: s.sector,
+    checklistType: s.checklistType,
+    score: s.score,
+    auditDate: s.auditDate,
+    monthYear: s.monthYear,
+  }));
+  return calculateLeadershipPerformanceFromSectors(lojaId, monthYear, sectorScores);
+}
+
+/**
+ * Convert supervision failures to audit score entries
+ * @deprecated Use audit_sector_scores table directly
+ */
+export function convertAuditsToScoreEntries(
+  audits: Array<{ id: string; loja_id: string; audit_date: string; global_score: number }>,
+  failures: Array<{ audit_id: string; loja_id: string; item_name: string; category?: string | null }>
+): AuditScoreEntry[] {
+  return createSectorLevelEntries(audits, failures);
+}
+
+/**
+ * Create score entries from audits
+ * @deprecated Use audit_sector_scores table directly
  */
 export function createSectorLevelEntries(
-  audits: Array<{
-    id: string;
-    loja_id: string;
-    audit_date: string;
-    global_score: number;
-  }>,
-  failures: Array<{
-    audit_id: string;
-    loja_id: string;
-    item_name: string;
-    category?: string | null;
-  }>
+  audits: Array<{ id: string; loja_id: string; audit_date: string; global_score: number }>,
+  failures: Array<{ audit_id: string; loja_id: string; item_name: string; category?: string | null }>
 ): AuditScoreEntry[] {
   const entries: AuditScoreEntry[] = [];
 
   for (const audit of audits) {
     const auditDate = new Date(audit.audit_date);
     const monthYear = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
-
-    // Detect checklist type from failures
     const auditFailures = failures.filter(f => f.audit_id === audit.id);
-    const firstFailure = auditFailures[0];
-    const checklistType = detectChecklistType(firstFailure?.category) || 'SUPERVISOR';
+    const checklistType = detectChecklistType(auditFailures[0]?.category) || 'SUPERVISOR';
 
-    // Use the REAL global_score from the PDF directly
     entries.push({
       id: audit.id,
       auditId: audit.id,
       lojaId: audit.loja_id,
-      sector: 'outros', // Sector is irrelevant for whole-store audits
+      sector: 'outros',
       checklistType,
-      score: audit.global_score, // EXACT score from the PDF
+      score: audit.global_score,
       auditDate: audit.audit_date,
       monthYear,
     });

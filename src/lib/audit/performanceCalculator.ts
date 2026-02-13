@@ -144,14 +144,15 @@ function calculateWeightedAverage(
 
 /**
  * Filter scores that are valid for a specific position
+ * Since audits are whole-store supervision audits (single global_score),
+ * we only filter by checklistType (not sector) to avoid excluding valid audits.
  */
 function filterScoresForPosition(
   scores: AuditScoreEntry[],
   position: LeadershipPositionCode
 ): AuditScoreEntry[] {
-  return scores.filter(entry =>
-    isSectorValidForPosition(position, entry.sector, entry.checklistType)
-  );
+  const validTypes = getValidChecklistTypesForPosition(position);
+  return scores.filter(entry => validTypes.includes(entry.checklistType));
 }
 
 /**
@@ -327,8 +328,11 @@ export function convertAuditsToScoreEntries(
 }
 
 /**
- * Create sector-specific audit entries from failures
- * This provides granular sector-level scoring
+ * Convert audits to score entries using the ACTUAL global_score from each PDF.
+ * Each audit = ONE score entry with the real score.
+ * Checklist type is detected from failure categories when possible.
+ * 
+ * IMPORTANT: This uses global_score directly - NO synthetic/estimated scores.
  */
 export function createSectorLevelEntries(
   audits: Array<{
@@ -347,61 +351,25 @@ export function createSectorLevelEntries(
   const entries: AuditScoreEntry[] = [];
 
   for (const audit of audits) {
-    const auditFailures = failures.filter(f => f.audit_id === audit.id);
-    
-    // Group failures by sector
-    const sectorGroups = new Map<AuditSectorCode, number>();
-    
-    for (const failure of auditFailures) {
-      const { sector } = categorizeSector(failure.item_name, failure.category);
-      sectorGroups.set(sector, (sectorGroups.get(sector) || 0) + 1);
-    }
-
-    // Create month-year string
     const auditDate = new Date(audit.audit_date);
     const monthYear = `${auditDate.getFullYear()}-${String(auditDate.getMonth() + 1).padStart(2, '0')}`;
 
-    // Detect checklist type
+    // Detect checklist type from failures
+    const auditFailures = failures.filter(f => f.audit_id === audit.id);
     const firstFailure = auditFailures[0];
     const checklistType = detectChecklistType(firstFailure?.category) || 'SUPERVISOR';
 
-    // Create an entry for each sector found
-    // Estimate sector score based on failure count relative to global score
-    const totalFailures = auditFailures.length;
-    
-    for (const [sector, failureCount] of sectorGroups) {
-      // Calculate sector-specific penalty
-      // More failures = lower score proportionally
-      const failureRatio = failureCount / Math.max(1, totalFailures);
-      const globalPenalty = 100 - audit.global_score;
-      const sectorPenalty = globalPenalty * failureRatio * 1.5; // Weight failures more
-      const sectorScore = Math.max(0, Math.min(100, 100 - sectorPenalty));
-
-      entries.push({
-        id: `${audit.id}-${sector}`,
-        auditId: audit.id,
-        lojaId: audit.loja_id,
-        sector,
-        checklistType,
-        score: sectorScore,
-        auditDate: audit.audit_date,
-        monthYear,
-      });
-    }
-
-    // If no failures, create an entry with the global score for 'outros'
-    if (sectorGroups.size === 0) {
-      entries.push({
-        id: `${audit.id}-global`,
-        auditId: audit.id,
-        lojaId: audit.loja_id,
-        sector: 'outros',
-        checklistType,
-        score: audit.global_score,
-        auditDate: audit.audit_date,
-        monthYear,
-      });
-    }
+    // Use the REAL global_score from the PDF directly
+    entries.push({
+      id: audit.id,
+      auditId: audit.id,
+      lojaId: audit.loja_id,
+      sector: 'outros', // Sector is irrelevant for whole-store audits
+      checklistType,
+      score: audit.global_score, // EXACT score from the PDF
+      auditDate: audit.audit_date,
+      monthYear,
+    });
   }
 
   return entries;

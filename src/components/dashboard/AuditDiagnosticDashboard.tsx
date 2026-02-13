@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   AlertOctagon,
   RotateCcw,
@@ -30,6 +30,8 @@ import {
   Flame,
   ArrowUpRight,
   ArrowDownRight,
+  Store,
+  MousePointerClick,
 } from "lucide-react";
 import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -55,7 +57,9 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -72,6 +76,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useSupervisionAudits, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useLeadershipPerformance,
   useCalculateLeadershipPerformance,
@@ -80,6 +85,7 @@ import { SectorBadgeCompact } from "@/components/dashboard/SectorResponsibilityB
 import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { ComplianceHeatmap } from "@/components/dashboard/ComplianceHeatmap";
 import { LeadershipRadar } from "@/components/dashboard/LeadershipRadar";
+import { AuditDrillDownDialog, DrillDownConfig } from "@/components/dashboard/AuditDrillDownDialog";
 import {
   SECTOR_POSITION_MAP,
   categorizeItemToSector,
@@ -176,10 +182,41 @@ export function AuditDiagnosticDashboard({
   isAdmin = false,
 }: AuditDiagnosticDashboardProps) {
   const { options: lojas } = useConfigLojas();
+  const { unidades, isAdmin: userIsAdmin, isGerenteUnidade } = useUserProfile();
   const { audits, failures, isLoadingFailures, isLoadingAudits } = useSupervisionAudits();
   const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [lojaFilter, setLojaFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), "yyyy-MM"));
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [drillDown, setDrillDown] = useState<DrillDownConfig | null>(null);
+  const [drillDownOpen, setDrillDownOpen] = useState(false);
+
+  // Effective loja ID: props override > filter
+  const effectiveLojaId = selectedUnidadeId || (lojaFilter !== "all" ? lojaFilter : null);
+
+  // Available stores based on role
+  const availableStores = useMemo(() => {
+    if (isAdmin || userIsAdmin) return lojas;
+    return unidades;
+  }, [isAdmin, userIsAdmin, lojas, unidades]);
+
+  // Group stores by brand for selector
+  const groupedStores = useMemo(() => {
+    const groups: Record<string, typeof availableStores> = {};
+    availableStores.forEach((loja) => {
+      let brand = "Outras";
+      for (const [key, patterns] of Object.entries(BRAND_PATTERNS)) {
+        if (key === "all") continue;
+        if (patterns.some((p) => loja.nome.toUpperCase().includes(p))) {
+          brand = key.charAt(0).toUpperCase() + key.slice(1);
+          break;
+        }
+      }
+      if (!groups[brand]) groups[brand] = [];
+      groups[brand].push(loja);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [availableStores]);
 
   const monthOptions = useMemo(() => getMonthOptions(), []);
   const previousMonth = useMemo(() => {
@@ -197,7 +234,7 @@ export function AuditDiagnosticDashboard({
     generalTier,
     isLoading: isLoadingPerformance,
   } = useLeadershipPerformance({
-    lojaId: selectedUnidadeId,
+    lojaId: effectiveLojaId,
     monthYear: selectedMonth,
     usePersistedScores: true,
   });
@@ -206,12 +243,16 @@ export function AuditDiagnosticDashboard({
 
   // Filter lojas by brand
   const filteredLojaIds = useMemo(() => {
-    if (brandFilter === "all") return lojas.map((l) => l.id);
-    const patterns = BRAND_PATTERNS[brandFilter] || [];
-    return lojas
-      .filter((loja) => patterns.some((p) => loja.nome.toUpperCase().includes(p)))
-      .map((l) => l.id);
-  }, [lojas, brandFilter]);
+    let storeIds = isAdmin || userIsAdmin ? lojas.map((l) => l.id) : unidades.map((l) => l.id);
+    if (brandFilter !== "all") {
+      const patterns = BRAND_PATTERNS[brandFilter] || [];
+      storeIds = storeIds.filter((id) => {
+        const loja = lojas.find((l) => l.id === id);
+        return loja && patterns.some((p) => loja.nome.toUpperCase().includes(p));
+      });
+    }
+    return storeIds;
+  }, [lojas, unidades, brandFilter, isAdmin, userIsAdmin]);
 
   const getLojaName = (lojaId: string) => {
     return lojas.find((l) => l.id === lojaId)?.nome || "Desconhecida";
@@ -233,13 +274,18 @@ export function AuditDiagnosticDashboard({
   // All failures filtered by unit and brand
   const unitFilteredFailures = useMemo(() => {
     let result = failures;
-    if (selectedUnidadeId) {
-      result = result.filter((f) => f.loja_id === selectedUnidadeId);
+    // Role-based: non-admin users only see their assigned stores
+    if (!isAdmin && !userIsAdmin) {
+      const myIds = unidades.map((u) => u.id);
+      result = result.filter((f) => myIds.includes(f.loja_id));
+    }
+    if (effectiveLojaId) {
+      result = result.filter((f) => f.loja_id === effectiveLojaId);
     } else if (brandFilter !== "all") {
       result = result.filter((f) => filteredLojaIds.includes(f.loja_id));
     }
     return result;
-  }, [failures, selectedUnidadeId, brandFilter, filteredLojaIds]);
+  }, [failures, effectiveLojaId, brandFilter, filteredLojaIds, isAdmin, userIsAdmin, unidades]);
 
   // Current month failures
   const currentMonthFailures = useMemo(() => {
@@ -269,13 +315,17 @@ export function AuditDiagnosticDashboard({
   // Audits this month
   const currentMonthAudits = useMemo(() => {
     let result = audits.filter((a) => a.audit_date.startsWith(selectedMonth));
-    if (selectedUnidadeId) {
-      result = result.filter((a) => a.loja_id === selectedUnidadeId);
+    if (!isAdmin && !userIsAdmin) {
+      const myIds = unidades.map((u) => u.id);
+      result = result.filter((a) => myIds.includes(a.loja_id));
+    }
+    if (effectiveLojaId) {
+      result = result.filter((a) => a.loja_id === effectiveLojaId);
     } else if (brandFilter !== "all") {
       result = result.filter((a) => filteredLojaIds.includes(a.loja_id));
     }
     return result;
-  }, [audits, selectedMonth, selectedUnidadeId, brandFilter, filteredLojaIds]);
+  }, [audits, selectedMonth, effectiveLojaId, brandFilter, filteredLojaIds, isAdmin, userIsAdmin, unidades]);
 
   const avgGlobalScore = useMemo(() => {
     if (currentMonthAudits.length === 0) return null;
@@ -285,13 +335,17 @@ export function AuditDiagnosticDashboard({
   // Previous month avg for comparison
   const prevMonthAudits = useMemo(() => {
     let result = audits.filter((a) => a.audit_date.startsWith(previousMonth));
-    if (selectedUnidadeId) {
-      result = result.filter((a) => a.loja_id === selectedUnidadeId);
+    if (!isAdmin && !userIsAdmin) {
+      const myIds = unidades.map((u) => u.id);
+      result = result.filter((a) => myIds.includes(a.loja_id));
+    }
+    if (effectiveLojaId) {
+      result = result.filter((a) => a.loja_id === effectiveLojaId);
     } else if (brandFilter !== "all") {
       result = result.filter((a) => filteredLojaIds.includes(a.loja_id));
     }
     return result;
-  }, [audits, previousMonth, selectedUnidadeId, brandFilter, filteredLojaIds]);
+  }, [audits, previousMonth, effectiveLojaId, brandFilter, filteredLojaIds, isAdmin, userIsAdmin, unidades]);
 
   const prevAvgScore = useMemo(() => {
     if (prevMonthAudits.length === 0) return null;
@@ -355,7 +409,7 @@ export function AuditDiagnosticDashboard({
 
   // Worst unit (admin)
   const worstUnit = useMemo(() => {
-    if (!isAdmin || selectedUnidadeId) return null;
+    if (!isAdmin || effectiveLojaId) return null;
     const unitCounts: Record<string, { count: number; lojaId: string }> = {};
     allCurrentMonthFailures.forEach((f) => {
       if (!unitCounts[f.loja_id]) {
@@ -370,7 +424,7 @@ export function AuditDiagnosticDashboard({
       nome: getLojaName(sorted[0].lojaId),
       failureCount: sorted[0].count,
     };
-  }, [allCurrentMonthFailures, isAdmin, selectedUnidadeId]);
+  }, [allCurrentMonthFailures, isAdmin, effectiveLojaId]);
 
   // Observations
   const observations = useMemo(() => {
@@ -400,7 +454,11 @@ export function AuditDiagnosticDashboard({
       const monthAudits = audits.filter((a) => {
         const auditMonth = a.audit_date.substring(0, 7);
         if (auditMonth !== m) return false;
-        if (selectedUnidadeId) return a.loja_id === selectedUnidadeId;
+        if (!isAdmin && !userIsAdmin) {
+          const myIds = unidades.map((u) => u.id);
+          if (!myIds.includes(a.loja_id)) return false;
+        }
+        if (effectiveLojaId) return a.loja_id === effectiveLojaId;
         if (brandFilter !== "all") return filteredLojaIds.includes(a.loja_id);
         return true;
       });
@@ -421,11 +479,11 @@ export function AuditDiagnosticDashboard({
         failures: monthFailures.length,
       };
     });
-  }, [audits, selectedUnidadeId, brandFilter, filteredLojaIds, unitFilteredFailures]);
+  }, [audits, effectiveLojaId, brandFilter, filteredLojaIds, unitFilteredFailures, isAdmin, userIsAdmin, unidades]);
 
   // Failure trend by unit (for admin network view)
   const unitRanking = useMemo(() => {
-    if (!isAdmin || selectedUnidadeId) return [];
+    if ((!isAdmin && !userIsAdmin) || effectiveLojaId) return [];
     const unitData: Record<string, { lojaId: string; failures: number; audits: number; score: number }> = {};
     currentMonthAudits.forEach((a) => {
       if (!unitData[a.loja_id]) {
@@ -446,7 +504,18 @@ export function AuditDiagnosticDashboard({
         avgScore: u.audits > 0 ? u.score / u.audits : 0,
       }))
       .sort((a, b) => a.avgScore - b.avgScore);
-  }, [isAdmin, selectedUnidadeId, currentMonthAudits, allCurrentMonthFailures]);
+  }, [isAdmin, userIsAdmin, effectiveLojaId, currentMonthAudits, allCurrentMonthFailures]);
+
+  // Drill-down handler
+  const openDrillDown = useCallback((title: string, filteredFailures: SupervisionFailure[]) => {
+    setDrillDown({
+      type: "item",
+      title,
+      failures: filteredFailures,
+      getLojaName,
+    });
+    setDrillDownOpen(true);
+  }, [getLojaName]);
 
   if (isLoadingFailures || isLoadingAudits) {
     return (
@@ -553,21 +622,50 @@ export function AuditDiagnosticDashboard({
             </SelectContent>
           </Select>
 
-          {isAdmin && (
-            <Select value={brandFilter} onValueChange={setBrandFilter}>
-              <SelectTrigger className="w-[160px] h-9 bg-background">
-                <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue />
+          {/* Store Selector */}
+          {!selectedUnidadeId && (
+            <Select value={lojaFilter} onValueChange={setLojaFilter}>
+              <SelectTrigger className="w-[220px] h-9 bg-background">
+                <Store className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Todas as unidades" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas as Marcas</SelectItem>
-                <SelectItem value="caminito">Caminito</SelectItem>
-                <SelectItem value="nazo">Nazo</SelectItem>
-                <SelectItem value="caju">Caju</SelectItem>
-                <SelectItem value="fosters">Fosters</SelectItem>
+                <SelectItem value="all">
+                  <span className="flex items-center gap-2">
+                    <Store className="h-3.5 w-3.5" />
+                    Todas as unidades
+                  </span>
+                </SelectItem>
+                {groupedStores.map(([brand, stores]) => (
+                  <SelectGroup key={brand}>
+                    <SelectLabel className="text-xs uppercase text-primary font-semibold">
+                      {brand}
+                    </SelectLabel>
+                    {stores.map((loja) => (
+                      <SelectItem key={loja.id} value={loja.id}>
+                        {loja.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
           )}
+
+          {/* Brand Comparative Filter - available for all roles */}
+          <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <SelectTrigger className="w-[160px] h-9 bg-background">
+              <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as Marcas</SelectItem>
+              <SelectItem value="caminito">Caminito</SelectItem>
+              <SelectItem value="nazo">Nazo</SelectItem>
+              <SelectItem value="caju">Caju</SelectItem>
+              <SelectItem value="fosters">Fosters</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -595,7 +693,10 @@ export function AuditDiagnosticDashboard({
         </Card>
 
         {/* Total Falhas */}
-        <Card className="rounded-2xl shadow-card">
+        <Card
+          className="rounded-2xl shadow-card cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+          onClick={() => openDrillDown("Todas as Falhas", allCurrentMonthFailures)}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium uppercase text-muted-foreground">Total Falhas</p>
@@ -607,7 +708,10 @@ export function AuditDiagnosticDashboard({
         </Card>
 
         {/* Pendentes */}
-        <Card className="rounded-2xl shadow-card">
+        <Card
+          className="rounded-2xl shadow-card cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+          onClick={() => openDrillDown("Falhas Pendentes", allCurrentMonthFailures.filter((f) => f.status === "pending"))}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium uppercase text-muted-foreground">Pendentes</p>
@@ -631,7 +735,10 @@ export function AuditDiagnosticDashboard({
         </Card>
 
         {/* Recorrentes */}
-        <Card className="rounded-2xl shadow-card border-l-4 border-l-destructive">
+        <Card
+          className="rounded-2xl shadow-card border-l-4 border-l-destructive cursor-pointer hover:ring-2 hover:ring-destructive/20 transition-all"
+          onClick={() => openDrillDown("Falhas Recorrentes", recurringFailures)}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium uppercase text-muted-foreground">Recorrentes</p>
@@ -645,7 +752,13 @@ export function AuditDiagnosticDashboard({
 
       {/* ===== WORST UNIT ALERT (Admin) ===== */}
       {worstUnit && (
-        <Card className="rounded-2xl shadow-card border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
+        <Card
+          className="rounded-2xl shadow-card border-l-4 border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20 cursor-pointer hover:ring-2 hover:ring-amber-500/20 transition-all"
+          onClick={() => {
+            const unitFailures = allCurrentMonthFailures.filter((f) => f.loja_id === worstUnit.lojaId);
+            openDrillDown(`Unidade: ${worstUnit.nome}`, unitFailures);
+          }}
+        >
           <CardContent className="flex items-center justify-between p-4">
             <div className="flex items-center gap-4">
               <TrendingDown className="h-6 w-6 text-amber-600" />
@@ -801,7 +914,16 @@ export function AuditDiagnosticDashboard({
                       {sectorDistribution.slice(0, 5).map((sector) => {
                         const Icon = getSectorIcon(sector.sector);
                         return (
-                          <div key={sector.sector} className="flex items-center gap-2">
+                          <button
+                            key={sector.sector}
+                            className="flex items-center gap-2 w-full rounded-lg p-1.5 hover:bg-muted/50 transition-colors cursor-pointer text-left"
+                            onClick={() => {
+                              const related = currentMonthFailures.filter((f) => {
+                                return categorizeItemToSector(f.item_name, f.category) === sector.sector;
+                              });
+                              openDrillDown(`Setor: ${sector.displayName}`, related);
+                            }}
+                          >
                             <div
                               className="flex h-6 w-6 items-center justify-center rounded"
                               style={{ backgroundColor: `${sector.color}20` }}
@@ -812,7 +934,7 @@ export function AuditDiagnosticDashboard({
                               <span className="font-medium">{sector.displayName}</span>
                               <span className="text-muted-foreground">{sector.count} ({sector.percentage}%)</span>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -827,10 +949,15 @@ export function AuditDiagnosticDashboard({
             {/* Top 10 Non-conformities */}
             <Card className="rounded-2xl shadow-card">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-sm uppercase">
-                  <BarChart3 className="h-4 w-4 text-primary" />
-                  Top 10 Não Conformidades
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-sm uppercase">
+                    <BarChart3 className="h-4 w-4 text-primary" />
+                    Top 10 Não Conformidades
+                  </CardTitle>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <MousePointerClick className="h-3 w-3" /> Clique para detalhar
+                  </span>
+                </div>
               </CardHeader>
               <CardContent>
                 {topOffenders.length === 0 ? (
@@ -845,6 +972,14 @@ export function AuditDiagnosticDashboard({
                         data={topOffenders}
                         layout="vertical"
                         margin={{ top: 0, right: 20, left: 0, bottom: 0 }}
+                        onClick={(data) => {
+                          if (data?.activePayload?.[0]) {
+                            const itemName = data.activePayload[0].payload.fullName;
+                            const related = currentMonthFailures.filter((f) => f.item_name === itemName);
+                            openDrillDown(`Detalhes: ${itemName}`, related);
+                          }
+                        }}
+                        className="cursor-pointer"
                       >
                         <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="hsl(var(--border))" />
                         <XAxis type="number" tick={{ fontSize: 11 }} />
@@ -862,6 +997,7 @@ export function AuditDiagnosticDashboard({
                                 <div className="bg-popover border rounded-lg p-3 shadow-lg">
                                   <p className="font-medium text-sm">{data.fullName}</p>
                                   <p className="text-primary font-bold">{data.count} ocorrências</p>
+                                  <p className="text-[10px] text-muted-foreground mt-1">Clique para ver detalhes</p>
                                 </div>
                               );
                             }
@@ -957,7 +1093,14 @@ export function AuditDiagnosticDashboard({
                   {unitRanking.map((unit, idx) => {
                     const tier = getTierForScore(unit.avgScore);
                     return (
-                      <div key={unit.lojaId} className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted/50 transition-colors">
+                      <div
+                        key={unit.lojaId}
+                        className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => {
+                          const unitFailures = allCurrentMonthFailures.filter((f) => f.loja_id === unit.lojaId);
+                          openDrillDown(`Unidade: ${unit.nome}`, unitFailures);
+                        }}
+                      >
                         <span className="text-xs font-bold text-muted-foreground w-6 text-center">
                           {idx + 1}º
                         </span>
@@ -1107,7 +1250,7 @@ export function AuditDiagnosticDashboard({
         {/* ===== TAB: NOTAS POR CARGO ===== */}
         <TabsContent value="scores" className="space-y-6 animate-fade-in">
           {/* General Score */}
-          {selectedUnidadeId && (
+          {effectiveLojaId && (
             <Card className="rounded-2xl shadow-card bg-gradient-to-br from-primary/10 to-primary/5">
               <CardContent className="flex items-center justify-between p-6">
                 <div>
@@ -1252,14 +1395,22 @@ export function AuditDiagnosticDashboard({
 
         {/* ===== TAB: CONFORMIDADE ===== */}
         <TabsContent value="heatmap" className="animate-fade-in">
-          <ComplianceHeatmap lojaId={selectedUnidadeId} />
+          <ComplianceHeatmap lojaId={effectiveLojaId} />
         </TabsContent>
 
         {/* ===== TAB: COMPETÊNCIAS ===== */}
         <TabsContent value="radar" className="animate-fade-in">
-          <LeadershipRadar lojaId={selectedUnidadeId} />
+          <LeadershipRadar lojaId={effectiveLojaId} />
         </TabsContent>
       </Tabs>
+
+      {/* Drill-Down Dialog */}
+      <AuditDrillDownDialog
+        open={drillDownOpen}
+        onOpenChange={setDrillDownOpen}
+        config={drillDown}
+      />
     </div>
   );
 }
+

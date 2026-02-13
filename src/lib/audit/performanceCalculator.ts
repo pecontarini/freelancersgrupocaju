@@ -84,6 +84,7 @@ export function detectChecklistType(
   metadata?: Record<string, unknown>
 ): AuditChecklistType | null {
   const searchText = (category || '').toLowerCase();
+  if (searchText.includes('fiscal') && searchText.includes('cpd')) return 'FISCAL_CPD';
   if (searchText.includes('fiscal')) return 'FISCAL';
   if (searchText.includes('alimento') || searchText.includes('food')) return 'AUDITORIA_DE_ALIMENTOS';
   if (searchText.includes('supervisor') || searchText.includes('supervisão')) return 'SUPERVISOR';
@@ -91,14 +92,18 @@ export function detectChecklistType(
 }
 
 /**
- * CORE: Calculate position performance using "Média de Médias por Setor"
+ * CORE: Calculate position performance using Weighted Points Accumulation
  * 
  * Algorithm:
- * 1. For each checklist type valid for this position:
- *    a. Filter sector scores matching valid sectors
- *    b. Group by sector → average each sector
- *    c. Average across sectors (each sector counts equally)
- * 2. Weighted average across checklist types (Supervisor×2, Fiscal×1, Alimentos×1)
+ * 1. For each audit score matching this position's valid sectors/checklist types:
+ *    a. audit_points = (score / 100) * WEIGHT_OF_CHECKLIST_TYPE
+ *    b. max_points = 1.0 * WEIGHT_OF_CHECKLIST_TYPE
+ * 2. final_score = (sum_audit_points / sum_max_points) * 100
+ * 
+ * Example: Supervisor(w=2) at 80% + Fiscal(w=1) at 100%
+ *   points = (0.80*2) + (1.00*1) = 2.6
+ *   max    = 2 + 1 = 3.0
+ *   final  = (2.6/3.0)*100 = 86.66%
  */
 export function calculatePositionFromSectorScores(
   position: LeadershipPositionCode,
@@ -107,8 +112,8 @@ export function calculatePositionFromSectorScores(
   const rule = POSITION_ROUTING_RULES[position];
   const reviewReasons: string[] = [];
   const breakdown: PositionPerformanceResult['breakdown'] = [];
-  let weightedSum = 0;
-  let totalWeight = 0;
+  let totalAuditPoints = 0;
+  let totalMaxPoints = 0;
   let totalAudits = 0;
 
   for (const [checklistType, validSectors] of Object.entries(rule.rules)) {
@@ -122,27 +127,19 @@ export function calculatePositionFromSectorScores(
 
     if (matchingScores.length === 0) continue;
 
-    // Step 1: Group by sector and calculate average per sector
-    const sectorGroups = new Map<string, number[]>();
-    for (const s of matchingScores) {
-      const existing = sectorGroups.get(s.sectorCode) || [];
-      existing.push(s.score);
-      sectorGroups.set(s.sectorCode, existing);
-    }
-
-    // Step 2: Average across sectors (each sector counts equally)
-    let sectorAvgSum = 0;
-    let sectorCount = 0;
-    for (const [, scores] of sectorGroups) {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      sectorAvgSum += avg;
-      sectorCount++;
-    }
-
-    const typeAverage = sectorAvgSum / sectorCount;
     const weight = AUDIT_TYPE_WEIGHTS[checklistType as AuditChecklistType];
-    weightedSum += typeAverage * weight;
-    totalWeight += weight;
+
+    // Accumulate weighted points for each individual audit score
+    let typeAuditPoints = 0;
+    let typeMaxPoints = 0;
+    for (const s of matchingScores) {
+      typeAuditPoints += (s.score / 100) * weight;
+      typeMaxPoints += 1.0 * weight;
+    }
+
+    const typeAverage = (typeAuditPoints / typeMaxPoints) * 100;
+    totalAuditPoints += typeAuditPoints;
+    totalMaxPoints += typeMaxPoints;
     totalAudits += matchingScores.length;
 
     breakdown.push({
@@ -154,7 +151,7 @@ export function calculatePositionFromSectorScores(
     });
   }
 
-  if (totalWeight === 0) {
+  if (totalMaxPoints === 0) {
     return {
       position,
       label: POSITION_LABELS[position],
@@ -167,7 +164,7 @@ export function calculatePositionFromSectorScores(
     };
   }
 
-  const finalScore = weightedSum / totalWeight;
+  const finalScore = (totalAuditPoints / totalMaxPoints) * 100;
   return {
     position,
     label: POSITION_LABELS[position],

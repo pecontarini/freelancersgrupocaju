@@ -20,7 +20,7 @@ export interface PositionRoutingRule {
    * Key: checklist type
    * Value: array of valid sectors, or null if this type doesn't apply
    */
-  rules: Partial<Record<AuditChecklistType, AuditSectorCode[] | null>>;
+  rules: Partial<Record<AuditChecklistType | 'FISCAL_CPD', AuditSectorCode[] | null>>;
   /**
    * Whether this position consolidates from child positions
    */
@@ -135,6 +135,7 @@ export const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, PositionRout
     rules: {
       SUPERVISOR: ['estoque', 'cozinha', 'sushi', 'parrilla', 'bar', 'dml'],
       FISCAL: ['estoque', 'cozinha', 'cozinha_quente', 'saladas_sobremesas', 'sushi', 'parrilla', 'bar', 'dml'],
+      FISCAL_CPD: ['estoque', 'cozinha', 'cozinha_quente', 'saladas_sobremesas', 'sushi', 'parrilla', 'bar', 'dml'],
       AUDITORIA_DE_ALIMENTOS: ['estoque', 'cozinha', 'sushi', 'parrilla', 'bar', 'dml'],
     },
     isManager: true,
@@ -151,7 +152,8 @@ export const POSITION_ROUTING_RULES: Record<LeadershipPositionCode, PositionRout
     position: 'gerente_front',
     rules: {
       SUPERVISOR: ['salao', 'area_comum', 'documentos', 'lavagem', 'delivery', 'asg', 'manutencao', 'brinquedoteca', 'recepcao'],
-      FISCAL: ['salao', 'area_comum'], // Only salão and área comum for fiscal
+      FISCAL: ['salao', 'area_comum'],
+      FISCAL_CPD: ['salao', 'area_comum'],
       AUDITORIA_DE_ALIMENTOS: ['salao', 'area_comum', 'documentos', 'lavagem'],
     },
     isManager: true,

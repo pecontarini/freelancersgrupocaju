@@ -1934,6 +1934,7 @@ export type Database = {
           total_budget: number | null
           uniforms_budget: number
           updated_at: string
+          utensils_budget: number
         }
         Insert: {
           cleaning_budget?: number
@@ -1946,6 +1947,7 @@ export type Database = {
           total_budget?: number | null
           uniforms_budget?: number
           updated_at?: string
+          utensils_budget?: number
         }
         Update: {
           cleaning_budget?: number
@@ -1958,6 +1960,7 @@ export type Database = {
           total_budget?: number | null
           uniforms_budget?: number
           updated_at?: string
+          utensils_budget?: number
         }
         Relationships: [
           {

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
@@ -77,9 +77,9 @@ export function FinancialHealthCard({
     // Get operational expenses for the store
     const operationalTotals = effectiveStoreId 
       ? getTotalsForStoreMonth(effectiveStoreId, currentMonthYear)
-      : { uniformes: 0, limpeza: 0, total: 0 };
+      : { uniformes: 0, limpeza: 0, utensilios: 0, total: 0 };
 
-    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza;
+    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios;
 
     // Get budget for effective store
     const budget = effectiveStoreId 
@@ -90,6 +90,7 @@ export function FinancialHealthCard({
     const maintenanceBudget = budget?.maintenance_budget || 0;
     const uniformsBudget = budget?.uniforms_budget || 0;
     const cleaningBudget = budget?.cleaning_budget || 0;
+    const utensilsBudget = budget?.utensils_budget || 0;
     const totalBudget = budget?.total_budget || 0;
     
     // Category stats
@@ -125,6 +126,14 @@ export function FinancialHealthCard({
       hasBudget: cleaningBudget > 0,
     };
 
+    const utensilsStats: CategoryStats = {
+      spent: operationalTotals.utensilios,
+      budget: utensilsBudget,
+      percentageUsed: utensilsBudget > 0 ? (operationalTotals.utensilios / utensilsBudget) * 100 : 0,
+      remaining: utensilsBudget - operationalTotals.utensilios,
+      hasBudget: utensilsBudget > 0,
+    };
+
     const totalStats: CategoryStats = {
       spent: totalSpent,
       budget: totalBudget,
@@ -148,6 +157,7 @@ export function FinancialHealthCard({
       maintenance: maintenanceStats,
       uniforms: uniformsStats,
       cleaning: cleaningStats,
+      utensils: utensilsStats,
       total: totalStats,
       dailyAverage,
       projectedTotal,
@@ -275,6 +285,12 @@ export function FinancialHealthCard({
             iconColor="text-cyan-500" 
             stats={stats.cleaning} 
           />
+          <CategoryProgressBar 
+            label="Utensílios" 
+            icon={UtensilsCrossed} 
+            iconColor="text-rose-500" 
+            stats={stats.utensils} 
+          />
           <div className="pt-2 border-t">
             <CategoryProgressBar 
               label="Total Geral" 
@@ -340,6 +356,20 @@ export function FinancialHealthCard({
               stats.cleaning.remaining >= 0 ? "text-cyan-600" : "text-destructive"
             )}>
               {stats.cleaning.hasBudget ? formatCurrency(stats.cleaning.remaining) : "N/A"}
+            </p>
+          </div>
+
+          {/* Saldo Utensílios */}
+          <div className="space-y-1 rounded-lg bg-rose-50 dark:bg-rose-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <UtensilsCrossed className="h-3 w-3 text-rose-500" />
+              Saldo Utensílios
+            </p>
+            <p className={cn(
+              "text-sm font-bold",
+              stats.utensils.remaining >= 0 ? "text-rose-600" : "text-destructive"
+            )}>
+              {stats.utensils.hasBudget ? formatCurrency(stats.utensils.remaining) : "N/A"}
             </p>
           </div>
         </div>

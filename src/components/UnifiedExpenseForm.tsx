@@ -57,11 +57,12 @@ interface UnifiedExpenseFormProps {
   storeId: string | null;
 }
 
-type CategoryType = "uniformes" | "limpeza" | "apoio" | "manutencao";
+type CategoryType = "uniformes" | "limpeza" | "apoio" | "utensilios" | "manutencao";
 
 const CATEGORIES = [
   { value: "uniformes", label: "Uniformes", icon: Shirt, color: "text-purple-500" },
   { value: "limpeza", label: "Material de Limpeza", icon: SprayCanIcon, color: "text-cyan-500" },
+  { value: "utensilios", label: "Utensílios", icon: Wrench, color: "text-rose-500" },
   { value: "apoio", label: "Apoio/Outros", icon: HelpCircle, color: "text-gray-500" },
   { value: "manutencao", label: "Manutenção", icon: Wrench, color: "text-orange-500" },
 ] as const;
@@ -297,7 +298,7 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
       });
     } else {
       // Simple expense (uniformes, limpeza, apoio)
-      const operationalCategory = category as "uniformes" | "limpeza" | "apoio";
+      const operationalCategory = category as "uniformes" | "limpeza" | "apoio" | "utensilios";
       await addExpense({
         store_id: effectiveStoreId,
         category: operationalCategory,

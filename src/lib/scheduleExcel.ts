@@ -18,6 +18,7 @@ export interface ParsedScheduleEntry {
   schedule_type: "working" | "off";
   start_time: string | null;
   end_time: string | null;
+  break_duration: number; // minutes
 }
 
 export interface ScheduleParseError {
@@ -117,8 +118,13 @@ export function generateScheduleTemplate(
     ["INSTRUÇÕES DE PREENCHIMENTO"],
     [""],
     ["1. Preencha os horários no formato: 08:00 - 16:00"],
-    ["2. Para FOLGA, digite: FOLGA (ou F, OFF)"],
-    ["3. Para dobra (turno longo), ex: 11:00 - 23:00"],
+    ["2. Para especificar intervalo: 08:00 - 16:00 (30m) ou (1h)"],
+    ["3. Se omitido, turnos > 6h assumem intervalo de 1h"],
+    ["4. Para FOLGA, digite: FOLGA (ou F, OFF)"],
+    ["5. Para dobra (turno longo), ex: 11:00 - 23:00"],
+    ["6. Deixe vazio para não programar nada"],
+    ["7. NÃO altere os nomes dos funcionários na coluna A"],
+    ["8. NÃO altere a aba __meta__ (dados do sistema)"],
     ["4. Deixe vazio para não programar nada"],
     ["5. NÃO altere os nomes dos funcionários na coluna A"],
     ["6. NÃO altere a aba __meta__ (dados do sistema)"],
@@ -139,35 +145,64 @@ export function generateScheduleTemplate(
 
 const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg"]);
 
+function parseBreakDuration(cellValue: string, startTime: string, endTime: string): number {
+  // Look for break info in parentheses or "int" suffix: (1h), (60m), (30m), (15m), int 30m, etc.
+  const breakPattern = /\(?\s*(\d+)\s*(h|m|min|hr)\s*\)?/i;
+  const match = cellValue.match(breakPattern);
+  if (match) {
+    const value = parseInt(match[1], 10);
+    const unit = match[2].toLowerCase();
+    if (unit === "h" || unit === "hr") return value * 60;
+    return value; // already minutes
+  }
+
+  // Default: 60 min for shifts > 6h, 0 otherwise
+  const sMin = timeToMinutes(startTime);
+  let eMin = timeToMinutes(endTime);
+  if (eMin <= sMin) eMin += 1440;
+  const shiftLength = eMin - sMin;
+  return shiftLength > 360 ? 60 : 0;
+}
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
 function parseTimeRange(cellValue: string): {
   start_time: string;
   end_time: string;
+  break_duration: number;
 } | null {
   const cleaned = cellValue
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 
-  // Match patterns: "08:00 - 16:00", "08:00-16:00", "08:00 as 16:00", "08:00 a 16:00", "08:00 até 16:00"
-  const pattern = /^(\d{1,2}:\d{2})\s*[-–—aàeé\s]*(?:s|té)?\s*(\d{1,2}:\d{2})$/i;
-  // More flexible: try splitting by common separators
   const separators = [" - ", " – ", " — ", "-", "–", "—", " as ", " a ", " até ", " ate "];
 
   for (const sep of separators) {
     const idx = cleaned.indexOf(sep);
     if (idx > 0) {
       const left = cleaned.slice(0, idx).trim();
-      const right = cleaned.slice(idx + sep.length).trim();
+      // Right side: take only the time part (strip break info)
+      const rightRaw = cleaned.slice(idx + sep.length).trim();
+      const rightTime = rightRaw.match(/^(\d{1,2}:\d{2})/);
 
       const startMatch = left.match(/^(\d{1,2}):(\d{2})$/);
-      const endMatch = right.match(/^(\d{1,2}):(\d{2})$/);
 
-      if (startMatch && endMatch) {
-        const sh = startMatch[1].padStart(2, "0");
-        const sm = startMatch[2];
-        const eh = endMatch[1].padStart(2, "0");
-        const em = endMatch[2];
-        return { start_time: `${sh}:${sm}`, end_time: `${eh}:${em}` };
+      if (startMatch && rightTime) {
+        const endParts = rightTime[1].match(/^(\d{1,2}):(\d{2})$/);
+        if (endParts) {
+          const sh = startMatch[1].padStart(2, "0");
+          const sm = startMatch[2];
+          const eh = endParts[1].padStart(2, "0");
+          const em = endParts[2];
+          const start_time = `${sh}:${sm}`;
+          const end_time = `${eh}:${em}`;
+          const break_duration = parseBreakDuration(cellValue, start_time, end_time);
+          return { start_time, end_time, break_duration };
+        }
       }
     }
   }
@@ -281,6 +316,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
                 schedule_type: "off",
                 start_time: null,
                 end_time: null,
+                break_duration: 0,
               });
               offCount++;
               continue;
@@ -296,6 +332,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
                 schedule_type: "working",
                 start_time: parsed.start_time,
                 end_time: parsed.end_time,
+                break_duration: parsed.break_duration,
               });
               workingCount++;
               continue;

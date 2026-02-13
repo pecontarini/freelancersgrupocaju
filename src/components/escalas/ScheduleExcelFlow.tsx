@@ -97,7 +97,7 @@ export function ScheduleExcelFlow({
           sector_id: sectorId,
           start_time: entry.start_time,
           end_time: entry.end_time,
-          break_duration: entry.schedule_type === "working" ? 60 : 0,
+          break_duration: entry.break_duration,
           schedule_type: entry.schedule_type,
           agreed_rate: 0,
         });

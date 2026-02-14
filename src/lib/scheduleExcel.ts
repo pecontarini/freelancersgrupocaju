@@ -84,6 +84,15 @@ export function generateScheduleTemplate(
   // Actually, let's use a cleaner approach: put IDs in a separate hidden sheet
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
+  // Force meta row date cells to be TEXT so Excel doesn't convert to serial numbers
+  for (let c = 1; c <= weekDays.length; c++) {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[cellRef]) {
+      ws[cellRef].t = "s"; // force string type
+      ws[cellRef].z = "@"; // text number format
+    }
+  }
+
   // Set column widths
   ws["!cols"] = [
     { wch: 25 }, // Employee name
@@ -118,16 +127,14 @@ export function generateScheduleTemplate(
     ["INSTRUÇÕES DE PREENCHIMENTO"],
     [""],
     ["1. Preencha os horários no formato: 08:00 - 16:00"],
-    ["2. Para especificar intervalo: 08:00 - 16:00 (30m) ou (1h)"],
+    ["2. Para especificar intervalo: 08:00 - 16:00 (30m) ou (1h) ou (3h)"],
     ["3. Se omitido, turnos > 6h assumem intervalo de 1h"],
     ["4. Para FOLGA, digite: FOLGA (ou F, OFF)"],
     ["5. Para dobra (turno longo), ex: 11:00 - 23:00"],
     ["6. Deixe vazio para não programar nada"],
     ["7. NÃO altere os nomes dos funcionários na coluna A"],
     ["8. NÃO altere a aba __meta__ (dados do sistema)"],
-    ["4. Deixe vazio para não programar nada"],
-    ["5. NÃO altere os nomes dos funcionários na coluna A"],
-    ["6. NÃO altere a aba __meta__ (dados do sistema)"],
+    ["9. IMPORTANTE: Formate as células de horário como TEXTO no Excel"],
     [""],
     [`Setor: ${sectorName}`],
     [`Semana: ${format(weekDays[0], "dd/MM/yyyy")} a ${format(weekDays[6], "dd/MM/yyyy")}`],
@@ -146,8 +153,8 @@ export function generateScheduleTemplate(
 const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg"]);
 
 function parseBreakDuration(cellValue: string, startTime: string, endTime: string): number {
-  // Look for break info in parentheses or "int" suffix: (1h), (60m), (30m), (15m), int 30m, etc.
-  const breakPattern = /\(?\s*(\d+)\s*(h|m|min|hr)\s*\)?/i;
+  // Look for break info in parentheses: (1h), (60m), (30m), (15m), (3h), etc.
+  const breakPattern = /\(\s*(\d+)\s*(h|m|min|hr)\s*\)/i;
   const match = cellValue.match(breakPattern);
   if (match) {
     const value = parseInt(match[1], 10);
@@ -169,6 +176,67 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
+/** Convert an Excel serial date number to ISO YYYY-MM-DD string */
+function excelSerialToISO(serial: number): string {
+  // Excel epoch is 1900-01-01, but has a leap year bug (day 60 = Feb 29, 1900 which doesn't exist)
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+  const ms = excelEpoch.getTime() + serial * 86400000;
+  const d = new Date(ms);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Convert an Excel time fraction (0–1) to HH:MM string */
+function excelTimeToHHMM(fraction: number): string {
+  const totalMinutes = Math.round(fraction * 1440);
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Normalize a cell value to a string, handling Excel serial dates/times */
+function cellToString(cell: any): string {
+  if (cell === null || cell === undefined) return "";
+  if (typeof cell === "string") return cell.trim();
+  if (typeof cell === "number") {
+    // Could be an Excel time fraction (0 < x < 1) — but schedule cells are text, so just stringify
+    return String(cell);
+  }
+  if (cell instanceof Date) {
+    return format(cell, "yyyy-MM-dd");
+  }
+  return String(cell).trim();
+}
+
+/** Extract a date string from a meta-row cell that may be ISO text or Excel serial number */
+function parseDateCell(cell: any): string | null {
+  if (cell === null || cell === undefined) return null;
+
+  // Already an ISO string
+  if (typeof cell === "string") {
+    const trimmed = cell.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    // Try parsing dd/MM/yyyy
+    const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+    return null;
+  }
+
+  // Excel serial date number (typically > 40000 for modern dates)
+  if (typeof cell === "number" && cell > 30000 && cell < 200000) {
+    return excelSerialToISO(cell);
+  }
+
+  // JS Date object
+  if (cell instanceof Date) {
+    return format(cell, "yyyy-MM-dd");
+  }
+
+  return null;
+}
+
 function parseTimeRange(cellValue: string): {
   start_time: string;
   end_time: string;
@@ -178,6 +246,9 @@ function parseTimeRange(cellValue: string): {
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
+
+  // If cell is empty after cleaning, skip
+  if (!cleaned) return null;
 
   const separators = [" - ", " – ", " — ", "-", "–", "—", " as ", " a ", " até ", " ate "];
 
@@ -247,24 +318,26 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
         const rawData = XLSX.utils.sheet_to_json<any>(scheduleSheet, {
           header: 1,
           defval: "",
-        }) as string[][];
+          raw: true, // prevent XLSX from formatting — we handle conversion ourselves
+        }) as any[][];
 
         if (rawData.length < 4) {
           reject(new Error("Planilha vazia ou com formato inválido."));
           return;
         }
 
-        // Row 0 = metadata (marker + ISO dates)
+        // Row 0 = metadata (marker + ISO dates or Excel serial dates)
         const metaRow = rawData[0];
-        if (metaRow[0] !== METADATA_ROW_KEY) {
+        const metaMarker = cellToString(metaRow[0]);
+        if (metaMarker !== METADATA_ROW_KEY) {
           reject(new Error("Formato de planilha não reconhecido. Use o modelo gerado pelo sistema."));
           return;
         }
 
         const dates: string[] = [];
         for (let c = 1; c < metaRow.length; c++) {
-          const dateStr = String(metaRow[c]).trim();
-          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+          const dateStr = parseDateCell(metaRow[c]);
+          if (dateStr) {
             dates.push(dateStr);
           }
         }
@@ -288,7 +361,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
 
         for (let r = 3; r < rawData.length; r++) {
           const row = rawData[r];
-          const employeeName = String(row[0] || "").trim();
+          const employeeName = cellToString(row[0]);
           if (!employeeName) continue;
 
           // Find employee by normalized name from __meta__ sheet
@@ -305,7 +378,22 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           }
 
           for (let c = 0; c < dates.length; c++) {
-            const cellValue = String(row[c + 1] || "").trim();
+            const rawCell = row[c + 1];
+
+            // Handle Excel time serial numbers (e.g., 0.375 = 09:00)
+            // If the cell is a pure number between 0 and 1, it's likely a time — skip or warn
+            if (typeof rawCell === "number" && rawCell > 0 && rawCell < 1) {
+              // Single time value, not a range — can't determine start/end
+              errors.push({
+                row: r + 1,
+                employeeName: empMeta.employee_name,
+                dateLabel: format(new Date(dates[c] + "T12:00:00"), "EEE dd/MM", { locale: ptBR }),
+                message: `Célula formatada como horário pelo Excel. Use formato texto: HH:MM - HH:MM.`,
+              });
+              continue;
+            }
+
+            const cellValue = cellToString(rawCell);
             if (!cellValue) continue;
 
             const dateStr = dates[c];

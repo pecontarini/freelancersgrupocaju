@@ -88,6 +88,7 @@ export function ScheduleExcelFlow({
     setIsSaving(true);
     let successCount = 0;
     let errorCount = 0;
+    const errorMessages: string[] = [];
 
     for (const entry of parseResult.entries) {
       try {
@@ -102,8 +103,11 @@ export function ScheduleExcelFlow({
           agreed_rate: 0,
         });
         successCount++;
-      } catch {
+      } catch (err: any) {
         errorCount++;
+        if (errorMessages.length < 3) {
+          errorMessages.push(`${entry.employee_name} (${entry.date}): ${err?.message || "erro desconhecido"}`);
+        }
       }
     }
 
@@ -115,7 +119,10 @@ export function ScheduleExcelFlow({
     if (errorCount === 0) {
       toast.success(`${successCount} lançamento(s) importado(s) com sucesso!`);
     } else {
-      toast.warning(`${successCount} importados, ${errorCount} com erro.`);
+      toast.warning(
+        `${successCount} importados, ${errorCount} com erro.${errorMessages.length > 0 ? " " + errorMessages.join("; ") : ""}`,
+        { duration: 8000 }
+      );
     }
   }
 

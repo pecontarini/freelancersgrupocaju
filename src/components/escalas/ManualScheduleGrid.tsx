@@ -55,6 +55,7 @@ import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
+import { MasterExportButton } from "./MasterExportButton";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -227,19 +228,28 @@ export function ManualScheduleGrid() {
             Lançamento único por dia — o POP é calculado automaticamente pelo horário.
           </p>
         </div>
-        {activeSectorId && sortedEmployees.length > 0 && (
-          <ScheduleExcelFlow
-            employees={sortedEmployees.map((e) => ({
-              id: e.id,
-              name: e.name,
-              job_title: e.job_title,
-              worker_type: e.worker_type || "clt",
-            }))}
-            weekDays={weekDays}
-            sectorName={sectors.find((s) => s.id === activeSectorId)?.name || "Setor"}
-            sectorId={activeSectorId}
-          />
-        )}
+        <div className="flex gap-1.5 flex-wrap">
+          {(isAdmin || isPartner) && selectedUnit && (
+            <MasterExportButton
+              unitId={selectedUnit}
+              unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "Unidade"}
+              weekStart={currentWeekBase}
+            />
+          )}
+          {activeSectorId && sortedEmployees.length > 0 && (
+            <ScheduleExcelFlow
+              employees={sortedEmployees.map((e) => ({
+                id: e.id,
+                name: e.name,
+                job_title: e.job_title,
+                worker_type: e.worker_type || "clt",
+              }))}
+              weekDays={weekDays}
+              sectorName={sectors.find((s) => s.id === activeSectorId)?.name || "Setor"}
+              sectorId={activeSectorId}
+            />
+          )}
+        </div>
       </div>
 
       {/* Unit selector for admin/partner */}

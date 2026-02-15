@@ -20,7 +20,8 @@ import {
   CMVUnmappedAlert,
   CMVSalesDashboard,
   CMVKardexDashboard,
-  CMVClosingReport
+  CMVClosingReport,
+  CMVLiveStockCard,
 } from "@/components/cmv";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -150,6 +151,9 @@ export function CMVTab() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Live Stock Valuation */}
+              <CMVLiveStockCard />
 
               {/* Daily Count Form */}
               <CMVDailyCountForm />

@@ -6,17 +6,14 @@ import {
   XCircle,
   Clock,
   ClipboardCopy,
-  MessageCircle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Users,
   Loader2,
-  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -30,6 +27,7 @@ import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useD1Schedules, type D1Schedule } from "@/hooks/useD1Schedules";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { D1SectorAccordion, groupBySector } from "./D1SectorAccordion";
 
 const APP_URL = window.location.origin;
 
@@ -52,7 +50,7 @@ export function D1ManagementPanel() {
   const { data: schedules = [], isLoading } = useD1Schedules(selectedUnit, selectedDate);
 
   // Split into 3 groups
-  const { confirmed, denied, pending } = useMemo(() => {
+  const { confirmed, denied, pending, sectorGroups } = useMemo(() => {
     const confirmed: D1Schedule[] = [];
     const denied: D1Schedule[] = [];
     const pending: D1Schedule[] = [];
@@ -63,7 +61,9 @@ export function D1ManagementPanel() {
       else pending.push(s);
     }
 
-    return { confirmed, denied, pending };
+    const sectorGroups = groupBySector(schedules);
+
+    return { confirmed, denied, pending, sectorGroups };
   }, [schedules]);
 
   function navigateDate(dir: number) {
@@ -228,33 +228,11 @@ export function D1ManagementPanel() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Pending */}
-          <StatusColumn
-            title="⏳ Pendentes"
-            items={pending}
-            color="border-yellow-400 dark:border-yellow-600"
-            badgeClass="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300"
-            showWhatsApp
-            buildWhatsAppLink={buildWhatsAppLink}
-          />
-
-          {/* Denied */}
-          <StatusColumn
-            title="❌ Ausentes / Negados"
-            items={denied}
-            color="border-red-400 dark:border-red-600"
-            badgeClass="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-          />
-
-          {/* Confirmed */}
-          <StatusColumn
-            title="✅ Confirmados"
-            items={confirmed}
-            color="border-green-400 dark:border-green-600"
-            badgeClass="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-          />
-        </div>
+        <D1SectorAccordion
+          sectors={sectorGroups}
+          dateLabel={formatDateLabel(selectedDate)}
+          buildWhatsAppLink={buildWhatsAppLink}
+        />
       )}
     </div>
   );
@@ -270,91 +248,6 @@ function KpiCard({ label, value, icon, color }: { label: string; value: number; 
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="text-2xl font-bold">{value}</p>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ─── Status Column ─── */
-function StatusColumn({
-  title,
-  items,
-  color,
-  badgeClass,
-  showWhatsApp,
-  buildWhatsAppLink,
-}: {
-  title: string;
-  items: D1Schedule[];
-  color: string;
-  badgeClass: string;
-  showWhatsApp?: boolean;
-  buildWhatsAppLink?: (s: D1Schedule) => string;
-}) {
-  return (
-    <Card className={`border-t-4 ${color}`}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{title}</span>
-          <Badge className={`${badgeClass} border-0 text-sm px-2`}>{items.length}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">Nenhum</p>
-        ) : (
-          items.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between gap-2 rounded-lg border p-2.5 bg-background"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium text-sm truncate">{s.employee_name}</span>
-                  {s.worker_type === "freelancer" && (
-                    <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
-                      FL
-                    </Badge>
-                  )}
-                </div>
-                <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                  {s.job_title && <span>{s.job_title}</span>}
-                  <span>•</span>
-                  <span>{s.sector_name}</span>
-                  {s.start_time && s.end_time && (
-                    <>
-                      <span>•</span>
-                      <span>{s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}</span>
-                    </>
-                  )}
-                </div>
-                {s.denial_reason && (
-                  <div className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1 mt-0.5">
-                    <AlertTriangle className="h-3 w-3" />
-                    Motivo: {s.denial_reason}
-                  </div>
-                )}
-              </div>
-              {showWhatsApp && buildWhatsAppLink && (
-                <a
-                  href={buildWhatsAppLink(s)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0"
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-700 dark:hover:bg-green-950/30 h-8"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">WhatsApp</span>
-                  </Button>
-                </a>
-              )}
-            </div>
-          ))
-        )}
       </CardContent>
     </Card>
   );

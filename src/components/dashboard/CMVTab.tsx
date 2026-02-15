@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2, Activity } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2, Activity, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -18,7 +18,8 @@ import {
   CMVProductMappingHub,
   CMVUnmappedAlert,
   CMVSalesDashboard,
-  CMVKardexDashboard
+  CMVKardexDashboard,
+  CMVClosingReport
 } from "@/components/cmv";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -64,7 +65,7 @@ export function CMVTab() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="operacional" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7 max-w-5xl">
+        <TabsList className="grid w-full grid-cols-8 max-w-5xl">
           <TabsTrigger value="operacional" className="flex items-center gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Operacional</span>
@@ -76,6 +77,10 @@ export function CMVTab() {
           <TabsTrigger value="auditoria" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Auditoria</span>
+          </TabsTrigger>
+          <TabsTrigger value="fechamento" className="flex items-center gap-1.5">
+            <FileText className="h-4 w-4" />
+            <span className="hidden sm:inline">Fechamento</span>
           </TabsTrigger>
           <TabsTrigger value="entradas" className="flex items-center gap-1.5">
             <FileUp className="h-4 w-4" />
@@ -183,6 +188,11 @@ export function CMVTab() {
           
           {/* BI Dashboard */}
           <CMVAnalyticsDashboard />
+        </TabsContent>
+
+        {/* ====== ABA: FECHAMENTO CMV ====== */}
+        <TabsContent value="fechamento" className="space-y-6">
+          <CMVClosingReport />
         </TabsContent>
 
         {/* ====== ABA 3: ENTRADAS (NFe Scanner) ====== */}

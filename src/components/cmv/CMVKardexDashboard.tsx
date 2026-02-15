@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { format, subDays, parseISO, addDays } from "date-fns";
+import { format, subDays, parseISO, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Activity, TrendingDown, TrendingUp, Package, Loader2 } from "lucide-react";
+import { CalendarIcon, Activity, TrendingDown, TrendingUp, Package, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useCMVItems } from "@/hooks/useCMV";
@@ -77,6 +77,19 @@ export function CMVKardexDashboard() {
   const totalSales = positions.reduce((s, p) => s + Number(p.total_sales), 0);
   const totalWaste = positions.reduce((s, p) => s + Number(p.total_waste), 0);
   const lastDivergence = positions.length > 0 ? positions[positions.length - 1].divergence : null;
+
+  // Precision indicators
+  const precisionStats = useMemo(() => {
+    const daysWithCount = positions.filter(p => p.physical_count != null);
+    const daysZeroDivergence = daysWithCount.filter(p => Number(p.divergence) === 0);
+    const accuracy = daysWithCount.length > 0 ? (daysZeroDivergence.length / daysWithCount.length) * 100 : null;
+    const unidentifiedLoss = positions
+      .filter(p => p.divergence != null && Number(p.divergence) < 0)
+      .reduce((sum, p) => sum + Math.abs(Number(p.divergence)), 0);
+    const totalCountedDays = daysWithCount.length;
+    const totalDays = positions.length;
+    return { accuracy, unidentifiedLoss, totalCountedDays, totalDays };
+  }, [positions]);
 
   const formatDayLabel = (dateStr: string) => {
     const d = parseISO(dateStr);
@@ -328,6 +341,64 @@ export function CMVKardexDashboard() {
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+          {/* Precision Indicators */}
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                Indicadores de Precisão — {selectedItemName}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Acuracidade do Estoque</p>
+                  <p className={cn(
+                    "text-3xl font-bold",
+                    precisionStats.accuracy != null && precisionStats.accuracy >= 80 ? "text-emerald-600" :
+                    precisionStats.accuracy != null && precisionStats.accuracy >= 50 ? "text-amber-600" :
+                    precisionStats.accuracy != null ? "text-destructive" : "text-muted-foreground"
+                  )}>
+                    {precisionStats.accuracy != null ? `${precisionStats.accuracy.toFixed(0)}%` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    % de dias com divergência zero
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Perda Não Identificada</p>
+                  <p className={cn(
+                    "text-3xl font-bold",
+                    precisionStats.unidentifiedLoss > 0 ? "text-destructive" : "text-emerald-600"
+                  )}>
+                    {precisionStats.unidentifiedLoss > 0
+                      ? `-${precisionStats.unidentifiedLoss.toFixed(1)} ${selectedItemUnit}`
+                      : `0 ${selectedItemUnit}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Soma das divergências negativas
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Cobertura de Contagens</p>
+                  <p className="text-3xl font-bold text-primary">
+                    {precisionStats.totalCountedDays}/{precisionStats.totalDays}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Dias com contagem física registrada
+                  </p>
+                </div>
+              </div>
+              {precisionStats.accuracy != null && precisionStats.accuracy < 50 && (
+                <div className="flex items-start gap-2 mt-4 bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                  <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-sm text-destructive">
+                    Acuracidade abaixo de 50% — Investigar possíveis falhas de registro, desvios ou erros de contagem.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>

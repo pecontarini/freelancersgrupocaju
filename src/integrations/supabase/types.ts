@@ -855,6 +855,69 @@ export type Database = {
           },
         ]
       }
+      daily_stock_positions: {
+        Row: {
+          created_at: string
+          date: string
+          divergence: number | null
+          id: string
+          ingredient_id: string
+          opening_balance: number
+          physical_count: number | null
+          theoretical_balance: number
+          total_entry: number
+          total_sales: number
+          total_waste: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          divergence?: number | null
+          id?: string
+          ingredient_id: string
+          opening_balance?: number
+          physical_count?: number | null
+          theoretical_balance?: number
+          total_entry?: number
+          total_sales?: number
+          total_waste?: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          divergence?: number | null
+          id?: string
+          ingredient_id?: string
+          opening_balance?: number
+          physical_count?: number | null
+          theoretical_balance?: number
+          total_entry?: number
+          total_sales?: number
+          total_waste?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_stock_positions_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_stock_positions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           active: boolean
@@ -962,6 +1025,60 @@ export type Database = {
           {
             foreignKeyName: "freelancer_entries_loja_id_fkey"
             columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_transactions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          ingredient_id: string
+          notes: string | null
+          quantity: number
+          reference_id: string | null
+          transaction_type: Database["public"]["Enums"]["inventory_transaction_type"]
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          ingredient_id: string
+          notes?: string | null
+          quantity: number
+          reference_id?: string | null
+          transaction_type: Database["public"]["Enums"]["inventory_transaction_type"]
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          ingredient_id?: string
+          notes?: string | null
+          quantity?: number
+          reference_id?: string | null
+          transaction_type?: Database["public"]["Enums"]["inventory_transaction_type"]
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_transactions_ingredient_id_fkey"
+            columns: ["ingredient_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_unit_id_fkey"
+            columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
@@ -2303,6 +2420,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      build_daily_stock_snapshot: {
+        Args: { p_date: string; p_unit_id: string }
+        Returns: undefined
+      }
       calculate_audit_period: {
         Args: { p_end_date: string; p_loja_id: string; p_start_date: string }
         Returns: {
@@ -2359,6 +2480,13 @@ export type Database = {
         | "conformidade_setor"
         | "tempo_prato"
       familia_operacional: "front" | "back"
+      inventory_transaction_type:
+        | "purchase"
+        | "sale_deduction"
+        | "waste"
+        | "audit_adjustment"
+        | "transfer_in"
+        | "transfer_out"
       kpi_type: "nps" | "supervisao" | "tempo_prato" | "tempo_comanda"
       origem_dado: "sheets" | "pdf" | "kds" | "manual"
       position_type:
@@ -2509,6 +2637,14 @@ export const Constants = {
         "tempo_prato",
       ],
       familia_operacional: ["front", "back"],
+      inventory_transaction_type: [
+        "purchase",
+        "sale_deduction",
+        "waste",
+        "audit_adjustment",
+        "transfer_in",
+        "transfer_out",
+      ],
       kpi_type: ["nps", "supervisao", "tempo_prato", "tempo_comanda"],
       origem_dado: ["sheets", "pdf", "kds", "manual"],
       position_type: [

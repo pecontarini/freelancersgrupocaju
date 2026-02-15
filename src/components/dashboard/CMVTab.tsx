@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2 } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2, Activity } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,7 +17,8 @@ import {
   CMVSalesImporter,
   CMVProductMappingHub,
   CMVUnmappedAlert,
-  CMVSalesDashboard
+  CMVSalesDashboard,
+  CMVKardexDashboard
 } from "@/components/cmv";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -63,10 +64,14 @@ export function CMVTab() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="operacional" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+        <TabsList className="grid w-full grid-cols-7 max-w-5xl">
           <TabsTrigger value="operacional" className="flex items-center gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Operacional</span>
+          </TabsTrigger>
+          <TabsTrigger value="kardex" className="flex items-center gap-1.5">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Kardex</span>
           </TabsTrigger>
           <TabsTrigger value="auditoria" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
@@ -153,6 +158,21 @@ export function CMVTab() {
                 <p>Acesso restrito</p>
               </CardContent>
             </Card>
+          )}
+        </TabsContent>
+
+        {/* ====== ABA: KARDEX (Timeline de Movimentação) ====== */}
+        <TabsContent value="kardex" className="space-y-6">
+          {!effectiveUnidadeId ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Selecione uma unidade acima</p>
+                <p className="text-sm">Para visualizar o kardex de movimentação</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <CMVKardexDashboard />
           )}
         </TabsContent>
 

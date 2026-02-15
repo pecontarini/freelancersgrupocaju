@@ -2444,6 +2444,23 @@ export type Database = {
           unidade: string
         }[]
       }
+      get_realtime_stock_positions: {
+        Args: { p_unit_id: string }
+        Returns: {
+          categoria: string
+          current_qty: number
+          current_value: number
+          days_since_count: number
+          entries_qty: number
+          exits_qty: number
+          item_id: string
+          item_name: string
+          last_count_date: string
+          last_count_qty: number
+          preco_custo_atual: number
+          unidade: string
+        }[]
+      }
       get_user_unidade_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

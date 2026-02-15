@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,17 @@ import {
   Pagination, PaginationContent, PaginationItem,
   PaginationLink, PaginationNext, PaginationPrevious,
 } from "@/components/ui/pagination";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
-import { BarChart3, AlertTriangle, Calendar, DollarSign, Package } from "lucide-react";
+import { BarChart3, AlertTriangle, Calendar, DollarSign, Package, Trash2, ShieldAlert, Loader2 } from "lucide-react";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useDailySales, DailySale } from "@/hooks/useDailySales";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatters";
+import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 const ANOMALY_THRESHOLD = 100;
@@ -32,6 +37,11 @@ interface DaySummary {
 
 export function CMVSalesDashboard() {
   const { effectiveUnidadeId } = useUnidade();
+  const { isAdmin, isPartner } = useUserProfile();
+  const canReset = isAdmin || isPartner;
+  const [confirmText, setConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1);
@@ -41,7 +51,49 @@ export function CMVSalesDashboard() {
   const [viewMode, setViewMode] = useState<"amount" | "quantity">("amount");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Fetch unit name for confirmation
+  const { data: unitName } = useQuery({
+    queryKey: ["unit-name", effectiveUnidadeId],
+    queryFn: async () => {
+      if (!effectiveUnidadeId) return null;
+      const { data } = await supabase
+        .from("config_lojas")
+        .select("nome")
+        .eq("id", effectiveUnidadeId)
+        .single();
+      return data?.nome || null;
+    },
+    enabled: !!effectiveUnidadeId,
+  });
+
   const { sales, isLoading } = useDailySales(effectiveUnidadeId || undefined, startDate, endDate);
+  const queryClient = useQueryClient();
+
+  const handleResetSales = async () => {
+    if (!effectiveUnidadeId || !unitName) return;
+    if (confirmText.trim().toUpperCase() !== unitName.trim().toUpperCase()) {
+      toast.error("Nome da unidade não confere. Operação cancelada.");
+      return;
+    }
+    setIsResetting(true);
+    try {
+      const { data, error } = await supabase.rpc("reset_unit_sales_data", {
+        target_unit_id: effectiveUnidadeId,
+      });
+      if (error) throw error;
+      const result = data as any;
+      toast.success(
+        `Limpeza concluída: ${result.daily_sales_deleted} vendas, ${result.transactions_deleted} transações e ${result.positions_deleted} posições removidas.`
+      );
+      setDialogOpen(false);
+      setConfirmText("");
+      queryClient.invalidateQueries({ queryKey: ["daily-sales"] });
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao resetar dados de vendas.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const daySummaries = useMemo<DaySummary[]>(() => {
     if (!sales.length) return [];
@@ -328,6 +380,75 @@ export function CMVSalesDashboard() {
               </Pagination>
             </div>
           )}
+        </Card>
+      )}
+
+      {/* Danger Zone - Reset Sales */}
+      {canReset && effectiveUnidadeId && (
+        <Card className="border-destructive/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-destructive">
+              <ShieldAlert className="h-5 w-5" />
+              Zona de Perigo
+            </CardTitle>
+            <CardDescription>
+              Ações irreversíveis que afetam todo o histórico de vendas desta unidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setConfirmText(""); }}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Zerar Vendas e Consumo
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                    <ShieldAlert className="h-5 w-5" />
+                    Confirmar Exclusão Total
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-3">
+                      <p>Esta ação irá remover <strong>permanentemente</strong>:</p>
+                      <ul className="list-disc pl-5 space-y-1 text-sm">
+                        <li>Todo o histórico de vendas importadas (<code>daily_sales</code>)</li>
+                        <li>Todas as baixas de estoque por venda (<code>sale_deduction</code>)</li>
+                        <li>Todos os snapshots de posição diária de estoque</li>
+                      </ul>
+                      <p className="text-sm">
+                        Os vínculos de produtos (De-Para), itens ignorados e cadastros <strong>não serão afetados</strong>.
+                      </p>
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-sm font-medium">
+                          Digite o nome da unidade para confirmar: <strong className="text-destructive">{unitName}</strong>
+                        </Label>
+                        <Input
+                          placeholder={unitName || "Nome da unidade"}
+                          value={confirmText}
+                          onChange={(e) => setConfirmText(e.target.value)}
+                          className="border-destructive/50 focus-visible:ring-destructive"
+                        />
+                      </div>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isResetting}>Cancelar</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    onClick={handleResetSales}
+                    disabled={isResetting || confirmText.trim().toUpperCase() !== (unitName || "").trim().toUpperCase()}
+                    className="gap-2"
+                  >
+                    {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    {isResetting ? "Removendo..." : "Confirmar Exclusão"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
         </Card>
       )}
     </div>

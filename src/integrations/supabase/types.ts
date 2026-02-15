@@ -2454,6 +2454,7 @@ export type Database = {
       }
       is_first_user: { Args: never; Returns: boolean }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
+      reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
         Returns: boolean

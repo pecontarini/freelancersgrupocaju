@@ -16,3 +16,4 @@ export { CMVProductMappingHub } from "./CMVProductMappingHub";
 export { CMVUnmappedAlert } from "./CMVUnmappedAlert";
 export { CMVSalesDashboard } from "./CMVSalesDashboard";
 export { CMVKardexDashboard } from "./CMVKardexDashboard";
+export { CMVClosingReport } from "./CMVClosingReport";

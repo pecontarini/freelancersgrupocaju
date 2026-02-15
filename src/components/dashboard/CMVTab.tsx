@@ -16,6 +16,7 @@ import {
   CMVPeriodAudit,
   CMVSalesImporter,
   CMVProductMappingHub,
+  CMVSmartSalesImporter,
   CMVUnmappedAlert,
   CMVSalesDashboard,
   CMVKardexDashboard,
@@ -251,8 +252,8 @@ export function CMVTab() {
               {/* Sales Dashboard */}
               <CMVSalesDashboard />
               
-              {/* New CSV Importer */}
-              <CMVSalesImporter />
+              {/* Smart Sales Importer with column mapping */}
+              <CMVSmartSalesImporter />
               
               {/* Legacy PDF Processor (kept for compatibility) */}
               <CMVSalesProcessor />

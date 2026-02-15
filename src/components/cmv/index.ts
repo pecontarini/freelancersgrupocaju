@@ -15,3 +15,4 @@ export { CMVSalesImporter } from "./CMVSalesImporter";
 export { CMVProductMappingHub } from "./CMVProductMappingHub";
 export { CMVUnmappedAlert } from "./CMVUnmappedAlert";
 export { CMVSalesDashboard } from "./CMVSalesDashboard";
+export { CMVKardexDashboard } from "./CMVKardexDashboard";

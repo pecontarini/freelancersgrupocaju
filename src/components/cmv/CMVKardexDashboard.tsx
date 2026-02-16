@@ -54,8 +54,10 @@ export function CMVKardexDashboard() {
     endDate
   );
 
-  const selectedItemName = cmvItems.find(i => i.id === selectedIngredient)?.nome || "";
-  const selectedItemUnit = cmvItems.find(i => i.id === selectedIngredient)?.unidade || "un";
+  const selectedItem = cmvItems.find(i => i.id === selectedIngredient);
+  const selectedItemName = selectedItem?.nome || "";
+  const selectedItemUnit = selectedItem?.unidade || "un";
+  const selectedItemCost = selectedItem?.preco_custo_atual || 0;
 
   // Build chart data
   const chartData = useMemo(() => {
@@ -86,10 +88,15 @@ export function CMVKardexDashboard() {
     const unidentifiedLoss = positions
       .filter(p => p.divergence != null && Number(p.divergence) < 0)
       .reduce((sum, p) => sum + Math.abs(Number(p.divergence)), 0);
+    const impliedEntries = positions
+      .filter(p => p.divergence != null && Number(p.divergence) > 5)
+      .reduce((sum, p) => sum + Number(p.divergence), 0);
     const totalCountedDays = daysWithCount.length;
     const totalDays = positions.length;
-    return { accuracy, unidentifiedLoss, totalCountedDays, totalDays };
-  }, [positions]);
+    const totalLossValue = unidentifiedLoss * selectedItemCost;
+    const impliedEntriesValue = impliedEntries * selectedItemCost;
+    return { accuracy, unidentifiedLoss, impliedEntries, totalCountedDays, totalDays, totalLossValue, impliedEntriesValue };
+  }, [positions, selectedItemCost]);
 
   const formatDayLabel = (dateStr: string) => {
     const d = parseISO(dateStr);
@@ -286,13 +293,16 @@ export function CMVKardexDashboard() {
                       <TableHead className="text-right">Saldo Teórico</TableHead>
                       <TableHead className="text-right">Contagem Real</TableHead>
                       <TableHead className="text-right">Diferença</TableHead>
+                      <TableHead className="text-right">Valor R$</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {positions.map((pos) => {
                       const div = pos.divergence != null ? Number(pos.divergence) : null;
+                      const divValue = div != null ? Math.abs(div) * selectedItemCost : null;
+                      const isImpliedEntry = div != null && div > 5;
                       return (
-                        <TableRow key={pos.date}>
+                        <TableRow key={pos.date} className={cn(isImpliedEntry && "bg-amber-50/50 dark:bg-amber-950/10")}>
                           <TableCell className="font-medium whitespace-nowrap">
                             {formatDayLabel(pos.date)}
                           </TableCell>
@@ -324,16 +334,26 @@ export function CMVKardexDashboard() {
                                   "tabular-nums font-semibold",
                                   div < 0
                                     ? "border-destructive/50 bg-destructive/10 text-destructive"
+                                    : isImpliedEntry
+                                    ? "border-amber-500/50 bg-amber-50 text-amber-700 dark:bg-amber-950/30"
                                     : div === 0
                                     ? "border-green-500/50 bg-green-50 text-green-700 dark:bg-green-950/30"
                                     : "border-yellow-500/50 bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30"
                                 )}
                               >
+                                {isImpliedEntry && "⚠ "}
                                 {div > 0 ? "+" : ""}{div.toFixed(1)}
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">—</span>
                             )}
+                          </TableCell>
+                          <TableCell className={cn(
+                            "text-right tabular-nums font-mono text-sm",
+                            div != null && div < 0 ? "text-destructive font-semibold" :
+                            isImpliedEntry ? "text-amber-700 font-semibold" : "text-muted-foreground"
+                          )}>
+                            {divValue != null && divValue > 0 ? `R$ ${divValue.toFixed(2)}` : "—"}
                           </TableCell>
                         </TableRow>
                       );
@@ -352,43 +372,57 @@ export function CMVKardexDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-xs text-muted-foreground font-medium mb-1">Acuracidade do Estoque</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Acuracidade</p>
                   <p className={cn(
-                    "text-3xl font-bold",
+                    "text-2xl font-bold",
                     precisionStats.accuracy != null && precisionStats.accuracy >= 80 ? "text-emerald-600" :
                     precisionStats.accuracy != null && precisionStats.accuracy >= 50 ? "text-amber-600" :
                     precisionStats.accuracy != null ? "text-destructive" : "text-muted-foreground"
                   )}>
                     {precisionStats.accuracy != null ? `${precisionStats.accuracy.toFixed(0)}%` : "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    % de dias com divergência zero
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Dias com dif. zero</p>
                 </div>
-                <div className="rounded-lg border p-4 text-center">
+                <div className="rounded-lg border border-destructive/20 p-4 text-center">
                   <p className="text-xs text-muted-foreground font-medium mb-1">Perda Não Identificada</p>
                   <p className={cn(
-                    "text-3xl font-bold",
+                    "text-2xl font-bold",
                     precisionStats.unidentifiedLoss > 0 ? "text-destructive" : "text-emerald-600"
                   )}>
-                    {precisionStats.unidentifiedLoss > 0
-                      ? `-${precisionStats.unidentifiedLoss.toFixed(1)} ${selectedItemUnit}`
-                      : `0 ${selectedItemUnit}`}
+                    {precisionStats.totalLossValue > 0
+                      ? `R$ ${precisionStats.totalLossValue.toFixed(2)}`
+                      : "R$ 0,00"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Soma das divergências negativas
+                    {precisionStats.unidentifiedLoss > 0
+                      ? `${precisionStats.unidentifiedLoss.toFixed(1)} ${selectedItemUnit} faltantes`
+                      : "Sem perdas"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-400/30 p-4 text-center">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">⚠ Entradas Implícitas</p>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    precisionStats.impliedEntries > 0 ? "text-amber-600" : "text-emerald-600"
+                  )}>
+                    {precisionStats.impliedEntriesValue > 0
+                      ? `R$ ${precisionStats.impliedEntriesValue.toFixed(2)}`
+                      : "R$ 0,00"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {precisionStats.impliedEntries > 0
+                      ? `${precisionStats.impliedEntries.toFixed(1)} ${selectedItemUnit} sem NF`
+                      : "Tudo registrado"}
                   </p>
                 </div>
                 <div className="rounded-lg border p-4 text-center">
-                  <p className="text-xs text-muted-foreground font-medium mb-1">Cobertura de Contagens</p>
-                  <p className="text-3xl font-bold text-primary">
+                  <p className="text-xs text-muted-foreground font-medium mb-1">Contagens</p>
+                  <p className="text-2xl font-bold text-primary">
                     {precisionStats.totalCountedDays}/{precisionStats.totalDays}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Dias com contagem física registrada
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Dias com contagem física</p>
                 </div>
               </div>
               {precisionStats.accuracy != null && precisionStats.accuracy < 50 && (

@@ -191,6 +191,11 @@ export function CMVPeriodAudit() {
   const summary = useMemo(() => {
     const totalExpected = auditData.reduce((sum, item) => sum + Math.max(0, item.expectedFinal), 0);
     const totalDivergence = auditData.reduce((sum, item) => sum + Math.abs(item.divergence), 0);
+    // Separate positive (implied entries/surplus) from negative (real losses)
+    const itemsNegativeDivergence = auditData.filter(item => item.divergence < 0);
+    const itemsPositiveDivergence = auditData.filter(item => item.divergence > 5); // >5 = likely unrecorded entry
+    const totalRealLoss = itemsNegativeDivergence.reduce((sum, item) => sum + Math.abs(item.divergenceValue), 0);
+    const totalImpliedEntries = itemsPositiveDivergence.reduce((sum, item) => sum + item.divergenceValue, 0);
     const totalLoss = auditData.reduce((sum, item) => sum + Math.max(0, item.divergenceValue), 0);
     const totalGain = auditData.reduce((sum, item) => sum + Math.min(0, item.divergenceValue), 0);
     const itemsWithDivergence = auditData.filter(item => item.divergence !== 0).length;
@@ -203,7 +208,6 @@ export function CMVPeriodAudit() {
       : 0;
     const performanceTier = getPerformanceTier(overallDivergencePercent);
 
-    // Period financial totals
     const totalPurchasesValue = auditData.reduce((sum, item) => sum + item.entries * item.initialCost, 0);
     const totalSalesValue = auditData.reduce((sum, item) => sum + item.sales * item.initialCost, 0);
     const totalInitialValue = auditData.reduce((sum, item) => sum + item.initialCount * item.initialCost, 0);
@@ -215,6 +219,10 @@ export function CMVPeriodAudit() {
     return {
       totalDivergence,
       totalLoss,
+      totalRealLoss,
+      totalImpliedEntries,
+      itemsNegativeCount: itemsNegativeDivergence.length,
+      itemsPositiveCount: itemsPositiveDivergence.length,
       totalGain: Math.abs(totalGain),
       itemsWithDivergence,
       accuracy,
@@ -511,18 +519,24 @@ export function CMVPeriodAudit() {
               </h3>
               <Badge variant="secondary">{summary.periodDays} dias</Badge>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total de Compras</p>
                 <p className="text-xl font-bold font-mono">R$ {summary.totalPurchasesValue.toFixed(2)}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Vendas (Carnes)</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Vendas (Consumo)</p>
                 <p className="text-xl font-bold font-mono">R$ {summary.totalSalesValue.toFixed(2)}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Prejuízo Total</p>
-                <p className="text-xl font-bold font-mono text-destructive">R$ {summary.totalLoss.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">🔴 Perdas Reais</p>
+                <p className="text-xl font-bold font-mono text-destructive">R$ {summary.totalRealLoss.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">{summary.itemsNegativeCount} itens com falta</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">⚠️ Entradas Implícitas</p>
+                <p className="text-xl font-bold font-mono text-amber-600">R$ {summary.totalImpliedEntries.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">{summary.itemsPositiveCount} itens sem NF</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Divergência Geral</p>
@@ -693,8 +707,16 @@ export function CMVPeriodAudit() {
                   </TableHeader>
                   <TableBody>
                     {auditData.map(item => (
-                      <TableRow key={item.itemId}>
-                        <TableCell className="font-medium">{item.itemName}</TableCell>
+                      <TableRow key={item.itemId} className={cn(
+                        item.divergence > 5 && "bg-amber-50/50 dark:bg-amber-950/10",
+                        item.divergence < -5 && "bg-red-50/30 dark:bg-red-950/10"
+                      )}>
+                        <TableCell className="font-medium">
+                          {item.itemName}
+                          {item.divergence > 5 && item.entries === 0 && (
+                            <span className="ml-2 text-xs text-amber-600">⚠ Sem NF</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-center font-mono">{item.initialCount}</TableCell>
                         <TableCell className="text-center">
                           <button

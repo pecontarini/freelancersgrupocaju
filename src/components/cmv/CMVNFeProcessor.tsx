@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileUp, Loader2, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Package, Scale, Edit3 } from "lucide-react";
+import { FileUp, Loader2, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Package, Scale, Edit3, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNFeExtraction, ExtractedNFeItem } from "@/hooks/useNFeExtraction";
 import { useCMVItems } from "@/hooks/useCMV";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnidade } from "@/contexts/UnidadeContext";
+
+function normalizeNfeName(name: string): string {
+  return name.toUpperCase().trim().replace(/\s+/g, " ");
+}
 
 interface ItemMapping {
   nfeItem: ExtractedNFeItem;
@@ -22,6 +27,7 @@ interface ItemMapping {
   priceChanged: boolean;
   currentPrice: number | null;
   selected: boolean;
+  autoLinked: boolean; // true if matched from saved nfe mapping
   // Conversion fields
   isKgItem: boolean;
   suggestedUnits: number | null;
@@ -35,6 +41,20 @@ export function CMVNFeProcessor() {
   const { isExtracting, extractedData, extractionError, extractFromFile, clearExtractedData } = useNFeExtraction();
   const { items: cmvItems, updateItem } = useCMVItems();
   
+  const queryClient = useQueryClient();
+  
+  // Load saved NFe mappings
+  const { data: savedNfeMappings = [] } = useQuery({
+    queryKey: ["cmv-nfe-mappings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cmv_nfe_mappings")
+        .select("*");
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const [itemMappings, setItemMappings] = useState<ItemMapping[]>([]);
   const [priceUpdateDialog, setPriceUpdateDialog] = useState<{
     open: boolean;
@@ -81,10 +101,24 @@ export function CMVNFeProcessor() {
     const data = await extractFromFile(file);
     if (data && data.items.length > 0) {
       const mappings: ItemMapping[] = data.items.map(nfeItem => {
-        const matchedItem = cmvItems.find(cmv => 
-          cmv.nome.toLowerCase().includes(nfeItem.nome.toLowerCase().split(" ")[0]) ||
-          nfeItem.nome.toLowerCase().includes(cmv.nome.toLowerCase().split(" ")[0])
+        // 1. Try saved NFe mapping first
+        const normalized = normalizeNfeName(nfeItem.nome);
+        const savedMapping = savedNfeMappings.find(
+          m => m.nome_nfe_normalizado === normalized
         );
+        
+        let matchedItem: typeof cmvItems[0] | undefined;
+        if (savedMapping) {
+          matchedItem = cmvItems.find(i => i.id === savedMapping.cmv_item_id);
+        }
+        
+        // 2. Fallback to fuzzy name match
+        if (!matchedItem) {
+          matchedItem = cmvItems.find(cmv => 
+            cmv.nome.toLowerCase().includes(nfeItem.nome.toLowerCase().split(" ")[0]) ||
+            nfeItem.nome.toLowerCase().includes(cmv.nome.toLowerCase().split(" ")[0])
+          );
+        }
         
         const priceChanged = matchedItem 
           ? Math.abs(matchedItem.preco_custo_atual - nfeItem.valor_unitario) > 0.01
@@ -97,7 +131,8 @@ export function CMVNFeProcessor() {
           cmvItemId: matchedItem?.id || null,
           priceChanged,
           currentPrice: matchedItem?.preco_custo_atual || null,
-          selected: !!matchedItem, // Auto-select if matched
+          selected: !!matchedItem,
+          autoLinked: !!savedMapping && !!matchedItem,
           ...conversion,
         };
       });
@@ -123,7 +158,8 @@ export function CMVNFeProcessor() {
         cmvItemId,
         priceChanged,
         currentPrice: cmvItem?.preco_custo_atual || null,
-        selected: true, // Auto-select when mapping
+        selected: true,
+        autoLinked: false,
         ...conversion,
       };
       return updated;
@@ -263,7 +299,27 @@ export function CMVNFeProcessor() {
         }
       }
 
-      toast.success(`${validMappings.length} itens registrados no estoque!`);
+      // Save NFe→CMV mappings for auto-fill next time
+      const existingNormalized = new Set(savedNfeMappings.map(m => m.nome_nfe_normalizado));
+      const newMappingsToSave = validMappings
+        .filter(m => !existingNormalized.has(normalizeNfeName(m.nfeItem.nome)))
+        .map(m => ({
+          nome_nfe_normalizado: normalizeNfeName(m.nfeItem.nome),
+          nome_nfe_original: m.nfeItem.nome,
+          cmv_item_id: m.cmvItemId!,
+        }));
+
+      if (newMappingsToSave.length > 0) {
+        await supabase.from("cmv_nfe_mappings").upsert(newMappingsToSave, {
+          onConflict: "nome_nfe_normalizado",
+        });
+        queryClient.invalidateQueries({ queryKey: ["cmv-nfe-mappings"] });
+      }
+
+      const savedCount = newMappingsToSave.length;
+      toast.success(
+        `${validMappings.length} itens registrados!${savedCount > 0 ? ` ${savedCount} vínculo(s) salvo(s) para próximas notas.` : ""}`
+      );
       clearExtractedData();
       setItemMappings([]);
     } catch (error) {
@@ -462,10 +518,15 @@ export function CMVNFeProcessor() {
                                     Preço
                                   </Button>
                                 ) : (
-                                  <Badge variant="outline" className="text-green-600">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    OK
-                                  </Badge>
+                                  <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-green-600">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      OK
+                                    </Badge>
+                                    {mapping.autoLinked && (
+                                      <Link2 className="h-3 w-3 text-blue-500" />
+                                    )}
+                                  </div>
                                 )
                               ) : (
                                 <Badge variant="outline" className="text-muted-foreground">

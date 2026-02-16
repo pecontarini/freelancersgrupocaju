@@ -2,12 +2,13 @@ import { useState, useRef, useMemo, useCallback } from "react";
 import {
   Upload, FileSpreadsheet, Loader2, Trash2, ArrowRight, ArrowLeft,
   CheckCircle2, Columns3, CalendarDays, Eye, Zap, AlertTriangle,
-  PackageCheck, PackageX, Link2
+  PackageCheck, PackageX, Link2, FileText
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -149,6 +150,7 @@ export function CMVSmartSalesImporter() {
   const [fileData, setFileData] = useState<FileData | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping>({ date: -1, product: -1, quantity: -1, amount: null });
   const [dateFormat, setDateFormat] = useState<DateFormat>("DD/MM/YYYY");
+  const [isTransactional, setIsTransactional] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [result, setResult] = useState<SalesImportResult | null>(null);
@@ -254,38 +256,72 @@ export function CMVSmartSalesImporter() {
 
   // ── Aggregated preview ──
   const aggregatedPreview = useMemo(() => {
-    if (!fileData || mapping.date === -1 || mapping.product === -1 || mapping.quantity === -1) return null;
+    if (!fileData || mapping.date === -1 || mapping.product === -1 || (!isTransactional && mapping.quantity === -1)) return null;
 
     const parsed: ParsedSaleRow[] = [];
     const failures: ParseFailure[] = [];
 
-    for (let i = 0; i < fileData.rows.length; i++) {
-      const row = fileData.rows[i];
-      const rawDate = row[mapping.date];
-      const rawProduct = row[mapping.product];
-      const rawQty = row[mapping.quantity];
-      const rawAmount = mapping.amount !== null ? row[mapping.amount] : 0;
-      const rawStr = `Data=${String(rawDate ?? "")}, Item=${String(rawProduct ?? "")}, Qtd=${String(rawQty ?? "")}`;
+    if (isTransactional) {
+      // Transactional mode: group by date+product, count lines
+      const countMap = new Map<string, { date: string; item: string; count: number; amount: number }>();
 
-      const itemName = rawProduct ? String(rawProduct).toUpperCase().trim() : null;
-      if (!itemName) { failures.push({ line: i + 2, rawData: rawStr, reason: "Nome do item vazio" }); continue; }
+      for (let i = 0; i < fileData.rows.length; i++) {
+        const row = fileData.rows[i];
+        const rawDate = row[mapping.date];
+        const rawProduct = row[mapping.product];
+        const rawAmount = mapping.amount !== null ? row[mapping.amount] : 0;
+        const rawStr = `Data=${String(rawDate ?? "")}, Item=${String(rawProduct ?? "")}`;
 
-      const saleDate = parseWithFormat(rawDate, dateFormat);
-      if (!saleDate) { failures.push({ line: i + 2, rawData: rawStr, reason: "Data inválida" }); continue; }
+        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim() : null;
+        if (!itemName) { failures.push({ line: i + 2, rawData: rawStr, reason: "Nome do item vazio" }); continue; }
 
-      const qty = parseQty(rawQty);
-      if (qty === null) { failures.push({ line: i + 2, rawData: rawStr, reason: "Quantidade inválida" }); continue; }
+        const saleDate = parseWithFormat(rawDate, dateFormat);
+        if (!saleDate) { failures.push({ line: i + 2, rawData: rawStr, reason: "Data inválida" }); continue; }
 
-      const totalAmount = parseQty(rawAmount) ?? 0;
-      parsed.push({ sale_date: saleDate, item_name: itemName, quantity: qty, total_amount: totalAmount });
+        const totalAmount = parseQty(rawAmount) ?? 0;
+        const key = `${saleDate}||${itemName}`;
+        const existing = countMap.get(key);
+        if (existing) {
+          existing.count += 1;
+          existing.amount += totalAmount;
+        } else {
+          countMap.set(key, { date: saleDate, item: itemName, count: 1, amount: totalAmount });
+        }
+      }
+
+      for (const entry of countMap.values()) {
+        parsed.push({ sale_date: entry.date, item_name: entry.item, quantity: entry.count, total_amount: entry.amount });
+      }
+    } else {
+      // Standard mode: use quantity column
+      for (let i = 0; i < fileData.rows.length; i++) {
+        const row = fileData.rows[i];
+        const rawDate = row[mapping.date];
+        const rawProduct = row[mapping.product];
+        const rawQty = row[mapping.quantity];
+        const rawAmount = mapping.amount !== null ? row[mapping.amount] : 0;
+        const rawStr = `Data=${String(rawDate ?? "")}, Item=${String(rawProduct ?? "")}, Qtd=${String(rawQty ?? "")}`;
+
+        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim() : null;
+        if (!itemName) { failures.push({ line: i + 2, rawData: rawStr, reason: "Nome do item vazio" }); continue; }
+
+        const saleDate = parseWithFormat(rawDate, dateFormat);
+        if (!saleDate) { failures.push({ line: i + 2, rawData: rawStr, reason: "Data inválida" }); continue; }
+
+        const qty = parseQty(rawQty);
+        if (qty === null) { failures.push({ line: i + 2, rawData: rawStr, reason: "Quantidade inválida" }); continue; }
+
+        const totalAmount = parseQty(rawAmount) ?? 0;
+        parsed.push({ sale_date: saleDate, item_name: itemName, quantity: qty, total_amount: totalAmount });
+      }
     }
 
-    const aggregated = aggregateSales(parsed);
+    const aggregated = isTransactional ? parsed : aggregateSales(parsed);
     const uniqueDates = new Set(aggregated.map(r => r.sale_date));
     const uniqueProducts = new Set(aggregated.map(r => r.item_name));
 
-    return { aggregated, failures, parsed, uniqueDates: uniqueDates.size, uniqueProducts: uniqueProducts.size };
-  }, [fileData, mapping, dateFormat]);
+    return { aggregated, failures, parsed: isTransactional ? parsed : parsed, uniqueDates: uniqueDates.size, uniqueProducts: uniqueProducts.size };
+  }, [fileData, mapping, dateFormat, isTransactional]);
 
   // ── White-list filtering: split matched vs unmatched ──
   const filteredPreview = useMemo(() => {
@@ -367,12 +403,13 @@ export function CMVSmartSalesImporter() {
     setStep("upload");
     setFileData(null);
     setMapping({ date: -1, product: -1, quantity: -1, amount: null });
+    setIsTransactional(false);
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   // ── Validation ──
-  const isMappingValid = mapping.date !== -1 && mapping.product !== -1 && mapping.quantity !== -1;
+  const isMappingValid = mapping.date !== -1 && mapping.product !== -1 && (isTransactional || mapping.quantity !== -1);
   const usedColumns = new Set([mapping.date, mapping.product, mapping.quantity, ...(mapping.amount !== null ? [mapping.amount] : [])]);
 
   // ─── Render ────────────────────────────────────────────────────────
@@ -424,6 +461,36 @@ export function CMVSmartSalesImporter() {
                 <Badge variant="outline">{fileData.totalRows.toLocaleString("pt-BR")} linhas</Badge>
               </div>
 
+              {/* Transactional mode checkbox */}
+              <div
+                className="flex items-start gap-3 border rounded-lg p-4 cursor-pointer transition-colors hover:bg-muted/50"
+                onClick={() => {
+                  setIsTransactional(prev => {
+                    if (!prev) setMapping(m => ({ ...m, quantity: -1 }));
+                    return !prev;
+                  });
+                }}
+              >
+                <Checkbox
+                  id="transactional-mode"
+                  checked={isTransactional}
+                  onCheckedChange={(checked) => {
+                    const val = !!checked;
+                    setIsTransactional(val);
+                    if (val) setMapping(m => ({ ...m, quantity: -1 }));
+                  }}
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="transactional-mode" className="cursor-pointer font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    📄 Arquivo Transacional (1 linha = 1 item vendido)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Marque se seu arquivo não possui coluna de quantidade. O sistema contará automaticamente as linhas por produto.
+                  </p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <MappingSelect
                   label="Data / Hora da Venda"
@@ -445,16 +512,18 @@ export function CMVSmartSalesImporter() {
                   usedColumns={usedColumns}
                   currentKey="product"
                 />
-                <MappingSelect
-                  label="Quantidade Vendida"
-                  icon={<Zap className="h-4 w-4" />}
-                  required
-                  value={mapping.quantity}
-                  onChange={v => setMapping(m => ({ ...m, quantity: v }))}
-                  headers={fileData.headers}
-                  usedColumns={usedColumns}
-                  currentKey="quantity"
-                />
+                {!isTransactional && (
+                  <MappingSelect
+                    label="Quantidade Vendida"
+                    icon={<Zap className="h-4 w-4" />}
+                    required
+                    value={mapping.quantity}
+                    onChange={v => setMapping(m => ({ ...m, quantity: v }))}
+                    headers={fileData.headers}
+                    usedColumns={usedColumns}
+                    currentKey="quantity"
+                  />
+                )}
                 <MappingSelect
                   label="Valor Total (opcional)"
                   icon={<Zap className="h-4 w-4" />}
@@ -471,13 +540,14 @@ export function CMVSmartSalesImporter() {
                 <div className="border rounded-lg overflow-hidden">
                   <div className="bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground">
                     <Eye className="h-3.5 w-3.5 inline mr-1" /> Prévia das primeiras 5 linhas
+                    {isTransactional && <Badge variant="secondary" className="ml-2 text-[10px]">Modo Contagem</Badge>}
                   </div>
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-xs">Data (bruto)</TableHead>
                         <TableHead className="text-xs">Produto</TableHead>
-                        <TableHead className="text-xs">Qtd</TableHead>
+                        {!isTransactional && <TableHead className="text-xs">Qtd</TableHead>}
                         {mapping.amount !== null && <TableHead className="text-xs">Valor</TableHead>}
                       </TableRow>
                     </TableHeader>
@@ -486,7 +556,7 @@ export function CMVSmartSalesImporter() {
                         <TableRow key={i}>
                           <TableCell className="text-xs font-mono">{String(row[mapping.date] ?? "")}</TableCell>
                           <TableCell className="text-xs">{String(row[mapping.product] ?? "")}</TableCell>
-                          <TableCell className="text-xs">{String(row[mapping.quantity] ?? "")}</TableCell>
+                          {!isTransactional && <TableCell className="text-xs">{String(row[mapping.quantity] ?? "")}</TableCell>}
                           {mapping.amount !== null && <TableCell className="text-xs">{String(row[mapping.amount] ?? "")}</TableCell>}
                         </TableRow>
                       ))}

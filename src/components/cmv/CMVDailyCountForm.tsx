@@ -46,7 +46,8 @@ export function CMVDailyCountForm() {
     [cmvItems]
   );
 
-  // Initialize counts from existing data
+  // Initialize counts from existing data - use JSON key to avoid infinite loops
+  const contagensKey = JSON.stringify(contagensByDate.map(c => `${c.cmv_item_id}:${c.quantidade}`));
   useEffect(() => {
     if (contagensByDate.length > 0) {
       const existingCounts: Record<string, ItemCount> = {};
@@ -59,10 +60,10 @@ export function CMVDailyCountForm() {
       });
       setCounts(existingCounts);
     } else {
-      // Reset to empty when date changes and no data exists
       setCounts({});
     }
-  }, [contagensByDate, dateString]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contagensKey, dateString]);
 
   const handleCountChange = (itemId: string, value: string, currentCost: number) => {
     setCounts(prev => ({
@@ -93,7 +94,7 @@ export function CMVDailyCountForm() {
         cmv_item_id: c.cmv_item_id,
         loja_id: effectiveUnidadeId,
         data_contagem: dateString,
-        quantidade: parseInt(c.quantidade) || 0,
+        quantidade: parseFloat(c.quantidade) || 0,
         preco_custo_snapshot: c.preco_custo_snapshot,
       }));
 

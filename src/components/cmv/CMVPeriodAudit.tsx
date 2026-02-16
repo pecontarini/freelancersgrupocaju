@@ -57,6 +57,9 @@ interface AuditItem {
   initialCost: number;
   entries: number;
   sales: number;
+  waste: number;
+  transfers: number;
+  totalExits: number;
   expectedFinal: number;
   actualFinal: number;
   finalCost: number;
@@ -158,6 +161,9 @@ export function CMVPeriodAudit() {
       const divergence = Number(row.divergence);
       const theoreticalFinal = Number(row.theoretical_final);
       const divergencePercent = theoreticalFinal > 0 ? (Math.abs(divergence) / theoreticalFinal) * 100 : 0;
+      const sales = Number(row.sales_consumption);
+      const waste = Number(row.waste_qty);
+      const transfers = Number(row.transfers_qty);
 
       return {
         itemId: row.item_id,
@@ -165,7 +171,10 @@ export function CMVPeriodAudit() {
         initialCount: Number(row.initial_stock),
         initialCost: Number(row.initial_cost),
         entries: Number(row.purchases_qty),
-        sales: Number(row.sales_consumption),
+        sales,
+        waste,
+        transfers,
+        totalExits: sales + waste + transfers,
         expectedFinal: Number(row.theoretical_final),
         actualFinal: Number(row.real_final_stock),
         finalCost: Number(row.final_cost),
@@ -327,21 +336,24 @@ export function CMVPeriodAudit() {
       String(item.initialCount),
       String(item.entries),
       String(item.sales),
-      String(item.expectedFinal),
+      String(item.waste),
+      String(item.transfers),
+      item.expectedFinal.toFixed(2),
       String(item.actualFinal),
-      String(item.divergence),
+      item.divergence.toFixed(2),
       `R$ ${item.divergenceValue.toFixed(2)}`,
     ]);
 
     autoTable(doc, {
       startY: detailY + 5,
-      head: [["Item", "Inicial", "Entradas", "Saídas", "Esperado", "Real", "Diverg.", "Valor"]],
+      head: [["Item", "Inicial", "(+)Entr.", "(-)Venda", "(-)Desp.", "(-)Transf.", "Esperado", "Real", "Dif.", "Valor"]],
       body: tableData,
       theme: "striped",
-      headStyles: { fillColor: [41, 128, 185] },
+      headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
+      styles: { fontSize: 7 },
       columnStyles: {
-        6: { halign: "center" },
-        7: { halign: "right" },
+        8: { halign: "center" },
+        9: { halign: "right" },
       },
       margin: { left: 14, right: 14 },
     });
@@ -664,16 +676,18 @@ export function CMVPeriodAudit() {
               </div>
             ) : (
               <div className="rounded-md border overflow-x-auto">
-                <Table>
+                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Produto</TableHead>
-                      <TableHead className="text-center">Estoque Inicial</TableHead>
+                      <TableHead className="text-center">Saldo Inicial</TableHead>
                       <TableHead className="text-center">(+) Entradas</TableHead>
-                      <TableHead className="text-center">(-) Vendas Teóricas</TableHead>
-                      <TableHead className="text-center">(=) Estoque Ideal</TableHead>
-                      <TableHead className="text-center">Estoque Real</TableHead>
-                      <TableHead className="text-center">Divergência</TableHead>
+                      <TableHead className="text-center">(-) Vendas</TableHead>
+                      <TableHead className="text-center">(-) Desperdício</TableHead>
+                      <TableHead className="text-center">(-) Transf.</TableHead>
+                      <TableHead className="text-center">(=) Esperado</TableHead>
+                      <TableHead className="text-center">Contagem Final</TableHead>
+                      <TableHead className="text-center">Diferença</TableHead>
                       <TableHead className="text-right">Prejuízo R$</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -681,7 +695,7 @@ export function CMVPeriodAudit() {
                     {auditData.map(item => (
                       <TableRow key={item.itemId}>
                         <TableCell className="font-medium">{item.itemName}</TableCell>
-                        <TableCell className="text-center">{item.initialCount}</TableCell>
+                        <TableCell className="text-center font-mono">{item.initialCount}</TableCell>
                         <TableCell className="text-center">
                           <button
                             type="button"
@@ -702,19 +716,25 @@ export function CMVPeriodAudit() {
                             <ShoppingCart className="h-3 w-3 opacity-50" />
                           </button>
                         </TableCell>
-                        <TableCell className="text-center font-medium">{item.expectedFinal}</TableCell>
-                        <TableCell className="text-center">{item.actualFinal}</TableCell>
+                        <TableCell className="text-center font-mono text-muted-foreground">
+                          {item.waste > 0 ? `-${item.waste}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-muted-foreground">
+                          {item.transfers > 0 ? `-${item.transfers}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-center font-bold font-mono">{item.expectedFinal.toFixed(2)}</TableCell>
+                        <TableCell className="text-center font-mono">{item.actualFinal}</TableCell>
                         <TableCell className="text-center">
                           {item.divergence !== 0 ? (
-                            <Badge variant={item.divergence > 0 ? "destructive" : "default"} className={cn(
-                              item.divergence < 0 && "bg-green-500"
+                            <Badge variant={item.divergence < 0 ? "destructive" : "default"} className={cn(
+                              item.divergence > 0 && "bg-green-500"
                             )}>
-                              {item.divergence > 0 ? (
+                              {item.divergence < 0 ? (
                                 <TrendingDown className="h-3 w-3 mr-1" />
                               ) : (
                                 <TrendingUp className="h-3 w-3 mr-1" />
                               )}
-                              {item.divergence}
+                              {item.divergence > 0 ? "+" : ""}{item.divergence.toFixed(2)}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-green-600">
@@ -725,17 +745,15 @@ export function CMVPeriodAudit() {
                         </TableCell>
                         <TableCell className={cn(
                           "text-right font-mono",
-                          item.divergenceValue > 0 ? "text-destructive" : 
-                          item.divergenceValue < 0 ? "text-green-600" : ""
+                          item.divergenceValue > 0 ? "text-destructive font-bold" : ""
                         )}>
-                          {item.divergenceValue > 0 ? "-" : item.divergenceValue < 0 ? "+" : ""}
-                          R$ {Math.abs(item.divergenceValue).toFixed(2)}
+                          {item.divergenceValue > 0 ? `R$ ${item.divergenceValue.toFixed(2)}` : "—"}
                         </TableCell>
                       </TableRow>
                     ))}
                     {auditData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                           Nenhum item com movimentação no período
                         </TableCell>
                       </TableRow>

@@ -2476,7 +2476,9 @@ export type Database = {
           real_final_stock: number
           sales_consumption: number
           theoretical_final: number
+          transfers_qty: number
           unidade: string
+          waste_qty: number
         }[]
       }
       get_realtime_stock_positions: {

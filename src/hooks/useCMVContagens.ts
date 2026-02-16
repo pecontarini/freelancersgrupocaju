@@ -173,6 +173,8 @@ export interface AuditPeriodRow {
   initial_cost: number;
   purchases_qty: number;
   sales_consumption: number;
+  waste_qty: number;
+  transfers_qty: number;
   theoretical_final: number;
   real_final_stock: number;
   final_cost: number;

@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CalendarIcon, ClipboardCheck, Loader2, Save, CheckCircle, FileSpreadsheet, FileText } from "lucide-react";
+import { CMVChecklistFacilImporter } from "./CMVChecklistFacilImporter";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -380,7 +381,8 @@ export function CMVDailyCountForm() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap justify-between gap-2">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <CMVChecklistFacilImporter />
               <Button
                 variant="outline"
                 onClick={handleExportExcel}

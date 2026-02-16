@@ -19,3 +19,4 @@ export { CMVKardexDashboard } from "./CMVKardexDashboard";
 export { CMVClosingReport } from "./CMVClosingReport";
 export { CMVSmartSalesImporter } from "./CMVSmartSalesImporter";
 export { CMVLiveStockCard } from "./CMVLiveStockCard";
+export { CMVChecklistFacilImporter } from "./CMVChecklistFacilImporter";

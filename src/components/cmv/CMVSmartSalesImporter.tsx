@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useCallback } from "react";
 import {
   Upload, FileSpreadsheet, Loader2, Trash2, ArrowRight, ArrowLeft,
   CheckCircle2, Columns3, CalendarDays, Eye, Zap, AlertTriangle,
-  PackageCheck, PackageX, Link2, FileText
+  PackageCheck, PackageX, Link2, FileText, Search, ClipboardList
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -156,6 +156,7 @@ export function CMVSmartSalesImporter() {
   const [result, setResult] = useState<SalesImportResult | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [auditSearch, setAuditSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canClearSales = isAdmin || isPartner;
@@ -272,7 +273,7 @@ export function CMVSmartSalesImporter() {
         const rawAmount = mapping.amount !== null ? row[mapping.amount] : 0;
         const rawStr = `Data=${String(rawDate ?? "")}, Item=${String(rawProduct ?? "")}`;
 
-        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim() : null;
+        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim().replace(/\s+/g, " ") : null;
         if (!itemName) { failures.push({ line: i + 2, rawData: rawStr, reason: "Nome do item vazio" }); continue; }
 
         const saleDate = parseWithFormat(rawDate, dateFormat);
@@ -302,7 +303,7 @@ export function CMVSmartSalesImporter() {
         const rawAmount = mapping.amount !== null ? row[mapping.amount] : 0;
         const rawStr = `Data=${String(rawDate ?? "")}, Item=${String(rawProduct ?? "")}, Qtd=${String(rawQty ?? "")}`;
 
-        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim() : null;
+        const itemName = rawProduct ? String(rawProduct).toUpperCase().trim().replace(/\s+/g, " ") : null;
         if (!itemName) { failures.push({ line: i + 2, rawData: rawStr, reason: "Nome do item vazio" }); continue; }
 
         const saleDate = parseWithFormat(rawDate, dateFormat);
@@ -351,10 +352,37 @@ export function CMVSmartSalesImporter() {
     // Only matched parsed rows should be imported
     const matchedNames = new Set(matched.map(m => m.item_name));
     const filteredParsed = aggregatedPreview.parsed.filter(p =>
-      matchedNames.has(p.item_name.toUpperCase().trim())
+      matchedNames.has(p.item_name.toUpperCase().trim().replace(/\s+/g, " "))
     );
 
     return { matched, unmatched, filteredParsed };
+  }, [aggregatedPreview, mappingsLookup]);
+
+  // ── Full audit list: every unique product with status ──
+  const auditItems = useMemo(() => {
+    if (!aggregatedPreview) return [];
+
+    // Aggregate total qty per unique product across all dates
+    const productTotals = new Map<string, number>();
+    for (const row of aggregatedPreview.aggregated) {
+      productTotals.set(row.item_name, (productTotals.get(row.item_name) || 0) + row.quantity);
+    }
+
+    return Array.from(productTotals.entries()).map(([name, totalQty]) => {
+      const normalizedName = name.toUpperCase().trim().replace(/\s+/g, " ");
+      const link = mappingsLookup.get(normalizedName);
+      return {
+        item_name: name,
+        totalQty,
+        matched: !!link,
+        ingredientName: link?.ingredientName ?? null,
+        multiplicador: link?.multiplicador ?? null,
+      };
+    }).sort((a, b) => {
+      // Matched first, then by qty desc
+      if (a.matched !== b.matched) return a.matched ? -1 : 1;
+      return b.totalQty - a.totalQty;
+    });
   }, [aggregatedPreview, mappingsLookup]);
 
   // ── Import (only matched items) ──
@@ -675,18 +703,125 @@ export function CMVSmartSalesImporter() {
                 </div>
               </div>
 
-              {/* Tabbed view: Recognized vs Discarded */}
-              <Tabs defaultValue="matched" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+              {/* Tabbed view: Audit + Recognized + Discarded */}
+              <Tabs defaultValue="audit" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="audit" className="gap-1.5">
+                    <ClipboardList className="h-3.5 w-3.5" />
+                    Auditoria ({auditItems.length})
+                  </TabsTrigger>
                   <TabsTrigger value="matched" className="gap-1.5">
                     <PackageCheck className="h-3.5 w-3.5" />
                     Reconhecidos ({filteredPreview.matched.length})
                   </TabsTrigger>
                   <TabsTrigger value="unmatched" className="gap-1.5">
                     <PackageX className="h-3.5 w-3.5" />
-                    Descartados ({filteredPreview.unmatched.length})
+                    Sem Vínculo ({filteredPreview.unmatched.length})
                   </TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="audit">
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Buscar produto... (ex: BOMBOM, NHOQUE)"
+                        value={auditSearch}
+                        onChange={e => setAuditSearch(e.target.value)}
+                        className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                    </div>
+                    <div className="border rounded-lg overflow-hidden max-h-80 overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Produto no Arquivo</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-xs">Vínculo</TableHead>
+                            <TableHead className="text-xs text-right">Qtd Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(() => {
+                            const searchNorm = auditSearch.toUpperCase().trim();
+                            const filtered = searchNorm
+                              ? auditItems.filter(a => a.item_name.includes(searchNorm))
+                              : auditItems;
+                            
+                            if (filtered.length === 0) {
+                              return (
+                                <TableRow>
+                                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-6">
+                                    {auditSearch ? "Nenhum item encontrado para essa busca." : "Nenhum item processado."}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+
+                            const matchedCount = filtered.filter(a => a.matched).length;
+                            const unmatchedCount = filtered.filter(a => !a.matched).length;
+                            const totalQty = filtered.reduce((sum, a) => sum + a.totalQty, 0);
+                            const matchedQty = filtered.filter(a => a.matched).reduce((sum, a) => sum + a.totalQty, 0);
+
+                            return (
+                              <>
+                                <TableRow className="bg-muted/50 font-medium">
+                                  <TableCell className="text-xs">
+                                    {filtered.length} itens {auditSearch && "(filtrados)"}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    <span className="text-primary">{matchedCount}✓</span> / <span className="text-muted-foreground">{unmatchedCount}✗</span>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-xs text-right font-mono">
+                                    <span className="text-primary">{matchedQty.toLocaleString("pt-BR")}</span>
+                                    {" / "}
+                                    {totalQty.toLocaleString("pt-BR")}
+                                  </TableCell>
+                                </TableRow>
+                                {filtered.slice(0, 100).map((a, i) => (
+                                  <TableRow key={i} className={!a.matched ? "opacity-50" : ""}>
+                                    <TableCell className="text-xs max-w-[200px] truncate" title={a.item_name}>
+                                      {a.item_name}
+                                    </TableCell>
+                                    <TableCell>
+                                      {a.matched ? (
+                                        <Badge variant="default" className="text-[10px] px-1.5 py-0">✓ Vinculado</Badge>
+                                      ) : (
+                                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">✗ Ignorado</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-xs">
+                                      {a.ingredientName ? (
+                                        <span className="text-primary">{a.ingredientName}</span>
+                                      ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-xs text-right font-mono font-semibold">
+                                      {a.totalQty.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                                      {a.multiplicador && a.multiplicador !== 1 && (
+                                        <span className="text-muted-foreground font-normal ml-1">(×{a.multiplicador})</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                {filtered.length > 100 && (
+                                  <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-xs text-muted-foreground italic">
+                                      ...e mais {filtered.length - 100} itens. Use a busca para refinar.
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </TabsContent>
 
                 <TabsContent value="matched">
                   <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">

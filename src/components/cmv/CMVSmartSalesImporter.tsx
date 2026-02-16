@@ -1,7 +1,8 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import {
   Upload, FileSpreadsheet, Loader2, Trash2, ArrowRight, ArrowLeft,
-  CheckCircle2, Columns3, CalendarDays, Eye, Zap, AlertTriangle
+  CheckCircle2, Columns3, CalendarDays, Eye, Zap, AlertTriangle,
+  PackageCheck, PackageX, Link2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,13 +18,14 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useDailySales, aggregateSales, ParsedSaleRow, SalesImportResult, ParseFailure } from "@/hooks/useDailySales";
 import { CMVImportSummaryModal } from "./CMVImportSummaryModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import * as XLSX from "xlsx";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -44,6 +46,17 @@ interface FileData {
 }
 
 type Step = "upload" | "mapping" | "dateformat" | "preview" | "done";
+
+interface MatchedSaleItem extends ParsedSaleRow {
+  ingredientName: string;
+  multiplicador: number;
+  consumo: number;
+}
+
+interface UnmatchedSaleItem {
+  item_name: string;
+  quantity: number;
+}
 
 // ─── Utilities ───────────────────────────────────────────────────────
 function guessColumnRole(header: string): "date" | "product" | "quantity" | "amount" | null {
@@ -145,6 +158,36 @@ export function CMVSmartSalesImporter() {
 
   const canClearSales = isAdmin || isPartner;
 
+  // ── Fetch sales mappings (white list) ──
+  const { data: salesMappings = [] } = useQuery({
+    queryKey: ["cmv-sales-mappings-for-import"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cmv_sales_mappings")
+        .select("nome_venda, multiplicador, cmv_item_id, cmv_items!cmv_sales_mappings_cmv_item_id_fkey(nome)")
+      if (error) throw error;
+      return data as Array<{
+        nome_venda: string;
+        multiplicador: number;
+        cmv_item_id: string;
+        cmv_items: { nome: string } | null;
+      }>;
+    },
+  });
+
+  // Build a normalized lookup map: UPPER(TRIM(nome_venda)) -> mapping info
+  const mappingsLookup = useMemo(() => {
+    const map = new Map<string, { ingredientName: string; multiplicador: number }>();
+    for (const m of salesMappings) {
+      const key = m.nome_venda.toUpperCase().trim().replace(/\s+/g, " ");
+      map.set(key, {
+        ingredientName: m.cmv_items?.nome ?? "—",
+        multiplicador: m.multiplicador,
+      });
+    }
+    return map;
+  }, [salesMappings]);
+
   // ── File reading ──
   const readFile = useCallback(async (file: File) => {
     const name = file.name.toLowerCase();
@@ -244,14 +287,52 @@ export function CMVSmartSalesImporter() {
     return { aggregated, failures, parsed, uniqueDates: uniqueDates.size, uniqueProducts: uniqueProducts.size };
   }, [fileData, mapping, dateFormat]);
 
-  // ── Import ──
+  // ── White-list filtering: split matched vs unmatched ──
+  const filteredPreview = useMemo(() => {
+    if (!aggregatedPreview) return null;
+
+    const matched: MatchedSaleItem[] = [];
+    const unmatchedMap = new Map<string, number>();
+
+    for (const row of aggregatedPreview.aggregated) {
+      const normalizedName = row.item_name.toUpperCase().trim().replace(/\s+/g, " ");
+      const link = mappingsLookup.get(normalizedName);
+
+      if (link) {
+        matched.push({
+          ...row,
+          ingredientName: link.ingredientName,
+          multiplicador: link.multiplicador,
+          consumo: row.quantity * link.multiplicador,
+        });
+      } else {
+        unmatchedMap.set(row.item_name, (unmatchedMap.get(row.item_name) || 0) + row.quantity);
+      }
+    }
+
+    const unmatched: UnmatchedSaleItem[] = Array.from(unmatchedMap, ([item_name, quantity]) => ({ item_name, quantity }));
+
+    // Only matched parsed rows should be imported
+    const matchedNames = new Set(matched.map(m => m.item_name));
+    const filteredParsed = aggregatedPreview.parsed.filter(p =>
+      matchedNames.has(p.item_name.toUpperCase().trim())
+    );
+
+    return { matched, unmatched, filteredParsed };
+  }, [aggregatedPreview, mappingsLookup]);
+
+  // ── Import (only matched items) ──
   const handleImport = async () => {
-    if (!effectiveUnidadeId || !aggregatedPreview) return;
+    if (!effectiveUnidadeId || !aggregatedPreview || !filteredPreview) return;
+    if (filteredPreview.matched.length === 0) {
+      toast({ title: "Nenhum item reconhecido", description: "Nenhum item possui vínculo configurado. Configure os vínculos no De-Para.", variant: "destructive" });
+      return;
+    }
     setIsProcessing(true);
     try {
       const importResult = await importSales.mutateAsync({
         unitId: effectiveUnidadeId,
-        rows: aggregatedPreview.parsed,
+        rows: filteredPreview.filteredParsed,
         parseFailures: aggregatedPreview.failures,
         totalFileLines: fileData?.totalRows ?? 0,
       });
@@ -491,84 +572,154 @@ export function CMVSmartSalesImporter() {
             </div>
           )}
 
-          {/* ── STEP: Preview ── */}
-          {step === "preview" && aggregatedPreview && fileData && (
+          {/* ── STEP: Preview (with White-List Filtering) ── */}
+          {step === "preview" && aggregatedPreview && filteredPreview && fileData && (
             <div className="space-y-6">
               {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatMini label="Linhas no Arquivo" value={fileData.totalRows} />
-                <StatMini label="Após Agrupamento" value={aggregatedPreview.aggregated.length} accent />
-                <StatMini label="Dias Distintos" value={aggregatedPreview.uniqueDates} />
                 <StatMini label="Produtos Distintos" value={aggregatedPreview.uniqueProducts} />
+                <StatMini label="✅ Reconhecidos" value={filteredPreview.matched.length} accent />
+                <StatMini label="🗑️ Descartados" value={filteredPreview.unmatched.length} />
               </div>
 
               {aggregatedPreview.failures.length > 0 && (
                 <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
                   <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                   <div className="text-sm">
-                    <p className="font-medium text-amber-600">{aggregatedPreview.failures.length} linhas ignoradas</p>
+                    <p className="font-medium text-amber-600">{aggregatedPreview.failures.length} linhas com erro de parsing</p>
                     <p className="text-xs text-muted-foreground">Detalhes serão mostrados no relatório final.</p>
                   </div>
                 </div>
               )}
 
-              {/* Compression ratio */}
-              <div className="bg-muted/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Taxa de Compressão</span>
-                  <span className="text-sm font-bold text-primary">
-                    {fileData.totalRows > 0
-                      ? `${Math.round((1 - aggregatedPreview.aggregated.length / fileData.totalRows) * 100)}%`
-                      : "—"}
-                  </span>
+              {/* White-list info */}
+              <div className="flex items-start gap-2 bg-primary/5 border border-primary/20 rounded-lg p-3">
+                <Link2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium">Filtro por Vínculo (White List)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Apenas itens com vínculo configurado no De-Para serão importados.
+                    {filteredPreview.unmatched.length > 0 && ` ${filteredPreview.unmatched.length} itens sem vínculo serão ignorados.`}
+                  </p>
                 </div>
-                <Progress
-                  value={fileData.totalRows > 0 ? (1 - aggregatedPreview.aggregated.length / fileData.totalRows) * 100 : 0}
-                  className="h-2"
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  De {fileData.totalRows.toLocaleString("pt-BR")} linhas para {aggregatedPreview.aggregated.length.toLocaleString("pt-BR")} registros agrupados (Data + Produto).
-                </p>
               </div>
 
-              {/* Preview table */}
-              <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Data</TableHead>
-                      <TableHead className="text-xs">Produto</TableHead>
-                      <TableHead className="text-xs text-right">Qtd Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {aggregatedPreview.aggregated.slice(0, 20).map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs font-mono">{formatDateBR(r.sale_date)}</TableCell>
-                        <TableCell className="text-xs">{r.item_name}</TableCell>
-                        <TableCell className="text-xs text-right font-mono">{r.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</TableCell>
-                      </TableRow>
-                    ))}
-                    {aggregatedPreview.aggregated.length > 20 && (
-                      <TableRow>
-                        <TableCell colSpan={3} className="text-center text-xs text-muted-foreground italic">
-                          ...e mais {aggregatedPreview.aggregated.length - 20} registros
-                        </TableCell>
-                      </TableRow>
+              {/* Tabbed view: Recognized vs Discarded */}
+              <Tabs defaultValue="matched" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="matched" className="gap-1.5">
+                    <PackageCheck className="h-3.5 w-3.5" />
+                    Reconhecidos ({filteredPreview.matched.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="unmatched" className="gap-1.5">
+                    <PackageX className="h-3.5 w-3.5" />
+                    Descartados ({filteredPreview.unmatched.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="matched">
+                  <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    {filteredPreview.matched.length === 0 ? (
+                      <div className="p-6 text-center text-muted-foreground">
+                        <PackageX className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm font-medium">Nenhum item reconhecido</p>
+                        <p className="text-xs">Configure vínculos no De-Para de Vendas para que o sistema reconheça os itens.</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Produto (Arquivo)</TableHead>
+                            <TableHead className="text-xs">Vínculo (Ingrediente)</TableHead>
+                            <TableHead className="text-xs text-right">Qtd Vendida</TableHead>
+                            <TableHead className="text-xs text-right">Consumo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredPreview.matched.slice(0, 30).map((r, i) => (
+                            <TableRow key={i}>
+                              <TableCell className="text-xs">{r.item_name}</TableCell>
+                              <TableCell className="text-xs">
+                                <Badge variant="outline" className="font-normal text-xs">
+                                  {r.ingredientName}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {r.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {r.consumo.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
+                                {r.multiplicador !== 1 && (
+                                  <span className="text-muted-foreground ml-1">(×{r.multiplicador})</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {filteredPreview.matched.length > 30 && (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-xs text-muted-foreground italic">
+                                ...e mais {filteredPreview.matched.length - 30} itens reconhecidos
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="unmatched">
+                  <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    {filteredPreview.unmatched.length === 0 ? (
+                      <div className="p-6 text-center text-muted-foreground">
+                        <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500 opacity-70" />
+                        <p className="text-sm font-medium">Todos os itens possuem vínculo!</p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Produto (Sem Vínculo)</TableHead>
+                            <TableHead className="text-xs text-right">Qtd Total</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredPreview.unmatched.slice(0, 50).map((r, i) => (
+                            <TableRow key={i} className="opacity-60">
+                              <TableCell className="text-xs">{r.item_name}</TableCell>
+                              <TableCell className="text-xs text-right font-mono">
+                                {r.quantity.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs font-normal">Ignorado</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {filteredPreview.unmatched.length > 50 && (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-center text-xs text-muted-foreground italic">
+                                ...e mais {filteredPreview.unmatched.length - 50} itens ignorados
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
 
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => setStep("dateformat")}>
                   <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
                 </Button>
-                <Button onClick={handleImport} disabled={isProcessing || aggregatedPreview.aggregated.length === 0}>
+                <Button onClick={handleImport} disabled={isProcessing || filteredPreview.matched.length === 0}>
                   {isProcessing ? (
                     <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</>
                   ) : (
-                    <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {aggregatedPreview.aggregated.length} registros</>
+                    <><CheckCircle2 className="h-4 w-4 mr-2" /> Importar {filteredPreview.matched.length} itens reconhecidos</>
                   )}
                 </Button>
               </div>

@@ -10,7 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileUp, Loader2, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Package, Scale, Edit3, Link2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
+import { FileUp, Loader2, AlertTriangle, CheckCircle, TrendingUp, TrendingDown, Package, Scale, Edit3, Link2, CalendarIcon, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useNFeExtraction, ExtractedNFeItem } from "@/hooks/useNFeExtraction";
 import { useCMVItems } from "@/hooks/useCMV";
@@ -64,6 +66,27 @@ export function CMVNFeProcessor() {
     newPrice: number;
   }>({ open: false, item: null, cmvItemId: null, oldPrice: 0, newPrice: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [entryDate, setEntryDate] = useState(""); // YYYY-MM-DD for Kardex entry
+  const [emissionDate, setEmissionDate] = useState(""); // read-only from NFe
+
+  const parseNfeDate = (dateStr?: string | null): string => {
+    if (!dateStr) return new Date().toISOString().split("T")[0];
+    // Try common formats: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY
+    const slashMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (slashMatch) return `${slashMatch[3]}-${slashMatch[2]}-${slashMatch[1]}`;
+    const dashMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dashMatch) return dateStr;
+    const dashDmy = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (dashDmy) return `${dashDmy[3]}-${dashDmy[2]}-${dashDmy[1]}`;
+    return new Date().toISOString().split("T")[0];
+  };
+
+  const formatDateBR = (dateStr: string): string => {
+    const parts = dateStr.split("-");
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return dateStr;
+  };
 
   const calculateConversion = (nfeItem: ExtractedNFeItem, cmvItem: typeof cmvItems[0] | undefined) => {
     const isKg = nfeItem.unidade?.toLowerCase() === "kg" || 
@@ -225,33 +248,52 @@ export function CMVNFeProcessor() {
     }
   };
 
-  const handleProcessEntry = async () => {
+  const handleOpenConfirmModal = () => {
     if (!effectiveUnidadeId) {
       toast.error("Selecione uma unidade");
       return;
     }
 
-    // Only process selected items with valid mappings
     const validMappings = itemMappings.filter(m => m.selected && m.cmvItemId);
     if (validMappings.length === 0) {
       toast.error("Selecione e vincule pelo menos um item");
       return;
     }
 
+    // Check for unmapped selected items
+    const unmapped = itemMappings.filter(m => m.selected && !m.cmvItemId);
+    if (unmapped.length > 0) {
+      toast.error(`${unmapped.length} item(ns) selecionado(s) sem vínculo. Vincule ou desmarque-os.`);
+      return;
+    }
+
+    // Parse emission date from extracted data
+    const parsedEmission = parseNfeDate(extractedData?.data_emissao);
+    setEmissionDate(parsedEmission);
+    setEntryDate(parsedEmission); // default entry date = emission date
+    setConfirmModalOpen(true);
+  };
+
+  const handleConfirmEntry = async () => {
+    if (!effectiveUnidadeId || !entryDate) return;
+
+    const validMappings = itemMappings.filter(m => m.selected && m.cmvItemId);
+    if (validMappings.length === 0) return;
+
     setIsProcessing(true);
     try {
       const { data: user } = await supabase.auth.getUser();
       
-      // Create movements with final confirmed units
+      // Create movements with the confirmed entry date
       const movements = validMappings.map(m => ({
         cmv_item_id: m.cmvItemId!,
         loja_id: effectiveUnidadeId,
         tipo_movimento: "entrada",
-        quantidade: m.finalUnits, // Use the final confirmed quantity
+        quantidade: m.finalUnits,
         preco_unitario: m.isKgItem 
-          ? (m.nfeItem.valor_total / m.finalUnits) // Calculate unit price from total
+          ? (m.nfeItem.valor_total / m.finalUnits)
           : m.nfeItem.valor_unitario,
-        data_movimento: new Date().toISOString().split("T")[0],
+        data_movimento: entryDate, // Uses the confirmed date
         referencia: extractedData?.numero_nf || "NFe importada",
         created_by: user.user?.id,
       }));
@@ -259,7 +301,7 @@ export function CMVNFeProcessor() {
       const { error } = await supabase.from("cmv_movements").insert(movements);
       if (error) throw error;
 
-      // Update inventory with final quantities
+      // Update inventory
       for (const m of validMappings) {
         const { data: currentInv } = await supabase
           .from("cmv_inventory")
@@ -274,10 +316,9 @@ export function CMVNFeProcessor() {
           cmv_item_id: m.cmvItemId!,
           loja_id: effectiveUnidadeId,
           quantidade_atual: newQty,
-          ultima_contagem: new Date().toISOString().split("T")[0],
+          ultima_contagem: entryDate,
         }, { onConflict: "cmv_item_id,loja_id" });
 
-        // Update cost price if it changed (calculate per-unit cost)
         if (m.priceChanged && m.currentPrice !== null) {
           const newUnitPrice = m.isKgItem 
             ? (m.nfeItem.valor_total / m.finalUnits)
@@ -299,7 +340,7 @@ export function CMVNFeProcessor() {
         }
       }
 
-      // Save NFe→CMV mappings for auto-fill next time
+      // Save NFe→CMV mappings for auto-fill
       const existingNormalized = new Set(savedNfeMappings.map(m => m.nome_nfe_normalizado));
       const newMappingsToSave = validMappings
         .filter(m => !existingNormalized.has(normalizeNfeName(m.nfeItem.nome)))
@@ -318,8 +359,9 @@ export function CMVNFeProcessor() {
 
       const savedCount = newMappingsToSave.length;
       toast.success(
-        `${validMappings.length} itens registrados!${savedCount > 0 ? ` ${savedCount} vínculo(s) salvo(s) para próximas notas.` : ""}`
+        `✅ Estoque atualizado para o dia ${formatDateBR(entryDate)}! ${validMappings.length} itens registrados.${savedCount > 0 ? ` ${savedCount} vínculo(s) salvo(s).` : ""}`
       );
+      setConfirmModalOpen(false);
       clearExtractedData();
       setItemMappings([]);
     } catch (error) {
@@ -557,20 +599,11 @@ export function CMVNFeProcessor() {
                     Cancelar
                   </Button>
                   <Button
-                    onClick={handleProcessEntry}
+                    onClick={handleOpenConfirmModal}
                     disabled={isProcessing || !itemMappings.some(m => m.selected && m.cmvItemId)}
                   >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <Package className="h-4 w-4 mr-2" />
-                        Processar Selecionados ({selectedCount})
-                      </>
-                    )}
+                    <Package className="h-4 w-4 mr-2" />
+                    Conferir e Processar ({selectedCount})
                   </Button>
                 </div>
               </div>
@@ -626,6 +659,163 @@ export function CMVNFeProcessor() {
             </Button>
             <Button onClick={handleUpdatePrice}>
               Atualizar para R$ {priceUpdateDialog.newPrice.toFixed(2)}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ===== CONFIRMATION MODAL ===== */}
+      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <FileText className="h-5 w-5 text-primary" />
+              Conferência de Entrada — NFe {extractedData?.numero_nf || "S/N"}
+            </DialogTitle>
+            <DialogDescription>
+              Revise os dados antes de confirmar. O estoque será atualizado na data selecionada.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Date Header */}
+          <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/50 border">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                Data de Emissão (NFe)
+              </Label>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-md bg-muted border text-sm font-mono">
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                {formatDateBR(emissionDate)}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Label className="text-xs uppercase tracking-wide flex items-center gap-1 text-primary font-semibold cursor-help">
+                      <CalendarIcon className="h-3 w-3" />
+                      Data de Entrada (Kardex)
+                      <Info className="h-3 w-3 text-muted-foreground" />
+                    </Label>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Essa é a data que será usada para calcular o saldo do estoque.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Input
+                type="date"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                className="font-mono"
+              />
+            </div>
+          </div>
+
+          {entryDate !== emissionDate && (
+            <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700 dark:text-amber-400">
+                A data de entrada ({formatDateBR(entryDate)}) é diferente da emissão ({formatDateBR(emissionDate)}). 
+                O Kardex será atualizado retroativamente para {formatDateBR(entryDate)}.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Separator />
+
+          {/* Items Table */}
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Itens da Nota ({itemMappings.filter(m => m.selected && m.cmvItemId).length})
+            </h4>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome na Nota</TableHead>
+                    <TableHead>Ingrediente Vinculado</TableHead>
+                    <TableHead className="text-center">Conversão</TableHead>
+                    <TableHead className="text-right">Qtd Final</TableHead>
+                    <TableHead className="text-right">Valor Unit.</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itemMappings.filter(m => m.selected && m.cmvItemId).map((mapping, idx) => {
+                    const cmvItem = cmvItems.find(i => i.id === mapping.cmvItemId);
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium text-sm">
+                          {mapping.nfeItem.nome}
+                          <span className="text-xs text-muted-foreground ml-1">
+                            ({mapping.nfeItem.quantidade} {mapping.nfeItem.unidade || "un"})
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-primary">{cmvItem?.nome || "—"}</span>
+                            {mapping.autoLinked && (
+                              <Link2 className="h-3 w-3 text-blue-500 shrink-0" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center text-xs text-muted-foreground">
+                          {mapping.isKgItem && mapping.standardWeightG ? (
+                            <span>1 un = {mapping.standardWeightG}g</span>
+                          ) : (
+                            <span>1:1</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-green-600">
+                          +{mapping.finalUnits}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          R$ {(mapping.isKgItem 
+                            ? (mapping.nfeItem.valor_total / mapping.finalUnits)
+                            : mapping.nfeItem.valor_unitario
+                          ).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Supplier info */}
+          {extractedData?.fornecedor && (
+            <div className="text-xs text-muted-foreground flex items-center gap-4">
+              <span>Fornecedor: <strong>{extractedData.fornecedor}</strong></span>
+              {extractedData.cnpj_fornecedor && (
+                <span>CNPJ: {extractedData.cnpj_fornecedor}</span>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
+              Voltar
+            </Button>
+            <Button
+              onClick={handleConfirmEntry}
+              disabled={isProcessing || !entryDate}
+              className="min-w-[200px]"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Confirmar Entrada em {formatDateBR(entryDate)}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

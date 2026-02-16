@@ -40,7 +40,8 @@ export function useD1Schedules(unitId: string | null, date: string) {
           id, schedule_date, employee_id, sector_id,
           start_time, end_time, schedule_type,
           confirmation_status, denial_reason,
-          employees!schedules_employee_id_fkey ( name, phone, job_title, worker_type )
+          employees!schedules_employee_id_fkey ( name, phone, job_title, worker_type ),
+          shifts!schedules_shift_id_fkey ( start_time, end_time )
         `)
         .in("sector_id", sectorIds)
         .eq("schedule_date", date)
@@ -59,8 +60,8 @@ export function useD1Schedules(unitId: string | null, date: string) {
         worker_type: s.employees?.worker_type || "clt",
         sector_name: sectorMap.get(s.sector_id) || "—",
         sector_id: s.sector_id,
-        start_time: s.start_time,
-        end_time: s.end_time,
+        start_time: s.start_time || s.shifts?.start_time || null,
+        end_time: s.end_time || s.shifts?.end_time || null,
         schedule_type: s.schedule_type,
         confirmation_status: s.confirmation_status,
         denial_reason: s.denial_reason,

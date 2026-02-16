@@ -9,6 +9,7 @@ export interface UserProfileData {
   isAdmin: boolean;
   isPartner: boolean;
   isGerenteUnidade: boolean;
+  isChefeSetor: boolean;
   unidades: ConfigOption[];
 }
 
@@ -25,6 +26,7 @@ export function useUserProfile() {
           isAdmin: false,
           isPartner: false,
           isGerenteUnidade: false,
+          isChefeSetor: false,
           unidades: [],
         };
       }
@@ -56,6 +58,7 @@ export function useUserProfile() {
       const isAdmin = roles.includes("admin");
       const isPartner = roles.includes("partner");
       const isGerenteUnidade = roles.includes("gerente_unidade");
+      const isChefeSetor = roles.includes("chefe_setor");
 
       // Fetch user stores (multi-loja support)
       let unidades: ConfigOption[] = [];
@@ -82,6 +85,7 @@ export function useUserProfile() {
         isAdmin,
         isPartner,
         isGerenteUnidade,
+        isChefeSetor,
         unidades,
       };
     },
@@ -95,6 +99,7 @@ export function useUserProfile() {
     isAdmin: data?.isAdmin || false,
     isPartner: data?.isPartner || false,
     isGerenteUnidade: data?.isGerenteUnidade || false,
+    isChefeSetor: data?.isChefeSetor || false,
     unidades: data?.unidades || [],
     // Backwards compatibility - first unidade
     unidade: data?.unidades?.[0] || null,

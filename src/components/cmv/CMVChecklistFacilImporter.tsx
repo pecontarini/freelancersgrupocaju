@@ -54,6 +54,7 @@ interface MappedRow {
   matchedId: string | null;
   similarity: number;
   quantidade: number;
+  originalQuantidade: number; // value from file, used to determine editability
   status: "matched" | "fuzzy" | "unmatched";
 }
 
@@ -169,6 +170,7 @@ export function CMVChecklistFacilImporter() {
           matchedId: match.matchId,
           similarity: match.similarity,
           quantidade: row.quantidade,
+          originalQuantidade: row.quantidade,
           status,
         };
       });
@@ -380,8 +382,27 @@ export function CMVChecklistFacilImporter() {
                           <span className="text-muted-foreground italic">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {row.quantidade}
+                      <TableCell className="text-right">
+                        {row.originalQuantidade > 0 ? (
+                          <span className="font-mono">{row.quantidade}</span>
+                        ) : (
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0"
+                            value={row.quantidade || ""}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setMappedRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === idx ? { ...r, quantidade: val } : r
+                                )
+                              );
+                            }}
+                            className="w-20 text-center"
+                          />
+                        )}
                       </TableCell>
                       <TableCell>
                         {row.status === "matched" && (

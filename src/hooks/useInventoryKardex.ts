@@ -12,60 +12,39 @@ export interface KardexDayRow {
   divergence: number | null;
 }
 
-export interface InventoryTransaction {
-  id: string;
-  date: string;
-  quantity: number;
-  transaction_type: string;
-  reference_id: string | null;
-  notes: string | null;
-}
-
 export function useInventoryKardex(
   unitId: string | undefined,
   ingredientId: string | undefined,
   startDate: string,
   endDate: string
 ) {
-  // Fetch daily stock positions
-  const { data: positions = [], isLoading: isLoadingPositions } = useQuery({
-    queryKey: ["daily-stock-positions", unitId, ingredientId, startDate, endDate],
+  const { data: positions = [], isLoading } = useQuery({
+    queryKey: ["kardex-daily", unitId, ingredientId, startDate, endDate],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("daily_stock_positions")
-        .select("*")
-        .eq("unit_id", unitId!)
-        .eq("ingredient_id", ingredientId!)
-        .gte("date", startDate)
-        .lte("date", endDate)
-        .order("date", { ascending: true });
+      const { data, error } = await supabase.rpc("compute_kardex_daily", {
+        p_unit_id: unitId!,
+        p_ingredient_id: ingredientId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
       if (error) throw error;
-      return data as KardexDayRow[];
+      return (data || []).map((row: any) => ({
+        date: row.day,
+        opening_balance: Number(row.opening_balance),
+        total_entry: Number(row.total_entry),
+        total_sales: Number(row.total_sales),
+        total_waste: Number(row.total_waste),
+        theoretical_balance: Number(row.theoretical_balance),
+        physical_count: row.physical_count != null ? Number(row.physical_count) : null,
+        divergence: row.divergence != null ? Number(row.divergence) : null,
+      })) as KardexDayRow[];
     },
-    enabled: !!unitId && !!ingredientId,
-  });
-
-  // Fetch raw transactions for drill-down
-  const { data: transactions = [], isLoading: isLoadingTx } = useQuery({
-    queryKey: ["inventory-transactions", unitId, ingredientId, startDate, endDate],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("inventory_transactions")
-        .select("*")
-        .eq("unit_id", unitId!)
-        .eq("ingredient_id", ingredientId!)
-        .gte("date", `${startDate}T00:00:00`)
-        .lte("date", `${endDate}T23:59:59`)
-        .order("date", { ascending: true });
-      if (error) throw error;
-      return data as InventoryTransaction[];
-    },
-    enabled: !!unitId && !!ingredientId,
+    enabled: !!unitId && !!ingredientId && !!startDate && !!endDate,
   });
 
   return {
     positions,
-    transactions,
-    isLoading: isLoadingPositions || isLoadingTx,
+    transactions: [],
+    isLoading,
   };
 }

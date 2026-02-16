@@ -2481,6 +2481,24 @@ export type Database = {
           waste_qty: number
         }[]
       }
+      compute_kardex_daily: {
+        Args: {
+          p_end_date: string
+          p_ingredient_id: string
+          p_start_date: string
+          p_unit_id: string
+        }
+        Returns: {
+          day: string
+          divergence: number
+          opening_balance: number
+          physical_count: number
+          theoretical_balance: number
+          total_entry: number
+          total_sales: number
+          total_waste: number
+        }[]
+      }
       get_realtime_stock_positions: {
         Args: { p_unit_id: string }
         Returns: {

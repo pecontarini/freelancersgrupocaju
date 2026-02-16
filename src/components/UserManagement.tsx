@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Edit2, Store, Shield, Loader2, X, Plus, Briefcase } from "lucide-react";
+import { Users, Edit2, Store, Shield, Loader2, X, Plus, Briefcase, CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -144,8 +144,8 @@ export function UserManagement() {
       // Remove existing user_stores
       await supabase.from("user_stores").delete().eq("user_id", userId);
 
-      // Add new stores if gerente_unidade
-      if (role === "gerente_unidade" && storeIds.length > 0) {
+      // Add new stores if role needs it
+      if ((role === "gerente_unidade" || role === "partner" || role === "chefe_setor") && storeIds.length > 0) {
         const storeInserts = storeIds.map((storeId) => ({
           user_id: userId,
           loja_id: storeId,
@@ -180,8 +180,8 @@ export function UserManagement() {
   const handleSaveUser = () => {
     if (!editingUser) return;
 
-    // Partner and Gerente both need at least one store
-    if ((selectedRole === "gerente_unidade" || selectedRole === "partner") && selectedStoreIds.length === 0) {
+    // Partner, Gerente and Chefe de Setor all need at least one store
+    if ((selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") && selectedStoreIds.length === 0) {
       toast.error("Selecione pelo menos uma loja.");
       return;
     }
@@ -189,7 +189,7 @@ export function UserManagement() {
     updateUserRole.mutate({
       userId: editingUser.id,
       role: selectedRole,
-      storeIds: (selectedRole === "gerente_unidade" || selectedRole === "partner") ? selectedStoreIds : [],
+      storeIds: (selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") ? selectedStoreIds : [],
     });
   };
 
@@ -225,6 +225,14 @@ export function UserManagement() {
         <Badge variant="secondary">
           <Store className="mr-1 h-3 w-3" />
           Gerente
+        </Badge>
+      );
+    }
+    if (roles.includes("chefe_setor")) {
+      return (
+        <Badge variant="outline" className="border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300">
+          <CalendarClock className="mr-1 h-3 w-3" />
+          Chefe de Setor
         </Badge>
       );
     }
@@ -363,11 +371,17 @@ export function UserManagement() {
                         Gerente de Unidade
                       </span>
                     </SelectItem>
+                    <SelectItem value="chefe_setor">
+                      <span className="flex items-center gap-2">
+                        <CalendarClock className="h-4 w-4" />
+                        Chefe de Setor (Escalas)
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {(selectedRole === "gerente_unidade" || selectedRole === "partner") && (
+              {(selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") && (
                 <div className="space-y-2">
                   <Label>Lojas Atribuídas</Label>
                   

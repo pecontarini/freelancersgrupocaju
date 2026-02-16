@@ -86,6 +86,7 @@ const Index = () => {
   const {
     isAdmin,
     isGerenteUnidade,
+    isChefeSetor,
     unidades,
     isLoading: isLoadingProfile,
     hasNoRole,
@@ -94,18 +95,21 @@ const Index = () => {
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(
     null
   );
-  const [activeTab, setActiveTab] = useState<string>("budgets");
+  const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "escalas" : "budgets");
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Auto-select first store for gerentes when they have stores assigned
   useEffect(() => {
     if (!isLoadingProfile && !isInitialized) {
-      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      if (isChefeSetor) {
+        setActiveTab("escalas");
+        if (unidades.length > 0) setSelectedUnidadeId(unidades[0].id);
+      } else if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
         setSelectedUnidadeId(unidades[0].id);
       }
       setIsInitialized(true);
     }
-  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isAdmin, unidades]);
+  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isAdmin, isChefeSetor, unidades]);
 
   // Filter entries based on selected unidade
   const filteredEntries = useMemo(() => {
@@ -183,6 +187,11 @@ const Index = () => {
   const currentTabConfig = tabConfig[activeTab] || tabConfig.budgets;
 
   const renderTabContent = () => {
+    // Chefe de setor only sees escalas
+    if (isChefeSetor && activeTab !== "escalas") {
+      return <EscalasTab />;
+    }
+
     switch (activeTab) {
       case "budgets":
         return (

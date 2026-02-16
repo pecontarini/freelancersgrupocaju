@@ -27,9 +27,13 @@ const navItems = [
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
   const { signOut } = useAuth();
-  const { isAdmin, profile } = useUserProfile();
+  const { isAdmin, isChefeSetor, profile } = useUserProfile();
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
+
+  const visibleNavItems = isChefeSetor
+    ? navItems.filter((i) => i.id === "escalas")
+    : navItems;
 
   return (
     <>
@@ -54,7 +58,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
             </SheetHeader>
             <div className="mt-6 space-y-4">
               <div className="text-sm text-muted-foreground">
-                {isAdmin ? "Administrador" : "Gerente de Unidade"}
+                {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente de Unidade"}
               </div>
               
               {isAdmin && (
@@ -100,7 +104,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm md:hidden safe-area-bottom">
         <div className="flex h-16 items-stretch justify-around">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
             const Icon = item.icon;
             
@@ -155,7 +159,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   <div className="text-left">
                     <div>{profile?.full_name || "Usuário"}</div>
                     <div className="text-xs font-normal text-muted-foreground">
-                      {isAdmin ? "Administrador" : "Gerente"}
+                      {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente"}
                     </div>
                   </div>
                 </SheetTitle>

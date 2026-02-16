@@ -116,7 +116,7 @@ const adminMenuItems = [
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, unidades, profile } = useUserProfile();
+  const { isAdmin, isChefeSetor, unidades, profile } = useUserProfile();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
@@ -158,7 +158,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {(isChefeSetor
+                ? menuItems.filter((i) => i.id === "escalas")
+                : menuItems
+              ).map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     onClick={() => handleTabClick(item.id)}
@@ -224,9 +227,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                   <span className="text-sm font-medium truncate max-w-[140px]">
                     {profile?.full_name || user?.email?.split("@")[0]}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    {isAdmin ? "Administrador" : "Gerente"}
-                  </span>
+                    <span className="text-xs text-muted-foreground">
+                      {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente"}
+                    </span>
                 </div>
               )}
               {!isCollapsed && <ChevronRight className="h-4 w-4 ml-auto" />}

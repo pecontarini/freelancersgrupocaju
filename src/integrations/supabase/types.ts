@@ -596,6 +596,41 @@ export type Database = {
           },
         ]
       }
+      cmv_nfe_mappings: {
+        Row: {
+          cmv_item_id: string
+          created_at: string
+          id: string
+          nome_nfe_normalizado: string
+          nome_nfe_original: string
+          updated_at: string
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string
+          id?: string
+          nome_nfe_normalizado: string
+          nome_nfe_original: string
+          updated_at?: string
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string
+          id?: string
+          nome_nfe_normalizado?: string
+          nome_nfe_original?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_nfe_mappings_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_pending_sales_items: {
         Row: {
           created_at: string

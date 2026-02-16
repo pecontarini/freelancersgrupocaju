@@ -70,16 +70,29 @@ export function CMVNFeProcessor() {
   const [entryDate, setEntryDate] = useState(""); // YYYY-MM-DD for Kardex entry
   const [emissionDate, setEmissionDate] = useState(""); // read-only from NFe
 
-  const parseNfeDate = (dateStr?: string | null): string => {
-    if (!dateStr) return new Date().toISOString().split("T")[0];
-    // Try common formats: DD/MM/YYYY, YYYY-MM-DD, DD-MM-YYYY
-    const slashMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if (slashMatch) return `${slashMatch[3]}-${slashMatch[2]}-${slashMatch[1]}`;
-    const dashMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (dashMatch) return dateStr;
-    const dashDmy = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (dashDmy) return `${dashDmy[3]}-${dashDmy[2]}-${dashDmy[1]}`;
-    return new Date().toISOString().split("T")[0];
+  const [dateWarning, setDateWarning] = useState(false);
+
+  const parseNfeDate = (dateStr?: string | null): { date: string; detected: boolean } => {
+    if (!dateStr || !dateStr.trim()) {
+      return { date: new Date().toISOString().split("T")[0], detected: false };
+    }
+    const cleaned = dateStr.trim();
+    // DD/MM/YYYY
+    const slashMatch = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashMatch) return { date: `${slashMatch[3]}-${slashMatch[2].padStart(2, "0")}-${slashMatch[1].padStart(2, "0")}`, detected: true };
+    // YYYY-MM-DD
+    const dashMatch = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dashMatch) return { date: `${dashMatch[1]}-${dashMatch[2]}-${dashMatch[3]}`, detected: true };
+    // DD-MM-YYYY
+    const dashDmy = cleaned.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dashDmy) return { date: `${dashDmy[3]}-${dashDmy[2].padStart(2, "0")}-${dashDmy[1].padStart(2, "0")}`, detected: true };
+    // DD.MM.YYYY
+    const dotMatch = cleaned.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dotMatch) return { date: `${dotMatch[3]}-${dotMatch[2].padStart(2, "0")}-${dotMatch[1].padStart(2, "0")}`, detected: true };
+    // Try extracting any date-like pattern from longer strings (e.g. "Emissão: 10/02/2026")
+    const embeddedDate = cleaned.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+    if (embeddedDate) return { date: `${embeddedDate[3]}-${embeddedDate[2].padStart(2, "0")}-${embeddedDate[1].padStart(2, "0")}`, detected: true };
+    return { date: new Date().toISOString().split("T")[0], detected: false };
   };
 
   const formatDateBR = (dateStr: string): string => {
@@ -268,9 +281,10 @@ export function CMVNFeProcessor() {
     }
 
     // Parse emission date from extracted data
-    const parsedEmission = parseNfeDate(extractedData?.data_emissao);
-    setEmissionDate(parsedEmission);
-    setEntryDate(parsedEmission); // default entry date = emission date
+    const parsed = parseNfeDate(extractedData?.data_emissao);
+    setEmissionDate(parsed.date);
+    setEntryDate(parsed.date); // default entry date = emission date
+    setDateWarning(!parsed.detected);
     setConfirmModalOpen(true);
   };
 
@@ -713,7 +727,17 @@ export function CMVNFeProcessor() {
             </div>
           </div>
 
-          {entryDate !== emissionDate && (
+          {dateWarning && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>⚠ Data não detectada na NF!</strong> O sistema não conseguiu extrair a data de emissão. 
+                Confira e ajuste a <strong>Data de Entrada</strong> abaixo antes de confirmar.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {entryDate !== emissionDate && !dateWarning && (
             <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-700 dark:text-amber-400">

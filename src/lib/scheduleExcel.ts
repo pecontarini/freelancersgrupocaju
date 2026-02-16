@@ -33,6 +33,8 @@ export interface ScheduleParseResult {
   errors: ScheduleParseError[];
   workingCount: number;
   offCount: number;
+  /** ISO date of the first date found in the file's meta row (original week) */
+  originalMonday: string | null;
 }
 
 // ─── Template Generator ───
@@ -281,7 +283,17 @@ function parseTimeRange(cellValue: string): {
   return null;
 }
 
-export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
+/**
+ * Parse a schedule Excel file.
+ * @param file        The .xlsx file
+ * @param targetMonday  Optional ISO date (YYYY-MM-DD) of the Monday to use.
+ *                      When provided, the dates from the file are IGNORED and
+ *                      columns are mapped positionally starting from this date.
+ */
+export function parseScheduleFile(
+  file: File,
+  targetMonday?: string | null
+): Promise<ScheduleParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -318,7 +330,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
         const rawData = XLSX.utils.sheet_to_json<any>(scheduleSheet, {
           header: 1,
           defval: "",
-          raw: true, // prevent XLSX from formatting — we handle conversion ourselves
+          raw: true,
         }) as any[][];
 
         if (rawData.length < 4) {
@@ -334,12 +346,26 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           return;
         }
 
-        const dates: string[] = [];
+        // Extract original dates from file for reference
+        const fileDates: string[] = [];
         for (let c = 1; c < metaRow.length; c++) {
           const dateStr = parseDateCell(metaRow[c]);
-          if (dateStr) {
-            dates.push(dateStr);
+          if (dateStr) fileDates.push(dateStr);
+        }
+
+        const originalMonday = fileDates.length > 0 ? fileDates[0] : null;
+
+        // Determine which dates to actually use
+        let dates: string[];
+        if (targetMonday) {
+          // Generate 7 days positionally from the target monday
+          const numCols = Math.max(fileDates.length, 7);
+          dates = [];
+          for (let i = 0; i < numCols; i++) {
+            dates.push(format(addDays(new Date(targetMonday + "T12:00:00"), i), "yyyy-MM-dd"));
           }
+        } else {
+          dates = fileDates;
         }
 
         if (dates.length === 0) {
@@ -347,8 +373,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           return;
         }
 
-        // Row 1 = IDs (hidden), Row 2 = header, Rows 3+ = data
-        // Build name->meta map for robust lookup regardless of row order
+        // Build name->meta map
         const nameToMeta = new Map<string, typeof metaData[0]>();
         for (const m of metaData) {
           nameToMeta.set(m.employee_name.trim().toUpperCase(), m);
@@ -364,7 +389,6 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           const employeeName = cellToString(row[0]);
           if (!employeeName) continue;
 
-          // Find employee by normalized name from __meta__ sheet
           const empMeta = nameToMeta.get(employeeName.toUpperCase());
 
           if (!empMeta) {
@@ -380,10 +404,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           for (let c = 0; c < dates.length; c++) {
             const rawCell = row[c + 1];
 
-            // Handle Excel time serial numbers (e.g., 0.375 = 09:00)
-            // If the cell is a pure number between 0 and 1, it's likely a time — skip or warn
             if (typeof rawCell === "number" && rawCell > 0 && rawCell < 1) {
-              // Single time value, not a range — can't determine start/end
               errors.push({
                 row: r + 1,
                 employeeName: empMeta.employee_name,
@@ -400,7 +421,6 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
             const dateLabel = format(new Date(dateStr + "T12:00:00"), "EEE dd/MM", { locale: ptBR });
             const cellLower = cellValue.toLowerCase().trim();
 
-            // Check if it's an OFF keyword
             if (OFF_KEYWORDS.has(cellLower)) {
               entries.push({
                 employee_id: empMeta.employee_id,
@@ -415,7 +435,6 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
               continue;
             }
 
-            // Try to parse time range
             const parsed = parseTimeRange(cellValue);
             if (parsed) {
               entries.push({
@@ -431,7 +450,6 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
               continue;
             }
 
-            // Parsing failed
             errors.push({
               row: r + 1,
               employeeName: empMeta.employee_name,
@@ -441,7 +459,7 @@ export function parseScheduleFile(file: File): Promise<ScheduleParseResult> {
           }
         }
 
-        resolve({ entries, errors, workingCount, offCount });
+        resolve({ entries, errors, workingCount, offCount, originalMonday });
       } catch (err) {
         reject(new Error("Erro ao processar arquivo. Verifique se é um Excel válido."));
       }

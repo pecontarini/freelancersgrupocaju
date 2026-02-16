@@ -9,6 +9,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Download,
   Upload,
@@ -17,8 +23,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  CalendarIcon,
+  Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { format, startOfWeek, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import {
   generateScheduleTemplate,
   parseScheduleFile,
@@ -48,9 +59,13 @@ export function ScheduleExcelFlow({
     errors: ScheduleParseError[];
     workingCount: number;
     offCount: number;
+    originalMonday: string | null;
   } | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [targetMonday, setTargetMonday] = useState<Date | undefined>(undefined);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const upsert = useUpsertSchedule();
   const qc = useQueryClient();
@@ -69,18 +84,64 @@ export function ScheduleExcelFlow({
     if (!file) return;
     e.target.value = "";
 
-    setIsParsing(true);
+    // Store file and open modal — user will pick the target week before parsing
+    setPendingFile(file);
     setImportModal(true);
+
+    // Default target to current week's monday from the weekDays prop
+    const defaultMonday = weekDays.length > 0
+      ? startOfWeek(weekDays[0], { weekStartsOn: 1 })
+      : startOfWeek(new Date(), { weekStartsOn: 1 });
+    setTargetMonday(defaultMonday);
+
+    // Auto-parse with default target
+    await runParse(file, format(defaultMonday, "yyyy-MM-dd"));
+  }
+
+  async function runParse(file: File, mondayISO: string) {
+    setIsParsing(true);
+    setParseResult(null);
     try {
-      const result = await parseScheduleFile(file);
+      const result = await parseScheduleFile(file, mondayISO);
       setParseResult(result);
     } catch (err: any) {
       toast.error(err.message);
       setImportModal(false);
+      setPendingFile(null);
     } finally {
       setIsParsing(false);
     }
   }
+
+  async function handleMondayChange(date: Date | undefined) {
+    if (!date) return;
+    const monday = startOfWeek(date, { weekStartsOn: 1 });
+    setTargetMonday(monday);
+    setCalendarOpen(false);
+    if (pendingFile) {
+      await runParse(pendingFile, format(monday, "yyyy-MM-dd"));
+    }
+  }
+
+  function closeModal() {
+    if (isSaving) return;
+    setImportModal(false);
+    setParseResult(null);
+    setPendingFile(null);
+    setTargetMonday(undefined);
+  }
+
+  const showDateWarning =
+    parseResult?.originalMonday &&
+    targetMonday &&
+    parseResult.originalMonday !== format(targetMonday, "yyyy-MM-dd");
+
+  const originalMondayFormatted = parseResult?.originalMonday
+    ? format(new Date(parseResult.originalMonday + "T12:00:00"), "dd/MM", { locale: ptBR })
+    : null;
+  const targetMondayFormatted = targetMonday
+    ? format(targetMonday, "dd/MM", { locale: ptBR })
+    : null;
 
   async function handleConfirmImport() {
     if (!parseResult || parseResult.entries.length === 0) return;
@@ -112,8 +173,7 @@ export function ScheduleExcelFlow({
     }
 
     setIsSaving(false);
-    setImportModal(false);
-    setParseResult(null);
+    closeModal();
     qc.invalidateQueries({ queryKey: ["manual-schedules"] });
 
     if (errorCount === 0) {
@@ -159,7 +219,7 @@ export function ScheduleExcelFlow({
       </div>
 
       {/* Import Confirmation Modal */}
-      <Dialog open={importModal} onOpenChange={(o) => { if (!o && !isSaving) { setImportModal(false); setParseResult(null); } }}>
+      <Dialog open={importModal} onOpenChange={(o) => { if (!o) closeModal(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -167,6 +227,48 @@ export function ScheduleExcelFlow({
               Importar Escala via Excel
             </DialogTitle>
           </DialogHeader>
+
+          {/* Target week picker */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Data de Início (Segunda-feira)</label>
+            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !targetMonday && "text-muted-foreground"
+                  )}
+                  disabled={isSaving}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {targetMonday
+                    ? `${format(targetMonday, "dd/MM/yyyy")} — ${format(addDays(targetMonday, 6), "dd/MM/yyyy")}`
+                    : "Selecione a semana"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={targetMonday}
+                  onSelect={handleMondayChange}
+                  className={cn("p-3 pointer-events-auto")}
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Date override warning */}
+          {showDateWarning && !isParsing && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm">
+              <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-amber-800 dark:text-amber-300">
+                A planilha é da semana de <strong>{originalMondayFormatted}</strong>, mas as
+                escalas serão salvas na semana de <strong>{targetMondayFormatted}</strong> conforme selecionado.
+              </p>
+            </div>
+          )}
 
           {isParsing && (
             <div className="flex flex-col items-center gap-3 py-8">
@@ -254,11 +356,7 @@ export function ScheduleExcelFlow({
           )}
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => { setImportModal(false); setParseResult(null); }}
-              disabled={isSaving}
-            >
+            <Button variant="outline" onClick={closeModal} disabled={isSaving}>
               Cancelar
             </Button>
             {parseResult && parseResult.entries.length > 0 && (

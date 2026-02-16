@@ -172,11 +172,35 @@ export function D1SectorAccordion({ sectors, dateLabel, buildWhatsAppLink }: D1S
 function SectorWhatsAppButton({ sector, dateLabel }: { sector: SectorGroup; dateLabel: string }) {
   if (sector.pending === 0 && sector.denied === 0) return null;
 
-  const missing = sector.pending + sector.denied;
-  const message = encodeURIComponent(
-    `Pessoal da ${sector.sectorName}, favor confirmar a escala de amanhã (${dateLabel}) no app! ` +
-    `Faltam ${missing} pessoa${missing > 1 ? "s" : ""}.`
+  const APP_URL = window.location.origin;
+
+  const needsAction = sector.items.filter(
+    (s) => !s.confirmation_status || s.confirmation_status === "pending" || s.confirmation_status === "denied"
   );
+  const confirmedNames = sector.items
+    .filter((s) => s.confirmation_status === "confirmed")
+    .map((s) => s.employee_name);
+
+  const lines: string[] = [
+    `🚨 *CONFIRMAÇÃO DE ESCALA - ${dateLabel}* 🚨`,
+    `*Setor:* ${sector.sectorName}`,
+    ``,
+    `Pessoal, favor confirmar o turno de amanhã agora! 👇`,
+    ``,
+  ];
+
+  for (const s of needsAction) {
+    const confirmUrl = `${APP_URL}/confirm-shift/${s.id}`;
+    lines.push(`👤 *${s.employee_name}*`);
+    lines.push(`🔗 ${confirmUrl}`);
+    lines.push(``);
+  }
+
+  if (confirmedNames.length > 0) {
+    lines.push(`✅ *Quem já confirmou:* ${confirmedNames.join(", ")}.`);
+  }
+
+  const message = encodeURIComponent(lines.join("\n"));
   const url = `https://wa.me/?text=${message}`;
 
   return (

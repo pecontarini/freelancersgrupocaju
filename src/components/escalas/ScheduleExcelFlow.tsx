@@ -37,7 +37,7 @@ import {
   type ParsedScheduleEntry,
   type ScheduleParseError,
 } from "@/lib/scheduleExcel";
-import { useUpsertSchedule } from "@/hooks/useManualSchedules";
+import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface ScheduleExcelFlowProps {
@@ -67,7 +67,6 @@ export function ScheduleExcelFlow({
   const [targetMonday, setTargetMonday] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const upsert = useUpsertSchedule();
   const qc = useQueryClient();
 
   function handleDownloadTemplate() {
@@ -147,42 +146,59 @@ export function ScheduleExcelFlow({
     if (!parseResult || parseResult.entries.length === 0) return;
 
     setIsSaving(true);
-    let successCount = 0;
-    let errorCount = 0;
-    const errorMessages: string[] = [];
 
-    for (const entry of parseResult.entries) {
-      try {
-        await upsert.mutateAsync({
-          employee_id: entry.employee_id,
-          schedule_date: entry.date,
-          sector_id: sectorId,
-          start_time: entry.start_time,
-          end_time: entry.end_time,
-          break_duration: entry.break_duration,
-          schedule_type: entry.schedule_type,
-          agreed_rate: 0,
-        });
-        successCount++;
-      } catch (err: any) {
-        errorCount++;
-        if (errorMessages.length < 3) {
-          errorMessages.push(`${entry.employee_name} (${entry.date}): ${err?.message || "erro desconhecido"}`);
-        }
+    try {
+      // 1. Find a default shift_id for the inserts
+      const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
+      if (!shifts || shifts.length === 0) {
+        toast.error("Nenhum turno cadastrado. Cadastre ao menos um turno.");
+        setIsSaving(false);
+        return;
       }
-    }
+      const shiftId = shifts[0].id;
 
-    setIsSaving(false);
-    closeModal();
-    qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      // 2. Build bulk payload — dates are already pure YYYY-MM-DD strings from the parser
+      const rows = parseResult.entries.map((entry) => {
+        console.log(
+          `[Excel Import] Salvando ${entry.employee_name} para data ${entry.date}` +
+          (showDateWarning ? " (Override Ativo)" : "")
+        );
+        return {
+          employee_id: entry.employee_id,
+          user_id: entry.employee_id,
+          schedule_date: entry.date, // pure YYYY-MM-DD string, no timezone
+          sector_id: sectorId,
+          shift_id: shiftId,
+          status: "scheduled",
+          schedule_type: entry.schedule_type,
+          start_time: entry.start_time || null,
+          end_time: entry.end_time || null,
+          break_duration: entry.break_duration ?? 60,
+          agreed_rate: 0,
+        };
+      });
 
-    if (errorCount === 0) {
-      toast.success(`${successCount} lançamento(s) importado(s) com sucesso!`);
-    } else {
-      toast.warning(
-        `${successCount} importados, ${errorCount} com erro.${errorMessages.length > 0 ? " " + errorMessages.join("; ") : ""}`,
-        { duration: 8000 }
-      );
+      // 3. Batch insert
+      const { error, data } = await supabase.from("schedules").insert(rows).select("id");
+
+      if (error) {
+        console.error("[Excel Import] Erro ao salvar escalas:", error);
+        toast.error(`Erro ao salvar escalas: ${error.message}`, { duration: 8000 });
+        setIsSaving(false);
+        return;
+      }
+
+      const savedCount = data?.length ?? rows.length;
+      console.log(`[Excel Import] ${savedCount} escalas salvas com sucesso.`);
+
+      setIsSaving(false);
+      closeModal();
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      toast.success(`${savedCount} lançamento(s) importado(s) com sucesso!`);
+    } catch (err: any) {
+      console.error("[Excel Import] Erro inesperado:", err);
+      toast.error(`Erro inesperado: ${err?.message || "erro desconhecido"}`, { duration: 8000 });
+      setIsSaving(false);
     }
   }
 

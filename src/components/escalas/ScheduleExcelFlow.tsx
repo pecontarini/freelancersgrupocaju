@@ -157,17 +157,48 @@ export function ScheduleExcelFlow({
       }
       const shiftId = shifts[0].id;
 
-      // 2. Build bulk payload — dates are already pure YYYY-MM-DD strings from the parser
+      // 2. Build employee -> correct sector mapping via sector_job_titles
+      const employeeIds = [...new Set(parseResult.entries.map((e) => e.employee_id))];
+      const { data: empData } = await supabase
+        .from("employees")
+        .select("id, job_title_id")
+        .in("id", employeeIds);
+
+      const empJobTitleMap = new Map<string, string>();
+      for (const emp of empData || []) {
+        if (emp.job_title_id) empJobTitleMap.set(emp.id, emp.job_title_id);
+      }
+
+      // Fetch sector_job_titles to resolve job_title_id -> sector_id
+      const jobTitleIds = [...new Set(Array.from(empJobTitleMap.values()))];
+      const { data: sjtData } = await supabase
+        .from("sector_job_titles")
+        .select("job_title_id, sector_id")
+        .in("job_title_id", jobTitleIds.length > 0 ? jobTitleIds : ["__none__"]);
+
+      const jobTitleToSector = new Map<string, string>();
+      for (const sjt of sjtData || []) {
+        // First match wins (an employee's primary sector)
+        if (!jobTitleToSector.has(sjt.job_title_id)) {
+          jobTitleToSector.set(sjt.job_title_id, sjt.sector_id);
+        }
+      }
+
+      // 3. Build bulk payload — auto-resolve sector per employee
       const rows = parseResult.entries.map((entry) => {
+        const jtId = empJobTitleMap.get(entry.employee_id);
+        const resolvedSectorId = jtId ? (jobTitleToSector.get(jtId) || sectorId) : sectorId;
+
         console.log(
           `[Excel Import] Salvando ${entry.employee_name} para data ${entry.date}` +
+          ` | setor: ${resolvedSectorId === sectorId ? "padrão" : "auto-resolvido"}` +
           (showDateWarning ? " (Override Ativo)" : "")
         );
         return {
           employee_id: entry.employee_id,
           user_id: entry.employee_id,
-          schedule_date: entry.date, // pure YYYY-MM-DD string, no timezone
-          sector_id: sectorId,
+          schedule_date: entry.date,
+          sector_id: resolvedSectorId,
           shift_id: shiftId,
           status: "scheduled",
           schedule_type: entry.schedule_type,

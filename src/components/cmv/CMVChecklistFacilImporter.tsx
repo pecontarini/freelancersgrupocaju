@@ -37,6 +37,7 @@ import {
   CalendarIcon,
   FileSpreadsheet,
   Store,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -55,6 +56,7 @@ interface MappedRow {
   similarity: number;
   quantidade: number;
   originalQuantidade: number; // value from file, used to determine editability
+  _editing?: boolean; // true when user clicked pencil to edit
   status: "matched" | "fuzzy" | "unmatched";
 }
 
@@ -383,8 +385,24 @@ export function CMVChecklistFacilImporter() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        {row.originalQuantidade > 0 ? (
-                          <span className="font-mono">{row.quantidade}</span>
+                        {row.originalQuantidade > 0 && row.quantidade === row.originalQuantidade && !row._editing ? (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="font-mono">{row.quantidade}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMappedRows((prev) =>
+                                  prev.map((r, i) =>
+                                    i === idx ? { ...r, _editing: true } : r
+                                  )
+                                );
+                              }}
+                              className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Editar quantidade"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </span>
                         ) : (
                           <Input
                             type="number"
@@ -401,6 +419,7 @@ export function CMVChecklistFacilImporter() {
                               );
                             }}
                             className="w-20 text-center"
+                            autoFocus={!!row._editing}
                           />
                         )}
                       </TableCell>

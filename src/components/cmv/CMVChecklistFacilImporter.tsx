@@ -2,6 +2,15 @@ import { useState, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -27,16 +36,17 @@ import {
   HelpCircle,
   CalendarIcon,
   FileSpreadsheet,
+  Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useCMVItems } from "@/hooks/useCMV";
 import { useCMVContagens } from "@/hooks/useCMVContagens";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { supabase } from "@/integrations/supabase/client";
 import { findBestMatch, type MatchOption } from "@/lib/fuzzyMatch";
-import {
-  parseChecklistFacilFile,
-} from "@/lib/checklistFacilParser";
+import { parseChecklistFacilFile } from "@/lib/checklistFacilParser";
 
 interface MappedRow {
   fileItem: string;
@@ -49,6 +59,12 @@ interface MappedRow {
 
 export function CMVChecklistFacilImporter() {
   const { effectiveUnidadeId } = useUnidade();
+  const { isAdmin, unidades } = useUserProfile();
+  const { options: allLojas } = useConfigLojas();
+
+  // Available units: admin sees all, others see their assigned stores
+  const availableUnits = isAdmin ? allLojas : unidades;
+
   const { data: unitName } = useQuery({
     queryKey: ["unit-name", effectiveUnidadeId],
     queryFn: async () => {
@@ -63,16 +79,18 @@ export function CMVChecklistFacilImporter() {
     enabled: !!effectiveUnidadeId,
   });
   const { items: cmvItems } = useCMVItems();
-  const { bulkUpsertContagens } = useCMVContagens(effectiveUnidadeId || undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isParsing, setIsParsing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [mappedRows, setMappedRows] = useState<MappedRow[]>([]);
-  const [detectedDate, setDetectedDate] = useState<string | null>(null);
   const [detectedUnit, setDetectedUnit] = useState<string | null>(null);
-  const [unitMismatch, setUnitMismatch] = useState(false);
+
+  // Editable session fields
+  const [selectedDate, setSelectedDate] = useState<string>(""); // YYYY-MM-DD
+  const [selectedUnitId, setSelectedUnitId] = useState<string>("");
+  const [unitMismatchWarning, setUnitMismatchWarning] = useState(false);
 
   const activeItems: MatchOption[] = useMemo(
     () => cmvItems.filter((i) => i.ativo).map((i) => ({ id: i.id, nome: i.nome })),
@@ -85,6 +103,9 @@ export function CMVChecklistFacilImporter() {
     const unmatched = mappedRows.filter((r) => r.status === "unmatched").length;
     return { matched, fuzzy, unmatched, total: mappedRows.length };
   }, [mappedRows]);
+
+  // Dynamic contagens hook based on selected unit
+  const { bulkUpsertContagens } = useCMVContagens(selectedUnitId || effectiveUnidadeId || undefined);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -105,19 +126,32 @@ export function CMVChecklistFacilImporter() {
         return;
       }
 
-      // Check unit mismatch
-      if (result.detectedUnit && unitName) {
-        const fileUnit = result.detectedUnit.toUpperCase().trim();
-        const systemUnit = unitName.toUpperCase().trim();
-        const mismatch = !fileUnit.includes(systemUnit) && !systemUnit.includes(fileUnit);
-        setUnitMismatch(mismatch);
-        setDetectedUnit(result.detectedUnit);
-      } else {
-        setUnitMismatch(false);
-        setDetectedUnit(result.detectedUnit);
+      // --- Unit Binding Logic ---
+      let resolvedUnitId = effectiveUnidadeId;
+      let mismatch = false;
+      setDetectedUnit(result.detectedUnit);
+
+      if (result.detectedUnit && availableUnits.length > 0) {
+        const fileUnitUpper = result.detectedUnit.toUpperCase().trim();
+        const matchedUnit = availableUnits.find((u) => {
+          const uName = u.nome.toUpperCase().trim();
+          return fileUnitUpper.includes(uName) || uName.includes(fileUnitUpper);
+        });
+
+        if (matchedUnit) {
+          resolvedUnitId = matchedUnit.id;
+        } else {
+          // Fallback to current unit, show warning
+          mismatch = true;
+          resolvedUnitId = effectiveUnidadeId;
+        }
       }
 
-      setDetectedDate(result.detectedDate);
+      setSelectedUnitId(resolvedUnitId);
+      setUnitMismatchWarning(mismatch);
+
+      // --- Date Binding ---
+      setSelectedDate(result.detectedDate || "");
 
       // Map rows to ingredients
       const mapped: MappedRow[] = result.rows.map((row) => {
@@ -150,7 +184,14 @@ export function CMVChecklistFacilImporter() {
   };
 
   const handleConfirm = async () => {
-    if (!effectiveUnidadeId || !detectedDate) return;
+    if (!selectedUnitId) {
+      toast.error("Selecione uma unidade de destino");
+      return;
+    }
+    if (!selectedDate) {
+      toast.error("Informe a data da contagem");
+      return;
+    }
 
     const validRows = mappedRows.filter((r) => r.matchedId);
     if (validRows.length === 0) {
@@ -173,15 +214,15 @@ export function CMVChecklistFacilImporter() {
 
       const contagens = validRows.map((r) => ({
         cmv_item_id: r.matchedId!,
-        loja_id: effectiveUnidadeId,
-        data_contagem: detectedDate,
+        loja_id: selectedUnitId,
+        data_contagem: selectedDate,
         quantidade: r.quantidade,
         preco_custo_snapshot: costMap.get(r.matchedId!) || 0,
       }));
 
       await bulkUpsertContagens.mutateAsync(contagens);
 
-      const formattedDate = detectedDate.split("-").reverse().join("/");
+      const formattedDate = selectedDate.split("-").reverse().join("/");
       toast.success(
         `Estoque atualizado com sucesso baseado na contagem de ${formattedDate}.`
       );
@@ -195,9 +236,12 @@ export function CMVChecklistFacilImporter() {
     }
   };
 
-  const formattedDate = detectedDate
-    ? detectedDate.split("-").reverse().join("/")
+  // Format for display
+  const displayDate = selectedDate
+    ? selectedDate.split("-").reverse().join("/")
     : "N/A";
+
+  const selectedUnitName = availableUnits.find((u) => u.id === selectedUnitId)?.nome || "—";
 
   return (
     <>
@@ -236,45 +280,75 @@ export function CMVChecklistFacilImporter() {
 
           <div className="flex-1 overflow-y-auto space-y-4">
             {/* Unit mismatch warning */}
-            {unitMismatch && (
+            {unitMismatchWarning && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Unidade Divergente</AlertTitle>
                 <AlertDescription>
                   O arquivo pertence à unidade{" "}
-                  <strong>{detectedUnit}</strong>, mas você está na unidade{" "}
-                  <strong>{unitName}</strong>.
+                  <strong>{detectedUnit}</strong>, mas não foi encontrada correspondência.
+                  A unidade atual foi usada como fallback. Confirme abaixo.
                 </AlertDescription>
               </Alert>
             )}
 
-            {/* Date + stats */}
-            <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-muted/50 border">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Data Detectada:</span>
-                <Badge variant="secondary" className="text-base font-semibold">
-                  {formattedDate}
-                </Badge>
+            {/* Session Data (editable date + unit) */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Dados da Sessão
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5 text-sm">
+                    <CalendarIcon className="h-3.5 w-3.5" />
+                    Data da Contagem
+                  </Label>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    max={new Date().toISOString().split("T")[0]}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5 text-sm">
+                    <Store className="h-3.5 w-3.5" />
+                    Unidade de Destino
+                  </Label>
+                  <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a unidade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableUnits.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="flex gap-2 ml-auto">
-                <Badge variant="default">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  {stats.matched} vinculados
+            </div>
+
+            {/* Stats badges */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="default">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                {stats.matched} vinculados
+              </Badge>
+              {stats.fuzzy > 0 && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300">
+                  <HelpCircle className="h-3 w-3 mr-1" />
+                  {stats.fuzzy} aproximados
                 </Badge>
-                {stats.fuzzy > 0 && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                    <HelpCircle className="h-3 w-3 mr-1" />
-                    {stats.fuzzy} aproximados
-                  </Badge>
-                )}
-                {stats.unmatched > 0 && (
-                  <Badge variant="outline" className="text-destructive border-destructive/30">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    {stats.unmatched} não vinculados
-                  </Badge>
-                )}
-              </div>
+              )}
+              {stats.unmatched > 0 && (
+                <Badge variant="outline" className="text-destructive border-destructive/30">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {stats.unmatched} não vinculados
+                </Badge>
+              )}
             </div>
 
             {/* Table */}
@@ -342,7 +416,7 @@ export function CMVChecklistFacilImporter() {
             </Button>
             <Button
               onClick={handleConfirm}
-              disabled={isSubmitting || stats.matched + stats.fuzzy === 0 || unitMismatch}
+              disabled={isSubmitting || stats.matched + stats.fuzzy === 0 || !selectedUnitId || !selectedDate}
               className="bg-green-600 hover:bg-green-700"
             >
               {isSubmitting ? (

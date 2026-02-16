@@ -7,7 +7,7 @@ import { D1ManagementPanel } from "./D1ManagementPanel";
 import { TeamManagement } from "./TeamManagement";
 import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
-import { useUserProfile } from "@/hooks/useUserProfile";
+
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
 interface EscalasTabProps {
@@ -15,7 +15,7 @@ interface EscalasTabProps {
 }
 
 export function EscalasTab({ defaultTab }: EscalasTabProps) {
-  const { isAdmin } = useUserProfile();
+  
   const { data: confirmations } = usePendingConfirmations();
 
   const hasRisk = (confirmations?.pending ?? 0) > 0 || (confirmations?.denied ?? 0) > 0;
@@ -48,20 +48,16 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <Users className="h-4 w-4" />
           Equipe
         </TabsTrigger>
-        {isAdmin && (
-          <TabsTrigger value="cargos-setores" className="gap-1.5">
-            <Briefcase className="h-4 w-4" />
-            <span className="hidden sm:inline">Cargos e Setores</span>
-            <span className="sm:hidden">Cargos</span>
-          </TabsTrigger>
-        )}
-        {isAdmin && (
-          <TabsTrigger value="matrix" className="gap-1.5">
-            <Settings2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Configurações</span>
-            <span className="sm:hidden">Config</span>
-          </TabsTrigger>
-        )}
+        <TabsTrigger value="cargos-setores" className="gap-1.5">
+          <Briefcase className="h-4 w-4" />
+          <span className="hidden sm:inline">Cargos e Setores</span>
+          <span className="sm:hidden">Cargos</span>
+        </TabsTrigger>
+        <TabsTrigger value="matrix" className="gap-1.5">
+          <Settings2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Configurações</span>
+          <span className="sm:hidden">Config</span>
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="scheduler">
@@ -76,16 +72,12 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="equipe">
         <TeamManagement />
       </TabsContent>
-      {isAdmin && (
-        <TabsContent value="cargos-setores">
-          <SectorJobTitleMapping />
-        </TabsContent>
-      )}
-      {isAdmin && (
-        <TabsContent value="matrix">
-          <StaffingMatrixConfig />
-        </TabsContent>
-      )}
+      <TabsContent value="cargos-setores">
+        <SectorJobTitleMapping />
+      </TabsContent>
+      <TabsContent value="matrix">
+        <StaffingMatrixConfig />
+      </TabsContent>
     </Tabs>
   );
 }

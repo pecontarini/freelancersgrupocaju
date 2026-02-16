@@ -72,7 +72,7 @@ export function StaffingMatrixConfig() {
   };
 
   const handleCountChange = (sectorId: string, day: number, shiftType: string, value: string) => {
-    if (!isAdmin) return;
+    // All authenticated roles with store access can edit
     const num = parseInt(value) || 0;
     upsertMatrix.mutate({
       sector_id: sectorId,
@@ -106,11 +106,6 @@ export function StaffingMatrixConfig() {
             Defina a quantidade mínima de pessoas por setor, dia e turno (POP nº 02).
           </p>
         </div>
-        {!isAdmin && (
-          <Badge variant="secondary" className="gap-1 self-start">
-            <Lock className="h-3 w-3" /> Somente visualização
-          </Badge>
-        )}
       </div>
 
       {/* Unit selector */}
@@ -132,7 +127,7 @@ export function StaffingMatrixConfig() {
             </SelectContent>
           </Select>
 
-          {isAdmin && selectedUnit && (
+          {selectedUnit && (
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1">
@@ -203,7 +198,7 @@ export function StaffingMatrixConfig() {
                           {d.label}
                         </TableHead>
                       ))}
-                      {isAdmin && <TableHead className="w-10" />}
+                      <TableHead className="w-10" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -214,8 +209,7 @@ export function StaffingMatrixConfig() {
                           const count = getCount(sector.id, d.value, shiftType);
                           return (
                             <TableCell key={d.value} className="text-center p-1">
-                              {isAdmin ? (
-                                <Input
+                              <Input
                                   type="number"
                                   min={0}
                                   className="h-8 w-14 text-center mx-auto"
@@ -224,16 +218,10 @@ export function StaffingMatrixConfig() {
                                     handleCountChange(sector.id, d.value, shiftType, e.target.value)
                                   }
                                 />
-                              ) : (
-                                <span className={count > 0 ? "font-semibold" : "text-muted-foreground"}>
-                                  {count}
-                                </span>
-                              )}
                             </TableCell>
                           );
                         })}
-                        {isAdmin && (
-                          <TableCell className="p-1">
+                        <TableCell className="p-1">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -243,7 +231,6 @@ export function StaffingMatrixConfig() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
-                        )}
                       </TableRow>
                     ))}
                   </TableBody>

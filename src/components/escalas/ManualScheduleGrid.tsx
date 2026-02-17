@@ -170,7 +170,7 @@ export function ManualScheduleGrid() {
       (m) => m.sector_id === activeSectorId && m.day_of_week === dayOfWeek && m.shift_type === shiftType
     );
     const efetivos = entry?.required_count ?? 0;
-    const extras = (entry as any)?.extras_count ?? 0;
+    const extras = entry?.extras_count ?? 0;
     return { efetivos, extras, total: efetivos + extras };
   }
 

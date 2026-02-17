@@ -127,7 +127,7 @@ export function OperationalDashboard() {
       )
     : null;
   const metaEfetivos = matrixEntry?.required_count ?? 0;
-  const metaExtras = (matrixEntry as any)?.extras_count ?? 0;
+  const metaExtras = matrixEntry?.extras_count ?? 0;
   const metaPOP = metaEfetivos + metaExtras;
 
   const escalados = todaySchedules.length;

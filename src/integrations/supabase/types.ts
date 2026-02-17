@@ -2103,6 +2103,7 @@ export type Database = {
         Row: {
           created_at: string
           day_of_week: number
+          extras_count: number
           id: string
           required_count: number
           sector_id: string
@@ -2112,6 +2113,7 @@ export type Database = {
         Insert: {
           created_at?: string
           day_of_week: number
+          extras_count?: number
           id?: string
           required_count?: number
           sector_id: string
@@ -2121,6 +2123,7 @@ export type Database = {
         Update: {
           created_at?: string
           day_of_week?: number
+          extras_count?: number
           id?: string
           required_count?: number
           sector_id?: string

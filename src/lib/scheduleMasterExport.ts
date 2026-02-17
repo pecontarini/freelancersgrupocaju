@@ -38,6 +38,17 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     .from("employees").select("id, name").eq("unit_id", unitId).eq("active", true);
   if (empErr) throw new Error("Erro ao buscar funcionários: " + empErr.message);
 
+  // Fetch staffing matrix for POP targets
+  const { data: matrixData } = await supabase
+    .from("staffing_matrix").select("*").in("sector_id", sectorIds);
+  const matrix = matrixData || [];
+
+  // Fetch shifts to know shift types
+  const { data: shiftsData } = await supabase
+    .from("shifts").select("name, type");
+  const shifts = shiftsData || [];
+  const shiftTypes = [...new Set(shifts.map((s) => s.type))];
+
   const empMap = new Map<string, string>();
   (employees || []).forEach((e) => empMap.set(e.id, e.name));
 
@@ -82,6 +93,31 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
         }
       }
       rows.push(row);
+    }
+
+    // Add POP summary rows per shift type
+    rows.push([]); // empty separator row
+    rows.push(["POP — Efetivo Mínimo"]);
+
+    for (const shiftType of shiftTypes) {
+      const shiftLabel = shifts.find((s) => s.type === shiftType)?.name || shiftType;
+      const popRow: string[] = [`POP ${shiftLabel}`];
+      for (const day of weekDays) {
+        const dow = day.getDay(); // 0=Sun..6=Sat
+        const entry = matrix.find(
+          (m) => m.sector_id === sector.id && m.day_of_week === dow && m.shift_type === shiftType
+        );
+        const efetivos = entry?.required_count ?? 0;
+        const extras = (entry as any)?.extras_count ?? 0;
+        if (efetivos === 0 && extras === 0) {
+          popRow.push("—");
+        } else if (extras > 0) {
+          popRow.push(`${efetivos} + ${extras} extras`);
+        } else {
+          popRow.push(`${efetivos}`);
+        }
+      }
+      rows.push(popRow);
     }
 
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);

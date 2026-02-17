@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios";
+export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios" | "outros";
 
 export interface OperationalExpense {
   id: string;
@@ -130,8 +130,11 @@ export function useOperationalExpenses() {
     const utensilios = filtered
       .filter((e) => e.category === "utensilios")
       .reduce((sum, e) => sum + e.valor, 0);
+    const apoio = filtered
+      .filter((e) => e.category === "apoio")
+      .reduce((sum, e) => sum + e.valor, 0);
     
-    return { uniformes, limpeza, utensilios, total: uniformes + limpeza + utensilios };
+    return { uniformes, limpeza, utensilios, apoio, total: uniformes + limpeza + utensilios + apoio };
   };
 
   return {

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Loader2, Shirt, SprayCanIcon } from "lucide-react";
+import { Plus, Loader2, Shirt, SprayCanIcon, UtensilsCrossed, PackageOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
+import { useOperationalExpenses, OperationalCategory } from "@/hooks/useOperationalExpenses";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface OperationalExpenseFormProps {
@@ -40,6 +40,8 @@ interface OperationalExpenseFormProps {
 const CATEGORIES = [
   { value: "uniformes", label: "Uniformes", icon: Shirt, color: "text-purple-500" },
   { value: "limpeza", label: "Material de Limpeza", icon: SprayCanIcon, color: "text-cyan-500" },
+  { value: "utensilios", label: "Utensílios", icon: UtensilsCrossed, color: "text-orange-500" },
+  { value: "apoio", label: "Outros", icon: PackageOpen, color: "text-gray-500" },
 ] as const;
 
 export function OperationalExpenseForm({ storeId }: OperationalExpenseFormProps) {
@@ -47,7 +49,7 @@ export function OperationalExpenseForm({ storeId }: OperationalExpenseFormProps)
   const { unidades, isAdmin, isGerenteUnidade } = useUserProfile();
   
   const [isOpen, setIsOpen] = useState(false);
-  const [category, setCategory] = useState<"uniformes" | "limpeza">("uniformes");
+  const [category, setCategory] = useState<OperationalCategory>("uniformes");
   const [valor, setValor] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [descricao, setDescricao] = useState("");
@@ -105,7 +107,7 @@ export function OperationalExpenseForm({ storeId }: OperationalExpenseFormProps)
           {/* Category Selection */}
           <div className="space-y-2">
             <Label>Categoria</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as "uniformes" | "limpeza")}>
+            <Select value={category} onValueChange={(v) => setCategory(v as OperationalCategory)}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>

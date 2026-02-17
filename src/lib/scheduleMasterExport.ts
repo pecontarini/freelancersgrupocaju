@@ -35,7 +35,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   if (schErr) throw new Error("Erro ao buscar escalas: " + schErr.message);
 
   const { data: employees, error: empErr } = await supabase
-    .from("employees").select("id, name").eq("unit_id", unitId).eq("active", true);
+    .from("employees").select("id, name, worker_type").eq("unit_id", unitId).eq("active", true);
   if (empErr) throw new Error("Erro ao buscar funcionários: " + empErr.message);
 
   // Fetch staffing matrix for POP targets
@@ -49,8 +49,8 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   const shifts = shiftsData || [];
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
 
-  const empMap = new Map<string, string>();
-  (employees || []).forEach((e) => empMap.set(e.id, e.name));
+  const empMap = new Map<string, { name: string; worker_type: string }>();
+  (employees || []).forEach((e) => empMap.set(e.id, { name: e.name, worker_type: e.worker_type || "clt" }));
 
   const scheduleBySector = new Map<string, typeof schedules>();
   for (const s of schedules || []) {
@@ -65,15 +65,23 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     const sectorSchedules = scheduleBySector.get(sector.id) || [];
     const empIds = new Set(sectorSchedules.map((s) => s.employee_id).filter(Boolean));
     const sectorEmployees = Array.from(empIds)
-      .map((id) => ({ id: id!, name: empMap.get(id!) }))
-      .filter((e) => e.name)
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      .map((id) => {
+        const emp = empMap.get(id!);
+        return { id: id!, name: emp?.name || "", worker_type: emp?.worker_type || "clt" };
+      })
+      .filter((e) => e.name);
+
+    // Sort: CLT first, then freelancers, alphabetically within each group
+    const cltEmployees = sectorEmployees.filter((e) => e.worker_type === "clt").sort((a, b) => a.name.localeCompare(b.name));
+    const extraEmployees = sectorEmployees.filter((e) => e.worker_type !== "clt").sort((a, b) => a.name.localeCompare(b.name));
 
     const header = ["Funcionário", ...weekDays.map((d, i) => `${DAY_LABELS[i]} (${format(d, "dd/MM")})`)];
     const rows: string[][] = [];
 
-    for (const emp of sectorEmployees) {
-      const row: string[] = [emp.name!];
+    // Helper to build row for an employee
+    function buildRow(emp: { id: string; name: string; worker_type: string }, isExtra: boolean): string[] {
+      const displayName = isExtra ? `${emp.name} [EXTRA]` : emp.name;
+      const row: string[] = [displayName];
       for (const day of weekDays) {
         const dateStr = format(day, "yyyy-MM-dd");
         const entry = sectorSchedules.find(
@@ -92,8 +100,45 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
           row.push(brkStr ? `${start} - ${end} ${brkStr}` : `${start} - ${end}`);
         }
       }
-      rows.push(row);
+      return row;
     }
+
+    // Add CLT employees
+    for (const emp of cltEmployees) {
+      rows.push(buildRow(emp, false));
+    }
+
+    // Separator between CLT and Extras if both exist
+    if (cltEmployees.length > 0 && extraEmployees.length > 0) {
+      rows.push(["── EXTRAS ──", ...weekDays.map(() => "")]);
+    }
+
+    // Add Extra/Freelancer employees
+    for (const emp of extraEmployees) {
+      rows.push(buildRow(emp, true));
+    }
+
+    // Daily summary row: "Efetivos: X | Extras: Y | Total: Z"
+    rows.push([]); // empty separator
+    const summaryRow: string[] = ["RESUMO DO DIA"];
+    for (const day of weekDays) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const daySchedules = sectorSchedules.filter(
+        (s) => s.schedule_date === dateStr && s.schedule_type === "working"
+      );
+      let cltCount = 0;
+      let extraCount = 0;
+      for (const s of daySchedules) {
+        const emp = s.employee_id ? empMap.get(s.employee_id) : null;
+        if (emp && emp.worker_type !== "clt") {
+          extraCount++;
+        } else {
+          cltCount++;
+        }
+      }
+      summaryRow.push(`Efetivos: ${cltCount} | Extras: ${extraCount} | Total: ${cltCount + extraCount}`);
+    }
+    rows.push(summaryRow);
 
     // Add POP summary rows per shift type
     rows.push([]); // empty separator row
@@ -121,7 +166,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     }
 
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    ws["!cols"] = [{ wch: 30 }, ...weekDays.map(() => ({ wch: 22 }))];
+    ws["!cols"] = [{ wch: 30 }, ...weekDays.map(() => ({ wch: 28 }))];
     const sheetName = sector.name.length > 31 ? sector.name.slice(0, 31) : sector.name;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }

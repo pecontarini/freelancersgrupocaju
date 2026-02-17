@@ -154,6 +154,34 @@ export function ManualScheduleGrid() {
     return m;
   }, [employees]);
 
+  // Calculate max extras slots needed across the week for the active sector
+  const extraSlots = useMemo(() => {
+    if (!activeSectorId) return 0;
+    let maxExtras = 0;
+    for (const day of weekDays) {
+      const dow = day.getDay();
+      const entries = staffingMatrix.filter(
+        (m) => m.sector_id === activeSectorId && m.day_of_week === dow
+      );
+      const dayExtras = entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
+      if (dayExtras > maxExtras) maxExtras = dayExtras;
+    }
+    return maxExtras;
+  }, [activeSectorId, staffingMatrix, weekDays]);
+
+  // Count how many freelancers are already scheduled per day
+  const freelancerCountPerDay = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const day of weekDays) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const count = schedules.filter(
+        (s) => s.schedule_date === dateStr && s.sector_id === activeSectorId && s.employee_id && employeeMap.get(s.employee_id) === "freelancer"
+      ).length;
+      counts.set(dateStr, count);
+    }
+    return counts;
+  }, [schedules, activeSectorId, weekDays, employeeMap]);
+
   // Calculate daily metrics using time-intersection logic
   function getDayMetrics(dateStr: string) {
     const daySchedules = schedules
@@ -512,6 +540,61 @@ export function ManualScheduleGrid() {
                           </TableRow>
                         );
                       })}
+                      {/* VAGA EXTRA placeholder rows */}
+                      {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (
+                        <TableRow key={`extra-slot-${slotIdx}`} className="bg-amber-50/50 dark:bg-amber-950/10">
+                          <TableCell className="font-medium sticky left-0 bg-amber-50 dark:bg-amber-950/20 z-10 border-r">
+                            <div className="flex items-center gap-1.5">
+                              <UserPlus className="h-3 w-3 text-amber-500" />
+                              <span className="text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                                VAGA EXTRA {String(slotIdx + 1).padStart(2, "0")}
+                              </span>
+                            </div>
+                          </TableCell>
+                          {weekDays.map((day, i) => {
+                            const dateStr = format(day, "yyyy-MM-dd");
+                            const dow = day.getDay();
+                            // Check if this slot is within the day's quota
+                            const dayEntries = staffingMatrix.filter(
+                              (m) => m.sector_id === activeSectorId && m.day_of_week === dow
+                            );
+                            const dayQuota = dayEntries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
+                            const alreadyFilled = freelancerCountPerDay.get(dateStr) || 0;
+                            const isWithinQuota = slotIdx < dayQuota;
+                            const isFilled = slotIdx < alreadyFilled;
+
+                            if (!isWithinQuota) {
+                              return (
+                                <TableCell key={i} className="text-center p-1">
+                                  <div className="h-10 flex items-center justify-center">
+                                    <span className="text-muted-foreground/20 text-xs">—</span>
+                                  </div>
+                                </TableCell>
+                              );
+                            }
+
+                            return (
+                              <TableCell
+                                key={i}
+                                className="text-center p-1 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-900/20 transition-colors"
+                                onClick={() => setFreelancerModal({ open: true, date: dateStr })}
+                              >
+                                <div className={`h-10 flex items-center justify-center rounded-md border-2 border-dashed ${
+                                  isFilled
+                                    ? "border-amber-400 bg-amber-100 dark:bg-amber-900/30"
+                                    : "border-amber-300/50 dark:border-amber-700/30"
+                                }`}>
+                                  {isFilled ? (
+                                    <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">Preenchida</span>
+                                  ) : (
+                                    <UserPlus className="h-3.5 w-3.5 text-amber-400/60" />
+                                  )}
+                                </div>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>

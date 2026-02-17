@@ -66,11 +66,12 @@ function getWeekDays(baseDate: Date): Date[] {
 
 export function ManualScheduleGrid() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner } = useUserProfile();
+  const { isAdmin, isPartner, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const canManage = isAdmin || isPartner || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
-  const selectedUnit = (isAdmin || isPartner) ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
+  const selectedUnit = canManage ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
 
   const [currentWeekBase, setCurrentWeekBase] = useState(new Date());
   const weekDays = useMemo(() => getWeekDays(currentWeekBase), [currentWeekBase]);
@@ -231,7 +232,7 @@ export function ManualScheduleGrid() {
           </p>
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {(isAdmin || isPartner) && selectedUnit && (
+          {canManage && selectedUnit && (
             <MasterExportButton
               unitId={selectedUnit}
               unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "Unidade"}
@@ -255,7 +256,7 @@ export function ManualScheduleGrid() {
       </div>
 
       {/* Unit selector for admin/partner */}
-      {(isAdmin || isPartner) && (
+      {canManage && (
         <Card>
           <CardContent className="pt-4 flex flex-wrap items-end gap-3">
             <div className="space-y-1">

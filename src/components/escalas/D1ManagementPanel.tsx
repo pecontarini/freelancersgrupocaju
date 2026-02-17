@@ -38,11 +38,12 @@ function formatDateLabel(dateStr: string): string {
 
 export function D1ManagementPanel() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner } = useUserProfile();
+  const { isAdmin, isPartner, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const canManage = isAdmin || isPartner || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
-  const selectedUnit = (isAdmin || isPartner) ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
+  const selectedUnit = canManage ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
 
   const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(tomorrow);
@@ -162,7 +163,7 @@ export function D1ManagementPanel() {
       {/* Unit + Date selector */}
       <Card>
         <CardContent className="pt-4 flex flex-wrap items-end gap-3">
-          {(isAdmin || isPartner) && (
+          {canManage && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Unidade</label>
               <Select value={selectedUnit || ""} onValueChange={setLocalUnitId}>

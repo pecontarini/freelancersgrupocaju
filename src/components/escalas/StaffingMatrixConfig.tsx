@@ -256,9 +256,10 @@ export function StaffingMatrixConfig() {
                                   <span className="text-[9px] text-orange-500 font-bold">+</span>
                                   <Input
                                     key={`ext-${sector.id}-${d.value}-${shiftType}-${extras}`}
-                                    type="number"
-                                    min={0}
-                                    className="h-6 w-10 text-center mx-auto text-[10px] border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    className="h-7 w-12 text-center mx-auto text-xs border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     defaultValue={extras}
                                     onBlur={(e) => {
                                       const v = parseInt(e.target.value) || 0;

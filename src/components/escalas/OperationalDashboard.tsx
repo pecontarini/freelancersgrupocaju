@@ -118,14 +118,17 @@ export function OperationalDashboard() {
 
   // KPI values
   const dayOfWeek = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // 0=Mon
-  const metaPOP = selectedSector
+  const matrixEntry = selectedSector
     ? matrix.find(
         (m) =>
           m.sector_id === selectedSector &&
           m.day_of_week === dayOfWeek &&
           m.shift_type === shiftType
-      )?.required_count ?? 0
-    : 0;
+      )
+    : null;
+  const metaEfetivos = matrixEntry?.required_count ?? 0;
+  const metaExtras = (matrixEntry as any)?.extras_count ?? 0;
+  const metaPOP = metaEfetivos + metaExtras;
 
   const escalados = todaySchedules.length;
   const presentes = todaySchedules.filter((s) => {
@@ -196,7 +199,7 @@ export function OperationalDashboard() {
     const text = [
       `📋 *Resumo Operacional - ${unitName} (${sectorName}) - ${shiftName}*`,
       ``,
-      `✅ Meta POP: ${metaPOP}`,
+      `✅ Meta POP: ${metaEfetivos}${metaExtras > 0 ? `+${metaExtras}` : ""} (${metaPOP} total)`,
       `👥 Escalados: ${escalados}`,
       `📍 Presentes: ${presentes}`,
       ...(divergencias.length > 0
@@ -294,7 +297,10 @@ export function OperationalDashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Meta POP</p>
-                <p className="text-3xl font-bold">{metaPOP}</p>
+                <p className="text-3xl font-bold">
+                  {metaEfetivos}
+                  {metaExtras > 0 && <span className="text-orange-500 text-xl">+{metaExtras}</span>}
+                </p>
               </div>
             </CardContent>
           </Card>

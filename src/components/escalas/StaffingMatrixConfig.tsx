@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Loader2, Lock } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
 import {
   useSectors,
   useShifts,
@@ -64,21 +64,42 @@ export function StaffingMatrixConfig() {
 
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
 
-  const getCount = (sectorId: string, day: number, shiftType: string) => {
-    const entry = matrix.find(
+  const getEntry = (sectorId: string, day: number, shiftType: string) => {
+    return matrix.find(
       (m) => m.sector_id === sectorId && m.day_of_week === day && m.shift_type === shiftType
     );
-    return entry?.required_count ?? 0;
+  };
+
+  const getCount = (sectorId: string, day: number, shiftType: string) => {
+    return getEntry(sectorId, day, shiftType)?.required_count ?? 0;
+  };
+
+  const getExtras = (sectorId: string, day: number, shiftType: string) => {
+    const entry = getEntry(sectorId, day, shiftType);
+    return (entry as any)?.extras_count ?? 0;
   };
 
   const handleCountChange = (sectorId: string, day: number, shiftType: string, value: string) => {
-    // All authenticated roles with store access can edit
     const num = parseInt(value) || 0;
+    const currentExtras = getExtras(sectorId, day, shiftType);
     upsertMatrix.mutate({
       sector_id: sectorId,
       day_of_week: day,
       shift_type: shiftType,
       required_count: num,
+      extras_count: currentExtras,
+    });
+  };
+
+  const handleExtrasChange = (sectorId: string, day: number, shiftType: string, value: string) => {
+    const num = parseInt(value) || 0;
+    const currentCount = getCount(sectorId, day, shiftType);
+    upsertMatrix.mutate({
+      sector_id: sectorId,
+      day_of_week: day,
+      shift_type: shiftType,
+      required_count: currentCount,
+      extras_count: num,
     });
   };
 
@@ -103,7 +124,11 @@ export function StaffingMatrixConfig() {
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Matriz de Efetivo Mínimo</h2>
           <p className="text-muted-foreground">
-            Defina a quantidade mínima de pessoas por setor, dia e turno (POP nº 02).
+            Defina a quantidade mínima de efetivos e extras por setor, dia e turno (POP nº 02).
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Formato: <Badge variant="outline" className="text-[10px] px-1.5 py-0">Efetivos + Extras</Badge> — 
+            Efetivos = quadro fixo (CLT) · Extras = diárias/freelancers planejados
           </p>
         </div>
       </div>
@@ -173,7 +198,7 @@ export function StaffingMatrixConfig() {
       {selectedUnit && !isLoading && sectors.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhum setor cadastrado para esta unidade. {isAdmin ? "Clique em \"Novo Setor\" para começar." : ""}
+            Nenhum setor cadastrado para esta unidade. {isAdmin ? 'Clique em "Novo Setor" para começar.' : ""}
           </CardContent>
         </Card>
       )}
@@ -185,7 +210,11 @@ export function StaffingMatrixConfig() {
           <Card key={shiftType}>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Turno: {shiftLabel}</CardTitle>
-              <CardDescription>Quantidade mínima de pessoas por setor e dia</CardDescription>
+              <CardDescription>
+                Quantidade mínima de pessoas por setor e dia — 
+                <span className="font-medium text-foreground"> Efetivos</span> (topo) + 
+                <span className="font-medium text-orange-600 dark:text-orange-400"> Extras</span> (baixo)
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -194,7 +223,7 @@ export function StaffingMatrixConfig() {
                     <TableRow>
                       <TableHead className="min-w-[140px]">Setor</TableHead>
                       {DAYS.map((d) => (
-                        <TableHead key={d.value} className="text-center min-w-[70px]">
+                        <TableHead key={d.value} className="text-center min-w-[90px]">
                           {d.label}
                         </TableHead>
                       ))}
@@ -207,30 +236,47 @@ export function StaffingMatrixConfig() {
                         <TableCell className="font-medium">{sector.name}</TableCell>
                         {DAYS.map((d) => {
                           const count = getCount(sector.id, d.value, shiftType);
+                          const extras = getExtras(sector.id, d.value, shiftType);
                           return (
                             <TableCell key={d.value} className="text-center p-1">
-                              <Input
+                              <div className="flex flex-col items-center gap-0.5">
+                                <Input
                                   type="number"
                                   min={0}
-                                  className="h-8 w-14 text-center mx-auto"
+                                  className="h-7 w-12 text-center mx-auto text-xs"
                                   defaultValue={count}
                                   onBlur={(e) =>
                                     handleCountChange(sector.id, d.value, shiftType, e.target.value)
                                   }
+                                  title="Efetivos (quadro fixo)"
                                 />
+                                <div className="flex items-center gap-0.5">
+                                  <span className="text-[9px] text-orange-500 font-bold">+</span>
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    className="h-6 w-10 text-center mx-auto text-[10px] border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400"
+                                    defaultValue={extras}
+                                    onBlur={(e) =>
+                                      handleExtrasChange(sector.id, d.value, shiftType, e.target.value)
+                                    }
+                                    title="Extras (freelancers/diárias)"
+                                  />
+                                </div>
+                              </div>
                             </TableCell>
                           );
                         })}
                         <TableCell className="p-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => deleteSector.mutate(sector.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => deleteSector.mutate(sector.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

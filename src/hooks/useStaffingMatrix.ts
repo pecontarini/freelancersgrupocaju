@@ -62,15 +62,20 @@ export function useUpsertStaffingMatrix() {
       day_of_week: number;
       shift_type: string;
       required_count: number;
+      extras_count?: number;
     }) => {
+      const payload: any = {
+        sector_id: row.sector_id,
+        day_of_week: row.day_of_week,
+        shift_type: row.shift_type,
+        required_count: row.required_count,
+        updated_at: new Date().toISOString(),
+      };
+      if (row.extras_count !== undefined) {
+        payload.extras_count = row.extras_count;
+      }
       const { error } = await supabase.from("staffing_matrix").upsert(
-        {
-          sector_id: row.sector_id,
-          day_of_week: row.day_of_week,
-          shift_type: row.shift_type,
-          required_count: row.required_count,
-          updated_at: new Date().toISOString(),
-        },
+        payload,
         { onConflict: "sector_id,day_of_week,shift_type" }
       );
       if (error) throw error;

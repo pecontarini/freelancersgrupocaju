@@ -164,12 +164,14 @@ export function ManualScheduleGrid() {
     return calculateDailyMetrics(daySchedules);
   }
 
-  function getPopTarget(dayOfWeek: number, shiftType: string): number {
-    if (!activeSectorId) return 0;
+  function getPopTarget(dayOfWeek: number, shiftType: string): { efetivos: number; extras: number; total: number } {
+    if (!activeSectorId) return { efetivos: 0, extras: 0, total: 0 };
     const entry = staffingMatrix.find(
       (m) => m.sector_id === activeSectorId && m.day_of_week === dayOfWeek && m.shift_type === shiftType
     );
-    return entry?.required_count ?? 0;
+    const efetivos = entry?.required_count ?? 0;
+    const extras = (entry as any)?.extras_count ?? 0;
+    return { efetivos, extras, total: efetivos + extras };
   }
 
   function getScheduleForCell(employeeId: string, dateStr: string): ManualSchedule | undefined {
@@ -368,8 +370,8 @@ export function ManualScheduleGrid() {
                           const dateStr = format(day, "yyyy-MM-dd");
                           const budget = getBudgetForDay(dateStr);
                           const jsDow = day.getDay();
-                          const popLunchTarget = getPopTarget(jsDow, "almoco");
-                          const popDinnerTarget = getPopTarget(jsDow, "jantar");
+                          const popLunch = getPopTarget(jsDow, "almoco");
+                          const popDinner = getPopTarget(jsDow, "jantar");
                           const metrics = getDayMetrics(dateStr);
 
                           return (
@@ -386,13 +388,15 @@ export function ManualScheduleGrid() {
                                     <MiniPopBadge
                                       icon={<Sun className="h-2.5 w-2.5" />}
                                       scheduled={metrics.lunchCount}
-                                      target={popLunchTarget}
+                                      efetivos={popLunch.efetivos}
+                                      extras={popLunch.extras}
                                       label="Alm"
                                     />
                                     <MiniPopBadge
                                       icon={<Moon className="h-2.5 w-2.5" />}
                                       scheduled={metrics.dinnerCount}
-                                      target={popDinnerTarget}
+                                      efetivos={popDinner.efetivos}
+                                      extras={popDinner.extras}
                                       label="Jan"
                                     />
                                   </div>
@@ -549,19 +553,22 @@ export function ManualScheduleGrid() {
 function MiniPopBadge({
   icon,
   scheduled,
-  target,
+  efetivos,
+  extras,
   label,
 }: {
   icon: React.ReactNode;
   scheduled: number;
-  target: number;
+  efetivos: number;
+  extras: number;
   label: string;
 }) {
-  const isDeficit = scheduled < target;
-  const isExcess = scheduled > target;
+  const total = efetivos + extras;
+  const isDeficit = scheduled < total;
+  const isExcess = scheduled > total;
 
   let bgClass = "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
-  if (target === 0 && scheduled === 0) {
+  if (total === 0 && scheduled === 0) {
     bgClass = "bg-muted text-muted-foreground";
   } else if (isDeficit) {
     bgClass = "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
@@ -570,9 +577,9 @@ function MiniPopBadge({
   }
 
   return (
-    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`}>
+    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`} title={`${label}: ${scheduled} escalados / Meta: ${efetivos}+${extras}`}>
       {icon}
-      <span>{scheduled}/{target}</span>
+      <span>{scheduled}/{efetivos}{extras > 0 && <span className="text-orange-500">+{extras}</span>}</span>
     </div>
   );
 }

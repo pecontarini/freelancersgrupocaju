@@ -76,7 +76,7 @@ export function StaffingMatrixConfig() {
 
   const getExtras = (sectorId: string, day: number, shiftType: string) => {
     const entry = getEntry(sectorId, day, shiftType);
-    return (entry as any)?.extras_count ?? 0;
+    return entry?.extras_count ?? 0;
   };
 
   const handleCountChange = (sectorId: string, day: number, shiftType: string, value: string) => {
@@ -241,25 +241,29 @@ export function StaffingMatrixConfig() {
                             <TableCell key={d.value} className="text-center p-1">
                               <div className="flex flex-col items-center gap-0.5">
                                 <Input
+                                  key={`eff-${sector.id}-${d.value}-${shiftType}-${count}`}
                                   type="number"
                                   min={0}
                                   className="h-7 w-12 text-center mx-auto text-xs"
                                   defaultValue={count}
-                                  onBlur={(e) =>
-                                    handleCountChange(sector.id, d.value, shiftType, e.target.value)
-                                  }
+                                  onBlur={(e) => {
+                                    const v = parseInt(e.target.value) || 0;
+                                    if (v !== count) handleCountChange(sector.id, d.value, shiftType, e.target.value);
+                                  }}
                                   title="Efetivos (quadro fixo)"
                                 />
                                 <div className="flex items-center gap-0.5">
                                   <span className="text-[9px] text-orange-500 font-bold">+</span>
                                   <Input
+                                    key={`ext-${sector.id}-${d.value}-${shiftType}-${extras}`}
                                     type="number"
                                     min={0}
                                     className="h-6 w-10 text-center mx-auto text-[10px] border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400"
                                     defaultValue={extras}
-                                    onBlur={(e) =>
-                                      handleExtrasChange(sector.id, d.value, shiftType, e.target.value)
-                                    }
+                                    onBlur={(e) => {
+                                      const v = parseInt(e.target.value) || 0;
+                                      if (v !== extras) handleExtrasChange(sector.id, d.value, shiftType, e.target.value);
+                                    }}
                                     title="Extras (freelancers/diárias)"
                                   />
                                 </div>

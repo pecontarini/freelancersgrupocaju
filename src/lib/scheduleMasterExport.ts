@@ -108,7 +108,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
           (m) => m.sector_id === sector.id && m.day_of_week === dow && m.shift_type === shiftType
         );
         const efetivos = entry?.required_count ?? 0;
-        const extras = (entry as any)?.extras_count ?? 0;
+        const extras = entry?.extras_count ?? 0;
         if (efetivos === 0 && extras === 0) {
           popRow.push("—");
         } else if (extras > 0) {

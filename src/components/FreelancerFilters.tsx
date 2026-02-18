@@ -1,4 +1,4 @@
-import React from "react";
+import { useMemo } from "react";
 import { Search, X, Calendar, Filter } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -65,7 +65,7 @@ export function FreelancerFilters({
     : lojas.filter(loja => unidades.some(u => u.id === loja.id));
 
   // Merge config funcoes + funcoes actually used in entries (deduplicated & sorted)
-  const allFuncoes = React.useMemo(() => {
+  const allFuncoes = useMemo(() => {
     const configNames = funcoes.map((f) => f.nome);
     const merged = [...new Set([...configNames, ...entryFuncoes])].sort();
     return merged.map((name) => ({ value: name, label: name }));

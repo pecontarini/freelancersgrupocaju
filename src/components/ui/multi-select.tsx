@@ -53,7 +53,7 @@ export function MultiSelect({
     .filter(Boolean);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -88,7 +88,7 @@ export function MultiSelect({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0 bg-background z-50" align="start">
+      <PopoverContent className="w-[220px] p-0 bg-background z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
         <ScrollArea className="max-h-[300px]">
           <div className="p-2 space-y-1">
             {options.length === 0 ? (

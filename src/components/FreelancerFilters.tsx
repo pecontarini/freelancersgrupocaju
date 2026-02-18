@@ -1,3 +1,4 @@
+import React from "react";
 import { Search, X, Calendar, Filter } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -31,6 +32,7 @@ import {
 import { useConfigFuncoes, useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 
 export interface FreelancerFiltersState {
   searchTerm: string;
@@ -53,6 +55,7 @@ export function FreelancerFilters({
 }: FreelancerFiltersProps) {
   const { options: lojas } = useConfigLojas();
   const { options: funcoes } = useConfigFuncoes();
+  const { uniqueFuncoes: entryFuncoes } = useFreelancerEntries();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
   const isMobile = useIsMobile();
 
@@ -61,8 +64,12 @@ export function FreelancerFilters({
     ? lojas 
     : lojas.filter(loja => unidades.some(u => u.id === loja.id));
 
-  // Convert funcoes to MultiSelect options
-  const funcaoOptions = funcoes.map((f) => ({ value: f.nome, label: f.nome }));
+  // Merge config funcoes + funcoes actually used in entries (deduplicated & sorted)
+  const allFuncoes = React.useMemo(() => {
+    const configNames = funcoes.map((f) => f.nome);
+    const merged = [...new Set([...configNames, ...entryFuncoes])].sort();
+    return merged.map((name) => ({ value: name, label: name }));
+  }, [funcoes, entryFuncoes]);
 
   const activeFiltersCount = [
     filters.searchTerm,
@@ -163,7 +170,7 @@ export function FreelancerFilters({
           )}
         </label>
         <MultiSelect
-          options={funcaoOptions}
+          options={allFuncoes}
           selected={filters.funcoes}
           onChange={handleFuncoesChange}
           placeholder="Todas as Funções"
@@ -378,7 +385,7 @@ export function FreelancerFilters({
         {/* Function Multi-Select */}
         <div className="w-[200px]">
           <MultiSelect
-            options={funcaoOptions}
+            options={allFuncoes}
             selected={filters.funcoes}
             onChange={handleFuncoesChange}
             placeholder="Todas as Funções"

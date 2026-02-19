@@ -46,6 +46,7 @@ import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { MobileFreelancerCard } from "@/components/mobile/MobileFreelancerCard";
 import { MaintenanceSingleExportButton } from "@/components/MaintenanceSingleExportButton";
+import { MaintenanceReportModal } from "@/components/maintenance/MaintenanceReportModal";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -77,6 +78,7 @@ export function BudgetsGerenciaisTab({
     dateStart: null,
     dateEnd: null,
   });
+  const [maintenanceReportOpen, setMaintenanceReportOpen] = useState(false);
 
   // Effective store ID from filters or prop
   const effectiveStoreId = filters.lojaId || selectedUnidadeId;
@@ -637,12 +639,23 @@ export function BudgetsGerenciaisTab({
 
       {/* Recent Maintenance History */}
       <Card className="rounded-2xl shadow-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base uppercase">
             {hasActiveFilters 
               ? `Manutenções Filtradas (${filteredMaintenance.length})`
               : "Histórico de Manutenções (Mês Atual)"}
           </CardTitle>
+          {filteredMaintenance.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setMaintenanceReportOpen(true)}
+            >
+              <FileText className="h-4 w-4" />
+              Ver Relatório Completo
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {recentMaintenance.length > 0 ? (
@@ -713,6 +726,18 @@ export function BudgetsGerenciaisTab({
                   </div>
                 );
               })}
+              {filteredMaintenance.length > 10 && (
+                <div className="pt-2 text-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-primary"
+                    onClick={() => setMaintenanceReportOpen(true)}
+                  >
+                    Ver todos os {filteredMaintenance.length} registros →
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -726,6 +751,14 @@ export function BudgetsGerenciaisTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Maintenance Report Modal */}
+      <MaintenanceReportModal
+        open={maintenanceReportOpen}
+        onOpenChange={setMaintenanceReportOpen}
+        entries={filteredMaintenance}
+        periodLabel={periodDisplayLabel}
+      />
     </div>
   );
 }

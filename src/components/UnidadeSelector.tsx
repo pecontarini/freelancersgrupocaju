@@ -17,7 +17,7 @@ interface UnidadeSelectorProps {
 
 export function UnidadeSelector({ selectedUnidadeId, onUnidadeChange }: UnidadeSelectorProps) {
   const { options: lojas, isLoading } = useConfigLojas();
-  const { isAdmin, isPartner, unidades, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, isOperator, unidades, isGerenteUnidade } = useUserProfile();
 
   // Admin - show all stores selector
   if (isAdmin) {
@@ -53,8 +53,8 @@ export function UnidadeSelector({ selectedUnidadeId, onUnidadeChange }: UnidadeS
     );
   }
 
-  // Partner with multiple stores - show multi-store selector (same as gerente with multi-stores)
-  if (isPartner && unidades.length > 1) {
+  // Operator with multiple stores - show multi-store selector (same as gerente with multi-stores)
+  if (isOperator && unidades.length > 1) {
     return (
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -86,8 +86,8 @@ export function UnidadeSelector({ selectedUnidadeId, onUnidadeChange }: UnidadeS
     );
   }
 
-  // Partner with single store - show badge
-  if (isPartner && unidades.length === 1) {
+  // Operator with single store - show badge
+  if (isOperator && unidades.length === 1) {
     return (
       <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
         <Store className="h-4 w-4 text-muted-foreground" />
@@ -97,8 +97,8 @@ export function UnidadeSelector({ selectedUnidadeId, onUnidadeChange }: UnidadeS
     );
   }
 
-  // Partner with no stores assigned
-  if (isPartner && unidades.length === 0) {
+  // Operator with no stores assigned
+  if (isOperator && unidades.length === 0) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2">
         <Store className="h-4 w-4 text-destructive" />

@@ -37,8 +37,8 @@ interface DaySummary {
 
 export function CMVSalesDashboard() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner } = useUserProfile();
-  const canReset = isAdmin || isPartner;
+  const { isAdmin, isOperator } = useUserProfile();
+  const canReset = isAdmin || isOperator;
   const [confirmText, setConfirmText] = useState("");
   const [isResetting, setIsResetting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);

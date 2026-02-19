@@ -7,9 +7,10 @@ export interface UserProfileData {
   profile: UserProfile | null;
   roles: AppRole[];
   isAdmin: boolean;
-  isPartner: boolean;
+  isOperator: boolean;
   isGerenteUnidade: boolean;
   isChefeSetor: boolean;
+  isEmployee: boolean;
   unidades: ConfigOption[];
 }
 
@@ -24,9 +25,10 @@ export function useUserProfile() {
           profile: null,
           roles: [],
           isAdmin: false,
-          isPartner: false,
+          isOperator: false,
           isGerenteUnidade: false,
           isChefeSetor: false,
+          isEmployee: false,
           unidades: [],
         };
       }
@@ -56,9 +58,10 @@ export function useUserProfile() {
 
       const roles = (rolesData?.map((r) => r.role) || []) as AppRole[];
       const isAdmin = roles.includes("admin");
-      const isPartner = roles.includes("partner");
+      const isOperator = roles.includes("operator");
       const isGerenteUnidade = roles.includes("gerente_unidade");
       const isChefeSetor = roles.includes("chefe_setor");
+      const isEmployee = roles.includes("employee");
 
       // Fetch user stores (multi-loja support)
       let unidades: ConfigOption[] = [];
@@ -83,9 +86,10 @@ export function useUserProfile() {
         profile: profileData as UserProfile | null,
         roles,
         isAdmin,
-        isPartner,
+        isOperator,
         isGerenteUnidade,
         isChefeSetor,
+        isEmployee,
         unidades,
       };
     },
@@ -97,9 +101,12 @@ export function useUserProfile() {
     profile: data?.profile || null,
     roles: data?.roles || [],
     isAdmin: data?.isAdmin || false,
-    isPartner: data?.isPartner || false,
+    isOperator: data?.isOperator || false,
+    // Backwards compatibility alias
+    isPartner: data?.isOperator || false,
     isGerenteUnidade: data?.isGerenteUnidade || false,
     isChefeSetor: data?.isChefeSetor || false,
+    isEmployee: data?.isEmployee || false,
     unidades: data?.unidades || [],
     // Backwards compatibility - first unidade
     unidade: data?.unidades?.[0] || null,

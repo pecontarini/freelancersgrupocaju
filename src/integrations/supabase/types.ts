@@ -2546,7 +2546,13 @@ export type Database = {
     }
     Enums: {
       action_plan_status: "pending" | "in_analysis" | "resolved"
-      app_role: "admin" | "gerente_unidade" | "partner" | "chefe_setor"
+      app_role:
+        | "admin"
+        | "gerente_unidade"
+        | "partner"
+        | "chefe_setor"
+        | "operator"
+        | "employee"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
       categoria_cargo: "gerencia" | "chefia"
       codigo_meta:
@@ -2702,7 +2708,14 @@ export const Constants = {
   public: {
     Enums: {
       action_plan_status: ["pending", "in_analysis", "resolved"],
-      app_role: ["admin", "gerente_unidade", "partner", "chefe_setor"],
+      app_role: [
+        "admin",
+        "gerente_unidade",
+        "partner",
+        "chefe_setor",
+        "operator",
+        "employee",
+      ],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
       categoria_cargo: ["gerencia", "chefia"],
       codigo_meta: [

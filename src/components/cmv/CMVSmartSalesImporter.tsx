@@ -142,7 +142,7 @@ function parseQty(value: unknown): number | null {
 // ─── Component ───────────────────────────────────────────────────────
 export function CMVSmartSalesImporter() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner } = useUserProfile();
+  const { isAdmin, isOperator } = useUserProfile();
   const { importSales } = useDailySales(effectiveUnidadeId || undefined);
   const queryClient = useQueryClient();
 
@@ -159,7 +159,7 @@ export function CMVSmartSalesImporter() {
   const [auditSearch, setAuditSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canClearSales = isAdmin || isPartner;
+  const canClearSales = isAdmin || isOperator;
 
   // ── Fetch sales mappings (white list) ──
   const { data: salesMappings = [] } = useQuery({

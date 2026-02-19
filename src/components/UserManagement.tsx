@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Edit2, Store, Shield, Loader2, X, Plus, Briefcase, CalendarClock } from "lucide-react";
+import { Users, Edit2, Store, Shield, Loader2, X, Plus, Briefcase, CalendarClock, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +48,8 @@ interface UserWithProfile {
   stores: { id: string; nome: string }[];
 }
 
+const ROLES_NEEDING_STORES: AppRole[] = ["gerente_unidade", "operator", "chefe_setor"];
+
 export function UserManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserWithProfile | null>(null);
@@ -61,35 +63,27 @@ export function UserManagement() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Get all profiles
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("*");
-
       if (profilesError) throw profilesError;
 
-      // Get all roles
       const { data: roles, error: rolesError } = await supabase
         .from("user_roles")
         .select("*");
-
       if (rolesError) throw rolesError;
 
-      // Get all user_stores
       const { data: userStores, error: userStoresError } = await supabase
         .from("user_stores")
         .select("*");
-
       if (userStoresError) throw userStoresError;
 
-      // Get all lojas for name lookup
       const { data: lojasData } = await supabase
         .from("config_lojas")
         .select("id, nome");
 
       const lojasMap = new Map(lojasData?.map((l) => [l.id, l.nome]) || []);
 
-      // Combine data
       const usersWithData: UserWithProfile[] = profiles.map((profile) => {
         const userRoles = roles
           .filter((r) => r.user_id === profile.user_id)
@@ -119,7 +113,6 @@ export function UserManagement() {
     },
   });
 
-  // Update user role and stores
   const updateUserRole = useMutation({
     mutationFn: async ({
       userId,
@@ -130,31 +123,24 @@ export function UserManagement() {
       role: AppRole;
       storeIds: string[];
     }) => {
-      // First, remove existing roles
       await supabase.from("user_roles").delete().eq("user_id", userId);
 
-      // Add new role
       const { error: roleError } = await supabase.from("user_roles").insert({
         user_id: userId,
         role: role,
       });
-
       if (roleError) throw roleError;
 
-      // Remove existing user_stores
       await supabase.from("user_stores").delete().eq("user_id", userId);
 
-      // Add new stores if role needs it
-      if ((role === "gerente_unidade" || role === "partner" || role === "chefe_setor") && storeIds.length > 0) {
+      if (ROLES_NEEDING_STORES.includes(role) && storeIds.length > 0) {
         const storeInserts = storeIds.map((storeId) => ({
           user_id: userId,
           loja_id: storeId,
         }));
-
         const { error: storesError } = await supabase
           .from("user_stores")
           .insert(storeInserts);
-
         if (storesError) throw storesError;
       }
     },
@@ -180,8 +166,7 @@ export function UserManagement() {
   const handleSaveUser = () => {
     if (!editingUser) return;
 
-    // Partner, Gerente and Chefe de Setor all need at least one store
-    if ((selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") && selectedStoreIds.length === 0) {
+    if (ROLES_NEEDING_STORES.includes(selectedRole) && selectedStoreIds.length === 0) {
       toast.error("Selecione pelo menos uma loja.");
       return;
     }
@@ -189,7 +174,7 @@ export function UserManagement() {
     updateUserRole.mutate({
       userId: editingUser.id,
       role: selectedRole,
-      storeIds: (selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") ? selectedStoreIds : [],
+      storeIds: ROLES_NEEDING_STORES.includes(selectedRole) ? selectedStoreIds : [],
     });
   };
 
@@ -212,11 +197,11 @@ export function UserManagement() {
         </Badge>
       );
     }
-    if (roles.includes("partner")) {
+    if (roles.includes("operator")) {
       return (
         <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
           <Briefcase className="mr-1 h-3 w-3" />
-          Sócio
+          Sócio Operador
         </Badge>
       );
     }
@@ -233,6 +218,14 @@ export function UserManagement() {
         <Badge variant="outline" className="border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300">
           <CalendarClock className="mr-1 h-3 w-3" />
           Chefe de Setor
+        </Badge>
+      );
+    }
+    if (roles.includes("employee")) {
+      return (
+        <Badge variant="outline" className="border-blue-400 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+          <UserCheck className="mr-1 h-3 w-3" />
+          Funcionário
         </Badge>
       );
     }
@@ -359,10 +352,10 @@ export function UserManagement() {
                         Admin (Acesso Total)
                       </span>
                     </SelectItem>
-                    <SelectItem value="partner">
+                    <SelectItem value="operator">
                       <span className="flex items-center gap-2">
                         <Briefcase className="h-4 w-4" />
-                        Sócio Proprietário
+                        Sócio Operador
                       </span>
                     </SelectItem>
                     <SelectItem value="gerente_unidade">
@@ -377,15 +370,20 @@ export function UserManagement() {
                         Chefe de Setor (Escalas)
                       </span>
                     </SelectItem>
+                    <SelectItem value="employee">
+                      <span className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4" />
+                        Funcionário (Visualização)
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              {(selectedRole === "gerente_unidade" || selectedRole === "partner" || selectedRole === "chefe_setor") && (
+              {ROLES_NEEDING_STORES.includes(selectedRole) && (
                 <div className="space-y-2">
                   <Label>Lojas Atribuídas</Label>
                   
-                  {/* Selected stores */}
                   {selectedStoreIds.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {selectedStoreIds.map((storeId) => {
@@ -410,7 +408,6 @@ export function UserManagement() {
                     </div>
                   )}
 
-                  {/* Add store dropdown */}
                   {availableStores.length > 0 && (
                     <Select
                       value=""

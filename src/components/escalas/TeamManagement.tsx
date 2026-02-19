@@ -64,12 +64,12 @@ function formatPhone(value: string): string {
 
 export function TeamManagement() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
 
-  // Local override for unit — used when admin/partner/gerente needs to pick a unit inside the dialog
+  // Local override for unit — used when admin/operator/gerente needs to pick a unit inside the dialog
   const [dialogUnitId, setDialogUnitId] = useState<string | null>(null);
-  const needsUnitSelector = isAdmin || isPartner || isGerenteUnidade;
+  const needsUnitSelector = isAdmin || isOperator || isGerenteUnidade;
 
   // The active unit: context unit for managers, dialog-selected for admins
   const activeUnitId = needsUnitSelector ? (dialogUnitId || effectiveUnidadeId) : effectiveUnidadeId;

@@ -30,7 +30,7 @@ function getFileType(file: File): "csv" | "excel" | null {
 
 export function CMVSalesImporter() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner } = useUserProfile();
+  const { isAdmin, isOperator } = useUserProfile();
   const { importSales } = useDailySales(effectiveUnidadeId || undefined);
   const queryClient = useQueryClient();
   
@@ -42,7 +42,7 @@ export function CMVSalesImporter() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canClearSales = isAdmin || isPartner;
+  const canClearSales = isAdmin || isOperator;
 
   const handleClearSales = async () => {
     if (!effectiveUnidadeId) return;

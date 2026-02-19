@@ -58,7 +58,7 @@ export interface ParsedEmployee {
 interface BulkImportTabProps {
   unitId: string | null;
   onDone: () => void;
-  /** If true, show a unit selector (for admin/partner users) */
+  /** If true, show a unit selector (for admin/operator users) */
   showUnitSelector?: boolean;
   /** All available units for the selector */
   availableUnits?: { id: string; nome: string }[];

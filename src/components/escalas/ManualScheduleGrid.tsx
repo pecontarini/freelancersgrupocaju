@@ -66,9 +66,9 @@ function getWeekDays(baseDate: Date): Date[] {
 
 export function ManualScheduleGrid() {
   const { effectiveUnidadeId } = useUnidade();
-  const { isAdmin, isPartner, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
-  const canManage = isAdmin || isPartner || isGerenteUnidade;
+  const canManage = isAdmin || isOperator || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
   const selectedUnit = canManage ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;

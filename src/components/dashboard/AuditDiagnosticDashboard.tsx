@@ -102,13 +102,13 @@ export function AuditDiagnosticDashboard({
   const { unidades, isAdmin: userIsAdmin } = useUserProfile();
   const [brandFilter, setBrandFilter] = useState("all");
   const [lojaFilter, setLojaFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("this_month");
+  const [periodFilter, setPeriodFilter] = useState("30d");
 
   const dateRange = useMemo(() => getDateRange(periodFilter), [periodFilter]);
 
   const effectiveLojaId = selectedUnidadeId || (lojaFilter !== "all" ? lojaFilter : null);
 
-  const { audits, failures, isLoadingAudits, isLoadingFailures } = useSupervisionAudits(
+  const { audits, failures, isLoadingAudits, isLoadingFailures, auditChecklistTypes, deleteAudit, isDeletingAudit } = useSupervisionAudits(
     effectiveLojaId,
     undefined,
     dateRange
@@ -414,6 +414,10 @@ export function AuditDiagnosticDashboard({
             audits={filteredAudits}
             failures={filteredFailures}
             getLojaName={getLojaName}
+            auditChecklistTypes={auditChecklistTypes}
+            onDeleteAudit={deleteAudit}
+            isDeletingAudit={isDeletingAudit}
+            isAdmin={isAdmin || userIsAdmin}
           />
         </TabsContent>
       </Tabs>

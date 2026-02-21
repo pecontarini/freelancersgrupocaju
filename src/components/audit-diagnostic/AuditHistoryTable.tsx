@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList, ExternalLink, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ClipboardList, ExternalLink, CheckCircle, XCircle, Eye, Trash2, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,14 +18,30 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import type { SupervisionAudit, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { categorizeItemToSector, SECTOR_POSITION_MAP } from "@/lib/sectorPositionMapping";
+import { AUDIT_TYPE_LABELS, type AuditChecklistType } from "@/lib/audit/auditTypes";
 
 interface AuditHistoryTableProps {
   audits: SupervisionAudit[];
   failures: SupervisionFailure[];
   getLojaName: (id: string) => string;
+  auditChecklistTypes?: Record<string, string[]>;
+  onDeleteAudit?: (auditId: string) => Promise<void>;
+  isDeletingAudit?: boolean;
+  isAdmin?: boolean;
 }
 
 function getScoreBadgeClass(score: number): string {
@@ -33,12 +50,33 @@ function getScoreBadgeClass(score: number): string {
   return "bg-red-100 text-red-700 border-red-300";
 }
 
-export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistoryTableProps) {
+function getChecklistTypeLabel(types: string[]): string {
+  return types
+    .map((t) => AUDIT_TYPE_LABELS[t as AuditChecklistType] || t)
+    .join(", ");
+}
+
+export function AuditHistoryTable({
+  audits,
+  failures,
+  getLojaName,
+  auditChecklistTypes = {},
+  onDeleteAudit,
+  isDeletingAudit = false,
+  isAdmin = false,
+}: AuditHistoryTableProps) {
   const [selectedAudit, setSelectedAudit] = useState<SupervisionAudit | null>(null);
 
   const auditFailures = selectedAudit
     ? failures.filter((f) => f.audit_id === selectedAudit.id)
     : [];
+
+  const handleDelete = async () => {
+    if (selectedAudit && onDeleteAudit) {
+      await onDeleteAudit(selectedAudit.id);
+      setSelectedAudit(null);
+    }
+  };
 
   return (
     <>
@@ -61,6 +99,7 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
                   <TableRow>
                     <TableHead>Data</TableHead>
                     <TableHead>Unidade</TableHead>
+                    <TableHead>Tipo</TableHead>
                     <TableHead className="text-center">Nota Final</TableHead>
                     <TableHead className="text-center">Falhas</TableHead>
                     <TableHead className="text-center w-[60px]">Ação</TableHead>
@@ -71,6 +110,7 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
                     const auditFailureCount = failures.filter(
                       (f) => f.audit_id === audit.id
                     ).length;
+                    const types = auditChecklistTypes[audit.id] || [];
                     return (
                       <TableRow
                         key={audit.id}
@@ -82,6 +122,19 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
                         </TableCell>
                         <TableCell className="text-sm">
                           {getLojaName(audit.loja_id)}
+                        </TableCell>
+                        <TableCell>
+                          {types.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {types.map((t) => (
+                                <Badge key={t} variant="secondary" className="text-[10px]">
+                                  {AUDIT_TYPE_LABELS[t as AuditChecklistType] || t}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge
@@ -121,7 +174,7 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
             <div className="mt-4 space-y-4">
               {/* Audit header info */}
               <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-                <div>
+                <div className="space-y-1">
                   <p className="text-sm font-medium">{getLojaName(selectedAudit.loja_id)}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(selectedAudit.audit_date + "T12:00:00").toLocaleDateString("pt-BR", {
@@ -131,6 +184,16 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
                       year: "numeric",
                     })}
                   </p>
+                  {/* Checklist type badges */}
+                  {(auditChecklistTypes[selectedAudit.id] || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(auditChecklistTypes[selectedAudit.id] || []).map((t) => (
+                        <Badge key={t} variant="secondary" className="text-[10px]">
+                          {AUDIT_TYPE_LABELS[t as AuditChecklistType] || t}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <Badge
                   variant="outline"
@@ -190,6 +253,47 @@ export function AuditHistoryTable({ audits, failures, getLojaName }: AuditHistor
                   })
                 )}
               </div>
+
+              {/* Delete button (admin only) */}
+              {isAdmin && onDeleteAudit && (
+                <>
+                  <Separator />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="w-full gap-2"
+                        disabled={isDeletingAudit}
+                      >
+                        {isDeletingAudit ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                        Excluir Auditoria
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir auditoria?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação é irreversível. A auditoria, suas falhas e scores setoriais serão permanentemente excluídos.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDelete}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
             </div>
           )}
         </SheetContent>

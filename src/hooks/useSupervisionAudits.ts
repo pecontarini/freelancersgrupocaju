@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -231,6 +232,73 @@ export function useSupervisionAudits(
     return recurringFailureItems[key] > 1;
   };
 
+  // Fetch audit sector scores for checklist type info
+  const auditIds = audits.map((a) => a.id);
+  const { data: auditSectorScores = [], isLoading: isLoadingScores } = useQuery({
+    queryKey: ["audit-sector-scores-by-audits", auditIds],
+    queryFn: async () => {
+      if (auditIds.length === 0) return [];
+      // Fetch in batches of 50 to avoid query size limits
+      const results: Array<{ audit_id: string; checklist_type: string }> = [];
+      for (let i = 0; i < auditIds.length; i += 50) {
+        const batch = auditIds.slice(i, i + 50);
+        const { data, error } = await supabase
+          .from("audit_sector_scores")
+          .select("audit_id, checklist_type")
+          .in("audit_id", batch);
+        if (error) throw error;
+        if (data) results.push(...data);
+      }
+      return results;
+    },
+    enabled: auditIds.length > 0,
+  });
+
+  // Build a map: audit_id -> unique checklist types
+  const auditChecklistTypes = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    auditSectorScores.forEach((s) => {
+      if (!map[s.audit_id]) map[s.audit_id] = [];
+      if (!map[s.audit_id].includes(s.checklist_type)) {
+        map[s.audit_id].push(s.checklist_type);
+      }
+    });
+    return map;
+  }, [auditSectorScores]);
+
+  // Delete audit mutation (cascade)
+  const deleteAuditMutation = useMutation({
+    mutationFn: async (auditId: string) => {
+      // Delete in order: failures -> sector scores -> audit
+      const { error: e1 } = await supabase
+        .from("supervision_failures")
+        .delete()
+        .eq("audit_id", auditId);
+      if (e1) throw e1;
+
+      const { error: e2 } = await supabase
+        .from("audit_sector_scores")
+        .delete()
+        .eq("audit_id", auditId);
+      if (e2) throw e2;
+
+      const { error: e3 } = await supabase
+        .from("supervision_audits")
+        .delete()
+        .eq("id", auditId);
+      if (e3) throw e3;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supervision-audits"] });
+      queryClient.invalidateQueries({ queryKey: ["supervision-failures"] });
+      queryClient.invalidateQueries({ queryKey: ["audit-sector-scores-by-audits"] });
+      toast({ title: "Auditoria excluída com sucesso" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao excluir auditoria", description: error.message, variant: "destructive" });
+    },
+  });
+
   return {
     audits,
     failures,
@@ -243,5 +311,8 @@ export function useSupervisionAudits(
     resolveFailure: resolveFailureMutation.mutateAsync,
     validateFailure: validateFailureMutation.mutateAsync,
     isRecurring,
+    auditChecklistTypes,
+    deleteAudit: deleteAuditMutation.mutateAsync,
+    isDeletingAudit: deleteAuditMutation.isPending,
   };
 }

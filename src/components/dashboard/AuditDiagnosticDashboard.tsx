@@ -15,6 +15,7 @@ import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -52,6 +53,11 @@ import {
   AIAnalysisButton,
   AlertsFeed,
 } from "@/components/audit-diagnostic";
+import {
+  ChecklistTemplateManager,
+  ChecklistLinksPanel,
+  ChecklistResponsesDashboard,
+} from "@/components/checklist-daily";
 
 interface AuditDiagnosticDashboardProps {
   selectedUnidadeId: string | null;
@@ -409,14 +415,21 @@ export function AuditDiagnosticDashboard({
 
       {/* ===== TABS ===== */}
       <Tabs defaultValue="analytics" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-3 mb-4 h-auto gap-1">
           <TabsTrigger value="analytics" className="flex items-center gap-1.5 text-sm py-2.5">
             <LayoutDashboard className="h-4 w-4" />
-            <span>Visão Geral e Recorrências</span>
+            <span className="hidden sm:inline">Visão Geral</span>
+            <span className="sm:hidden">Geral</span>
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-1.5 text-sm py-2.5">
             <History className="h-4 w-4" />
-            <span>Histórico de Auditorias</span>
+            <span className="hidden sm:inline">Histórico</span>
+            <span className="sm:hidden">Hist.</span>
+          </TabsTrigger>
+          <TabsTrigger value="daily-checklist" className="flex items-center gap-1.5 text-sm py-2.5">
+            <ClipboardList className="h-4 w-4" />
+            <span className="hidden sm:inline">Checklist Diário</span>
+            <span className="sm:hidden">Check.</span>
           </TabsTrigger>
         </TabsList>
 
@@ -440,6 +453,28 @@ export function AuditDiagnosticDashboard({
             isDeletingAudit={isDeletingAudit}
             isAdmin={isAdmin || userIsAdmin}
           />
+        </TabsContent>
+
+        {/* ===== TAB 3: Daily Checklist ===== */}
+        <TabsContent value="daily-checklist" className="animate-fade-in space-y-6">
+          {effectiveLojaId ? (
+            <>
+              {(isAdmin || userIsAdmin) && (
+                <ChecklistTemplateManager
+                  lojaId={effectiveLojaId}
+                  lojaName={getLojaName(effectiveLojaId)}
+                />
+              )}
+              <ChecklistLinksPanel lojaId={effectiveLojaId} />
+              <ChecklistResponsesDashboard lojaId={effectiveLojaId} />
+            </>
+          ) : (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">
+                Selecione uma unidade no filtro acima para gerenciar o Checklist Diário.
+              </p>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>

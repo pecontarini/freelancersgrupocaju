@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, Loader2, Calendar, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart3, Loader2, Calendar, ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
 import { format, subDays } from "date-fns";
@@ -29,6 +30,12 @@ interface ResponseRow {
   conforming_items: number;
   responded_by_name: string | null;
   created_at: string;
+  template_id: string | null;
+}
+
+interface TemplateOption {
+  id: string;
+  name: string;
 }
 
 const SECTOR_COLORS: Record<string, string> = {
@@ -57,10 +64,24 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
   const [expandedResponse, setExpandedResponse] = useState<string | null>(null);
   const [responseItems, setResponseItems] = useState<any[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("all");
 
   useEffect(() => {
-    if (lojaId) fetchResponses();
+    if (lojaId) {
+      fetchTemplates();
+      fetchResponses();
+    }
   }, [lojaId]);
+
+  async function fetchTemplates() {
+    const { data } = await supabase
+      .from("checklist_templates")
+      .select("id, name")
+      .eq("loja_id", lojaId)
+      .order("name");
+    setTemplates(data || []);
+  }
 
   async function fetchResponses() {
     setLoading(true);
@@ -75,6 +96,11 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     setResponses((data as ResponseRow[]) || []);
     setLoading(false);
   }
+
+  const filteredResponses = useMemo(() => {
+    if (selectedTemplateId === "all") return responses;
+    return responses.filter((r) => r.template_id === selectedTemplateId);
+  }, [responses, selectedTemplateId]);
 
   async function toggleDrillDown(responseId: string) {
     if (expandedResponse === responseId) {
@@ -92,10 +118,9 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     setLoadingItems(false);
   }
 
-  // Chart data: group by date + sector
   const chartData = useMemo(() => {
     const byDate: Record<string, Record<string, number>> = {};
-    responses.forEach((r) => {
+    filteredResponses.forEach((r) => {
       if (!byDate[r.response_date]) byDate[r.response_date] = {};
       byDate[r.response_date][r.sector_code] = r.total_score;
     });
@@ -103,11 +128,11 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     return Object.entries(byDate)
       .map(([date, sectors]) => ({ date: format(new Date(date), "dd/MM"), ...sectors }))
       .reverse();
-  }, [responses]);
+  }, [filteredResponses]);
 
   const activeSectors = useMemo(() => {
-    return [...new Set(responses.map((r) => r.sector_code))];
-  }, [responses]);
+    return [...new Set(filteredResponses.map((r) => r.sector_code))];
+  }, [filteredResponses]);
 
   if (loading) {
     return (
@@ -121,6 +146,24 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
 
   return (
     <div className="space-y-4">
+      {/* Template filter */}
+      {templates.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+            <SelectTrigger className="w-[250px] h-9">
+              <SelectValue placeholder="Filtrar por template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Templates</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {/* Evolution chart */}
       {chartData.length > 1 && (
         <Card>
@@ -163,16 +206,17 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {responses.length === 0 ? (
+          {filteredResponses.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               Nenhuma resposta registrada nos últimos 30 dias.
             </p>
           ) : (
             <div className="space-y-2">
-              {responses.map((r) => {
+              {filteredResponses.map((r) => {
                 const sectorName = SECTOR_POSITION_MAP[r.sector_code as AuditSector]?.displayName || r.sector_code;
                 const scoreColor = r.total_score >= 90 ? "text-green-600" : r.total_score >= 70 ? "text-yellow-600" : "text-red-600";
                 const isExpanded = expandedResponse === r.id;
+                const tplName = templates.find((t) => t.id === r.template_id)?.name;
 
                 return (
                   <div key={r.id}>
@@ -191,6 +235,7 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                           {format(new Date(r.response_date), "dd/MM/yyyy", { locale: ptBR })} •{" "}
                           {r.responded_by_name || "Anônimo"} •{" "}
                           {r.conforming_items}/{r.total_items} conformes
+                          {tplName && ` • 📄 ${tplName}`}
                         </div>
                       </div>
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -209,12 +254,17 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                               >
                                 {item.is_conforming ? "OK" : "NC"}
                               </Badge>
-                              <div>
+                              <div className="flex-1">
                                 <span>{item.checklist_template_items?.item_text || "Item"}</span>
                                 {item.observation && (
                                   <p className="text-xs text-muted-foreground mt-0.5">
                                     💬 {item.observation}
                                   </p>
+                                )}
+                                {item.photo_url && (
+                                  <a href={item.photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 block">
+                                    📷 Ver foto
+                                  </a>
                                 )}
                               </div>
                             </div>

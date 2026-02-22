@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Edit2, Trash2, ToggleLeft, ToggleRight, Loader2, FileText } from "lucide-react";
+import { Edit2, Trash2, ToggleLeft, ToggleRight, Loader2, FileText, Link2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ChecklistLinksPanel } from "./ChecklistLinksPanel";
 
 interface Template {
   id: string;
@@ -35,6 +36,7 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedLinks, setExpandedLinks] = useState<string | null>(null);
 
   useEffect(() => {
     if (lojaId) fetchTemplates();
@@ -54,7 +56,6 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
       return;
     }
 
-    // Get item counts
     const enriched: Template[] = [];
     for (const t of data) {
       const { count: itemCount } = await supabase
@@ -98,7 +99,8 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
 
   async function handleDelete() {
     if (!deleteId) return;
-    // Delete items first, then template
+    // Delete links, items, then template
+    await supabase.from("checklist_sector_links").delete().eq("template_id", deleteId);
     await supabase.from("checklist_template_items").delete().eq("template_id", deleteId);
     const { error } = await supabase.from("checklist_templates").delete().eq("id", deleteId);
     if (error) {
@@ -106,8 +108,13 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
     } else {
       toast.success("Template excluído");
       setTemplates((prev) => prev.filter((t) => t.id !== deleteId));
+      if (expandedLinks === deleteId) setExpandedLinks(null);
     }
     setDeleteId(null);
+  }
+
+  function toggleLinksPanel(templateId: string) {
+    setExpandedLinks((prev) => (prev === templateId ? null : templateId));
   }
 
   if (loading) {
@@ -133,51 +140,78 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
         </CardHeader>
         <CardContent className="space-y-2">
           {templates.map((t) => (
-            <div key={t.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">{t.name}</span>
-                  <Badge variant={t.is_active ? "default" : "secondary"} className="text-xs">
-                    {t.is_active ? "Ativo" : "Inativo"}
-                  </Badge>
+            <div key={t.id} className="space-y-0">
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{t.name}</span>
+                    <Badge variant={t.is_active ? "default" : "secondary"} className="text-xs">
+                      {t.is_active ? "Ativo" : "Inativo"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {t.item_count} itens • {t.mapped_count} mapeados
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t.item_count} itens • {t.mapped_count} mapeados
-                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => toggleLinksPanel(t.id)}
+                    title="Ver Links"
+                  >
+                    <Link2 className="h-3.5 w-3.5 text-primary" />
+                    {expandedLinks === t.id ? (
+                      <ChevronUp className="h-3 w-3 absolute bottom-0.5 right-0.5" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 absolute bottom-0.5 right-0.5" />
+                    )}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => toggleActive(t.id, t.is_active)}
+                    title={t.is_active ? "Desativar" : "Ativar"}
+                  >
+                    {t.is_active ? (
+                      <ToggleRight className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => onEdit(t.id)}
+                    title="Editar"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive"
+                    onClick={() => setDeleteId(t.id)}
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={() => toggleActive(t.id, t.is_active)}
-                  title={t.is_active ? "Desativar" : "Ativar"}
-                >
-                  {t.is_active ? (
-                    <ToggleRight className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={() => onEdit(t.id)}
-                  title="Editar"
-                >
-                  <Edit2 className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-destructive"
-                  onClick={() => setDeleteId(t.id)}
-                  title="Excluir"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+
+              {/* Expanded links panel */}
+              {expandedLinks === t.id && (
+                <div className="ml-4 mt-1 border-l-2 border-primary/20 pl-4 pb-2">
+                  <ChecklistLinksPanel
+                    lojaId={lojaId}
+                    templateId={t.id}
+                    templateName={t.name}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </CardContent>
@@ -188,7 +222,7 @@ export function ChecklistTemplateList({ lojaId, refreshKey, onEdit }: ChecklistT
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir template?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todos os itens do template serão removidos.
+              Esta ação não pode ser desfeita. Todos os itens e links do template serão removidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

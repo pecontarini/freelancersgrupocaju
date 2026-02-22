@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.generate-audit-alerts]
 verify_jwt = false
+
+[functions.extract-checklist-items]
+verify_jwt = false
+
+[functions.submit-daily-checklist]
+verify_jwt = false

@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ConfirmShift from "./pages/ConfirmShift";
+import DailyChecklist from "./pages/DailyChecklist";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,9 +27,11 @@ function App() {
                 <Route path="/auth" element={<Auth />} />
                 <Route
                   path="/confirm-shift/:scheduleId"
-                  element={
-                    <ConfirmShift />
-                  }
+                  element={<ConfirmShift />}
+                />
+                <Route
+                  path="/checklist/:accessToken"
+                  element={<DailyChecklist />}
                 />
                 <Route
                   path="/"

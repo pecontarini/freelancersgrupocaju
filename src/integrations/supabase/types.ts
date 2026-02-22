@@ -433,6 +433,219 @@ export type Database = {
         }
         Relationships: []
       }
+      checklist_response_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_conforming: boolean
+          observation: string | null
+          photo_url: string | null
+          response_id: string
+          template_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_conforming?: boolean
+          observation?: string | null
+          photo_url?: string | null
+          response_id: string
+          template_item_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_conforming?: boolean
+          observation?: string | null
+          photo_url?: string | null
+          response_id?: string
+          template_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_response_items_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_response_items_template_item_id_fkey"
+            columns: ["template_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_template_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_responses: {
+        Row: {
+          conforming_items: number
+          created_at: string
+          id: string
+          link_id: string
+          loja_id: string
+          responded_by_name: string | null
+          response_date: string
+          sector_code: string
+          total_items: number
+          total_score: number
+        }
+        Insert: {
+          conforming_items?: number
+          created_at?: string
+          id?: string
+          link_id: string
+          loja_id: string
+          responded_by_name?: string | null
+          response_date?: string
+          sector_code: string
+          total_items?: number
+          total_score?: number
+        }
+        Update: {
+          conforming_items?: number
+          created_at?: string
+          id?: string
+          link_id?: string
+          loja_id?: string
+          responded_by_name?: string | null
+          response_date?: string
+          sector_code?: string
+          total_items?: number
+          total_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_responses_link_id_fkey"
+            columns: ["link_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_sector_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_responses_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_sector_links: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          is_active: boolean
+          loja_id: string
+          sector_code: string
+        }
+        Insert: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          loja_id: string
+          sector_code: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          loja_id?: string
+          sector_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_sector_links_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_template_items: {
+        Row: {
+          created_at: string
+          id: string
+          item_order: number
+          item_text: string
+          original_category: string | null
+          sector_code: string | null
+          template_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_order?: number
+          item_text: string
+          original_category?: string | null
+          sector_code?: string | null
+          template_id: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_order?: number
+          item_text?: string
+          original_category?: string | null
+          sector_code?: string | null
+          template_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          loja_id: string
+          name: string
+          source_pdf_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          loja_id: string
+          name: string
+          source_pdf_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          loja_id?: string
+          name?: string
+          source_pdf_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_templates_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_contagens: {
         Row: {
           cmv_item_id: string

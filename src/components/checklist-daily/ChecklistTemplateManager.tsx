@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Upload, Loader2, Wand2, Trash2, Save, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Upload, Loader2, Wand2, Trash2, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { SECTOR_POSITION_MAP, categorizeItemToSector, type AuditSector } from "@/lib/sectorPositionMapping";
 
 interface ExtractedItem {
+  id?: string; // present when editing
   item_text: string;
   category: string;
   weight: number;
@@ -20,14 +21,17 @@ interface ExtractedItem {
 interface ChecklistTemplateManagerProps {
   lojaId: string;
   lojaName: string;
+  editingTemplateId?: string | null;
   onTemplateCreated?: () => void;
+  onCancelEdit?: () => void;
 }
 
-export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }: ChecklistTemplateManagerProps) {
+export function ChecklistTemplateManager({ lojaId, lojaName, editingTemplateId, onTemplateCreated, onCancelEdit }: ChecklistTemplateManagerProps) {
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [items, setItems] = useState<ExtractedItem[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
 
   const sectorOptions = useMemo(() => {
     return Object.entries(SECTOR_POSITION_MAP)
@@ -39,13 +43,59 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
   const mappedCount = items.filter((i) => i.sector_code).length;
   const pendingCount = items.length - mappedCount;
 
+  // Load template for editing
+  useEffect(() => {
+    if (editingTemplateId) {
+      loadTemplate(editingTemplateId);
+    } else {
+      resetForm();
+    }
+  }, [editingTemplateId]);
+
+  async function loadTemplate(templateId: string) {
+    const { data: template } = await supabase
+      .from("checklist_templates")
+      .select("id, name")
+      .eq("id", templateId)
+      .single();
+
+    if (!template) {
+      toast.error("Template não encontrado");
+      return;
+    }
+
+    const { data: templateItems } = await supabase
+      .from("checklist_template_items")
+      .select("id, item_text, item_order, weight, sector_code, original_category")
+      .eq("template_id", templateId)
+      .order("item_order");
+
+    setTemplateName(template.name);
+    setItems(
+      (templateItems || []).map((item) => ({
+        id: item.id,
+        item_text: item.item_text,
+        category: item.original_category || "",
+        weight: item.weight,
+        item_order: item.item_order,
+        sector_code: item.sector_code || undefined,
+      }))
+    );
+    setIsEditing(true);
+  }
+
+  function resetForm() {
+    setTemplateName("");
+    setItems([]);
+    setIsEditing(false);
+  }
+
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setExtracting(true);
-      // Only auto-fill name if user hasn't typed one
       if (!templateName.trim()) {
         setTemplateName(`${lojaName} - ${file.name.replace(/\.pdf$/i, "")}`);
       }
@@ -135,38 +185,70 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
     try {
       setSaving(true);
 
-      // Create template
-      const { data: template, error: templateError } = await supabase
-        .from("checklist_templates")
-        .insert({
-          loja_id: lojaId,
-          name: templateName.trim(),
-          is_active: false,
-        })
-        .select()
-        .single();
+      if (isEditing && editingTemplateId) {
+        // Update existing template
+        const { error: nameError } = await supabase
+          .from("checklist_templates")
+          .update({ name: templateName.trim() })
+          .eq("id", editingTemplateId);
 
-      if (templateError) throw templateError;
+        if (nameError) throw nameError;
 
-      // Insert items
-      const templateItems = items.map((item) => ({
-        template_id: template.id,
-        item_text: item.item_text,
-        item_order: item.item_order,
-        weight: item.weight,
-        sector_code: item.sector_code || null,
-        original_category: item.category || null,
-      }));
+        // Delete old items and re-insert
+        await supabase
+          .from("checklist_template_items")
+          .delete()
+          .eq("template_id", editingTemplateId);
 
-      const { error: itemsError } = await supabase
-        .from("checklist_template_items")
-        .insert(templateItems);
+        const templateItems = items.map((item) => ({
+          template_id: editingTemplateId,
+          item_text: item.item_text,
+          item_order: item.item_order,
+          weight: item.weight,
+          sector_code: item.sector_code || null,
+          original_category: item.category || null,
+        }));
 
-      if (itemsError) throw itemsError;
+        const { error: itemsError } = await supabase
+          .from("checklist_template_items")
+          .insert(templateItems);
 
-      toast.success("Template salvo com sucesso!");
-      setItems([]);
-      setTemplateName("");
+        if (itemsError) throw itemsError;
+
+        toast.success("Template atualizado com sucesso!");
+      } else {
+        // Create new template — save as active by default
+        const { data: template, error: templateError } = await supabase
+          .from("checklist_templates")
+          .insert({
+            loja_id: lojaId,
+            name: templateName.trim(),
+            is_active: true,
+          })
+          .select()
+          .single();
+
+        if (templateError) throw templateError;
+
+        const templateItems = items.map((item) => ({
+          template_id: template.id,
+          item_text: item.item_text,
+          item_order: item.item_order,
+          weight: item.weight,
+          sector_code: item.sector_code || null,
+          original_category: item.category || null,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from("checklist_template_items")
+          .insert(templateItems);
+
+        if (itemsError) throw itemsError;
+
+        toast.success("Template salvo e ativado!");
+      }
+
+      resetForm();
       onTemplateCreated?.();
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar template");
@@ -177,11 +259,17 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg flex items-center gap-2">
           <Upload className="h-5 w-5 text-primary" />
-          Upload e Extração de Checklist
+          {isEditing ? "Editar Template" : "Criar Novo Template"}
         </CardTitle>
+        {isEditing && (
+          <Button size="sm" variant="ghost" onClick={() => { resetForm(); onCancelEdit?.(); }} className="gap-1">
+            <X className="h-4 w-4" />
+            Cancelar Edição
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Template Name - always visible */}
@@ -197,10 +285,12 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
           </p>
         </div>
 
-        {/* Upload */}
+        {/* Upload - only show when not editing or to replace items */}
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="text-sm font-medium mb-1 block">PDF do Checklist</label>
+            <label className="text-sm font-medium mb-1 block">
+              {isEditing ? "Substituir itens (upload novo PDF)" : "PDF do Checklist"}
+            </label>
             <Input
               type="file"
               accept=".pdf"
@@ -296,7 +386,7 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
             {/* Save */}
             <Button className="w-full gap-2" onClick={handleSave} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar Template
+              {isEditing ? "Atualizar Template" : "Salvar Template"}
             </Button>
           </>
         )}

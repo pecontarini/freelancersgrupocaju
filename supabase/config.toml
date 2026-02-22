@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.scan-storage-fix-scores]
 verify_jwt = false
+
+[functions.analyze-audit-patterns]
+verify_jwt = false

@@ -48,6 +48,8 @@ import {
   RecurrenceRanking,
   AuditHistoryTable,
   AuditReportGenerator,
+  SectorReportGenerator,
+  AIAnalysisButton,
 } from "@/components/audit-diagnostic";
 
 interface AuditDiagnosticDashboardProps {
@@ -257,6 +259,21 @@ export function AuditDiagnosticDashboard({
             {/* Report Generator */}
             <AuditReportGenerator
               audits={filteredAudits}
+              failures={filteredFailures}
+              unitName={unitDisplayName}
+              periodLabel={periodLabel}
+              avgScore={avgScore}
+            />
+
+            {/* Sector Report */}
+            <SectorReportGenerator
+              failures={filteredFailures}
+              unitName={unitDisplayName}
+              periodLabel={periodLabel}
+            />
+
+            {/* AI Analysis */}
+            <AIAnalysisButton
               failures={filteredFailures}
               unitName={unitDisplayName}
               periodLabel={periodLabel}

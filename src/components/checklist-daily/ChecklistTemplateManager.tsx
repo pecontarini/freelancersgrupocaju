@@ -45,7 +45,7 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
 
     try {
       setExtracting(true);
-      setTemplateName(file.name.replace(/\.pdf$/i, ""));
+      setTemplateName(`${lojaName} - ${file.name.replace(/\.pdf$/i, "")}`);
 
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -208,8 +208,11 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
               <Input
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="Ex: Checklist Supervisor Fiscal"
+                placeholder={`Ex: Checklist ${lojaName} - Supervisão`}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Dica: inclua o nome da unidade e tipo (Supervisão, Fiscal, etc.) para facilitar a localização.
+              </p>
             </div>
 
             {/* Stats + actions */}

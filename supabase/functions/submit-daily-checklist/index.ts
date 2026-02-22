@@ -153,10 +153,10 @@ serve(async (req) => {
         return jsonResponse({ success: false, error: "Responses array is required" }, 400);
       }
 
-      // Validate all items have photos
-      const missingPhotos = responses.filter((r: any) => !r.photo_url);
-      if (missingPhotos.length > 0) {
-        return jsonResponse({ success: false, error: `${missingPhotos.length} item(ns) sem foto. Foto é obrigatória para todos os itens.` }, 400);
+      // Validate non-conforming items have observations
+      const missingObs = responses.filter((r: any) => r.is_conforming === false && (!r.observation || !r.observation.trim()));
+      if (missingObs.length > 0) {
+        return jsonResponse({ success: false, error: `${missingObs.length} item(ns) não conforme(s) sem observação. Observação é obrigatória para itens marcados como NÃO.` }, 400);
       }
 
       // Get item weights for score calculation

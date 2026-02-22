@@ -1,114 +1,67 @@
 
-## Plano Unificado: Refatoracao Completa do Diagnostico de Auditoria
+## Plano: Corrigir Horarios na Confirmacao D-1 + Confirmacao de Freelancers
 
-Este plano consolida todas as mudancas pendentes em uma unica implementacao.
+### Problema 1: Horarios errados na pagina de confirmacao
 
----
+**Causa raiz identificada:** A edge function `confirm-shift` e a pagina `ConfirmShift.tsx` buscam APENAS os horarios do turno padrao (`shifts.start_time/end_time`, ex: 08:00-16:00), ignorando os horarios individuais registrados na escala (`schedules.start_time/end_time`, ex: 12:00-00:00).
 
-### 1. Corrigir filtro padrao de periodo
+Dados reais confirmam o problema:
+- Funcionario com escala 12:00-00:00, mas o turno padrao e 08:00-16:00
+- Na pagina de confirmacao, aparece "08:00 as 16:00" em vez de "12:00 as 00:00"
 
-**Problema**: O dashboard usa `this_month` como padrao, escondendo auditorias do mes anterior (como as da Mult 03 em janeiro).
+### Problema 2: Freelancers sem confirmacao
 
-**Solucao**: Alterar o estado inicial de `periodFilter` de `"this_month"` para `"30d"` em `AuditDiagnosticDashboard.tsx`.
-
----
-
-### 2. Remover aba "Plano de Acao" (legada)
-
-Remover completamente a aba que gerenciava pendencias item a item, ja que tudo agora fica no Diagnostico.
-
-**Arquivos a editar:**
-- `src/components/layout/AppSidebar.tsx` - Remover o item `planoacao` do array `menuItems` (linhas 71-75)
-- `src/pages/Index.tsx` - Remover:
-  - Import do `ActionPlanTab` (linha 16)
-  - Entrada `planoacao` do `tabConfig` (linhas 43-46)
-  - Case `"planoacao"` do switch (linhas 219-222)
+Freelancers ja aparecem no painel D-1 e ja recebem o link de WhatsApp, mas a confirmacao funciona normalmente para eles. O pedido e garantir que o fluxo completo funcione tambem para freelancers (confirmacao registrada e visivel).
 
 ---
 
-### 3. Exibir tipo de checklist no Historico de Auditorias
+### Arquivos a editar
 
-Mostrar na tabela e no Sheet lateral qual foi o tipo da auditoria (Supervisao, Fiscal, Fiscal CPD, Auditoria de Alimentos).
+**1. `supabase/functions/confirm-shift/index.ts`**
+- Adicionar `start_time, end_time` na query SELECT da tabela `schedules` (linha 31)
+- Retornar esses campos junto com os dados do schedule para que a pagina use os horarios corretos
 
-**Como funciona:**
-- Buscar `audit_sector_scores` para os audits do periodo (ja existe a tabela com `checklist_type`)
-- Cruzar pelo `audit_id` para descobrir o(s) tipo(s) de cada auditoria
-- Exibir como Badge na tabela (nova coluna "Tipo") e no cabecalho do Sheet lateral
+**2. `src/pages/ConfirmShift.tsx`**
+- Alterar `parseSchedule()` (linhas 43-56) para usar os horarios individuais da escala com fallback para os do turno:
+  ```text
+  shift_start: data.start_time || shifts.start_time  (em vez de so shifts.start_time)
+  shift_end:   data.end_time   || shifts.end_time     (em vez de so shifts.end_time)
+  ```
 
-**Arquivos a editar:**
-- `src/hooks/useSupervisionAudits.ts` - Adicionar query para buscar `audit_sector_scores` e retornar no hook
-- `src/components/audit-diagnostic/AuditHistoryTable.tsx` - Adicionar coluna "Tipo" na tabela e badge no Sheet
-- `src/components/dashboard/AuditDiagnosticDashboard.tsx` - Passar dados de scores para o componente
+**3. `src/components/escalas/D1SectorAccordion.tsx`**
+- No `SectorWhatsAppButton` (linhas 192-196), incluir o horario de cada funcionario na mensagem do WhatsApp "Cobrar Setor", para que o lider veja os horarios corretos de cada pessoa
 
----
-
-### 4. Botao de excluir auditoria (apenas admins)
-
-Permitir que administradores excluam uma auditoria duplicada ou incorreta direto pelo Sheet lateral.
-
-**Fluxo:**
-1. Usuario admin abre o Sheet de uma auditoria
-2. Clica no botao "Excluir Auditoria" (vermelho, no rodape do Sheet)
-3. AlertDialog de confirmacao aparece
-4. Ao confirmar, o sistema exclui em cascata:
-   - `supervision_failures` WHERE audit_id = X
-   - `audit_sector_scores` WHERE audit_id = X
-   - `supervision_audits` WHERE id = X
-5. Invalida queries e fecha o Sheet
-
-**Arquivos a editar:**
-- `src/hooks/useSupervisionAudits.ts` - Adicionar mutation `deleteAudit`
-- `src/components/audit-diagnostic/AuditHistoryTable.tsx` - Adicionar botao + AlertDialog + logica de exclusao
-
-**Migracao de banco necessaria:**
-- A tabela `audit_sector_scores` ja tem policy de ALL para admins, que cobre DELETE
-- A tabela `supervision_audits` precisa de uma policy de DELETE para admins (verificar se ja existe)
-- A tabela `supervision_failures` ja tem policy de DELETE para admins
+Nenhuma alteracao de banco de dados necessaria. Os horarios individuais ja estao salvos corretamente na tabela `schedules`.
 
 ---
 
 ### Detalhes tecnicos
 
-**Migracao SQL (se necessario):**
+**Edge Function - query atualizada:**
 ```text
--- Garantir que admins podem deletar supervision_audits
-CREATE POLICY "Delete supervision_audits admin only"
-  ON supervision_audits FOR DELETE
-  USING (has_role(auth.uid(), 'admin'::app_role));
+SELECT:
+  id, schedule_date, status, confirmation_status, confirmation_responded_at,
+  employee_id, start_time, end_time,  <-- ADICIONAR estes 2 campos
+  employees!schedules_employee_id_fkey ( name ),
+  shifts!schedules_shift_id_fkey ( name, start_time, end_time ),
+  sectors!schedules_sector_id_fkey ( name )
 ```
 
-**Hook `useSupervisionAudits.ts` - novas funcionalidades:**
+**ConfirmShift.tsx - parseSchedule corrigido:**
 ```text
-1. Nova query: buscar audit_sector_scores por audit_ids
-2. Nova mutation: deleteAudit
-   - DELETE supervision_failures WHERE audit_id
-   - DELETE audit_sector_scores WHERE audit_id
-   - DELETE supervision_audits WHERE id
-   - Invalidar queries ["supervision-audits"], ["supervision-failures"]
-3. Retornar: auditSectorScores, deleteAudit
+shift_start: data.start_time?.substring(0,5) || shifts.start_time?.substring(0,5)
+shift_end:   data.end_time?.substring(0,5)   || shifts.end_time?.substring(0,5)
 ```
 
-**`AuditHistoryTable.tsx` - mudancas visuais:**
+**D1SectorAccordion.tsx - mensagem "Cobrar Setor" com horarios:**
 ```text
-Tabela:
-  | Data | Unidade | Tipo (NOVO) | Nota Final | Falhas | Acao |
-
-Sheet lateral:
-  - Badge com tipo no cabecalho (ex: "Supervisao")
-  - Botao "Excluir Auditoria" no rodape (apenas admins)
-  - AlertDialog de confirmacao antes de excluir
-
-Props adicionais:
-  - sectorScores: para resolver o tipo
-  - onDeleteAudit: callback de exclusao
-  - isAdmin: para mostrar/ocultar botao
+Para cada funcionario pendente:
+  "👤 *Nome* (HH:MM-HH:MM)"
+  "🔗 link_confirmacao"
 ```
 
-**Resumo de arquivos editados:**
-1. `src/components/dashboard/AuditDiagnosticDashboard.tsx` - Filtro padrao + passar props
-2. `src/hooks/useSupervisionAudits.ts` - Query de scores + mutation delete
-3. `src/components/audit-diagnostic/AuditHistoryTable.tsx` - Coluna tipo + botao excluir
-4. `src/components/layout/AppSidebar.tsx` - Remover item planoacao
-5. `src/pages/Index.tsx` - Remover import, config e case do planoacao
-
-**Nenhum componente novo sera criado.** Todas as mudancas sao em arquivos existentes.
+### Resumo das mudancas
+- 3 arquivos editados, nenhum arquivo novo
+- Nenhuma migracao de banco
+- A edge function precisa ser redeployada (automatico)
+- Freelancers ja funcionam no fluxo atual, a correcao dos horarios beneficia todos (CLT e freelancers igualmente)

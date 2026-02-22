@@ -49,8 +49,8 @@ function parseSchedule(data: any): ScheduleInfo {
     confirmation_responded_at: data.confirmation_responded_at,
     employee_name: (data.employees as any)?.name || "Colaborador",
     shift_name: (data.shifts as any)?.name || "Turno",
-    shift_start: (data.shifts as any)?.start_time?.substring(0, 5) || "",
-    shift_end: (data.shifts as any)?.end_time?.substring(0, 5) || "",
+    shift_start: data.start_time?.substring(0, 5) || (data.shifts as any)?.start_time?.substring(0, 5) || "",
+    shift_end: data.end_time?.substring(0, 5) || (data.shifts as any)?.end_time?.substring(0, 5) || "",
     sector_name: (data.sectors as any)?.name || "Setor",
   };
 }

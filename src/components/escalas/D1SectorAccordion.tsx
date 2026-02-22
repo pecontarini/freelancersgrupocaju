@@ -191,7 +191,10 @@ function SectorWhatsAppButton({ sector, dateLabel }: { sector: SectorGroup; date
 
   for (const s of needsAction) {
     const confirmUrl = `${APP_URL}/confirm-shift/${s.id}`;
-    lines.push(`👤 *${s.employee_name}*`);
+    const timeRange = s.start_time && s.end_time
+      ? ` (${s.start_time.slice(0, 5)}–${s.end_time.slice(0, 5)})`
+      : "";
+    lines.push(`👤 *${s.employee_name}*${timeRange}`);
     lines.push(`🔗 ${confirmUrl}`);
     lines.push(``);
   }

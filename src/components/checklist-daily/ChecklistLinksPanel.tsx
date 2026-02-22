@@ -133,15 +133,24 @@ export function ChecklistLinksPanel({ lojaId, templateId, templateName }: Checkl
     );
   }
 
+  function getPublicBaseUrl() {
+    const origin = window.location.origin;
+    // If on preview/dev URL, use the published URL instead
+    if (origin.includes('lovableproject.com') || origin.includes('localhost')) {
+      return 'https://freelancersgrupocaju.lovable.app';
+    }
+    return origin;
+  }
+
   function copyLink(token: string) {
-    const url = `${window.location.origin}/checklist/${token}`;
+    const url = `${getPublicBaseUrl()}/checklist/${token}`;
     navigator.clipboard.writeText(url);
     toast.success("Link copiado!");
   }
 
   function shareWhatsApp(token: string, sectorCode: string) {
     const sectorName = SECTOR_POSITION_MAP[sectorCode as AuditSector]?.displayName || sectorCode;
-    const url = `${window.location.origin}/checklist/${token}`;
+    const url = `${getPublicBaseUrl()}/checklist/${token}`;
     const text = `📋 Checklist Diário - ${sectorName}\n📄 ${templateName}\n\nAplique o checklist do seu setor:\n${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }

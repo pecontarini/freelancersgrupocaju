@@ -15,7 +15,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { PDF_COLORS, PDF_LAYOUT, addPageFooter } from "@/lib/pdf/grupoCajuPdfTheme";
-import { supabase } from "@/integrations/supabase/client";
+
 
 interface ChecklistItem {
   id: string;

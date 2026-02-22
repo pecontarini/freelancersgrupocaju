@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle2, XCircle, MessageSquare, Loader2, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { CheckCircle2, XCircle, MessageSquare, MessageCircle, Loader2, Send, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -182,6 +182,33 @@ export default function DailyChecklist() {
     );
   }
 
+  function shareResultWhatsApp(result: SubmitResult) {
+    const nonConforming = result.total_items - result.conforming_items;
+    const scoreEmoji = result.total_score >= 90 ? "🟢" : result.total_score >= 70 ? "🟡" : "🔴";
+    const dateStr = format(new Date(), "dd/MM/yyyy");
+    
+    // Build list of non-conforming items
+    const failedItems = Object.values(responses)
+      .filter((r) => r.is_conforming === false)
+      .map((r) => {
+        const item = items.find((i) => i.id === r.template_item_id);
+        return item ? `  ❌ ${item.item_text}${r.observation ? ` — _${r.observation}_` : ""}` : null;
+      })
+      .filter(Boolean);
+
+    let text = `📋 *Checklist Diário — ${sectorDisplayName}*\n`;
+    text += `🏪 ${result.loja_name} • ${dateStr}\n`;
+    text += `👤 Aplicado por: ${respondedByName}\n\n`;
+    text += `${scoreEmoji} *Nota: ${result.total_score.toFixed(0)}%*\n`;
+    text += `✅ ${result.conforming_items} conformes | ❌ ${nonConforming} não conformes\n`;
+
+    if (failedItems.length > 0) {
+      text += `\n*Itens não conformes:*\n${failedItems.join("\n")}`;
+    }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
   if (submitResult) {
     const scoreColor = submitResult.total_score >= 90 ? "text-green-600" : submitResult.total_score >= 70 ? "text-yellow-600" : "text-red-600";
     return (
@@ -206,7 +233,16 @@ export default function DailyChecklist() {
             <span className="text-muted-foreground"> não conformes</span>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mt-4">Obrigado pela aplicação!</p>
+        
+        <Button
+          className="mt-4 gap-2 bg-green-600 hover:bg-green-700 text-white"
+          onClick={() => shareResultWhatsApp(submitResult)}
+        >
+          <MessageCircle className="h-5 w-5" />
+          Enviar Resultado por WhatsApp
+        </Button>
+        
+        <p className="text-sm text-muted-foreground mt-2">Obrigado pela aplicação!</p>
       </div>
     );
   }

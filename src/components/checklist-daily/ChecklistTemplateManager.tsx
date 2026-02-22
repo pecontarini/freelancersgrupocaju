@@ -45,7 +45,10 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
 
     try {
       setExtracting(true);
-      setTemplateName(`${lojaName} - ${file.name.replace(/\.pdf$/i, "")}`);
+      // Only auto-fill name if user hasn't typed one
+      if (!templateName.trim()) {
+        setTemplateName(`${lojaName} - ${file.name.replace(/\.pdf$/i, "")}`);
+      }
 
       const reader = new FileReader();
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -181,6 +184,19 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Template Name - always visible */}
+        <div>
+          <label className="text-sm font-medium mb-1 block">Nome do Template</label>
+          <Input
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder={`Ex: Checklist ${lojaName} - Supervisão`}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Dica: inclua o nome da unidade e tipo (Supervisão, Fiscal, etc.) para facilitar a localização.
+          </p>
+        </div>
+
         {/* Upload */}
         <div className="flex gap-3 items-end">
           <div className="flex-1">
@@ -202,19 +218,6 @@ export function ChecklistTemplateManager({ lojaId, lojaName, onTemplateCreated }
 
         {items.length > 0 && (
           <>
-            {/* Template name */}
-            <div>
-              <label className="text-sm font-medium mb-1 block">Nome do Template</label>
-              <Input
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder={`Ex: Checklist ${lojaName} - Supervisão`}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Dica: inclua o nome da unidade e tipo (Supervisão, Fiscal, etc.) para facilitar a localização.
-              </p>
-            </div>
-
             {/* Stats + actions */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex gap-2 text-sm">

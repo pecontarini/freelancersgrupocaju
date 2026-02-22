@@ -1,84 +1,60 @@
 
-## Plano: Correção Definitiva do Checklist Diário
 
-### Problemas Identificados
+## Plano: Checklist Publico sem Login + Correcoes de Estabilidade
 
-1. **Links não vinculados a templates** -- Os links por setor misturam itens de TODOS os templates. Não há como separar checklists por tipo de auditoria (Supervisão, Fiscal, etc.)
-2. **Gerentes não podem criar templates** -- O banco permite apenas admin/operator. Gerentes precisam de permissão de escrita
-3. **Sem upload de foto obrigatório** -- O campo `photo_url` existe no banco mas a interface não tem funcionalidade de câmera/upload
-4. **Respostas não vinculadas a template** -- Impossível ver evolução por tipo de auditoria
+### Problemas Encontrados
 
-### Solução
+1. **Link pede login para enviar fotos**: A pagina `DailyChecklist.tsx` usa `supabase.storage.upload()` no client-side, que exige autenticacao. O bucket `checklist-photos` tem politica de SELECT publica, mas NAO tem politica de INSERT -- logo o upload falha sem login.
 
-#### 1. Banco de Dados -- Vincular links e respostas a templates
+2. **Segundo template sem links gerados**: O template "Supervisor de Back - Ricardo" (64 itens, todos mapeados) tem 0 links porque o usuario precisa clicar "Gerar Links" manualmente apos criar o template. O sistema funciona, mas a UX nao deixa claro que e necessario gerar os links.
 
-Adicionar `template_id` nas tabelas `checklist_sector_links` e `checklist_responses` para que cada link seja exclusivo de um template especifico:
+### Solucao
 
-```text
-checklist_sector_links
-  + template_id (uuid, FK -> checklist_templates.id)
+#### 1. Upload de fotos sem login via Edge Function
 
-checklist_responses  
-  + template_id (uuid, FK -> checklist_templates.id)
-```
+Em vez de usar `supabase.storage.upload()` no cliente (que exige auth), vamos enviar a foto para a edge function `submit-daily-checklist` com uma nova action `upload-photo`. A edge function usa `service_role` e consegue fazer upload no storage sem autenticacao do usuario.
 
-Adicionar RLS para `gerente_unidade` poder criar/editar templates, items e links nas suas unidades.
+**Fluxo:**
+1. Chefe tira foto no celular
+2. Foto e convertida para base64 no frontend
+3. Frontend envia para `submit-daily-checklist` com action `upload-photo`
+4. Edge function faz upload no bucket `checklist-photos` com service_role
+5. Edge function retorna a URL publica da foto
+6. Frontend exibe preview e salva a URL no estado
 
-#### 2. Links separados por Template
+#### 2. Gerar links automaticamente ao criar template
 
-**ChecklistLinksPanel** -- Recebe tambem o `templateId` selecionado. Links sao gerados e exibidos POR template, permitindo que cada auditoria (Supervisao, Fiscal) tenha seus proprios links por setor.
-
-**Fluxo no dashboard:**
-- Lista de templates com botao "Ver Links" para cada um
-- Ao selecionar um template, exibe os links dos setores desse template especifico
-
-#### 3. Foto obrigatória no checklist dos chefes
-
-**DailyChecklist.tsx** -- Adicionar para CADA pergunta:
-- Botao de camera/upload de foto (usando o bucket `checklist-photos` ja existente)
-- Upload direto para o storage sem autenticacao (bucket publico)
-- Validacao: nao permite enviar o checklist se algum item nao tiver foto
-- Preview da foto apos upload
-- A `photo_url` sera salva no `checklist_response_items`
-
-**Edge function `submit-daily-checklist`** -- Nenhuma mudanca necessaria, ja aceita `photo_url`.
-
-#### 4. Gerentes podem gerenciar templates
-
-Adicionar politicas RLS de escrita para `gerente_unidade` nas tabelas:
-- `checklist_templates` -- INSERT/UPDATE/DELETE para suas lojas
-- `checklist_template_items` -- INSERT/UPDATE/DELETE para templates das suas lojas
-- `checklist_sector_links` -- ALL para suas lojas
-
-#### 5. Dashboard de Respostas por Template
-
-**ChecklistResponsesDashboard** -- Adicionar filtro por template para ver evolucao de cada auditoria separadamente.
+Ao salvar um template (novo ou editado), o sistema automaticamente gera os links por setor para todos os setores mapeados. O usuario nao precisa mais clicar "Gerar Links" separadamente.
 
 ### Detalhes Tecnicos
 
 | Arquivo | Mudanca |
 |---------|---------|
-| **Migracao SQL** | Adicionar `template_id` em `checklist_sector_links` e `checklist_responses`. Criar RLS para gerentes |
-| **ChecklistLinksPanel.tsx** | Receber `templateId` prop, filtrar e gerar links por template |
-| **ChecklistTemplateList.tsx** | Adicionar botao "Links" por template, expandir para mostrar links do template |
-| **DailyChecklist.tsx** | Adicionar upload de foto obrigatoria por item, validacao antes do envio |
-| **submit-daily-checklist (edge fn)** | Filtrar itens tambem por `template_id` do link |
-| **ChecklistResponsesDashboard.tsx** | Adicionar filtro por template |
-| **AuditDiagnosticDashboard.tsx** | Permitir acesso para `operator` e `gerente_unidade` ao painel de templates |
+| `supabase/functions/submit-daily-checklist/index.ts` | Adicionar action `upload-photo` que recebe base64, faz upload no storage com service_role e retorna URL publica |
+| `src/pages/DailyChecklist.tsx` | Substituir `supabase.storage.upload()` por chamada a edge function via `fetch()`. Converter arquivo para base64 antes de enviar |
+| `src/components/checklist-daily/ChecklistTemplateManager.tsx` | Apos salvar template, chamar automaticamente a geracao de links para os setores mapeados |
 
-### Upload de Fotos -- Fluxo
+#### Edge Function -- Nova action `upload-photo`
 
-1. Chefe tira foto ou seleciona do dispositivo
-2. Upload vai para o bucket `checklist-photos` (ja existe, publico)
-3. URL publica e salva no estado do componente
-4. Ao submeter, `photo_url` e enviada junto com cada resposta
-5. **Validacao**: botao "Enviar" so habilita quando TODOS os itens tiverem foto E resposta
+Recebe:
+- `action: "upload-photo"`
+- `access_token`: token do link (para validar que e um link ativo)
+- `file_base64`: conteudo da foto em base64
+- `file_name`: nome do arquivo
 
-### Ordem de Implementacao
+Retorna:
+- `{ success: true, data: { public_url: "..." } }`
 
-1. Migracao SQL (template_id + RLS gerentes)
-2. Atualizar edge function para usar template_id
-3. Atualizar ChecklistLinksPanel para funcionar por template
-4. Adicionar upload de foto no DailyChecklist
-5. Atualizar dashboard de respostas com filtro por template
-6. Liberar acesso de gerentes no UI
+Validacoes:
+- Token deve ser de um link ativo
+- Arquivo deve ter no maximo 5MB
+- Extensao deve ser imagem (jpg, png, webp)
+
+#### Geracao automatica de links
+
+No `ChecklistTemplateManager.handleSave()`, apos salvar o template e os itens:
+1. Buscar todos os `sector_code` distintos dos itens salvos
+2. Buscar links existentes para esse template
+3. Inserir links para setores que ainda nao tem link
+4. Exibir toast informando quantos links foram gerados
+

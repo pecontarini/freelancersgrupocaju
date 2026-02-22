@@ -5,3 +5,4 @@ export { AuditHistoryTable } from "./AuditHistoryTable";
 export { AuditReportGenerator } from "./AuditReportGenerator";
 export { SectorReportGenerator } from "./SectorReportGenerator";
 export { AIAnalysisButton } from "./AIAnalysisButton";
+export { AlertsFeed } from "./AlertsFeed";

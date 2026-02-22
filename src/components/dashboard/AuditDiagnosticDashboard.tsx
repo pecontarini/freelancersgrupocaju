@@ -50,6 +50,7 @@ import {
   AuditReportGenerator,
   SectorReportGenerator,
   AIAnalysisButton,
+  AlertsFeed,
 } from "@/components/audit-diagnostic";
 
 interface AuditDiagnosticDashboardProps {
@@ -392,6 +393,9 @@ export function AuditDiagnosticDashboard({
           </Select>
         </div>
       </div>
+
+      {/* ===== ALERTS ===== */}
+      <AlertsFeed lojaId={effectiveLojaId} isAdmin={isAdmin || userIsAdmin} />
 
       {/* ===== KPI CARDS ===== */}
       <AuditKPICards

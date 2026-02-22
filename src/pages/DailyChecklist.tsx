@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CheckCircle2, XCircle, MessageSquare, MessageCircle, Loader2, Send, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { CheckCircle2, XCircle, MessageSquare, MessageCircle, Loader2, Send, ChevronDown, ChevronUp, Download, Camera, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { PDF_COLORS, PDF_LAYOUT, addPageFooter } from "@/lib/pdf/grupoCajuPdfTheme";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ChecklistItem {
   id: string;
@@ -51,10 +52,14 @@ export default function DailyChecklist() {
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingScore, setExistingScore] = useState<number | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
 
   const [linkId, setLinkId] = useState("");
   const [lojaName, setLojaName] = useState("");
   const [sectorCode, setSectorCode] = useState("");
+  const [templateName, setTemplateName] = useState("");
+
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -79,6 +84,7 @@ export default function DailyChecklist() {
       setLinkId(data.link_id);
       setLojaName(data.loja_name);
       setSectorCode(data.sector_code);
+      setTemplateName(data.template_name || "");
       setItems(data.items);
       setAlreadySubmitted(data.already_submitted);
       setExistingScore(data.existing_score);
@@ -104,8 +110,14 @@ export default function DailyChecklist() {
     return Object.values(responses).filter((r) => r.is_conforming !== null).length;
   }, [responses]);
 
+  const photosCount = useMemo(() => {
+    return Object.values(responses).filter((r) => r.photo_url).length;
+  }, [responses]);
+
   const progressPercent = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
   const allAnswered = answeredCount === items.length && items.length > 0;
+  const allPhotos = photosCount === items.length && items.length > 0;
+  const canSubmit = allAnswered && allPhotos && respondedByName.trim().length > 0;
 
   const sectorDisplayName = SECTOR_POSITION_MAP[sectorCode as AuditSector]?.displayName || sectorCode;
   const today = format(new Date(), "dd 'de' MMMM, yyyy (EEEE)", { locale: ptBR });
@@ -128,6 +140,44 @@ export default function DailyChecklist() {
     setExpandedObs((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
   }
 
+  async function handlePhotoUpload(itemId: string, file: File) {
+    try {
+      setUploadingPhoto(itemId);
+      
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${accessToken}/${itemId}_${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from("checklist-photos")
+        .upload(fileName, file, { upsert: true });
+
+      if (error) {
+        toast.error("Erro ao enviar foto");
+        console.error("Upload error:", error);
+        return;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("checklist-photos")
+        .getPublicUrl(data.path);
+
+      setResponses((prev) => ({
+        ...prev,
+        [itemId]: { ...prev[itemId], photo_url: publicData.publicUrl },
+      }));
+      
+      toast.success("Foto anexada!");
+    } catch {
+      toast.error("Erro ao enviar foto");
+    } finally {
+      setUploadingPhoto(null);
+    }
+  }
+
+  function triggerFileInput(itemId: string) {
+    fileInputRefs.current[itemId]?.click();
+  }
+
   async function handleSubmit() {
     if (!respondedByName.trim()) {
       toast.error("Por favor, informe seu nome");
@@ -135,6 +185,10 @@ export default function DailyChecklist() {
     }
     if (!allAnswered) {
       toast.error("Responda todos os itens antes de enviar");
+      return;
+    }
+    if (!allPhotos) {
+      toast.error("Anexe foto em todos os itens antes de enviar");
       return;
     }
 
@@ -195,17 +249,14 @@ export default function DailyChecklist() {
     const nonConforming = result.total_items - result.conforming_items;
     const scoreColor = result.total_score >= 90 ? PDF_COLORS.success : result.total_score >= 70 ? PDF_COLORS.warning : PDF_COLORS.danger;
 
-    // Logo
     try {
       doc.addImage(LOGO_BASE64, "JPEG", centerX - 18, 12, 36, 25);
     } catch { /* fallback */ }
 
-    // Institutional line
     doc.setDrawColor(...PDF_COLORS.institutional);
     doc.setLineWidth(1);
     doc.line(margin, 42, pageWidth - margin, 42);
 
-    // Title
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.setTextColor(...PDF_COLORS.institutional);
@@ -216,7 +267,11 @@ export default function DailyChecklist() {
     doc.setTextColor(...PDF_COLORS.graphite);
     doc.text(`${sectorDisplayName} — ${result.loja_name}`, centerX, 62, { align: "center" });
 
-    // Info block
+    if (templateName) {
+      doc.setFontSize(10);
+      doc.text(`Template: ${templateName}`, centerX, 69, { align: "center" });
+    }
+
     let y = 74;
     doc.setFillColor(...PDF_COLORS.gray50);
     doc.setDrawColor(...PDF_COLORS.gray200);
@@ -241,12 +296,10 @@ export default function DailyChecklist() {
     doc.setTextColor(...PDF_COLORS.graphite);
     doc.text(dateStr, pageWidth - margin - 6, y + 16, { align: "right" });
 
-    // Score summary boxes
     y = 104;
     const boxW = (pageWidth - margin * 2 - 16) / 3;
     const boxH = 30;
 
-    // Score box
     doc.setFillColor(...PDF_COLORS.white);
     doc.setDrawColor(...scoreColor);
     doc.setLineWidth(1.5);
@@ -260,7 +313,6 @@ export default function DailyChecklist() {
     doc.setTextColor(...scoreColor);
     doc.text(`${result.total_score.toFixed(0)}%`, margin + boxW / 2, y + 23, { align: "center" });
 
-    // Conformes box
     const box2X = margin + boxW + 8;
     doc.setDrawColor(...PDF_COLORS.success);
     doc.roundedRect(box2X, y, boxW, boxH, 2, 2, "FD");
@@ -273,7 +325,6 @@ export default function DailyChecklist() {
     doc.setTextColor(...PDF_COLORS.success);
     doc.text(String(result.conforming_items), box2X + boxW / 2, y + 23, { align: "center" });
 
-    // Não conformes box
     const box3X = margin + (boxW + 8) * 2;
     doc.setDrawColor(...PDF_COLORS.danger);
     doc.roundedRect(box3X, y, boxW, boxH, 2, 2, "FD");
@@ -286,7 +337,6 @@ export default function DailyChecklist() {
     doc.setTextColor(...PDF_COLORS.danger);
     doc.text(String(nonConforming), box3X + boxW / 2, y + 23, { align: "center" });
 
-    // Items table
     y = 142;
     const tableData = items.map((item, idx) => {
       const resp = responses[item.id];
@@ -324,7 +374,6 @@ export default function DailyChecklist() {
       },
     });
 
-    // Footer on all pages
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
@@ -342,13 +391,11 @@ export default function DailyChecklist() {
   }
 
   function handleWhatsAppPDF(result: SubmitResult) {
-    // Download the PDF first
     handleDownloadPDF(result);
-
-    // Open WhatsApp with summary message
     const scoreEmoji = result.total_score >= 90 ? "🟢" : result.total_score >= 70 ? "🟡" : "🔴";
     const nonConforming = result.total_items - result.conforming_items;
     let text = `📋 *Checklist Diário — ${sectorDisplayName}*\n`;
+    if (templateName) text += `📄 *${templateName}*\n`;
     text += `🏪 ${result.loja_name} • ${format(new Date(), "dd/MM/yyyy")}\n`;
     text += `${scoreEmoji} *Nota: ${result.total_score.toFixed(0)}%*\n`;
     text += `✅ ${result.conforming_items} conformes | ❌ ${nonConforming} não conformes\n\n`;
@@ -372,6 +419,9 @@ export default function DailyChecklist() {
         <p className="text-lg font-medium">
           {sectorDisplayName} — {submitResult.loja_name}
         </p>
+        {templateName && (
+          <p className="text-sm text-muted-foreground">📄 {templateName}</p>
+        )}
         <p className="text-muted-foreground">{format(new Date(), "dd/MM/yyyy")}</p>
         <div className="flex gap-8 text-sm">
           <div>
@@ -431,7 +481,10 @@ export default function DailyChecklist() {
           <img src={logoImg} alt="Logo" className="h-10 object-contain" />
           <div>
             <h1 className="text-lg font-bold uppercase">Checklist Diário — {sectorDisplayName}</h1>
-            <p className="text-xs text-muted-foreground">{lojaName} • {today}</p>
+            <p className="text-xs text-muted-foreground">
+              {lojaName} • {today}
+              {templateName && ` • 📄 ${templateName}`}
+            </p>
           </div>
         </div>
       </div>
@@ -450,7 +503,7 @@ export default function DailyChecklist() {
         {/* Progress */}
         <div className="space-y-1">
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Progresso: {answeredCount}/{items.length} itens</span>
+            <span>Progresso: {answeredCount}/{items.length} itens • 📷 {photosCount}/{items.length} fotos</span>
             <span>{progressPercent.toFixed(0)}%</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
@@ -463,6 +516,8 @@ export default function DailyChecklist() {
             const isYes = resp?.is_conforming === true;
             const isNo = resp?.is_conforming === false;
             const showObs = expandedObs[item.id];
+            const hasPhoto = !!resp?.photo_url;
+            const isUploading = uploadingPhoto === item.id;
 
             return (
               <Card key={item.id} className="p-4 space-y-3">
@@ -474,6 +529,59 @@ export default function DailyChecklist() {
                 {item.weight !== 1 && (
                   <span className="text-xs text-muted-foreground ml-8">Peso: {item.weight}</span>
                 )}
+
+                {/* Photo upload */}
+                <div className="ml-8">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    ref={(el) => { fileInputRefs.current[item.id] = el; }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handlePhotoUpload(item.id, file);
+                      e.target.value = "";
+                    }}
+                  />
+                  
+                  {hasPhoto ? (
+                    <div className="relative">
+                      <img
+                        src={resp.photo_url!}
+                        alt="Foto do item"
+                        className="w-full h-32 object-cover rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="absolute bottom-2 right-2 gap-1 h-7 text-xs"
+                        onClick={() => triggerFileInput(item.id)}
+                      >
+                        <Camera className="h-3 w-3" />
+                        Trocar
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 border-dashed h-20 flex-col"
+                      onClick={() => triggerFileInput(item.id)}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Camera className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Tirar foto ou anexar imagem *</span>
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2 ml-8">
                   <Button
@@ -527,10 +635,17 @@ export default function DailyChecklist() {
 
       {/* Submit footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4">
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-lg mx-auto space-y-1">
+          {!canSubmit && items.length > 0 && (
+            <p className="text-xs text-center text-muted-foreground">
+              {!allAnswered && `Responda todos os ${items.length} itens. `}
+              {!allPhotos && `Anexe foto em todos os ${items.length} itens. `}
+              {!respondedByName.trim() && "Informe seu nome."}
+            </p>
+          )}
           <Button
             className="w-full gap-2 h-12 text-base"
-            disabled={!allAnswered || !respondedByName.trim() || submitting}
+            disabled={!canSubmit || submitting}
             onClick={handleSubmit}
           >
             {submitting ? (
@@ -538,7 +653,7 @@ export default function DailyChecklist() {
             ) : (
               <Send className="h-5 w-5" />
             )}
-            Enviar Checklist
+            Enviar Checklist ({photosCount}/{items.length} 📷)
           </Button>
         </div>
       </div>

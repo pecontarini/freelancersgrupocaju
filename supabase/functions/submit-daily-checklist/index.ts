@@ -42,14 +42,20 @@ serve(async (req) => {
     }
 
     if (action === "fetch") {
-      // Get all active template items for this sector and store
-      const { data: items, error: itemsError } = await supabase
+      // Build query for items - filter by template_id if the link has one
+      let query = supabase
         .from("checklist_template_items")
-        .select("id, item_text, item_order, weight, original_category, checklist_templates!inner(loja_id, is_active)")
+        .select("id, item_text, item_order, weight, original_category, checklist_templates!inner(id, loja_id, is_active)")
         .eq("sector_code", link.sector_code)
         .eq("checklist_templates.loja_id", link.loja_id)
-        .eq("checklist_templates.is_active", true)
-        .order("item_order", { ascending: true });
+        .eq("checklist_templates.is_active", true);
+
+      // If link has template_id, filter by it
+      if (link.template_id) {
+        query = query.eq("checklist_templates.id", link.template_id);
+      }
+
+      const { data: items, error: itemsError } = await query.order("item_order", { ascending: true });
 
       if (itemsError) {
         console.error("Error fetching items:", itemsError);
@@ -59,14 +65,30 @@ serve(async (req) => {
         );
       }
 
+      // Get template name for display
+      let templateName = "";
+      if (link.template_id) {
+        const { data: tmpl } = await supabase
+          .from("checklist_templates")
+          .select("name")
+          .eq("id", link.template_id)
+          .single();
+        templateName = tmpl?.name || "";
+      }
+
       // Check if already submitted today
       const today = new Date().toISOString().split("T")[0];
-      const { data: existingResponse } = await supabase
+      let existingQuery = supabase
         .from("checklist_responses")
         .select("id, total_score, created_at")
         .eq("link_id", link.id)
-        .eq("response_date", today)
-        .maybeSingle();
+        .eq("response_date", today);
+
+      if (link.template_id) {
+        existingQuery = existingQuery.eq("template_id", link.template_id);
+      }
+
+      const { data: existingResponse } = await existingQuery.maybeSingle();
 
       return new Response(
         JSON.stringify({
@@ -76,6 +98,8 @@ serve(async (req) => {
             loja_id: link.loja_id,
             loja_name: link.config_lojas?.nome || "Unidade",
             sector_code: link.sector_code,
+            template_id: link.template_id || null,
+            template_name: templateName,
             items: items || [],
             already_submitted: !!existingResponse,
             existing_score: existingResponse?.total_score || null,
@@ -89,6 +113,15 @@ serve(async (req) => {
       if (!responses || !Array.isArray(responses)) {
         return new Response(
           JSON.stringify({ success: false, error: "Responses array is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate all items have photos
+      const missingPhotos = responses.filter((r: any) => !r.photo_url);
+      if (missingPhotos.length > 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: `${missingPhotos.length} item(ns) sem foto. Foto é obrigatória para todos os itens.` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -129,6 +162,7 @@ serve(async (req) => {
           link_id: link.id,
           loja_id: link.loja_id,
           sector_code: link.sector_code,
+          template_id: link.template_id || null,
           response_date: today,
           total_score: Math.round(score * 100) / 100,
           total_items: responses.length,

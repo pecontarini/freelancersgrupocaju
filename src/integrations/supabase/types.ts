@@ -488,6 +488,7 @@ export type Database = {
           responded_by_name: string | null
           response_date: string
           sector_code: string
+          template_id: string | null
           total_items: number
           total_score: number
         }
@@ -500,6 +501,7 @@ export type Database = {
           responded_by_name?: string | null
           response_date?: string
           sector_code: string
+          template_id?: string | null
           total_items?: number
           total_score?: number
         }
@@ -512,6 +514,7 @@ export type Database = {
           responded_by_name?: string | null
           response_date?: string
           sector_code?: string
+          template_id?: string | null
           total_items?: number
           total_score?: number
         }
@@ -530,6 +533,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "checklist_responses_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
         ]
       }
       checklist_sector_links: {
@@ -540,6 +550,7 @@ export type Database = {
           is_active: boolean
           loja_id: string
           sector_code: string
+          template_id: string | null
         }
         Insert: {
           access_token?: string
@@ -548,6 +559,7 @@ export type Database = {
           is_active?: boolean
           loja_id: string
           sector_code: string
+          template_id?: string | null
         }
         Update: {
           access_token?: string
@@ -556,6 +568,7 @@ export type Database = {
           is_active?: boolean
           loja_id?: string
           sector_code?: string
+          template_id?: string | null
         }
         Relationships: [
           {
@@ -563,6 +576,13 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_sector_links_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
             referencedColumns: ["id"]
           },
         ]

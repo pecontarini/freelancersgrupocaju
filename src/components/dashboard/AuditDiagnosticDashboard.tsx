@@ -56,7 +56,6 @@ import {
 import {
   ChecklistTemplateManager,
   ChecklistTemplateList,
-  ChecklistLinksPanel,
   ChecklistResponsesDashboard,
 } from "@/components/checklist-daily";
 
@@ -462,26 +461,21 @@ export function AuditDiagnosticDashboard({
         <TabsContent value="daily-checklist" className="animate-fade-in space-y-6">
           {effectiveLojaId ? (
             <>
-              {(isAdmin || userIsAdmin) && (
-                <>
-                  <ChecklistTemplateList
-                    lojaId={effectiveLojaId}
-                    refreshKey={templateRefreshKey}
-                    onEdit={(id) => setEditingTemplateId(id)}
-                  />
-                  <ChecklistTemplateManager
-                    lojaId={effectiveLojaId}
-                    lojaName={getLojaName(effectiveLojaId)}
-                    editingTemplateId={editingTemplateId}
-                    onTemplateCreated={() => {
-                      setTemplateRefreshKey((k) => k + 1);
-                      setEditingTemplateId(null);
-                    }}
-                    onCancelEdit={() => setEditingTemplateId(null)}
-                  />
-                </>
-              )}
-              <ChecklistLinksPanel lojaId={effectiveLojaId} />
+              <ChecklistTemplateList
+                lojaId={effectiveLojaId}
+                refreshKey={templateRefreshKey}
+                onEdit={(id) => setEditingTemplateId(id)}
+              />
+              <ChecklistTemplateManager
+                lojaId={effectiveLojaId}
+                lojaName={getLojaName(effectiveLojaId)}
+                editingTemplateId={editingTemplateId}
+                onTemplateCreated={() => {
+                  setTemplateRefreshKey((k) => k + 1);
+                  setEditingTemplateId(null);
+                }}
+                onCancelEdit={() => setEditingTemplateId(null)}
+              />
               <ChecklistResponsesDashboard lojaId={effectiveLojaId} />
             </>
           ) : (

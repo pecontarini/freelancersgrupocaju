@@ -1,67 +1,99 @@
 
-## Plano: Corrigir Horarios na Confirmacao D-1 + Confirmacao de Freelancers
 
-### Problema 1: Horarios errados na pagina de confirmacao
+## Plano Atualizado: Relatorio Setorial + Alertas + Analise IA (sem Plano de Acao no PDF)
 
-**Causa raiz identificada:** A edge function `confirm-shift` e a pagina `ConfirmShift.tsx` buscam APENAS os horarios do turno padrao (`shifts.start_time/end_time`, ex: 08:00-16:00), ignorando os horarios individuais registrados na escala (`schedules.start_time/end_time`, ex: 12:00-00:00).
-
-Dados reais confirmam o problema:
-- Funcionario com escala 12:00-00:00, mas o turno padrao e 08:00-16:00
-- Na pagina de confirmacao, aparece "08:00 as 16:00" em vez de "12:00 as 00:00"
-
-### Problema 2: Freelancers sem confirmacao
-
-Freelancers ja aparecem no painel D-1 e ja recebem o link de WhatsApp, mas a confirmacao funciona normalmente para eles. O pedido e garantir que o fluxo completo funcione tambem para freelancers (confirmacao registrada e visivel).
+Removemos o espaco de "Plano de Acao" e assinaturas do PDF setorial. O relatorio fica mais direto: cabecalho, resumo, tabela de falhas e pronto.
 
 ---
 
-### Arquivos a editar
+### PARTE 1: Relatorio Setorial com Selecao Multipla
 
-**1. `supabase/functions/confirm-shift/index.ts`**
-- Adicionar `start_time, end_time` na query SELECT da tabela `schedules` (linha 31)
-- Retornar esses campos junto com os dados do schedule para que a pagina use os horarios corretos
+**UI/UX**:
+- Novo botao "Relatorio por Setor" no header do Diagnostico
+- Dialog com checkboxes listando setores que possuem falhas (com contagem)
+- Setores sem falhas ficam desabilitados
+- Botoes "Selecionar Todos" / "Limpar" + "Gerar PDF"
+- PDF gerado com jsPDF + autoTable, uma secao por setor
 
-**2. `src/pages/ConfirmShift.tsx`**
-- Alterar `parseSchedule()` (linhas 43-56) para usar os horarios individuais da escala com fallback para os do turno:
-  ```text
-  shift_start: data.start_time || shifts.start_time  (em vez de so shifts.start_time)
-  shift_end:   data.end_time   || shifts.end_time     (em vez de so shifts.end_time)
-  ```
+**Estrutura do PDF (por setor)**:
+```text
+[Logo] RELATORIO SETORIAL - [NOME DO SETOR]
+Unidade: [LOJA] | Periodo: [DATAS]
+Chefe: [CARGO RESPONSAVEL]
 
-**3. `src/components/escalas/D1SectorAccordion.tsx`**
-- No `SectorWhatsAppButton` (linhas 192-196), incluir o horario de cada funcionario na mensagem do WhatsApp "Cobrar Setor", para que o lider veja os horarios corretos de cada pessoa
+Apontamentos: X | Recorrentes: Y
 
-Nenhuma alteracao de banco de dados necessaria. Os horarios individuais ja estao salvos corretamente na tabela `schedules`.
+| # | Item | Detalhes | Recorrente? |
+| 1 | ...  | ...      | Sim (3x)    |
+
+--- quebra de pagina para proximo setor ---
+```
+
+Sem espaco de plano de acao, sem assinaturas. Direto ao ponto.
+
+**Arquivos**:
+- **Novo**: `src/components/audit-diagnostic/SectorReportGenerator.tsx`
+- **Editar**: `src/components/audit-diagnostic/index.ts` (adicionar export)
+- **Editar**: `src/components/dashboard/AuditDiagnosticDashboard.tsx` (importar e renderizar no header)
 
 ---
 
-### Detalhes tecnicos
+### PARTE 2: Alertas Automaticos
 
-**Edge Function - query atualizada:**
-```text
-SELECT:
-  id, schedule_date, status, confirmation_status, confirmation_responded_at,
-  employee_id, start_time, end_time,  <-- ADICIONAR estes 2 campos
-  employees!schedules_employee_id_fkey ( name ),
-  shifts!schedules_shift_id_fkey ( name, start_time, end_time ),
-  sectors!schedules_sector_id_fkey ( name )
-```
+**UI/UX**:
+- Card compacto "Alertas" acima dos KPIs quando houver alertas nao lidos
+- Feed com alertas organizados por severidade:
+  - Vermelho: auditoria abaixo de 70%
+  - Laranja: item recorrente (3+ vezes em 60 dias)
+  - Amarelo: plano de acao vencendo em 24h
+- Botao de acao rapida em cada alerta ("Ver Auditoria")
+- Marca como lido ao clicar
 
-**ConfirmShift.tsx - parseSchedule corrigido:**
-```text
-shift_start: data.start_time?.substring(0,5) || shifts.start_time?.substring(0,5)
-shift_end:   data.end_time?.substring(0,5)   || shifts.end_time?.substring(0,5)
-```
+**Implementacao**:
+- **Migracao**: Criar tabela `audit_alerts` com campos: id, loja_id, alert_type, severity, title, description, reference_id, is_read, created_at
+- RLS: admins veem todos, gerentes veem de suas lojas
+- **Nova Edge Function**: `generate-audit-alerts` - verifica condicoes criticas e insere alertas
+- **Novo**: `src/components/audit-diagnostic/AlertsFeed.tsx`
+- **Editar**: `src/components/dashboard/AuditDiagnosticDashboard.tsx` (renderizar AlertsFeed)
 
-**D1SectorAccordion.tsx - mensagem "Cobrar Setor" com horarios:**
-```text
-Para cada funcionario pendente:
-  "👤 *Nome* (HH:MM-HH:MM)"
-  "🔗 link_confirmacao"
-```
+---
 
-### Resumo das mudancas
-- 3 arquivos editados, nenhum arquivo novo
-- Nenhuma migracao de banco
-- A edge function precisa ser redeployada (automatico)
-- Freelancers ja funcionam no fluxo atual, a correcao dos horarios beneficia todos (CLT e freelancers igualmente)
+### PARTE 3: Analise com IA
+
+**UI/UX**:
+- Botao "Analisar com IA" (icone Sparkles) no header do Diagnostico
+- Ao clicar, envia falhas do periodo para a IA
+- Dialog com resultado formatado:
+  1. Resumo Executivo (2-3 paragrafos)
+  2. Padroes Identificados
+  3. Causas Raiz Sugeridas
+  4. Recomendacoes priorizadas
+- Botoes "Copiar" e "Imprimir"
+- Loading animado: "Analisando X falhas em Y setores..."
+
+**Implementacao**:
+- **Nova Edge Function**: `analyze-audit-patterns` usando Lovable AI (gemini-2.5-flash)
+- **Novo**: `src/components/audit-diagnostic/AIAnalysisButton.tsx`
+- **Editar**: `src/components/audit-diagnostic/index.ts` (export)
+- **Editar**: `src/components/dashboard/AuditDiagnosticDashboard.tsx` (renderizar)
+
+---
+
+### Resumo de arquivos
+
+| Arquivo | Acao | Parte |
+|---------|------|-------|
+| `src/components/audit-diagnostic/SectorReportGenerator.tsx` | Novo | 1 |
+| `src/components/audit-diagnostic/AIAnalysisButton.tsx` | Novo | 3 |
+| `src/components/audit-diagnostic/AlertsFeed.tsx` | Novo | 2 |
+| `src/components/audit-diagnostic/index.ts` | Editar | 1,2,3 |
+| `src/components/dashboard/AuditDiagnosticDashboard.tsx` | Editar | 1,2,3 |
+| `supabase/functions/generate-audit-alerts/index.ts` | Novo | 2 |
+| `supabase/functions/analyze-audit-patterns/index.ts` | Novo | 3 |
+| Migracao: tabela `audit_alerts` | Novo | 2 |
+
+### Ordem de implementacao
+1. Relatorio Setorial (impacto imediato, sem dependencia de banco)
+2. Analise IA (alto valor, sem migracao)
+3. Alertas Automaticos (requer migracao + edge function)
+

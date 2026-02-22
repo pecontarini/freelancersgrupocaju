@@ -55,6 +55,7 @@ import {
 } from "@/components/audit-diagnostic";
 import {
   ChecklistTemplateManager,
+  ChecklistTemplateList,
   ChecklistLinksPanel,
   ChecklistResponsesDashboard,
 } from "@/components/checklist-daily";
@@ -112,6 +113,8 @@ export function AuditDiagnosticDashboard({
   const [brandFilter, setBrandFilter] = useState("all");
   const [lojaFilter, setLojaFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("30d");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
 
   const dateRange = useMemo(() => getDateRange(periodFilter), [periodFilter]);
 
@@ -460,10 +463,23 @@ export function AuditDiagnosticDashboard({
           {effectiveLojaId ? (
             <>
               {(isAdmin || userIsAdmin) && (
-                <ChecklistTemplateManager
-                  lojaId={effectiveLojaId}
-                  lojaName={getLojaName(effectiveLojaId)}
-                />
+                <>
+                  <ChecklistTemplateList
+                    lojaId={effectiveLojaId}
+                    refreshKey={templateRefreshKey}
+                    onEdit={(id) => setEditingTemplateId(id)}
+                  />
+                  <ChecklistTemplateManager
+                    lojaId={effectiveLojaId}
+                    lojaName={getLojaName(effectiveLojaId)}
+                    editingTemplateId={editingTemplateId}
+                    onTemplateCreated={() => {
+                      setTemplateRefreshKey((k) => k + 1);
+                      setEditingTemplateId(null);
+                    }}
+                    onCancelEdit={() => setEditingTemplateId(null)}
+                  />
+                </>
               )}
               <ChecklistLinksPanel lojaId={effectiveLojaId} />
               <ChecklistResponsesDashboard lojaId={effectiveLojaId} />

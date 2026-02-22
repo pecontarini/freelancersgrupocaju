@@ -3,8 +3,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function jsonResponse(body: object, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,13 +24,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { action, access_token, responses, responded_by_name } = await req.json();
+    const { action, access_token, responses, responded_by_name, file_base64, file_name } = await req.json();
 
     if (!access_token) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Access token is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "Access token is required" }, 400);
     }
 
     // Validate the link
@@ -35,14 +39,57 @@ serve(async (req) => {
       .single();
 
     if (linkError || !link) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Link inválido ou inativo" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ success: false, error: "Link inválido ou inativo" }, 404);
     }
 
+    // ==================== UPLOAD PHOTO ====================
+    if (action === "upload-photo") {
+      if (!file_base64 || !file_name) {
+        return jsonResponse({ success: false, error: "file_base64 and file_name are required" }, 400);
+      }
+
+      // Validate extension
+      const ext = (file_name as string).split(".").pop()?.toLowerCase() || "";
+      if (!["jpg", "jpeg", "png", "webp", "heic"].includes(ext)) {
+        return jsonResponse({ success: false, error: "Formato de imagem não suportado. Use JPG, PNG ou WebP." }, 400);
+      }
+
+      // Decode base64
+      const binaryStr = atob(file_base64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      // Validate size (5MB max)
+      if (bytes.length > 5 * 1024 * 1024) {
+        return jsonResponse({ success: false, error: "Arquivo muito grande. Máximo 5MB." }, 400);
+      }
+
+      const filePath = `${access_token}/${crypto.randomUUID()}.${ext}`;
+      const contentType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("checklist-photos")
+        .upload(filePath, bytes, { contentType, upsert: true });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return jsonResponse({ success: false, error: "Erro ao fazer upload da foto" }, 500);
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("checklist-photos")
+        .getPublicUrl(uploadData.path);
+
+      return jsonResponse({
+        success: true,
+        data: { public_url: publicData.publicUrl },
+      });
+    }
+
+    // ==================== FETCH ====================
     if (action === "fetch") {
-      // Build query for items - filter by template_id if the link has one
       let query = supabase
         .from("checklist_template_items")
         .select("id, item_text, item_order, weight, original_category, checklist_templates!inner(id, loja_id, is_active)")
@@ -50,7 +97,6 @@ serve(async (req) => {
         .eq("checklist_templates.loja_id", link.loja_id)
         .eq("checklist_templates.is_active", true);
 
-      // If link has template_id, filter by it
       if (link.template_id) {
         query = query.eq("checklist_templates.id", link.template_id);
       }
@@ -59,13 +105,9 @@ serve(async (req) => {
 
       if (itemsError) {
         console.error("Error fetching items:", itemsError);
-        return new Response(
-          JSON.stringify({ success: false, error: "Failed to fetch checklist items" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ success: false, error: "Failed to fetch checklist items" }, 500);
       }
 
-      // Get template name for display
       let templateName = "";
       if (link.template_id) {
         const { data: tmpl } = await supabase
@@ -76,7 +118,6 @@ serve(async (req) => {
         templateName = tmpl?.name || "";
       }
 
-      // Check if already submitted today
       const today = new Date().toISOString().split("T")[0];
       let existingQuery = supabase
         .from("checklist_responses")
@@ -90,40 +131,32 @@ serve(async (req) => {
 
       const { data: existingResponse } = await existingQuery.maybeSingle();
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            link_id: link.id,
-            loja_id: link.loja_id,
-            loja_name: link.config_lojas?.nome || "Unidade",
-            sector_code: link.sector_code,
-            template_id: link.template_id || null,
-            template_name: templateName,
-            items: items || [],
-            already_submitted: !!existingResponse,
-            existing_score: existingResponse?.total_score || null,
-          },
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: true,
+        data: {
+          link_id: link.id,
+          loja_id: link.loja_id,
+          loja_name: link.config_lojas?.nome || "Unidade",
+          sector_code: link.sector_code,
+          template_id: link.template_id || null,
+          template_name: templateName,
+          items: items || [],
+          already_submitted: !!existingResponse,
+          existing_score: existingResponse?.total_score || null,
+        },
+      });
     }
 
+    // ==================== SUBMIT ====================
     if (action === "submit") {
       if (!responses || !Array.isArray(responses)) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Responses array is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ success: false, error: "Responses array is required" }, 400);
       }
 
       // Validate all items have photos
       const missingPhotos = responses.filter((r: any) => !r.photo_url);
       if (missingPhotos.length > 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: `${missingPhotos.length} item(ns) sem foto. Foto é obrigatória para todos os itens.` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ success: false, error: `${missingPhotos.length} item(ns) sem foto. Foto é obrigatória para todos os itens.` }, 400);
       }
 
       // Get item weights for score calculation
@@ -138,7 +171,6 @@ serve(async (req) => {
         weightMap[item.id] = item.weight || 1;
       });
 
-      // Calculate score
       let totalWeight = 0;
       let conformingWeight = 0;
       let conformingCount = 0;
@@ -155,7 +187,6 @@ serve(async (req) => {
       const score = totalWeight > 0 ? (conformingWeight / totalWeight) * 100 : 0;
       const today = new Date().toISOString().split("T")[0];
 
-      // Insert response
       const { data: response, error: responseError } = await supabase
         .from("checklist_responses")
         .insert({
@@ -174,13 +205,9 @@ serve(async (req) => {
 
       if (responseError) {
         console.error("Error inserting response:", responseError);
-        return new Response(
-          JSON.stringify({ success: false, error: "Failed to save response" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ success: false, error: "Failed to save response" }, 500);
       }
 
-      // Insert response items
       const responseItems = responses.map((r: any) => ({
         response_id: response.id,
         template_item_id: r.template_item_id,
@@ -197,31 +224,22 @@ serve(async (req) => {
         console.error("Error inserting response items:", itemsError);
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            response_id: response.id,
-            total_score: response.total_score,
-            total_items: response.total_items,
-            conforming_items: response.conforming_items,
-            sector_code: link.sector_code,
-            loja_name: link.config_lojas?.nome || "Unidade",
-          },
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({
+        success: true,
+        data: {
+          response_id: response.id,
+          total_score: response.total_score,
+          total_items: response.total_items,
+          conforming_items: response.conforming_items,
+          sector_code: link.sector_code,
+          loja_name: link.config_lojas?.nome || "Unidade",
+        },
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: false, error: "Invalid action. Use 'fetch' or 'submit'" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: false, error: "Invalid action. Use 'fetch', 'submit', or 'upload-photo'" }, 400);
   } catch (error) {
     console.error("Error in submit-daily-checklist:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ success: false, error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
 });

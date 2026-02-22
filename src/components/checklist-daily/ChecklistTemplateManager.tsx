@@ -185,7 +185,10 @@ export function ChecklistTemplateManager({ lojaId, lojaName, editingTemplateId, 
     try {
       setSaving(true);
 
+      let savedTemplateId: string;
+
       if (isEditing && editingTemplateId) {
+        savedTemplateId = editingTemplateId;
         // Update existing template
         const { error: nameError } = await supabase
           .from("checklist_templates")
@@ -229,6 +232,7 @@ export function ChecklistTemplateManager({ lojaId, lojaName, editingTemplateId, 
           .single();
 
         if (templateError) throw templateError;
+        savedTemplateId = template.id;
 
         const templateItems = items.map((item) => ({
           template_id: template.id,
@@ -246,6 +250,40 @@ export function ChecklistTemplateManager({ lojaId, lojaName, editingTemplateId, 
         if (itemsError) throw itemsError;
 
         toast.success("Template salvo e ativado!");
+      }
+
+      // Auto-generate sector links for this template
+      const distinctSectors = [...new Set(items.filter(i => i.sector_code).map(i => i.sector_code!))];
+
+      if (distinctSectors.length > 0) {
+        // Check existing links for this template
+        const { data: existingLinks } = await supabase
+          .from("checklist_sector_links")
+          .select("sector_code")
+          .eq("loja_id", lojaId)
+          .eq("template_id", savedTemplateId);
+
+        const existingSectors = new Set((existingLinks || []).map(l => l.sector_code));
+        const newSectors = distinctSectors.filter(s => !existingSectors.has(s));
+
+        if (newSectors.length > 0) {
+          const linksToInsert = newSectors.map(sector => ({
+            loja_id: lojaId,
+            sector_code: sector,
+            template_id: savedTemplateId,
+            is_active: true,
+          }));
+
+          const { error: linksError } = await supabase
+            .from("checklist_sector_links")
+            .insert(linksToInsert);
+
+          if (linksError) {
+            console.error("Error creating links:", linksError);
+          } else {
+            toast.success(`${newSectors.length} link(s) de setor gerado(s) automaticamente!`);
+          }
+        }
       }
 
       resetForm();

@@ -143,29 +143,40 @@ export default function DailyChecklist() {
   async function handlePhotoUpload(itemId: string, file: File) {
     try {
       setUploadingPhoto(itemId);
-      
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${accessToken}/${itemId}_${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from("checklist-photos")
-        .upload(fileName, file, { upsert: true });
 
-      if (error) {
-        toast.error("Erro ao enviar foto");
-        console.error("Upload error:", error);
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]); // strip data:...;base64, prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-daily-checklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "upload-photo",
+          access_token: accessToken,
+          file_base64: base64,
+          file_name: file.name,
+        }),
+      });
+
+      const json = await res.json();
+      if (!json.success) {
+        toast.error(json.error || "Erro ao enviar foto");
         return;
       }
 
-      const { data: publicData } = supabase.storage
-        .from("checklist-photos")
-        .getPublicUrl(data.path);
-
       setResponses((prev) => ({
         ...prev,
-        [itemId]: { ...prev[itemId], photo_url: publicData.publicUrl },
+        [itemId]: { ...prev[itemId], photo_url: json.data.public_url },
       }));
-      
+
       toast.success("Foto anexada!");
     } catch {
       toast.error("Erro ao enviar foto");

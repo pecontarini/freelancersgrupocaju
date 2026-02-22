@@ -116,8 +116,15 @@ export default function DailyChecklist() {
 
   const progressPercent = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
   const allAnswered = answeredCount === items.length && items.length > 0;
-  const allPhotos = photosCount === items.length && items.length > 0;
-  const canSubmit = allAnswered && allPhotos && respondedByName.trim().length > 0;
+
+  // Check that all non-conforming items have an observation
+  const allNonConformingHaveObs = useMemo(() => {
+    return Object.values(responses).every(
+      (r) => r.is_conforming !== false || (r.observation && r.observation.trim().length > 0)
+    );
+  }, [responses]);
+
+  const canSubmit = allAnswered && allNonConformingHaveObs && respondedByName.trim().length > 0;
 
   const sectorDisplayName = SECTOR_POSITION_MAP[sectorCode as AuditSector]?.displayName || sectorCode;
   const today = format(new Date(), "dd 'de' MMMM, yyyy (EEEE)", { locale: ptBR });
@@ -127,6 +134,10 @@ export default function DailyChecklist() {
       ...prev,
       [itemId]: { ...prev[itemId], is_conforming: conforming },
     }));
+    // Auto-expand observation when marking as non-conforming
+    if (!conforming) {
+      setExpandedObs((prev) => ({ ...prev, [itemId]: true }));
+    }
   }
 
   function setObservation(itemId: string, obs: string) {
@@ -198,8 +209,8 @@ export default function DailyChecklist() {
       toast.error("Responda todos os itens antes de enviar");
       return;
     }
-    if (!allPhotos) {
-      toast.error("Anexe foto em todos os itens antes de enviar");
+    if (!allNonConformingHaveObs) {
+      toast.error("Preencha a observação em todos os itens marcados como NÃO");
       return;
     }
 
@@ -514,7 +525,7 @@ export default function DailyChecklist() {
         {/* Progress */}
         <div className="space-y-1">
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Progresso: {answeredCount}/{items.length} itens • 📷 {photosCount}/{items.length} fotos</span>
+            <span>Progresso: {answeredCount}/{items.length} itens</span>
             <span>{progressPercent.toFixed(0)}%</span>
           </div>
           <Progress value={progressPercent} className="h-2" />
@@ -540,59 +551,6 @@ export default function DailyChecklist() {
                 {item.weight !== 1 && (
                   <span className="text-xs text-muted-foreground ml-8">Peso: {item.weight}</span>
                 )}
-
-                {/* Photo upload */}
-                <div className="ml-8">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    ref={(el) => { fileInputRefs.current[item.id] = el; }}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handlePhotoUpload(item.id, file);
-                      e.target.value = "";
-                    }}
-                  />
-                  
-                  {hasPhoto ? (
-                    <div className="relative">
-                      <img
-                        src={resp.photo_url!}
-                        alt="Foto do item"
-                        className="w-full h-32 object-cover rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="absolute bottom-2 right-2 gap-1 h-7 text-xs"
-                        onClick={() => triggerFileInput(item.id)}
-                      >
-                        <Camera className="h-3 w-3" />
-                        Trocar
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full gap-2 border-dashed h-20 flex-col"
-                      onClick={() => triggerFileInput(item.id)}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <>
-                          <Camera className="h-5 w-5 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Tirar foto ou anexar imagem *</span>
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
 
                 <div className="flex items-center gap-2 ml-8">
                   <Button
@@ -628,14 +586,70 @@ export default function DailyChecklist() {
                   </Button>
                 </div>
 
-                {showObs && (
-                  <div className="ml-8">
+                {/* Photo upload (optional) */}
+                {(showObs || isNo) && (
+                  <div className="ml-8 space-y-2">
                     <Textarea
-                      placeholder="Observação (opcional)"
-                      className="text-sm h-16"
+                      placeholder={isNo ? "Descreva o problema encontrado *" : "Observação (opcional)"}
+                      className={`text-sm h-16 ${isNo && !(resp?.observation?.trim()) ? "border-red-400" : ""}`}
                       value={resp?.observation || ""}
                       onChange={(e) => setObservation(item.id, e.target.value)}
                     />
+                    {isNo && !(resp?.observation?.trim()) && (
+                      <p className="text-xs text-red-500">⚠ Observação obrigatória para itens não conformes</p>
+                    )}
+                    
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        ref={(el) => { fileInputRefs.current[item.id] = el; }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePhotoUpload(item.id, file);
+                          e.target.value = "";
+                        }}
+                      />
+                      {hasPhoto ? (
+                        <div className="relative">
+                          <img
+                            src={resp.photo_url!}
+                            alt="Foto do item"
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="absolute bottom-2 right-2 gap-1 h-7 text-xs"
+                            onClick={() => triggerFileInput(item.id)}
+                          >
+                            <Camera className="h-3 w-3" />
+                            Trocar
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => triggerFileInput(item.id)}
+                          disabled={isUploading}
+                        >
+                          {isUploading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Camera className="h-4 w-4" />
+                              <span className="text-xs">Anexar foto (opcional)</span>
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
               </Card>
@@ -650,7 +664,7 @@ export default function DailyChecklist() {
           {!canSubmit && items.length > 0 && (
             <p className="text-xs text-center text-muted-foreground">
               {!allAnswered && `Responda todos os ${items.length} itens. `}
-              {!allPhotos && `Anexe foto em todos os ${items.length} itens. `}
+              {!allNonConformingHaveObs && "Preencha observação nos itens NÃO. "}
               {!respondedByName.trim() && "Informe seu nome."}
             </p>
           )}
@@ -664,7 +678,7 @@ export default function DailyChecklist() {
             ) : (
               <Send className="h-5 w-5" />
             )}
-            Enviar Checklist ({photosCount}/{items.length} 📷)
+            Enviar Checklist ({answeredCount}/{items.length})
           </Button>
         </div>
       </div>

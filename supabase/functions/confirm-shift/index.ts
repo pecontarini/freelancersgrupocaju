@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       .from("schedules")
       .select(`
         id, schedule_date, status, confirmation_status, confirmation_responded_at,
-        employee_id,
+        employee_id, start_time, end_time,
         employees!schedules_employee_id_fkey ( name ),
         shifts!schedules_shift_id_fkey ( name, start_time, end_time ),
         sectors!schedules_sector_id_fkey ( name )

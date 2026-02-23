@@ -1,60 +1,84 @@
 
+## Plano: Exportacao Executiva da Escala Geral (Excel + PDF)
 
-## Plano: Checklist Publico sem Login + Correcoes de Estabilidade
+### Objetivo
 
-### Problemas Encontrados
+Elevar a exportacao da Escala Geral para nivel de entrega ao diretor, com dois formatos profissionais.
 
-1. **Link pede login para enviar fotos**: A pagina `DailyChecklist.tsx` usa `supabase.storage.upload()` no client-side, que exige autenticacao. O bucket `checklist-photos` tem politica de SELECT publica, mas NAO tem politica de INSERT -- logo o upload falha sem login.
+---
 
-2. **Segundo template sem links gerados**: O template "Supervisor de Back - Ricardo" (64 itens, todos mapeados) tem 0 links porque o usuario precisa clicar "Gerar Links" manualmente apos criar o template. O sistema funciona, mas a UX nao deixa claro que e necessario gerar os links.
+### 1. Excel Executivo (.xlsx)
 
-### Solucao
+Reformular `src/lib/scheduleMasterExport.ts` para gerar um arquivo visualmente organizado:
 
-#### 1. Upload de fotos sem login via Edge Function
+**Por aba (setor):**
+- Linha 1: Cabecalho mesclado com nome do setor, unidade e periodo (merge cells)
+- Linha 3: Header dos dias com fundo vermelho institucional (#D05937), texto branco, negrito
+- Funcionarios CLT em linhas alternadas (branco/cinza claro) para facilitar leitura
+- Linha separadora "EXTRAS" com fundo laranja claro antes dos freelancers
+- Freelancers com fundo laranja suave para diferenciar visualmente
+- Celulas de FOLGA com fundo cinza escuro e texto branco
+- Celulas de FERIAS com fundo roxo claro
+- Celulas de horario com texto centralizado
+- Linha "RESUMO DO DIA" com fundo amarelo claro e negrito
+- Linhas POP com fundo cinza claro e labels em negrito
+- Coluna de nomes com largura 32, colunas de dias com largura 22
+- Bordas finas em todas as celulas de dados
 
-Em vez de usar `supabase.storage.upload()` no cliente (que exige auth), vamos enviar a foto para a edge function `submit-daily-checklist` com uma nova action `upload-photo`. A edge function usa `service_role` e consegue fazer upload no storage sem autenticacao do usuario.
+**Nota tecnica:** A lib `xlsx` (SheetJS community/open-source) NAO suporta estilos de celula (cores, negrito, bordas). Para contornar isso, vamos trocar para a lib `xlsx-js-style`, que e um fork compativel que adiciona suporte completo a estilos. Alternativa: como o projeto ja usa `xlsx`, vamos maximizar a organizacao via estrutura (merges, larguras, linhas separadoras claras) e gerar o arquivo mais limpo possivel com a lib atual.
 
-**Fluxo:**
-1. Chefe tira foto no celular
-2. Foto e convertida para base64 no frontend
-3. Frontend envia para `submit-daily-checklist` com action `upload-photo`
-4. Edge function faz upload no bucket `checklist-photos` com service_role
-5. Edge function retorna a URL publica da foto
-6. Frontend exibe preview e salva a URL no estado
+**Aba extra "Resumo Geral":**
+- Tabela consolidada: Setor | Seg | Ter | ... | Dom (com contagens Efetivos/Extras/Total)
+- Totais gerais na ultima linha
 
-#### 2. Gerar links automaticamente ao criar template
+### 2. PDF Institucional (.pdf) -- Novo arquivo
 
-Ao salvar um template (novo ou editado), o sistema automaticamente gera os links por setor para todos os setores mapeados. O usuario nao precisa mais clicar "Gerar Links" separadamente.
+Criar `src/lib/scheduleMasterPdf.ts` usando jsPDF + autoTable, reutilizando o tema de `grupoCajuPdfTheme.ts`:
 
-### Detalhes Tecnicos
+**Pagina 1 -- Capa:**
+- Logo Grupo Caju centralizado
+- Titulo: "Escala Operacional Semanal"
+- Unidade e Periodo
+- Data de emissao
+- Linha institucional vermelha
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `supabase/functions/submit-daily-checklist/index.ts` | Adicionar action `upload-photo` que recebe base64, faz upload no storage com service_role e retorna URL publica |
-| `src/pages/DailyChecklist.tsx` | Substituir `supabase.storage.upload()` por chamada a edge function via `fetch()`. Converter arquivo para base64 antes de enviar |
-| `src/components/checklist-daily/ChecklistTemplateManager.tsx` | Apos salvar template, chamar automaticamente a geracao de links para os setores mapeados |
+**Paginas seguintes -- Uma por setor:**
+- Mini-header com logo pequeno + nome do setor
+- Tabela com jspdf-autotable:
+  - Header vermelho institucional com texto branco
+  - Colunas: Funcionario | Seg (dd/MM) | Ter | ... | Dom
+  - Celulas FOLGA em cinza, FERIAS em roxo, horarios normais em branco
+  - Freelancers com nome em laranja e tag [EXTRA]
+  - Linhas alternadas para legibilidade
+- Bloco de resumo abaixo: Efetivos / Extras / Total por dia
+- Bloco POP por turno
 
-#### Edge Function -- Nova action `upload-photo`
+**Rodape em todas as paginas:**
+- Data de geracao | "Grupo Caju - Escala Operacional" | Pagina X/Y
 
-Recebe:
-- `action: "upload-photo"`
-- `access_token`: token do link (para validar que e um link ativo)
-- `file_base64`: conteudo da foto em base64
-- `file_name`: nome do arquivo
+### 3. Botao com Dropdown
 
-Retorna:
-- `{ success: true, data: { public_url: "..." } }`
+Converter `src/components/escalas/MasterExportButton.tsx` de botao unico para dropdown com:
+- "Baixar Excel (.xlsx)" -- chama exportMasterSchedule
+- "Baixar PDF (.pdf)" -- chama exportMasterSchedulePdf
 
-Validacoes:
-- Token deve ser de um link ativo
-- Arquivo deve ter no maximo 5MB
-- Extensao deve ser imagem (jpg, png, webp)
+---
 
-#### Geracao automatica de links
+### Arquivos
 
-No `ChecklistTemplateManager.handleSave()`, apos salvar o template e os itens:
-1. Buscar todos os `sector_code` distintos dos itens salvos
-2. Buscar links existentes para esse template
-3. Inserir links para setores que ainda nao tem link
-4. Exibir toast informando quantos links foram gerados
+| Arquivo | Acao |
+|---------|------|
+| `src/lib/scheduleMasterExport.ts` | Refatorar: adicionar merges no cabecalho, aba "Resumo Geral", linhas separadoras mais claras, larguras otimizadas |
+| `src/lib/scheduleMasterPdf.ts` | **Novo**: PDF institucional com capa + tabelas por setor + resumo + POP + rodape |
+| `src/components/escalas/MasterExportButton.tsx` | Converter para dropdown com opcoes Excel e PDF |
 
+### Dados utilizados
+
+Ambos os formatos puxam exatamente os mesmos dados:
+- `sectors` -- setores da unidade
+- `schedules` -- escalas da semana
+- `employees` -- funcionarios ativos (nome, tipo CLT/extra)
+- `staffing_matrix` -- POP efetivo minimo (required_count + extras_count por setor/dia/turno)
+- `shifts` -- tipos de turno (almoco, jantar, etc.)
+
+A logica de fetch sera extraida para uma funcao compartilhada `fetchScheduleData()` para evitar duplicacao entre Excel e PDF.

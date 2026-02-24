@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.submit-daily-checklist]
 verify_jwt = false
+
+[functions.submit-checklist-correction]
+verify_jwt = false

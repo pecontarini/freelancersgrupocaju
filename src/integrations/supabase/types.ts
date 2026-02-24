@@ -433,6 +433,64 @@ export type Database = {
         }
         Relationships: []
       }
+      checklist_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by_name: string
+          correction_note: string | null
+          correction_photo_url: string
+          created_at: string
+          id: string
+          loja_id: string
+          response_id: string
+          response_item_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by_name: string
+          correction_note?: string | null
+          correction_photo_url: string
+          created_at?: string
+          id?: string
+          loja_id: string
+          response_id: string
+          response_item_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by_name?: string
+          correction_note?: string | null
+          correction_photo_url?: string
+          created_at?: string
+          id?: string
+          loja_id?: string
+          response_id?: string
+          response_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_corrections_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_corrections_response_id_fkey"
+            columns: ["response_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_corrections_response_item_id_fkey"
+            columns: ["response_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_response_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_response_items: {
         Row: {
           created_at: string

@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ConfirmShift from "./pages/ConfirmShift";
 import DailyChecklist from "./pages/DailyChecklist";
+import ChecklistCorrections from "./pages/ChecklistCorrections";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,10 @@ function App() {
                 <Route
                   path="/checklist/:accessToken"
                   element={<DailyChecklist />}
+                />
+                <Route
+                  path="/checklist-corrections/:responseId/:accessToken"
+                  element={<ChecklistCorrections />}
                 />
                 <Route
                   path="/"

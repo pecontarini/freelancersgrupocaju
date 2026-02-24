@@ -496,6 +496,7 @@ export type Database = {
           created_at: string
           id: string
           is_conforming: boolean
+          is_na: boolean
           observation: string | null
           photo_url: string | null
           response_id: string
@@ -505,6 +506,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_conforming?: boolean
+          is_na?: boolean
           observation?: string | null
           photo_url?: string | null
           response_id: string
@@ -514,6 +516,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_conforming?: boolean
+          is_na?: boolean
           observation?: string | null
           photo_url?: string | null
           response_id?: string

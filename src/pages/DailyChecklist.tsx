@@ -28,6 +28,7 @@ interface ChecklistItem {
 interface ItemResponse {
   template_item_id: string;
   is_conforming: boolean | null;
+  is_na: boolean;
   observation: string;
   photo_url: string | null;
 }
@@ -94,6 +95,7 @@ export default function DailyChecklist() {
         initial[item.id] = {
           template_item_id: item.id,
           is_conforming: null,
+          is_na: false,
           observation: "",
           photo_url: null,
         };
@@ -107,7 +109,11 @@ export default function DailyChecklist() {
   }
 
   const answeredCount = useMemo(() => {
-    return Object.values(responses).filter((r) => r.is_conforming !== null).length;
+    return Object.values(responses).filter((r) => r.is_conforming !== null || r.is_na).length;
+  }, [responses]);
+
+  const naCount = useMemo(() => {
+    return Object.values(responses).filter((r) => r.is_na).length;
   }, [responses]);
 
   const photosCount = useMemo(() => {
@@ -117,17 +123,17 @@ export default function DailyChecklist() {
   const progressPercent = items.length > 0 ? (answeredCount / items.length) * 100 : 0;
   const allAnswered = answeredCount === items.length && items.length > 0;
 
-  // Check that all non-conforming items have an observation
+  // Check that all non-conforming items have an observation (N/A items are exempt)
   const allNonConformingHaveObs = useMemo(() => {
     return Object.values(responses).every(
-      (r) => r.is_conforming !== false || (r.observation && r.observation.trim().length > 0)
+      (r) => r.is_na || r.is_conforming !== false || (r.observation && r.observation.trim().length > 0)
     );
   }, [responses]);
 
-  // Check that all non-conforming items have a photo
+  // Check that all non-conforming items have a photo (N/A items are exempt)
   const allNonConformingHavePhoto = useMemo(() => {
     return Object.values(responses).every(
-      (r) => r.is_conforming !== false || (r.photo_url && r.photo_url.length > 0)
+      (r) => r.is_na || r.is_conforming !== false || (r.photo_url && r.photo_url.length > 0)
     );
   }, [responses]);
 
@@ -139,12 +145,31 @@ export default function DailyChecklist() {
   function setAnswer(itemId: string, conforming: boolean) {
     setResponses((prev) => ({
       ...prev,
-      [itemId]: { ...prev[itemId], is_conforming: conforming },
+      [itemId]: { ...prev[itemId], is_conforming: conforming, is_na: false },
     }));
     // Auto-expand observation when marking as non-conforming
     if (!conforming) {
       setExpandedObs((prev) => ({ ...prev, [itemId]: true }));
     }
+  }
+
+  function setNA(itemId: string) {
+    setResponses((prev) => {
+      const current = prev[itemId];
+      const wasNA = current.is_na;
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          is_na: !wasNA,
+          is_conforming: wasNA ? null : null,
+          observation: wasNA ? current.observation : "",
+          photo_url: wasNA ? current.photo_url : null,
+        },
+      };
+    });
+    // Collapse obs panel when marking as N/A
+    setExpandedObs((prev) => ({ ...prev, [itemId]: false }));
   }
 
   function setObservation(itemId: string, obs: string) {
@@ -236,7 +261,8 @@ export default function DailyChecklist() {
           responded_by_name: respondedByName.trim(),
           responses: Object.values(responses).map((r) => ({
             template_item_id: r.template_item_id,
-            is_conforming: r.is_conforming,
+            is_conforming: r.is_na ? null : r.is_conforming,
+            is_na: r.is_na,
             observation: r.observation || null,
             photo_url: r.photo_url || null,
           })),
@@ -278,7 +304,9 @@ export default function DailyChecklist() {
     const margin = PDF_LAYOUT.margin;
     const pageWidth = doc.internal.pageSize.getWidth();
     const dateStr = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-    const nonConforming = result.total_items - result.conforming_items;
+    const naItems = Object.values(responses).filter((r) => r.is_na).length;
+    const evaluatedItems = result.total_items - naItems;
+    const nonConforming = evaluatedItems - result.conforming_items;
 
     // === PAGE 1: EXECUTIVE COVER ===
     addChecklistCover(doc, {
@@ -300,8 +328,8 @@ export default function DailyChecklist() {
 
     const tableData = items.map((item, idx) => {
       const resp = responses[item.id];
-      const conformeText = resp?.is_conforming === true ? "✓" : resp?.is_conforming === false ? "✗" : "—";
-      return [String(idx + 1), item.item_text, conformeText, resp?.observation || ""];
+      const conformeText = resp?.is_na ? "N/A" : resp?.is_conforming === true ? "✓" : resp?.is_conforming === false ? "✗" : "—";
+      return [String(idx + 1), item.item_text, conformeText, resp?.is_na ? "" : (resp?.observation || "")];
     });
 
     autoTable(doc, {
@@ -333,6 +361,9 @@ export default function DailyChecklist() {
           } else if (data.cell.raw === "✓") {
             data.cell.styles.textColor = PDF_COLORS.success;
             data.cell.styles.fontSize = 12;
+          } else if (data.cell.raw === "N/A") {
+            data.cell.styles.textColor = [150, 150, 150] as any;
+            data.cell.styles.fontStyle = "italic";
           }
         }
       },
@@ -341,7 +372,7 @@ export default function DailyChecklist() {
     // === PHOTO EVIDENCE SECTION ===
     const ncItems = items.filter((item) => {
       const resp = responses[item.id];
-      return resp?.is_conforming === false && resp?.photo_url;
+      return !resp?.is_na && resp?.is_conforming === false && resp?.photo_url;
     });
 
     if (ncItems.length > 0) {
@@ -378,13 +409,16 @@ export default function DailyChecklist() {
   async function handleWhatsAppPDF(result: SubmitResult) {
     await handleDownloadPDF(result);
     const scoreEmoji = result.total_score >= 90 ? "🟢" : result.total_score >= 70 ? "🟡" : "🔴";
-    const nonConforming = result.total_items - result.conforming_items;
+    const naItemsCount = Object.values(responses).filter((r) => r.is_na).length;
+    const evaluatedItems = result.total_items - naItemsCount;
+    const nonConforming = evaluatedItems - result.conforming_items;
     let text = `📋 *Checklist Diário — ${sectorDisplayName}*\n`;
     if (templateName) text += `📄 *${templateName}*\n`;
     text += `🏪 ${result.loja_name} • ${format(new Date(), "dd/MM/yyyy")}\n`;
     text += `${scoreEmoji} *Nota: ${result.total_score.toFixed(0)}%*\n`;
-    text += `✅ ${result.conforming_items} conformes | ❌ ${nonConforming} não conformes\n\n`;
-    text += `📎 _O PDF completo foi baixado. Por favor, anexe-o a esta conversa._`;
+    text += `✅ ${result.conforming_items} conformes | ❌ ${nonConforming} não conformes`;
+    if (naItemsCount > 0) text += ` | ⬜ ${naItemsCount} N/A`;
+    text += `\n\n📎 _O PDF completo foi baixado. Por favor, anexe-o a esta conversa._`;
 
     setTimeout(() => {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
@@ -408,15 +442,21 @@ export default function DailyChecklist() {
           <p className="text-sm text-muted-foreground">📄 {templateName}</p>
         )}
         <p className="text-muted-foreground">{format(new Date(), "dd/MM/yyyy")}</p>
-        <div className="flex gap-8 text-sm">
+        <div className="flex gap-6 text-sm flex-wrap justify-center">
           <div>
             <span className="font-bold text-green-600">{submitResult.conforming_items}</span>
             <span className="text-muted-foreground"> conformes</span>
           </div>
           <div>
-            <span className="font-bold text-red-600">{submitResult.total_items - submitResult.conforming_items}</span>
+            <span className="font-bold text-red-600">{submitResult.total_items - submitResult.conforming_items - naCount}</span>
             <span className="text-muted-foreground"> não conformes</span>
           </div>
+          {naCount > 0 && (
+            <div>
+              <span className="font-bold text-gray-500">{naCount}</span>
+              <span className="text-muted-foreground"> N/A</span>
+            </div>
+          )}
         </div>
         
         <div className="flex flex-col gap-3 w-full max-w-xs mt-4">
@@ -498,14 +538,15 @@ export default function DailyChecklist() {
         <div className="space-y-3">
           {items.map((item, idx) => {
             const resp = responses[item.id];
-            const isYes = resp?.is_conforming === true;
-            const isNo = resp?.is_conforming === false;
-            const showObs = expandedObs[item.id];
+            const isYes = !resp?.is_na && resp?.is_conforming === true;
+            const isNo = !resp?.is_na && resp?.is_conforming === false;
+            const isNA = !!resp?.is_na;
+            const showObs = expandedObs[item.id] && !isNA;
             const hasPhoto = !!resp?.photo_url;
             const isUploading = uploadingPhoto === item.id;
 
             return (
-              <Card key={item.id} className="p-4 space-y-3">
+              <Card key={item.id} className={`p-4 space-y-3 ${isNA ? "opacity-60 bg-muted/50" : ""}`}>
                 <div className="flex gap-2">
                   <span className="text-sm font-bold text-muted-foreground min-w-[28px]">{idx + 1}.</span>
                   <p className="text-sm font-medium flex-1">{item.item_text}</p>
@@ -515,13 +556,14 @@ export default function DailyChecklist() {
                   <span className="text-xs text-muted-foreground ml-8">Peso: {item.weight}</span>
                 )}
 
-                <div className="flex items-center gap-2 ml-8">
+                <div className="flex items-center gap-2 ml-8 flex-wrap">
                   <Button
                     type="button"
                     size="sm"
                     variant={isYes ? "default" : "outline"}
                     className={`gap-1.5 ${isYes ? "bg-green-600 hover:bg-green-700 text-white" : ""}`}
                     onClick={() => setAnswer(item.id, true)}
+                    disabled={isNA}
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     SIM
@@ -532,21 +574,33 @@ export default function DailyChecklist() {
                     variant={isNo ? "default" : "outline"}
                     className={`gap-1.5 ${isNo ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
                     onClick={() => setAnswer(item.id, false)}
+                    disabled={isNA}
                   >
                     <XCircle className="h-4 w-4" />
                     NÃO
                   </Button>
-
                   <Button
                     type="button"
                     size="sm"
-                    variant="ghost"
-                    className="ml-auto gap-1"
-                    onClick={() => toggleObs(item.id)}
+                    variant={isNA ? "default" : "outline"}
+                    className={`gap-1.5 ${isNA ? "bg-gray-500 hover:bg-gray-600 text-white" : ""}`}
+                    onClick={() => setNA(item.id)}
                   >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    {showObs ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    N/A
                   </Button>
+
+                  {!isNA && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto gap-1"
+                      onClick={() => toggleObs(item.id)}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      {showObs ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Photo upload (optional) */}

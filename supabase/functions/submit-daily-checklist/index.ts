@@ -153,14 +153,14 @@ serve(async (req) => {
         return jsonResponse({ success: false, error: "Responses array is required" }, 400);
       }
 
-      // Validate non-conforming items have observations
-      const missingObs = responses.filter((r: any) => r.is_conforming === false && (!r.observation || !r.observation.trim()));
+      // Validate non-conforming items have observations (skip N/A items)
+      const missingObs = responses.filter((r: any) => !r.is_na && r.is_conforming === false && (!r.observation || !r.observation.trim()));
       if (missingObs.length > 0) {
         return jsonResponse({ success: false, error: `${missingObs.length} item(ns) não conforme(s) sem observação. Observação é obrigatória para itens marcados como NÃO.` }, 400);
       }
 
-      // Validate non-conforming items have photos
-      const missingPhotos = responses.filter((r: any) => r.is_conforming === false && (!r.photo_url || !r.photo_url.trim()));
+      // Validate non-conforming items have photos (skip N/A items)
+      const missingPhotos = responses.filter((r: any) => !r.is_na && r.is_conforming === false && (!r.photo_url || !r.photo_url.trim()));
       if (missingPhotos.length > 0) {
         return jsonResponse({ success: false, error: `${missingPhotos.length} item(ns) não conforme(s) sem foto. Foto é obrigatória para itens marcados como NÃO.` }, 400);
       }
@@ -180,8 +180,13 @@ serve(async (req) => {
       let totalWeight = 0;
       let conformingWeight = 0;
       let conformingCount = 0;
+      let naCount = 0;
 
       responses.forEach((r: any) => {
+        if (r.is_na) {
+          naCount++;
+          return; // Skip N/A items from score calculation
+        }
         const weight = weightMap[r.template_item_id] || 1;
         totalWeight += weight;
         if (r.is_conforming) {
@@ -202,7 +207,7 @@ serve(async (req) => {
           template_id: link.template_id || null,
           response_date: today,
           total_score: Math.round(score * 100) / 100,
-          total_items: responses.length,
+          total_items: responses.length - naCount,
           conforming_items: conformingCount,
           responded_by_name: responded_by_name || "Anônimo",
         })
@@ -217,7 +222,8 @@ serve(async (req) => {
       const responseItems = responses.map((r: any) => ({
         response_id: response.id,
         template_item_id: r.template_item_id,
-        is_conforming: r.is_conforming,
+        is_conforming: r.is_na ? false : r.is_conforming,
+        is_na: r.is_na || false,
         observation: r.observation || null,
         photo_url: r.photo_url || null,
       }));

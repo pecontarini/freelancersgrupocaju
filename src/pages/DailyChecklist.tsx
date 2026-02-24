@@ -124,7 +124,14 @@ export default function DailyChecklist() {
     );
   }, [responses]);
 
-  const canSubmit = allAnswered && allNonConformingHaveObs && respondedByName.trim().length > 0;
+  // Check that all non-conforming items have a photo
+  const allNonConformingHavePhoto = useMemo(() => {
+    return Object.values(responses).every(
+      (r) => r.is_conforming !== false || (r.photo_url && r.photo_url.length > 0)
+    );
+  }, [responses]);
+
+  const canSubmit = allAnswered && allNonConformingHaveObs && allNonConformingHavePhoto && respondedByName.trim().length > 0;
 
   const sectorDisplayName = SECTOR_POSITION_MAP[sectorCode as AuditSector]?.displayName || sectorCode;
   const today = format(new Date(), "dd 'de' MMMM, yyyy (EEEE)", { locale: ptBR });
@@ -211,6 +218,10 @@ export default function DailyChecklist() {
     }
     if (!allNonConformingHaveObs) {
       toast.error("Preencha a observação em todos os itens marcados como NÃO");
+      return;
+    }
+    if (!allNonConformingHavePhoto) {
+      toast.error("Anexe uma foto em todos os itens marcados como NÃO");
       return;
     }
 
@@ -635,7 +646,7 @@ export default function DailyChecklist() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="gap-2"
+                          className={`gap-2 ${isNo && !hasPhoto ? "border-red-400 text-red-600" : ""}`}
                           onClick={() => triggerFileInput(item.id)}
                           disabled={isUploading}
                         >
@@ -644,10 +655,13 @@ export default function DailyChecklist() {
                           ) : (
                             <>
                               <Camera className="h-4 w-4" />
-                              <span className="text-xs">Anexar foto (opcional)</span>
+                              <span className="text-xs">{isNo ? "Anexar foto *" : "Anexar foto (opcional)"}</span>
                             </>
                           )}
                         </Button>
+                      )}
+                      {isNo && !hasPhoto && (
+                        <p className="text-xs text-red-500">⚠ Foto obrigatória para itens não conformes</p>
                       )}
                     </div>
                   </div>
@@ -665,6 +679,7 @@ export default function DailyChecklist() {
             <p className="text-xs text-center text-muted-foreground">
               {!allAnswered && `Responda todos os ${items.length} itens. `}
               {!allNonConformingHaveObs && "Preencha observação nos itens NÃO. "}
+              {!allNonConformingHavePhoto && "Anexe foto nos itens NÃO. "}
               {!respondedByName.trim() && "Informe seu nome."}
             </p>
           )}

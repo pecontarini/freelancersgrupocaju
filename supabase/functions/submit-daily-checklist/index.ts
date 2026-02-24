@@ -159,6 +159,12 @@ serve(async (req) => {
         return jsonResponse({ success: false, error: `${missingObs.length} item(ns) não conforme(s) sem observação. Observação é obrigatória para itens marcados como NÃO.` }, 400);
       }
 
+      // Validate non-conforming items have photos
+      const missingPhotos = responses.filter((r: any) => r.is_conforming === false && (!r.photo_url || !r.photo_url.trim()));
+      if (missingPhotos.length > 0) {
+        return jsonResponse({ success: false, error: `${missingPhotos.length} item(ns) não conforme(s) sem foto. Foto é obrigatória para itens marcados como NÃO.` }, 400);
+      }
+
       // Get item weights for score calculation
       const itemIds = responses.map((r: any) => r.template_item_id);
       const { data: items } = await supabase

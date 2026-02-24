@@ -86,7 +86,7 @@ type ExtractedFields = {
 export function MaintenanceForm() {
   const { addEntry, isAdding } = useMaintenanceEntries();
   const { options: lojas } = useConfigLojas();
-  const { isAdmin, unidades } = useUserProfile();
+  const { isAdmin, isOperator, unidades } = useUserProfile();
   const { isLookingUp, lookupSupplierByCpfCnpj } = useCpfLookup();
   const { isExtracting, extractFromFile, clearExtractedData } = useInvoiceExtraction();
   
@@ -98,7 +98,7 @@ export function MaintenanceForm() {
   const [showExtractionAlert, setShowExtractionAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const availableLojas = isAdmin ? lojas : unidades;
+  const availableLojas = (isAdmin || isOperator) ? lojas : unidades;
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

@@ -86,7 +86,7 @@ const formatCpfCnpj = (value: string) => {
 export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
   const { addExpense, isAdding: isAddingExpense } = useOperationalExpenses();
   const { addEntry: addMaintenanceEntry, isAdding: isAddingMaintenance } = useMaintenanceEntries();
-  const { unidades, isAdmin, isGerenteUnidade } = useUserProfile();
+  const { unidades, isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const { options: lojas } = useConfigLojas();
   const { isLookingUp, lookupSupplierByCpfCnpj } = useCpfLookup();
   const { isExtracting, extractFromFile, clearExtractedData } = useInvoiceExtraction();
@@ -112,9 +112,9 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
 
   // Determine effective store ID
   const effectiveStoreId =
-    storeId || (isGerenteUnidade && !isAdmin && unidades.length > 0 ? unidades[0].id : null);
+    storeId || (isGerenteUnidade && !isAdmin && !isOperator && unidades.length > 0 ? unidades[0].id : null);
   
-  const availableLojas = isAdmin ? lojas : unidades;
+  const availableLojas = (isAdmin || isOperator) ? lojas : unidades;
 
   // Auto-lookup supplier when CPF/CNPJ changes
   useEffect(() => {

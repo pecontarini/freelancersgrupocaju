@@ -1,12 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, Loader2, Calendar, ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { BarChart3, Loader2, Calendar, ChevronDown, ChevronUp, Filter, FileWarning, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { PDF_COLORS, PDF_LAYOUT, addPageFooter } from "@/lib/pdf/grupoCajuPdfTheme";
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,6 +37,7 @@ interface ResponseRow {
   responded_by_name: string | null;
   created_at: string;
   template_id: string | null;
+  link_id: string;
 }
 
 interface TemplateOption {
@@ -58,6 +65,8 @@ const SECTOR_COLORS: Record<string, string> = {
   documentos: "#78716c",
 };
 
+const PUBLISHED_URL = "https://freelancersgrupocaju.lovable.app";
+
 export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashboardProps) {
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +75,16 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
   const [loadingItems, setLoadingItems] = useState(false);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("all");
+  const [corrections, setCorrections] = useState<Record<string, any>>({});
+  const [lojaDisplayName, setLojaDisplayName] = useState("");
 
   useEffect(() => {
     if (lojaId) {
       fetchTemplates();
       fetchResponses();
+      supabase.from("config_lojas").select("nome").eq("id", lojaId).single().then(({ data }) => {
+        if (data) setLojaDisplayName(data.nome);
+      });
     }
   }, [lojaId]);
 
@@ -106,16 +120,204 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     if (expandedResponse === responseId) {
       setExpandedResponse(null);
       setResponseItems([]);
+      setCorrections({});
       return;
     }
     setExpandedResponse(responseId);
     setLoadingItems(true);
-    const { data } = await supabase
-      .from("checklist_response_items")
-      .select("*, checklist_template_items(item_text, weight)")
-      .eq("response_id", responseId);
-    setResponseItems(data || []);
+
+    const [itemsRes, correctionsRes] = await Promise.all([
+      supabase
+        .from("checklist_response_items")
+        .select("*, checklist_template_items(item_text, weight)")
+        .eq("response_id", responseId),
+      supabase
+        .from("checklist_corrections")
+        .select("*")
+        .eq("response_id", responseId),
+    ]);
+
+    setResponseItems(itemsRes.data || []);
+
+    const corrMap: Record<string, any> = {};
+    (correctionsRes.data || []).forEach((c: any) => {
+      corrMap[c.response_item_id] = c;
+    });
+    setCorrections(corrMap);
     setLoadingItems(false);
+  }
+
+  function getAccessTokenForResponse(response: ResponseRow): string | null {
+    // We need to look up the link's access_token
+    // Since we have link_id on the response, we can fetch it
+    return null; // Will be fetched async
+  }
+
+  async function generateNCReport(response: ResponseRow) {
+    // Fetch the access_token from the link
+    const { data: link } = await supabase
+      .from("checklist_sector_links")
+      .select("access_token")
+      .eq("id", response.link_id)
+      .single();
+
+    if (!link) {
+      toast.error("Erro ao buscar dados do link");
+      return;
+    }
+
+    const ncItems = responseItems.filter((item: any) => !item.is_conforming);
+    if (ncItems.length === 0) {
+      toast.error("Nenhum item não conforme nesta resposta");
+      return;
+    }
+
+    const sectorName = SECTOR_POSITION_MAP[response.sector_code as AuditSector]?.displayName || response.sector_code;
+    const correctionUrl = `${PUBLISHED_URL}/checklist-corrections/${response.id}/${link.access_token}`;
+    const dateStr = format(new Date(response.response_date + "T12:00:00"), "dd/MM/yyyy", { locale: ptBR });
+
+    const doc = new jsPDF("p", "mm", "a4");
+    const margin = PDF_LAYOUT.margin;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+
+    // Header
+    try {
+      doc.addImage(LOGO_BASE64, "JPEG", centerX - 18, 12, 36, 25);
+    } catch { /* fallback */ }
+
+    doc.setDrawColor(...PDF_COLORS.institutional);
+    doc.setLineWidth(1);
+    doc.line(margin, 42, pageWidth - margin, 42);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...PDF_COLORS.institutional);
+    doc.text("Relatório de Não Conformidades", centerX, 54, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(...PDF_COLORS.graphite);
+    doc.text(`${sectorName} — ${getLojaNameForPdf()}`, centerX, 62, { align: "center" });
+
+    doc.setFontSize(10);
+    doc.text(`Data: ${dateStr} • Aplicado por: ${response.responded_by_name || "Anônimo"}`, centerX, 69, { align: "center" });
+
+    // Summary boxes
+    let y = 78;
+    const boxW = (pageWidth - margin * 2 - 8) / 2;
+    const boxH = 25;
+
+    doc.setFillColor(...PDF_COLORS.white);
+    doc.setDrawColor(...PDF_COLORS.danger);
+    doc.setLineWidth(1.5);
+    doc.roundedRect(margin, y, boxW, boxH, 2, 2, "FD");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COLORS.gray500);
+    doc.text("NÃO CONFORMIDADES", margin + boxW / 2, y + 8, { align: "center" });
+    doc.setFontSize(16);
+    doc.setTextColor(...PDF_COLORS.danger);
+    doc.text(String(ncItems.length), margin + boxW / 2, y + 20, { align: "center" });
+
+    const scoreColor = response.total_score >= 90 ? PDF_COLORS.success : response.total_score >= 70 ? PDF_COLORS.warning : PDF_COLORS.danger;
+    doc.setDrawColor(...scoreColor);
+    doc.roundedRect(margin + boxW + 8, y, boxW, boxH, 2, 2, "FD");
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COLORS.gray500);
+    doc.text("NOTA DO CHECKLIST", margin + boxW + 8 + boxW / 2, y + 8, { align: "center" });
+    doc.setFontSize(16);
+    doc.setTextColor(...scoreColor);
+    doc.text(`${response.total_score.toFixed(0)}%`, margin + boxW + 8 + boxW / 2, y + 20, { align: "center" });
+
+    y = 110;
+
+    // NC Table
+    const tableData = ncItems.map((item: any, idx: number) => {
+      const corr = corrections[item.id];
+      return [
+        String(idx + 1),
+        item.checklist_template_items?.item_text || "Item",
+        String(item.checklist_template_items?.weight || 1),
+        item.observation || "—",
+        corr ? `✓ ${corr.corrected_by_name}` : "Pendente",
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [["#", "Item", "Peso", "Observação", "Correção"]],
+      body: tableData,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8, cellPadding: 3, textColor: PDF_COLORS.graphite },
+      headStyles: {
+        fillColor: PDF_COLORS.institutional,
+        textColor: PDF_COLORS.white,
+        fontStyle: "bold",
+        fontSize: 8,
+      },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 60 },
+        2: { cellWidth: 14, halign: "center" },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 36, halign: "center" },
+      },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 4) {
+          if (String(data.cell.raw).startsWith("✓")) {
+            data.cell.styles.textColor = PDF_COLORS.success;
+            data.cell.styles.fontStyle = "bold";
+          } else {
+            data.cell.styles.textColor = PDF_COLORS.danger;
+          }
+        }
+      },
+    });
+
+    // Correction link section
+    const finalY = (doc as any).lastAutoTable?.finalY || 200;
+    let linkY = finalY + 15;
+
+    if (linkY > 250) {
+      doc.addPage();
+      linkY = margin + 10;
+    }
+
+    doc.setFillColor(...PDF_COLORS.institutionalLight);
+    doc.setDrawColor(...PDF_COLORS.institutional);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(margin, linkY, pageWidth - margin * 2, 35, 3, 3, "FD");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...PDF_COLORS.institutional);
+    doc.text("📋 Link para Registro de Correções", centerX, linkY + 10, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...PDF_COLORS.graphite);
+    doc.text("Acesse o link abaixo para registrar as correções com foto:", centerX, linkY + 18, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...PDF_COLORS.institutional);
+    doc.textWithLink(correctionUrl, centerX - doc.getTextWidth(correctionUrl) / 2, linkY + 26, { url: correctionUrl });
+
+    // Footer
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      addPageFooter(doc, i, totalPages);
+    }
+
+    const fileName = `NC_${sectorName}_${dateStr.replace(/\//g, "-")}.pdf`;
+    doc.save(fileName);
+    toast.success("Relatório NC baixado!");
+  }
+
+  function getLojaNameForPdf(): string {
+    return lojaDisplayName || "Unidade";
   }
 
   const chartData = useMemo(() => {
@@ -217,6 +419,7 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                 const scoreColor = r.total_score >= 90 ? "text-green-600" : r.total_score >= 70 ? "text-yellow-600" : "text-red-600";
                 const isExpanded = expandedResponse === r.id;
                 const tplName = templates.find((t) => t.id === r.template_id)?.name;
+                const ncCount = r.total_items - r.conforming_items;
 
                 return (
                   <div key={r.id}>
@@ -230,6 +433,11 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                           <span className={`font-bold text-sm ${scoreColor}`}>
                             {r.total_score.toFixed(0)}%
                           </span>
+                          {ncCount > 0 && (
+                            <Badge variant="destructive" className="text-xs">
+                              {ncCount} NC
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {format(new Date(r.response_date), "dd/MM/yyyy", { locale: ptBR })} •{" "}
@@ -246,29 +454,77 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                         {loadingItems ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          responseItems.map((item: any) => (
-                            <div key={item.id} className="flex items-start gap-2 text-sm">
-                              <Badge
-                                variant={item.is_conforming ? "default" : "destructive"}
-                                className="text-xs mt-0.5 shrink-0"
-                              >
-                                {item.is_conforming ? "OK" : "NC"}
-                              </Badge>
-                              <div className="flex-1">
-                                <span>{item.checklist_template_items?.item_text || "Item"}</span>
-                                {item.observation && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">
-                                    💬 {item.observation}
-                                  </p>
-                                )}
-                                {item.photo_url && (
-                                  <a href={item.photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 block">
-                                    📷 Ver foto
-                                  </a>
-                                )}
+                          <>
+                            {/* NC Report button */}
+                            {responseItems.some((item: any) => !item.is_conforming) && (
+                              <div className="mb-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2 text-xs border-red-300 text-red-600 hover:bg-red-50"
+                                  onClick={() => generateNCReport(r)}
+                                >
+                                  <FileWarning className="h-4 w-4" />
+                                  Relatório NC (PDF + Link de Correção)
+                                </Button>
+                                {/* Correction summary */}
+                                {(() => {
+                                  const ncItems = responseItems.filter((item: any) => !item.is_conforming);
+                                  const corrected = ncItems.filter((item: any) => corrections[item.id]);
+                                  if (ncItems.length > 0) {
+                                    return (
+                                      <span className="text-xs text-muted-foreground ml-2">
+                                        {corrected.length}/{ncItems.length} corrigidos
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
-                            </div>
-                          ))
+                            )}
+
+                            {responseItems.map((item: any) => {
+                              const corr = corrections[item.id];
+                              return (
+                                <div key={item.id} className="flex items-start gap-2 text-sm">
+                                  <Badge
+                                    variant={item.is_conforming ? "default" : "destructive"}
+                                    className="text-xs mt-0.5 shrink-0"
+                                  >
+                                    {item.is_conforming ? "OK" : "NC"}
+                                  </Badge>
+                                  <div className="flex-1">
+                                    <span>{item.checklist_template_items?.item_text || "Item"}</span>
+                                    {item.observation && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        💬 {item.observation}
+                                      </p>
+                                    )}
+                                    {item.photo_url && (
+                                      <a href={item.photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-0.5 block">
+                                        📷 Ver foto
+                                      </a>
+                                    )}
+                                    {/* Correction badge */}
+                                    {!item.is_conforming && corr && (
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                        <span className="text-xs text-green-600 font-medium">
+                                          Corrigido por {corr.corrected_by_name} em {format(new Date(corr.corrected_at), "dd/MM HH:mm")}
+                                        </span>
+                                        <a href={corr.correction_photo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline ml-1">
+                                          📷
+                                        </a>
+                                      </div>
+                                    )}
+                                    {!item.is_conforming && !corr && (
+                                      <span className="text-xs text-red-500 mt-1 block">⏳ Correção pendente</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </>
                         )}
                       </div>
                     )}

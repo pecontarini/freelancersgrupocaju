@@ -1,123 +1,105 @@
 
 
-## Plano: Relatorio de Nao Conformidades + Link de Correcao
+## Plano: Redesign Profissional dos PDFs (Checklist Diario + Relatorio NC)
 
-### Objetivo
+### Diagnostico dos problemas atuais
 
-Criar um fluxo completo onde chefes/gerentes geram um relatorio das nao conformidades identificadas no checklist diario, e ao final desse relatorio ha um link publico que permite ao time registrar as correcoes com foto comprovando a resolucao.
+Ambos os PDFs sofrem dos mesmos problemas de design:
 
----
-
-### Visao geral do fluxo
-
-```text
-Checklist aplicado (itens NAO)
-        |
-        v
-Dashboard de Respostas --> Botao "Gerar Relatorio NC"
-        |
-        v
-PDF institucional com lista de nao conformidades
-+ Link publico ao final do PDF
-        |
-        v
-Time abre o link --> Ve os itens pendentes
---> Marca como corrigido + anexa foto + nome
-        |
-        v
-Status atualizado no banco (visivel no dashboard)
-```
+1. **Layout comprimido** -- elementos colados uns nos outros sem respiro visual
+2. **Hierarquia tipografica fraca** -- tamanhos de fonte muito similares entre titulos e corpo
+3. **Capa inexistente** -- o conteudo comeca direto no topo, sem presenca institucional forte
+4. **Secao de fotos basica** -- grid simples sem moldura, label e observacao mal posicionados
+5. **Link de correcao (NC)** -- caixa generica sem destaque visual suficiente
+6. **Sem Termo de Ciencia** -- falta formalidade no fechamento
 
 ---
 
-### Mudancas
+### Mudancas propostas
 
-**1. Nova tabela: `checklist_corrections`**
+#### 1. PDF do Checklist Diario (`src/pages/DailyChecklist.tsx`)
 
-Armazena as correcoes feitas pelo time para cada item nao conforme.
+**Pagina 1 -- Capa Executiva Institucional**
+- Logo centralizado no topo com linha institucional vermelha
+- Titulo "Checklist Diario" em destaque
+- Bloco de dados: Setor, Unidade, Aplicado Por, Data, Template
+- Indicadores grandes: NOTA (com cor por faixa), CONFORMES, NAO CONFORMES
+- Linha institucional no rodape da capa
 
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | PK |
-| response_item_id | uuid | FK para `checklist_response_items.id` |
-| response_id | uuid | FK para `checklist_responses.id` |
-| loja_id | uuid | FK para `config_lojas.id` |
-| corrected_by_name | text | Nome de quem corrigiu |
-| correction_photo_url | text | URL da foto comprovando a correcao |
-| correction_note | text | Observacao opcional sobre a correcao |
-| corrected_at | timestamptz | Data/hora da correcao |
-| created_at | timestamptz | Timestamp de criacao |
+**Pagina 2+ -- Tabela de Resultados**
+- Header de continuacao com mini-logo e nome da secao
+- Tabela com linhas zebradas (alternando branco/cinza claro)
+- Coluna de status com icones visuais (circulo verde/vermelho) em vez de texto puro
 
-RLS: Sem restricao de autenticacao (acesso publico via Edge Function, assim como o checklist).
+**Secao de Evidencias Fotograficas (redesenhada)**
+- Cada foto dentro de um card com:
+  - Borda arredondada cinza sutil
+  - Numero sequencial no canto (badge vermelho)
+  - Titulo do item abaixo da foto em negrito
+  - Observacao em italico com fundo cinza claro
+- Layout em grid 2 colunas com espacamento uniforme
+- Separador institucional antes da secao
 
-**2. Nova Edge Function: `submit-checklist-correction`**
+**Rodape padronizado** em todas as paginas (ja implementado via `addPageFooter`)
 
-Acoes:
-- `fetch`: Recebe um `response_id` e um `access_token`, valida o link, retorna os itens NAO conformes daquela resposta com status de correcao
-- `upload-photo`: Faz upload da foto de correcao (mesmo padrao do checklist)
-- `submit`: Registra a correcao de um item (nome, foto, observacao)
+#### 2. PDF do Relatorio NC (`ChecklistResponsesDashboard.tsx`)
 
-Validacoes:
-- O `access_token` deve ser valido e pertencer ao mesmo link/loja da resposta
-- Foto obrigatoria para registrar a correcao
-- Nome de quem corrigiu e obrigatorio
+**Pagina 1 -- Capa Institucional NC**
+- Reutilizar o padrao de capa do theme (`addExecutiveCover` adaptado)
+- Titulo: "Relatorio de Nao Conformidades"
+- Subtitulo: Setor e Unidade
+- Indicadores: Total de NCs e Nota do Checklist
+- Data de emissao e aplicador
 
-**3. Nova pagina: `src/pages/ChecklistCorrections.tsx`**
+**Pagina 2 -- Tabela de NCs**
+- Header de continuacao com mini-logo
+- Tabela com colunas: #, Item, Peso, Observacao, Status
+- Status estilizado: "Pendente" com fundo vermelho claro, "Corrigido" com fundo verde claro
+- Linhas zebradas
 
-Rota: `/checklist-corrections/:responseId/:accessToken`
+**Secao de Link de Correcao (redesenhada)**
+- Caixa grande com borda institucional espessa (2px)
+- Icone de clipboard estilizado (desenhado com formas geometricas)
+- Titulo "Registrar Correcoes" em tamanho maior
+- Instrucao clara em corpo de texto
+- URL em destaque com underline e cor institucional
+- Espaco para QR code placeholder (instrucao para escanear)
 
-Interface publica (sem login), similar a pagina do checklist:
-- Header institucional com logo, nome da unidade e setor
-- Lista dos itens NAO conformes com:
-  - Texto do item
-  - Observacao original do chefe
-  - Foto original da nao conformidade
-  - Botao "Registrar Correcao" com campo para nome, foto obrigatoria e observacao opcional
-- Itens ja corrigidos aparecem com badge verde e data/hora da correcao
-- Campo de nome do responsavel (preenchido uma vez, reutilizado para todos os itens)
-
-**4. Geracao do Relatorio PDF com Link**
-
-Adicionar botao "Relatorio NC" no `ChecklistResponsesDashboard` quando uma resposta e expandida e tem itens nao conformes.
-
-O PDF incluira:
-- Capa institucional (logo, unidade, setor, data)
-- Tabela de itens nao conformes com observacao e peso
-- Espaco para anotacoes / delegacao
-- QR Code ou link clicavel ao final apontando para a pagina de correcoes
-- Texto: "Acesse o link abaixo para registrar as correcoes com foto"
-
-**5. Atualizacao do Dashboard de Respostas**
-
-No drill-down de cada resposta no `ChecklistResponsesDashboard`:
-- Itens NAO conformes que ja foram corrigidos mostrarao um badge "Corrigido" com a data
-- Link para ver a foto da correcao
-- Contagem de correcoes pendentes vs realizadas
+**Pagina final -- Termo de Ciencia**
+- Reutilizar `addSignaturePage` do theme existente
+- Formaliza o documento com espaco para assinatura
 
 ---
 
 ### Detalhes tecnicos
 
-| Arquivo | Acao |
-|---------|------|
-| Migracao SQL | Criar tabela `checklist_corrections` |
-| `supabase/functions/submit-checklist-correction/index.ts` | **Novo**: Edge Function para fetch/upload/submit de correcoes |
-| `src/pages/ChecklistCorrections.tsx` | **Novo**: Pagina publica de correcoes |
-| `src/App.tsx` | Adicionar rota `/checklist-corrections/:responseId/:accessToken` |
-| `src/components/checklist-daily/ChecklistResponsesDashboard.tsx` | Adicionar botao "Relatorio NC" e badges de correcao no drill-down |
-| `supabase/config.toml` | Adicionar `[functions.submit-checklist-correction]` com `verify_jwt = false` |
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/lib/pdf/grupoCajuPdfTheme.ts` | Adicionar helpers: `addChecklistCover()`, `addPhotoEvidenceCard()`, `addCorrectionLinkSection()` |
+| `src/pages/DailyChecklist.tsx` | Refatorar `generateChecklistPDF` para usar capa, cards de foto redesenhados e rodape |
+| `src/components/checklist-daily/ChecklistResponsesDashboard.tsx` | Refatorar `generateNCReport` para usar capa, tabela zebrada, link redesenhado e termo de ciencia |
 
-### Configuracao de acesso
-
-A Edge Function tera `verify_jwt = false` no config.toml, e validara o `access_token` internamente (mesmo modelo ja usado pelo `submit-daily-checklist`). Isso garante que o time possa acessar a pagina de correcoes sem precisar de login.
-
-### Sobre os links
-
-O link de correcao sera gerado automaticamente a partir do `response_id` e do `access_token` ja existente no link do setor. Exemplo:
+### Novos helpers no theme
 
 ```text
-https://freelancersgrupocaju.lovable.app/checklist-corrections/{response_id}/{access_token}
+addChecklistCover(doc, params)
+  - Capa especifica para checklists (diferente da capa de auditoria)
+  - Params: sectorName, unitName, appliedBy, date, score, conforming, nonConforming, templateName
+
+addPhotoEvidenceCard(doc, params)
+  - Card individual de evidencia fotografica com moldura
+  - Params: x, y, w, h, imageUrl, itemText, observation, index
+
+addCorrectionLinkBox(doc, y, url)
+  - Caixa de destaque para o link de correcao
+  - Visual premium com borda espessa e instrucoes claras
 ```
 
-Nao sera necessario criar novos tokens -- reutilizamos o mesmo `access_token` do link do checklist, validando que o `response_id` pertence ao mesmo link.
+### Principios de design aplicados
+
+- **Respiro visual**: Margens generosas (20mm) e espacamento entre secoes (12-16mm)
+- **Hierarquia clara**: Titulos 16-22pt, subtitulos 12pt, corpo 9-10pt, labels 8pt
+- **Cor com proposito**: Vermelho institucional apenas em titulos e indicadores; cinzas para fundo e bordas
+- **Consistencia**: Ambos os PDFs seguem o mesmo design system (`grupoCajuPdfTheme`)
+- **Formalidade**: Termo de ciencia no fechamento para compliance
 

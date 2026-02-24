@@ -11,8 +11,8 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
-import { PDF_COLORS, PDF_LAYOUT, addPageFooter } from "@/lib/pdf/grupoCajuPdfTheme";
+import { PDF_COLORS, PDF_LAYOUT, addPageFooter, addContinuationHeader, addSignaturePage } from "@/lib/pdf/grupoCajuPdfTheme";
+import { addChecklistCover, addCorrectionLinkBox } from "@/lib/pdf/checklistPdfHelpers";
 import {
   ResponsiveContainer,
   LineChart,
@@ -178,61 +178,35 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
 
     const doc = new jsPDF("p", "mm", "a4");
     const margin = PDF_LAYOUT.margin;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const centerX = pageWidth / 2;
 
-    // Header
-    try {
-      doc.addImage(LOGO_BASE64, "JPEG", centerX - 18, 12, 36, 25);
-    } catch { /* fallback */ }
+    // === PAGE 1: EXECUTIVE COVER ===
+    addChecklistCover(doc, {
+      title: "Relatório de Não Conformidades",
+      subtitle: `${sectorName} — ${getLojaNameForPdf()}`,
+      sectorName,
+      unitName: getLojaNameForPdf(),
+      appliedBy: response.responded_by_name || "Anônimo",
+      date: dateStr,
+      score: response.total_score,
+      conforming: response.conforming_items,
+      nonConforming: ncItems.length,
+    });
 
-    doc.setDrawColor(...PDF_COLORS.institutional);
-    doc.setLineWidth(1);
-    doc.line(margin, 42, pageWidth - margin, 42);
+    // === PAGE 2: NC TABLE ===
+    doc.addPage();
+    let y = addContinuationHeader(doc, "Não Conformidades");
 
+    // Section title
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setTextColor(...PDF_COLORS.institutional);
-    doc.text("Relatório de Não Conformidades", centerX, 54, { align: "center" });
+    doc.text("Itens Não Conformes", margin, y);
+    y += 4;
+    doc.setDrawColor(...PDF_COLORS.institutional);
+    doc.setLineWidth(0.8);
+    doc.line(margin, y, margin + 50, y);
+    y += 10;
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.setTextColor(...PDF_COLORS.graphite);
-    doc.text(`${sectorName} — ${getLojaNameForPdf()}`, centerX, 62, { align: "center" });
-
-    doc.setFontSize(10);
-    doc.text(`Data: ${dateStr} • Aplicado por: ${response.responded_by_name || "Anônimo"}`, centerX, 69, { align: "center" });
-
-    // Summary boxes
-    let y = 78;
-    const boxW = (pageWidth - margin * 2 - 8) / 2;
-    const boxH = 25;
-
-    doc.setFillColor(...PDF_COLORS.white);
-    doc.setDrawColor(...PDF_COLORS.danger);
-    doc.setLineWidth(1.5);
-    doc.roundedRect(margin, y, boxW, boxH, 2, 2, "FD");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(...PDF_COLORS.gray500);
-    doc.text("NÃO CONFORMIDADES", margin + boxW / 2, y + 8, { align: "center" });
-    doc.setFontSize(16);
-    doc.setTextColor(...PDF_COLORS.danger);
-    doc.text(String(ncItems.length), margin + boxW / 2, y + 20, { align: "center" });
-
-    const scoreColor = response.total_score >= 90 ? PDF_COLORS.success : response.total_score >= 70 ? PDF_COLORS.warning : PDF_COLORS.danger;
-    doc.setDrawColor(...scoreColor);
-    doc.roundedRect(margin + boxW + 8, y, boxW, boxH, 2, 2, "FD");
-    doc.setFontSize(8);
-    doc.setTextColor(...PDF_COLORS.gray500);
-    doc.text("NOTA DO CHECKLIST", margin + boxW + 8 + boxW / 2, y + 8, { align: "center" });
-    doc.setFontSize(16);
-    doc.setTextColor(...scoreColor);
-    doc.text(`${response.total_score.toFixed(0)}%`, margin + boxW + 8 + boxW / 2, y + 20, { align: "center" });
-
-    y = 110;
-
-    // NC Table
     const tableData = ncItems.map((item: any, idx: number) => {
       const corr = corrections[item.id];
       return [
@@ -240,21 +214,24 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
         item.checklist_template_items?.item_text || "Item",
         String(item.checklist_template_items?.weight || 1),
         item.observation || "—",
-        corr ? `✓ ${corr.corrected_by_name}` : "Pendente",
+        corr ? `Corrigido` : "Pendente",
       ];
     });
 
     autoTable(doc, {
       startY: y,
-      head: [["#", "Item", "Peso", "Observação", "Correção"]],
+      head: [["#", "Item", "Peso", "Observação", "Status"]],
       body: tableData,
       margin: { left: margin, right: margin },
-      styles: { fontSize: 8, cellPadding: 3, textColor: PDF_COLORS.graphite },
+      styles: { fontSize: 8, cellPadding: 3.5, textColor: PDF_COLORS.graphite },
       headStyles: {
         fillColor: PDF_COLORS.institutional,
         textColor: PDF_COLORS.white,
         fontStyle: "bold",
         fontSize: 8,
+      },
+      alternateRowStyles: {
+        fillColor: PDF_COLORS.gray50,
       },
       columnStyles: {
         0: { cellWidth: 10, halign: "center" },
@@ -265,46 +242,36 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
       },
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 4) {
-          if (String(data.cell.raw).startsWith("✓")) {
+          if (data.cell.raw === "Corrigido") {
             data.cell.styles.textColor = PDF_COLORS.success;
             data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = PDF_COLORS.successLight;
           } else {
             data.cell.styles.textColor = PDF_COLORS.danger;
+            data.cell.styles.fontStyle = "bold";
+            data.cell.styles.fillColor = PDF_COLORS.dangerLight;
           }
         }
       },
     });
 
-    // Correction link section
-    const finalY = (doc as any).lastAutoTable?.finalY || 200;
-    let linkY = finalY + 15;
+    // === CORRECTION LINK SECTION ===
+    let linkY = (doc as any).lastAutoTable?.finalY || 200;
+    linkY += 16;
 
-    if (linkY > 250) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    if (linkY + 70 > pageHeight) {
       doc.addPage();
-      linkY = margin + 10;
+      linkY = addContinuationHeader(doc, "Link de Correção");
     }
 
-    doc.setFillColor(...PDF_COLORS.institutionalLight);
-    doc.setDrawColor(...PDF_COLORS.institutional);
-    doc.setLineWidth(0.8);
-    doc.roundedRect(margin, linkY, pageWidth - margin * 2, 35, 3, 3, "FD");
+    addCorrectionLinkBox(doc, linkY, correctionUrl);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...PDF_COLORS.institutional);
-    doc.text("📋 Link para Registro de Correções", centerX, linkY + 10, { align: "center" });
+    // === FINAL PAGE: SIGNATURE ===
+    doc.addPage();
+    addSignaturePage(doc);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...PDF_COLORS.graphite);
-    doc.text("Acesse o link abaixo para registrar as correções com foto:", centerX, linkY + 18, { align: "center" });
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...PDF_COLORS.institutional);
-    doc.textWithLink(correctionUrl, centerX - doc.getTextWidth(correctionUrl) / 2, linkY + 26, { url: correctionUrl });
-
-    // Footer
+    // === FOOTER on all pages ===
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);

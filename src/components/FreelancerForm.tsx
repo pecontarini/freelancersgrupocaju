@@ -50,7 +50,7 @@ export function FreelancerForm() {
   const [valorValue, setValorValue] = useState("");
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { createEntry } = useFreelancerEntries();
-  const { isAdmin, unidades, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, isOperator, unidades, isGerenteUnidade } = useUserProfile();
   const { lookupFreelancerByCpf, isLookingUp } = useCpfLookup();
   
   // Fetch dynamic options from config tables
@@ -59,9 +59,9 @@ export function FreelancerForm() {
   const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
   
   // For gerente with single store, use that store
-  const singleUnidade = isGerenteUnidade && !isAdmin && unidades.length === 1 ? unidades[0] : null;
+  const singleUnidade = isGerenteUnidade && !isAdmin && !isOperator && unidades.length === 1 ? unidades[0] : null;
   // For gerente with multiple stores, they can select
-  const availableLojas = isAdmin ? lojas : (isGerenteUnidade ? unidades : []);
+  const availableLojas = (isAdmin || isOperator) ? lojas : (isGerenteUnidade ? unidades : []);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

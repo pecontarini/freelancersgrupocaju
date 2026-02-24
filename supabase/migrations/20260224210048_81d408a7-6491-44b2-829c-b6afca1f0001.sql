@@ -1,0 +1,1 @@
+ALTER TABLE public.checklist_response_items ADD COLUMN is_na boolean NOT NULL DEFAULT false;

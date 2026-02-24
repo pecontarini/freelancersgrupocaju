@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
@@ -206,7 +207,10 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border pt-4">
+      <SidebarFooter className="border-t border-sidebar-border pt-4 space-y-2">
+        <div className="flex justify-center">
+          <ThemeToggle />
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

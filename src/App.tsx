@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { UnidadeProvider } from "@/contexts/UnidadeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -18,12 +19,13 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <UnidadeProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <BrowserRouter>
+          <AuthProvider>
+            <UnidadeProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route
@@ -48,10 +50,11 @@ function App() {
                 />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </TooltipProvider>
-          </UnidadeProvider>
-        </AuthProvider>
-      </BrowserRouter>
+              </TooltipProvider>
+            </UnidadeProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

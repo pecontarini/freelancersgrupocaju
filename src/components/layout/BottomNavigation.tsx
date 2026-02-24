@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useTheme } from "next-themes";
 import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
 
 interface BottomNavigationProps {
@@ -28,6 +29,7 @@ const navItems = [
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
   const { signOut } = useAuth();
   const { isAdmin, isChefeSetor, profile } = useUserProfile();
+  const { theme, setTheme } = useTheme();
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
@@ -87,7 +89,18 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 </div>
               )}
               
-              <div className="border-t pt-4">
+              <div className="border-t pt-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Tema</span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div className="pt-2">
                 <Button
                   variant="destructive"
                   className="w-full"
@@ -190,6 +203,17 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                     </Button>
                   </>
                 )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Tema</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  >
+                    {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                  </Button>
+                </div>
                 <Button
                   variant="destructive"
                   className="w-full h-12"

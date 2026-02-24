@@ -15,6 +15,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { PDF_COLORS, PDF_LAYOUT, addPageFooter } from "@/lib/pdf/grupoCajuPdfTheme";
+import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
 
 interface ChecklistItem {
@@ -273,10 +274,11 @@ export default function DailyChecklist() {
     );
   }
 
-  function generateChecklistPDF(result: SubmitResult): jsPDF {
+  async function generateChecklistPDF(result: SubmitResult): Promise<jsPDF> {
     const doc = new jsPDF("p", "mm", "a4");
     const margin = PDF_LAYOUT.margin;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const centerX = pageWidth / 2;
     const dateStr = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
     const nonConforming = result.total_items - result.conforming_items;
@@ -407,6 +409,94 @@ export default function DailyChecklist() {
       },
     });
 
+    // === PHOTO EVIDENCE SECTION ===
+    const ncItems = items.filter((item) => {
+      const resp = responses[item.id];
+      return resp?.is_conforming === false && resp?.photo_url;
+    });
+
+    if (ncItems.length > 0) {
+      let photoY = (doc as any).lastAutoTable?.finalY ?? 200;
+      const imgW = 70;
+      const imgH = 50;
+      const colGap = 10;
+      const cols = 2;
+      const totalW = cols * imgW + (cols - 1) * colGap;
+      const startX = (pageWidth - totalW) / 2;
+
+      // Section header
+      photoY += 12;
+      if (photoY > pageHeight - 80) {
+        doc.addPage();
+        photoY = margin + 10;
+      }
+
+      doc.setDrawColor(...PDF_COLORS.institutional);
+      doc.setLineWidth(0.5);
+      doc.line(margin, photoY, pageWidth - margin, photoY);
+      photoY += 8;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(...PDF_COLORS.institutional);
+      doc.text("Evidências Fotográficas — Não Conformidades", centerX, photoY, { align: "center" });
+      photoY += 10;
+
+      let colIdx = 0;
+      for (const item of ncItems) {
+        const resp = responses[item.id];
+        if (!resp?.photo_url) continue;
+
+        const x = startX + colIdx * (imgW + colGap);
+
+        // Check if we need a new page
+        if (photoY + imgH + 18 > pageHeight - 20) {
+          doc.addPage();
+          photoY = margin + 10;
+        }
+
+        // Item label
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7);
+        doc.setTextColor(...PDF_COLORS.danger);
+        const label = item.item_text.length > 45 ? item.item_text.substring(0, 42) + "..." : item.item_text;
+        doc.text(label, x, photoY);
+        const labelY = photoY + 3;
+
+        // Try to add photo
+        const added = await addImageFromUrl(doc, resp.photo_url, x, labelY, imgW, imgH);
+        if (!added) {
+          // Draw placeholder border
+          doc.setDrawColor(...PDF_COLORS.gray300);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(x, labelY, imgW, imgH, 2, 2, "S");
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(7);
+          doc.setTextColor(...PDF_COLORS.gray500);
+          doc.text("Foto indisponível", x + imgW / 2, labelY + imgH / 2, { align: "center" });
+        }
+
+        // Observation below photo
+        if (resp.observation) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(6);
+          doc.setTextColor(...PDF_COLORS.gray500);
+          const obsText = resp.observation.length > 60 ? resp.observation.substring(0, 57) + "..." : resp.observation;
+          doc.text(obsText, x, labelY + imgH + 5);
+        }
+
+        colIdx++;
+        if (colIdx >= cols) {
+          colIdx = 0;
+          photoY += imgH + 22;
+        }
+      }
+
+      // If last row was incomplete, advance Y
+      if (colIdx > 0) {
+        photoY += imgH + 22;
+      }
+    }
+
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
@@ -416,15 +506,15 @@ export default function DailyChecklist() {
     return doc;
   }
 
-  function handleDownloadPDF(result: SubmitResult) {
-    const doc = generateChecklistPDF(result);
+  async function handleDownloadPDF(result: SubmitResult) {
+    const doc = await generateChecklistPDF(result);
     const fileName = `Checklist_${sectorDisplayName}_${result.loja_name}_${format(new Date(), "dd-MM-yyyy")}.pdf`;
     doc.save(fileName);
     toast.success("PDF baixado com sucesso!");
   }
 
-  function handleWhatsAppPDF(result: SubmitResult) {
-    handleDownloadPDF(result);
+  async function handleWhatsAppPDF(result: SubmitResult) {
+    await handleDownloadPDF(result);
     const scoreEmoji = result.total_score >= 90 ? "🟢" : result.total_score >= 70 ? "🟡" : "🔴";
     const nonConforming = result.total_items - result.conforming_items;
     let text = `📋 *Checklist Diário — ${sectorDisplayName}*\n`;

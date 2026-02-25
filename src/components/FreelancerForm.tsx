@@ -59,9 +59,9 @@ export function FreelancerForm() {
   const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
   
   // For gerente with single store, use that store
-  const singleUnidade = isGerenteUnidade && !isAdmin && !isOperator && unidades.length === 1 ? unidades[0] : null;
-  // For gerente with multiple stores, they can select
-  const availableLojas = (isAdmin || isOperator) ? lojas : (isGerenteUnidade ? unidades : []);
+  const singleUnidade = (isGerenteUnidade || isOperator) && !isAdmin && unidades.length === 1 ? unidades[0] : null;
+  // For gerente/operator with multiple stores, they can select from their assigned stores
+  const availableLojas = isAdmin ? lojas : ((isGerenteUnidade || isOperator) ? unidades : []);
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

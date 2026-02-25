@@ -47,6 +47,7 @@ import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { MobileFreelancerCard } from "@/components/mobile/MobileFreelancerCard";
 import { MaintenanceSingleExportButton } from "@/components/MaintenanceSingleExportButton";
 import { MaintenanceReportModal } from "@/components/maintenance/MaintenanceReportModal";
+import { InlineBudgetEditor } from "@/components/InlineBudgetEditor";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -432,6 +433,7 @@ export function BudgetsGerenciaisTab({
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base uppercase">
             <span>Consumo do Budget Diário</span>
+            <InlineBudgetEditor preselectedStoreId={effectiveStoreId} />
             <Badge
               variant={
                 dailyConsumptionPercentage < 70

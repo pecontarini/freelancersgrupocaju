@@ -18,7 +18,7 @@ export function ConfigurationsTab() {
   const lojas = useConfigLojas();
   const funcoes = useConfigFuncoes();
   const gerencias = useConfigGerencias();
-  const { isAdmin, isGerenteUnidade } = useUserProfile();
+  const { isAdmin, isGerenteUnidade, isOperator } = useUserProfile();
 
   return (
     <div className="space-y-6">
@@ -33,7 +33,7 @@ export function ConfigurationsTab() {
       </div>
 
       {/* Budget Configuration - Admin Only */}
-      {isAdmin && (
+      {(isAdmin || isOperator) && (
         <OperationalBudgetSection />
       )}
 

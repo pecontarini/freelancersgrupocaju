@@ -33,11 +33,15 @@ import {
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { formatCurrency } from "@/lib/formatters";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export function BudgetConfigSection() {
   const { budgets, isLoading, upsertBudget, deleteBudget, isUpdating, isDeleting, getCurrentMonthYear } = useStoreBudgets();
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
+  const { isAdmin, isOperator, unidades } = useUserProfile();
   
+  // Operators only see their assigned stores
+  const availableLojas = isAdmin ? lojas : unidades;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string>("");
   const [selectedMonthYear, setSelectedMonthYear] = useState<string>(getCurrentMonthYear());
@@ -134,7 +138,10 @@ export function BudgetConfigSection() {
 
   // Filter to show only current and future budgets by default
   const currentMonthYear = getCurrentMonthYear();
-  const activeBudgets = budgets.filter((b) => b.month_year >= currentMonthYear);
+  // Filter budgets: operators only see their stores
+  const storeIds = new Set(availableLojas.map(l => l.id));
+  const visibleBudgets = isAdmin ? budgets : budgets.filter(b => storeIds.has(b.store_id));
+  const activeBudgets = visibleBudgets.filter((b) => b.month_year >= currentMonthYear);
 
   if (isLoading || isLoadingLojas) {
     return (
@@ -178,7 +185,7 @@ export function BudgetConfigSection() {
                         <SelectValue placeholder="Selecione a loja" />
                       </SelectTrigger>
                       <SelectContent>
-                        {lojas.map((loja) => (
+                        {availableLojas.map((loja) => (
                           <SelectItem key={loja.id} value={loja.id}>
                             <div className="flex items-center gap-2">
                               <Store className="h-4 w-4" />

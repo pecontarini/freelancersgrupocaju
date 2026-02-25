@@ -81,6 +81,7 @@ const Index = () => {
     useOperationalExpenses();
   const {
     isAdmin,
+    isOperator,
     isGerenteUnidade,
     isChefeSetor,
     unidades,
@@ -100,17 +101,17 @@ const Index = () => {
       if (isChefeSetor) {
         setActiveTab("escalas");
         if (unidades.length > 0) setSelectedUnidadeId(unidades[0].id);
-      } else if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      } else if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
         setSelectedUnidadeId(unidades[0].id);
       }
       setIsInitialized(true);
     }
-  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isAdmin, isChefeSetor, unidades]);
+  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isOperator, isAdmin, isChefeSetor, unidades]);
 
   // Filter entries based on selected unidade
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
-      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
         if (selectedUnidadeId) {
           if (entry.loja_id !== selectedUnidadeId) return false;
         } else {
@@ -122,7 +123,7 @@ const Index = () => {
       }
       return true;
     });
-  }, [entries, isAdmin, isGerenteUnidade, unidades, selectedUnidadeId]);
+  }, [entries, isAdmin, isOperator, isGerenteUnidade, unidades, selectedUnidadeId]);
 
   // Filter operational expenses based on selected unidade
   const filteredOperationalExpenses = useMemo(() => {
@@ -130,13 +131,13 @@ const Index = () => {
       if (selectedUnidadeId) {
         return expense.store_id === selectedUnidadeId;
       }
-      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
         const unidadeIds = unidades.map((u) => u.id);
         return unidadeIds.includes(expense.store_id);
       }
       return true;
     });
-  }, [operationalExpenses, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
+  }, [operationalExpenses, selectedUnidadeId, isAdmin, isOperator, isGerenteUnidade, unidades]);
 
   // Filter maintenance entries based on selected unidade
   const filteredMaintenanceEntries = useMemo(() => {
@@ -144,13 +145,13 @@ const Index = () => {
       if (selectedUnidadeId) {
         return entry.loja_id === selectedUnidadeId;
       }
-      if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
+      if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
         const unidadeIds = unidades.map((u) => u.id);
         return unidadeIds.includes(entry.loja_id || "");
       }
       return true;
     });
-  }, [maintenanceEntries, selectedUnidadeId, isAdmin, isGerenteUnidade, unidades]);
+  }, [maintenanceEntries, selectedUnidadeId, isAdmin, isOperator, isGerenteUnidade, unidades]);
 
   if (
     isLoading ||
@@ -197,7 +198,7 @@ const Index = () => {
               freelancerEntries={filteredEntries}
               operationalExpenses={filteredOperationalExpenses}
               maintenanceEntries={filteredMaintenanceEntries}
-              selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
+              selectedUnidadeId={selectedUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
             />
           </div>
         );
@@ -235,7 +236,7 @@ const Index = () => {
             freelancerEntries={filteredEntries}
             operationalExpenses={filteredOperationalExpenses}
             maintenanceEntries={filteredMaintenanceEntries}
-            selectedUnidadeId={selectedUnidadeId || (isGerenteUnidade && unidades.length > 0 ? unidades[0].id : "")}
+            selectedUnidadeId={selectedUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
           />
         );
     }

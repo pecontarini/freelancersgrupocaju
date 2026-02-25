@@ -1,91 +1,60 @@
 
-## Plano: Acesso Rapido para Editar Budgets na Aba Budgets Gerenciais
+
+## Plano: Gerar Documento Markdown para NotebookLM
 
 ### Objetivo
 
-Adicionar um botao discreto na aba principal (Budgets Gerenciais), proximo ao card de "Consumo do Budget Diario", que permite ao Socio Operador ou Gerente de Unidade abrir um dialog para cadastrar ou editar os budgets da sua loja — protegido por confirmacao de senha.
+Criar o arquivo `docs/app-guide-notebooklm.md` com um texto completo, em linguagem natural e em portugues, descrevendo todas as telas, perfis de acesso e fluxos do Portal da Lideranca do Grupo Caju. O arquivo pode ser baixado e usado como fonte no NotebookLM para gerar audio ou video.
 
-### Fluxo do usuario
+### Implementacao
 
-1. Na aba "Budgets Gerenciais", o usuario ve um botao "Editar Budgets" ao lado do titulo "Consumo do Budget Diario"
-2. Ao clicar, aparece um dialog pedindo a senha da conta (confirmacao de identidade)
-3. Ao digitar a senha correta, o sistema valida via autenticacao e abre o formulario completo de budgets (mesmo formulario que existe em Configuracoes)
-4. O usuario cadastra ou edita os valores e salva
-5. O dialog fecha e os dados da tela atualizam automaticamente
+| Arquivo | Acao |
+|---------|------|
+| `docs/app-guide-notebooklm.md` | Criar arquivo Markdown com o guia completo |
 
-### Mudancas
+### Conteudo do Documento
 
-**1. Novo componente — `src/components/InlineBudgetEditor.tsx`**
+O documento tera aproximadamente 12 secoes:
 
-Componente que encapsula:
-- Botao de gatilho (icone de engrenagem ou lapis, discreto)
-- Dialog de confirmacao de senha:
-  - Input de senha
-  - Botao "Confirmar"
-  - Validacao via `supabase.auth.signInWithPassword` usando o email do usuario logado
-  - Em caso de erro, mostra mensagem "Senha incorreta"
-- Apos autenticacao, exibe o formulario de budget (reutilizando a logica do `BudgetConfigSection`):
-  - Seletor de mes
-  - Campos para cada categoria (Freelancers, Manutencao, Uniformes, Limpeza, Utensilios)
-  - Loja pre-selecionada (a loja ativa no filtro ou a unica do usuario)
-  - Tabela dos budgets ativos da loja
-  - Botoes salvar/excluir
+1. **Introducao e Visao Geral** — O que e o Portal da Lideranca, para que serve, quais marcas fazem parte (Caju Limao, Caminito Parrilla, Nazo Japanese, Foster's Burguer)
 
-**2. Integracao na aba — `src/components/dashboard/BudgetsGerenciaisTab.tsx`**
+2. **Perfis de Acesso** — Descricao detalhada dos 5 perfis:
+   - Admin (acesso total)
+   - Socio Operador (lojas vinculadas, pode editar budgets)
+   - Gerente de Unidade (operacional das lojas vinculadas)
+   - Chefe de Setor (apenas aba Escalas)
+   - Colaborador (confirmacao de turno via link externo)
 
-- Importar o `InlineBudgetEditor`
-- Renderiza-lo ao lado do card "Consumo do Budget Diario", visivel apenas para `isOperator` ou `isGerenteUnidade`
-- Passar `effectiveStoreId` para pre-selecionar a loja
+3. **Tela de Login** — Fluxo de entrada, cadastro com aprovacao do admin
 
-### Detalhes tecnicos
+4. **Aba Budgets Gerenciais** — Cards de resumo financeiro, barra de consumo diario, lancamentos (freelancer, despesas, manutencao), filtros, graficos, exportacao PDF, botao "Editar Budgets" com verificacao de senha
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/components/InlineBudgetEditor.tsx` | Novo componente com dialog de senha + formulario de budgets |
-| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Importar e renderizar o editor inline, visivel para operator/gerente |
+5. **Aba Remuneracao Variavel** — Simulador de bonus, tiers, ranking entre lojas, feed de alertas, lancamento semanal
 
-### Seguranca
+6. **Aba Diagnostico de Auditoria** — Upload de checklists, KPIs, graficos de evolucao, ranking de recorrencias, relatorios PDF, analise com IA, sub-aba de Checklist Diario
 
-- A senha e validada server-side via `supabase.auth.signInWithPassword` — nao e uma senha fixa nem client-side
-- Apos a validacao, a sessao ja existente do usuario continua ativa (o signIn apenas confirma a identidade)
-- O componente so aparece para usuarios com role `operator` ou `gerente_unidade`
-- As policies RLS existentes na tabela `store_budgets` garantem que o usuario so acessa lojas vinculadas
+7. **Aba Performance Lideranca** — Diagnostico hierarquico por responsavel
 
-### Visual
+8. **Aba CMV (Unitarios)** — Contagem de estoque, NF-e, vendas, Kardex, auditoria de periodo, fechamento, mapeamento de produtos, cadastro de itens
 
-```text
-+------------------------------------------+
-| Consumo do Budget Diario    [85%] [Editar Budgets]  |
-| ████████████████░░░░                      |
-| Consumido: R$ 1.200   Disponivel: R$ 200 |
-+------------------------------------------+
+9. **Aba Escalas** — Editor semanal, Gestao D-1, Quadro Operacional, Equipe, Cargos e Setores, Configuracoes de matriz
 
-Ao clicar "Editar Budgets":
+10. **Aba Dores da Operacao (Admin)** — Central de reclamacoes, upload com IA, Pareto, diagnostico por loja, planos de acao
 
-+--- Dialog: Confirme sua senha -----------+
-| Para editar os budgets, confirme sua     |
-| senha de acesso.                         |
-|                                          |
-| Senha: [••••••••••]                      |
-|                                          |
-|            [Cancelar]  [Confirmar]        |
-+------------------------------------------+
+11. **Aba Configuracoes (Admin)** — Orcamento por loja, cargos, bonus, Google Sheets, checklists, lojas/funcoes/gerencias, usuarios
 
-Apos confirmar:
+12. **Aba Visao Rede (Admin)** — Dashboard executivo, KPIs globais, rankings, matriz de severidade, lead time
 
-+--- Dialog: Editar Budgets ---------------+
-| Loja: Unidade Centro  Mes: fevereiro 2026|
-|                                          |
-| Freelancers:  [R$ 5.000]                 |
-| Manutencao:   [R$ 3.000]                 |
-| Uniformes:    [R$ 1.000]                 |
-| Limpeza:      [R$ 800]                   |
-| Utensilios:   [R$ 1.200]                 |
-|                                          |
-| Budget Total: R$ 11.000                  |
-|                                          |
-| [Budgets ativos - tabela]                |
-|                                          |
-|            [Cancelar]  [Salvar]           |
-+------------------------------------------+
-```
+13. **Paginas Externas** — Confirmacao de turno (`/confirm-shift`), Checklist diario (`/checklist`), Correcao de checklist (`/checklist-corrections`)
+
+### Estilo de Escrita
+
+- Portugues brasileiro, linguagem natural e descritiva
+- Tom de narrador explicando cada tela como se estivesse mostrando o app
+- Sem codigo, sem jargao tecnico
+- Ideal para o NotebookLM interpretar e gerar audio/video
+
+### Resultado
+
+Um unico arquivo `.md` pronto para download e upload no NotebookLM.
+

@@ -98,7 +98,7 @@ export function MaintenanceForm() {
   const [showExtractionAlert, setShowExtractionAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const availableLojas = (isAdmin || isOperator) ? lojas : unidades;
+  const availableLojas = isAdmin ? lojas : unidades;
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),

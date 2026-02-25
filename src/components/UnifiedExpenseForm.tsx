@@ -112,9 +112,9 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
 
   // Determine effective store ID
   const effectiveStoreId =
-    storeId || (isGerenteUnidade && !isAdmin && !isOperator && unidades.length > 0 ? unidades[0].id : null);
+    storeId || ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0 ? unidades[0].id : null);
   
-  const availableLojas = (isAdmin || isOperator) ? lojas : unidades;
+  const availableLojas = isAdmin ? lojas : unidades;
 
   // Auto-lookup supplier when CPF/CNPJ changes
   useEffect(() => {

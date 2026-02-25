@@ -1,63 +1,91 @@
 
-
-## Plano: Adicionar opcao N/A (Nao Se Aplica) ao Checklist Diario
+## Plano: Acesso Rapido para Editar Budgets na Aba Budgets Gerenciais
 
 ### Objetivo
 
-Permitir que o aplicador marque itens como "N/A" (nao se aplica). Quando um item e marcado como N/A, seu peso e removido do calculo — redistribuindo-se proporcionalmente entre os demais itens respondidos como SIM ou NAO.
+Adicionar um botao discreto na aba principal (Budgets Gerenciais), proximo ao card de "Consumo do Budget Diario", que permite ao Socio Operador ou Gerente de Unidade abrir um dialog para cadastrar ou editar os budgets da sua loja — protegido por confirmacao de senha.
 
-### Logica de calculo
+### Fluxo do usuario
 
-O calculo atual soma os pesos dos itens conformes e divide pelo total de pesos. Com N/A, os itens marcados como N/A simplesmente saem do calculo:
-
-```text
-Antes:  score = SUM(peso_conformes) / SUM(peso_todos) * 100
-Depois: score = SUM(peso_conformes) / SUM(peso_todos - peso_NA) * 100
-```
-
-Exemplo: 10 itens de peso 1. Se 7 SIM, 2 NAO, 1 N/A:
-- Sem N/A: 7/10 = 70%
-- Com N/A: 7/9 = 77.8% (o item N/A sai do denominador)
+1. Na aba "Budgets Gerenciais", o usuario ve um botao "Editar Budgets" ao lado do titulo "Consumo do Budget Diario"
+2. Ao clicar, aparece um dialog pedindo a senha da conta (confirmacao de identidade)
+3. Ao digitar a senha correta, o sistema valida via autenticacao e abre o formulario completo de budgets (mesmo formulario que existe em Configuracoes)
+4. O usuario cadastra ou edita os valores e salva
+5. O dialog fecha e os dados da tela atualizam automaticamente
 
 ### Mudancas
 
-**1. Frontend — `src/pages/DailyChecklist.tsx`**
+**1. Novo componente — `src/components/InlineBudgetEditor.tsx`**
 
-- Adicionar um terceiro estado ao `ItemResponse.is_conforming`: `true` (SIM), `false` (NAO), `null` (nao respondido), e um novo campo `is_na: boolean`
-- Adicionar botao "N/A" ao lado de SIM/NAO com estilo cinza/neutro
-- Quando N/A e marcado:
-  - Nao exigir observacao nem foto
-  - Recolher o painel de observacao se estava aberto
-  - Contar como "respondido" no progresso
-- Atualizar `answeredCount` para contar itens com `is_conforming !== null || is_na === true`
-- Atualizar `canSubmit` para considerar itens N/A como respondidos
-- Atualizar o PDF: itens N/A aparecem com status "N/A" na tabela e nao contam na capa (indicadores ajustados)
-- Na tela de resultado, mostrar contagem de N/A separadamente
+Componente que encapsula:
+- Botao de gatilho (icone de engrenagem ou lapis, discreto)
+- Dialog de confirmacao de senha:
+  - Input de senha
+  - Botao "Confirmar"
+  - Validacao via `supabase.auth.signInWithPassword` usando o email do usuario logado
+  - Em caso de erro, mostra mensagem "Senha incorreta"
+- Apos autenticacao, exibe o formulario de budget (reutilizando a logica do `BudgetConfigSection`):
+  - Seletor de mes
+  - Campos para cada categoria (Freelancers, Manutencao, Uniformes, Limpeza, Utensilios)
+  - Loja pre-selecionada (a loja ativa no filtro ou a unica do usuario)
+  - Tabela dos budgets ativos da loja
+  - Botoes salvar/excluir
 
-**2. Backend — `supabase/functions/submit-daily-checklist/index.ts`**
+**2. Integracao na aba — `src/components/dashboard/BudgetsGerenciaisTab.tsx`**
 
-- Aceitar `is_na: boolean` no payload de cada resposta
-- No calculo do score, excluir itens com `is_na === true` do `totalWeight`
-- Ajustar `total_items` para refletir apenas itens efetivamente avaliados (sem N/A)
-- Salvar `is_na` na tabela `checklist_response_items`
-
-**3. Banco de dados — Migracao SQL**
-
-- Adicionar coluna `is_na boolean NOT NULL DEFAULT false` na tabela `checklist_response_items`
+- Importar o `InlineBudgetEditor`
+- Renderiza-lo ao lado do card "Consumo do Budget Diario", visivel apenas para `isOperator` ou `isGerenteUnidade`
+- Passar `effectiveStoreId` para pre-selecionar a loja
 
 ### Detalhes tecnicos
 
 | Arquivo | Mudanca |
 |---------|---------|
-| Migracao SQL | `ALTER TABLE checklist_response_items ADD COLUMN is_na boolean NOT NULL DEFAULT false` |
-| `supabase/functions/submit-daily-checklist/index.ts` | Excluir itens N/A do calculo de score; salvar `is_na` no insert |
-| `src/pages/DailyChecklist.tsx` | Novo botao N/A, nova logica de progresso/validacao, ajuste do PDF e tela de resultado |
+| `src/components/InlineBudgetEditor.tsx` | Novo componente com dialog de senha + formulario de budgets |
+| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Importar e renderizar o editor inline, visivel para operator/gerente |
 
-### Fluxo do usuario
+### Seguranca
 
-1. Abre o checklist e ve os itens com tres opcoes: **SIM**, **NAO**, **N/A**
-2. Marca um item como N/A — o item fica com visual cinza e nao pede foto/observacao
-3. O progresso conta o item como respondido
-4. Ao submeter, o backend calcula a nota ignorando os pesos dos itens N/A
-5. O PDF mostra "N/A" na coluna de status e os indicadores da capa refletem a contagem correta
+- A senha e validada server-side via `supabase.auth.signInWithPassword` — nao e uma senha fixa nem client-side
+- Apos a validacao, a sessao ja existente do usuario continua ativa (o signIn apenas confirma a identidade)
+- O componente so aparece para usuarios com role `operator` ou `gerente_unidade`
+- As policies RLS existentes na tabela `store_budgets` garantem que o usuario so acessa lojas vinculadas
 
+### Visual
+
+```text
++------------------------------------------+
+| Consumo do Budget Diario    [85%] [Editar Budgets]  |
+| ████████████████░░░░                      |
+| Consumido: R$ 1.200   Disponivel: R$ 200 |
++------------------------------------------+
+
+Ao clicar "Editar Budgets":
+
++--- Dialog: Confirme sua senha -----------+
+| Para editar os budgets, confirme sua     |
+| senha de acesso.                         |
+|                                          |
+| Senha: [••••••••••]                      |
+|                                          |
+|            [Cancelar]  [Confirmar]        |
++------------------------------------------+
+
+Apos confirmar:
+
++--- Dialog: Editar Budgets ---------------+
+| Loja: Unidade Centro  Mes: fevereiro 2026|
+|                                          |
+| Freelancers:  [R$ 5.000]                 |
+| Manutencao:   [R$ 3.000]                 |
+| Uniformes:    [R$ 1.000]                 |
+| Limpeza:      [R$ 800]                   |
+| Utensilios:   [R$ 1.200]                 |
+|                                          |
+| Budget Total: R$ 11.000                  |
+|                                          |
+| [Budgets ativos - tabela]                |
+|                                          |
+|            [Cancelar]  [Salvar]           |
++------------------------------------------+
+```

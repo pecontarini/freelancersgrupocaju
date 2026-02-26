@@ -1703,6 +1703,7 @@ export type Database = {
       maintenance_entries: {
         Row: {
           anexo_url: string | null
+          boleto_url: string | null
           chave_pix: string | null
           cpf_cnpj: string | null
           created_at: string
@@ -1718,6 +1719,7 @@ export type Database = {
         }
         Insert: {
           anexo_url?: string | null
+          boleto_url?: string | null
           chave_pix?: string | null
           cpf_cnpj?: string | null
           created_at?: string
@@ -1733,6 +1735,7 @@ export type Database = {
         }
         Update: {
           anexo_url?: string | null
+          boleto_url?: string | null
           chave_pix?: string | null
           cpf_cnpj?: string | null
           created_at?: string

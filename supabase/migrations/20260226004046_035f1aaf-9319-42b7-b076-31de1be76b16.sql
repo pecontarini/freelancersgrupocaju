@@ -1,0 +1,1 @@
+ALTER TABLE public.maintenance_entries ADD COLUMN boleto_url text;

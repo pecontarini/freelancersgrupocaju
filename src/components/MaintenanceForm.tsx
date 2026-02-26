@@ -92,11 +92,16 @@ export function MaintenanceForm() {
   
   const [anexoUrl, setAnexoUrl] = useState<string | null>(null);
   const [anexoName, setAnexoName] = useState<string | null>(null);
+  const [boletoUrl, setBoletoUrl] = useState<string | null>(null);
+  const [boletoName, setBoletoName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingBoleto, setIsUploadingBoleto] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadProgressBoleto, setUploadProgressBoleto] = useState(0);
   const [extractedFields, setExtractedFields] = useState<ExtractedFields>({});
   const [showExtractionAlert, setShowExtractionAlert] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const boletoInputRef = useRef<HTMLInputElement>(null);
 
   const availableLojas = isAdmin ? lojas : unidades;
 
@@ -262,6 +267,60 @@ export function MaintenanceForm() {
     }
   };
 
+  const handleBoletoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo 10MB.");
+      return;
+    }
+
+    setIsUploadingBoleto(true);
+    setUploadProgressBoleto(0);
+
+    const progressInterval = setInterval(() => {
+      setUploadProgressBoleto((prev) => {
+        if (prev >= 90) { clearInterval(progressInterval); return 90; }
+        return prev + 10;
+      });
+    }, 200);
+
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `boletos/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("maintenance-attachments")
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("maintenance-attachments")
+        .getPublicUrl(fileName);
+
+      setBoletoUrl(publicUrl);
+      setBoletoName(file.name);
+      toast.success("Boleto enviado com sucesso!");
+    } catch (error) {
+      console.error("Boleto upload error:", error);
+      toast.error("Erro ao enviar boleto.");
+    } finally {
+      setUploadProgressBoleto(100);
+      setTimeout(() => setUploadProgressBoleto(0), 500);
+      setIsUploadingBoleto(false);
+    }
+  };
+
+  const removeBoleto = () => {
+    setBoletoUrl(null);
+    setBoletoName(null);
+    if (boletoInputRef.current) {
+      boletoInputRef.current.value = "";
+    }
+  };
+
   const onSubmit = async (data: FormData) => {
     const selectedLoja = availableLojas.find((l) => l.id === data.loja_id);
     if (!selectedLoja) {
@@ -294,6 +353,7 @@ export function MaintenanceForm() {
       valor: valorNumerico,
       descricao: data.descricao || "",
       anexo_url: anexoUrl,
+      boleto_url: boletoUrl,
     });
 
     form.reset({
@@ -306,6 +366,7 @@ export function MaintenanceForm() {
       descricao: "",
     });
     removeAttachment();
+    removeBoleto();
   };
 
   // Helper to get field styling based on extraction status
@@ -429,6 +490,72 @@ export function MaintenanceForm() {
                       size="icon"
                       className="h-10 w-10 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-900/20"
                       onClick={removeAttachment}
+                    >
+                      <X className="h-5 w-5 text-red-500" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </FormItem>
+
+            {/* Boleto Attachment */}
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                Anexo do Boleto (opcional)
+              </FormLabel>
+              <div className="space-y-3">
+                <input
+                  ref={boletoInputRef}
+                  type="file"
+                  accept="image/*,application/pdf,.pdf"
+                  onChange={handleBoletoUpload}
+                  className="hidden"
+                />
+                {!boletoUrl ? (
+                  <div className="space-y-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-dashed border-2 min-h-[48px] h-auto py-3 hover:bg-primary/5 active:scale-[0.98] transition-all touch-manipulation"
+                      onClick={() => boletoInputRef.current?.click()}
+                      disabled={isUploadingBoleto}
+                    >
+                      <div className="flex items-center justify-center gap-3 w-full">
+                        {isUploadingBoleto ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-primary flex-shrink-0" />
+                        ) : (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Camera className="h-4 w-4 text-primary" />
+                            <span className="text-muted-foreground">/</span>
+                            <Upload className="h-4 w-4 text-primary" />
+                          </div>
+                        )}
+                        <span className="font-medium text-sm">
+                          {isUploadingBoleto ? "Enviando boleto..." : "Anexar Boleto"}
+                        </span>
+                      </div>
+                    </Button>
+                    {isUploadingBoleto && uploadProgressBoleto > 0 && (
+                      <Progress value={uploadProgressBoleto} className="h-2" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-lg border p-3 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate text-green-800 dark:text-green-200">
+                        Boleto anexado
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400 truncate">
+                        {boletoName}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 flex-shrink-0 hover:bg-red-100 dark:hover:bg-red-900/20"
+                      onClick={removeBoleto}
                     >
                       <X className="h-5 w-5 text-red-500" />
                     </Button>

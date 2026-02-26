@@ -9,6 +9,7 @@ export interface MaintenanceEntry {
   valor: number;
   descricao: string | null;
   anexo_url: string | null;
+  boleto_url: string | null;
   created_by: string | null;
   cpf_cnpj: string | null;
   chave_pix: string | null;
@@ -33,4 +34,5 @@ export interface MaintenanceFormData {
   valor: number;
   descricao: string;
   anexo_url: string | null;
+  boleto_url: string | null;
 }

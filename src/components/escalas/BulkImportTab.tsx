@@ -287,10 +287,16 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
 
       let result: ParsedEmployee[];
 
-      // Excel/CSV: process locally with SheetJS (fast, no AI cost)
+      // Excel/CSV: try local parsing first, fallback to AI for complex layouts
       if (["xlsx", "xls", "csv"].includes(ext)) {
         setProcessingMode("local");
-        result = await parseSpreadsheetLocally(file);
+        try {
+          result = await parseSpreadsheetLocally(file);
+        } catch (localErr) {
+          console.log("Local parse failed, falling back to AI:", (localErr as Error).message);
+          setProcessingMode("ai");
+          result = await extractWithAI(file);
+        }
       } else {
         // PDF/Image: send to AI edge function
         setProcessingMode("ai");

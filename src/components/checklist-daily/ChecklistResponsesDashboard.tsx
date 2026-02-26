@@ -111,6 +111,18 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     setLoading(false);
   }
 
+  // Merge template options from DB + from responses (covers cases where template was deleted but responses exist)
+  const allTemplateOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    templates.forEach((t) => map.set(t.id, t.name));
+    responses.forEach((r) => {
+      if (r.template_id && !map.has(r.template_id)) {
+        map.set(r.template_id, `Template ${r.template_id.slice(0, 6)}…`);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [templates, responses]);
+
   const filteredResponses = useMemo(() => {
     if (selectedTemplateId === "all") return responses;
     return responses.filter((r) => r.template_id === selectedTemplateId);
@@ -316,7 +328,7 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
   return (
     <div className="space-y-4">
       {/* Template filter */}
-      {templates.length > 0 && (
+      {allTemplateOptions.length > 0 && (
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
@@ -325,11 +337,16 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Templates</SelectItem>
-              {templates.map((t) => (
+              {allTemplateOptions.map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {selectedTemplateId !== "all" && (
+            <Badge variant="secondary" className="text-xs">
+              {filteredResponses.length} resultado{filteredResponses.length !== 1 ? "s" : ""}
+            </Badge>
+          )}
         </div>
       )}
 

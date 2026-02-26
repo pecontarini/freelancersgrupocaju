@@ -98,15 +98,20 @@ export function FreelancerForm() {
       chave_pix: data.chave_pix,
       loja_id: data.loja_id,
     });
+
+    // Salvar loja selecionada antes do reset
+    const currentLoja = data.loja;
+    const currentLojaId = data.loja_id;
+
     form.reset();
     setCpfValue("");
     setValorValue("");
     setAutoFilledFields(new Set());
-    
-    // Re-apply unidade for gerente with single store
-    if (singleUnidade) {
-      form.setValue("loja", singleUnidade.nome);
-      form.setValue("loja_id", singleUnidade.id);
+
+    // Re-aplicar loja para todos os perfis (single ou multi-loja)
+    if (currentLojaId) {
+      form.setValue("loja", currentLoja);
+      form.setValue("loja_id", currentLojaId);
     }
   };
 

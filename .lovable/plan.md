@@ -1,60 +1,64 @@
 
 
-## Plano: Gerar Documento Markdown para NotebookLM
+## Plano: Fixar Loja Selecionada Entre Lancamentos Consecutivos
 
-### Objetivo
+### Problema
 
-Criar o arquivo `docs/app-guide-notebooklm.md` com um texto completo, em linguagem natural e em portugues, descrevendo todas as telas, perfis de acesso e fluxos do Portal da Lideranca do Grupo Caju. O arquivo pode ser baixado e usado como fonte no NotebookLM para gerar audio ou video.
+Quando um usuario com multiplas lojas (ex: 3 lojas) cadastra um freelancer e o formulario faz `form.reset()`, os campos `loja` e `loja_id` sao limpos. No proximo lancamento, o usuario precisa selecionar a loja novamente e, se nao perceber, recebe o erro "Loja e obrigatoria".
 
-### Implementacao
+A logica atual (linha 101-110 de `FreelancerForm.tsx`) so re-aplica a loja para usuarios com **uma unica loja** (`singleUnidade`). Usuarios com 2+ lojas perdem a selecao.
 
-| Arquivo | Acao |
-|---------|------|
-| `docs/app-guide-notebooklm.md` | Criar arquivo Markdown com o guia completo |
+### Solucao
 
-### Conteudo do Documento
+Salvar a loja selecionada antes do `form.reset()` e re-aplicar imediatamente depois, para **todos** os perfis (nao apenas `singleUnidade`).
 
-O documento tera aproximadamente 12 secoes:
+### Mudancas
 
-1. **Introducao e Visao Geral** — O que e o Portal da Lideranca, para que serve, quais marcas fazem parte (Caju Limao, Caminito Parrilla, Nazo Japanese, Foster's Burguer)
+**Arquivo: `src/components/FreelancerForm.tsx`**
 
-2. **Perfis de Acesso** — Descricao detalhada dos 5 perfis:
-   - Admin (acesso total)
-   - Socio Operador (lojas vinculadas, pode editar budgets)
-   - Gerente de Unidade (operacional das lojas vinculadas)
-   - Chefe de Setor (apenas aba Escalas)
-   - Colaborador (confirmacao de turno via link externo)
+Na funcao `onSubmit` (linhas 89-111):
 
-3. **Tela de Login** — Fluxo de entrada, cadastro com aprovacao do admin
+1. Antes de `form.reset()`, capturar os valores atuais de `loja` e `loja_id`
+2. Apos `form.reset()`, re-aplicar esses valores salvos (independente do perfil)
+3. Remover a condicao `if (singleUnidade)` que limita a re-aplicacao
 
-4. **Aba Budgets Gerenciais** — Cards de resumo financeiro, barra de consumo diario, lancamentos (freelancer, despesas, manutencao), filtros, graficos, exportacao PDF, botao "Editar Budgets" com verificacao de senha
+Codigo atual:
+```
+form.reset();
+setCpfValue("");
+setValorValue("");
+setAutoFilledFields(new Set());
 
-5. **Aba Remuneracao Variavel** — Simulador de bonus, tiers, ranking entre lojas, feed de alertas, lancamento semanal
+// Re-apply unidade for gerente with single store
+if (singleUnidade) {
+  form.setValue("loja", singleUnidade.nome);
+  form.setValue("loja_id", singleUnidade.id);
+}
+```
 
-6. **Aba Diagnostico de Auditoria** — Upload de checklists, KPIs, graficos de evolucao, ranking de recorrencias, relatorios PDF, analise com IA, sub-aba de Checklist Diario
+Codigo novo:
+```
+// Salvar loja selecionada antes do reset
+const currentLoja = data.loja;
+const currentLojaId = data.loja_id;
 
-7. **Aba Performance Lideranca** — Diagnostico hierarquico por responsavel
+form.reset();
+setCpfValue("");
+setValorValue("");
+setAutoFilledFields(new Set());
 
-8. **Aba CMV (Unitarios)** — Contagem de estoque, NF-e, vendas, Kardex, auditoria de periodo, fechamento, mapeamento de produtos, cadastro de itens
+// Re-aplicar loja para todos os perfis (single ou multi-loja)
+if (currentLojaId) {
+  form.setValue("loja", currentLoja);
+  form.setValue("loja_id", currentLojaId);
+}
+```
 
-9. **Aba Escalas** — Editor semanal, Gestao D-1, Quadro Operacional, Equipe, Cargos e Setores, Configuracoes de matriz
+### Impacto
 
-10. **Aba Dores da Operacao (Admin)** — Central de reclamacoes, upload com IA, Pareto, diagnostico por loja, planos de acao
+- **Admin**: mantem a loja selecionada entre lancamentos
+- **Socio Operador (multi-loja)**: corrige o bug reportado — loja fica fixa
+- **Gerente (single loja)**: continua funcionando normalmente
+- **Gerente (multi-loja)**: tambem corrigido
 
-11. **Aba Configuracoes (Admin)** — Orcamento por loja, cargos, bonus, Google Sheets, checklists, lojas/funcoes/gerencias, usuarios
-
-12. **Aba Visao Rede (Admin)** — Dashboard executivo, KPIs globais, rankings, matriz de severidade, lead time
-
-13. **Paginas Externas** — Confirmacao de turno (`/confirm-shift`), Checklist diario (`/checklist`), Correcao de checklist (`/checklist-corrections`)
-
-### Estilo de Escrita
-
-- Portugues brasileiro, linguagem natural e descritiva
-- Tom de narrador explicando cada tela como se estivesse mostrando o app
-- Sem codigo, sem jargao tecnico
-- Ideal para o NotebookLM interpretar e gerar audio/video
-
-### Resultado
-
-Um unico arquivo `.md` pronto para download e upload no NotebookLM.
-
+Nenhuma outra mudanca necessaria. A correcao e cirurgica e universal.

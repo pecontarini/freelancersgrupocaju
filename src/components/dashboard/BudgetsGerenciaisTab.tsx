@@ -474,6 +474,7 @@ export function BudgetsGerenciaisTab({
         <FinancialHealthCard
           freelancerEntries={filteredFreelancers}
           maintenanceEntries={filteredMaintenance}
+          operationalExpenses={filteredExpenses}
           selectedUnidadeId={effectiveStoreId}
         />
         <CostEvolutionChart

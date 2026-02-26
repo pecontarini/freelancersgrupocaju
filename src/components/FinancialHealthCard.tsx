@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed, ChevronRight } from "lucide-react";
+import { BudgetDrillDownDialog, BudgetCategory } from "@/components/dashboard/BudgetDrillDownDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
@@ -10,12 +11,14 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
+import { OperationalExpense } from "@/hooks/useOperationalExpenses";
 import { formatCurrency, parseDateString } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 interface FinancialHealthCardProps {
   freelancerEntries: FreelancerEntry[];
   maintenanceEntries: MaintenanceEntry[];
+  operationalExpenses?: OperationalExpense[];
   selectedUnidadeId: string | null;
 }
 
@@ -30,10 +33,13 @@ interface CategoryStats {
 export function FinancialHealthCard({
   freelancerEntries,
   maintenanceEntries,
+  operationalExpenses: operationalExpensesProp,
   selectedUnidadeId,
 }: FinancialHealthCardProps) {
+  const [drillDownCategory, setDrillDownCategory] = useState<BudgetCategory | null>(null);
   const { getBudgetForStoreMonth, getCurrentMonthYear, isLoading } = useStoreBudgets();
-  const { getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
+  const { expenses: allOperationalExpenses, getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
+  const opExpenses = operationalExpensesProp ?? allOperationalExpenses;
   const { options: lojas } = useConfigLojas();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
@@ -198,21 +204,32 @@ export function FinancialHealthCard({
     label, 
     icon: Icon, 
     iconColor, 
-    stats: catStats 
+    stats: catStats,
+    onClick,
   }: { 
     label: string; 
     icon: React.ElementType; 
     iconColor: string; 
     stats: CategoryStats;
+    onClick?: () => void;
   }) => (
-    <div className="space-y-1.5">
+    <button
+      type="button"
+      className={cn(
+        "w-full text-left space-y-1.5 rounded-lg p-2 -mx-2 transition-colors",
+        onClick && "hover:bg-muted/60 cursor-pointer group"
+      )}
+      onClick={onClick}
+      disabled={!onClick}
+    >
       <div className="flex items-center justify-between text-xs">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <Icon className={cn("h-3.5 w-3.5", iconColor)} />
           {label}
         </span>
-        <span className="font-medium">
+        <span className="flex items-center gap-1 font-medium">
           {catStats.hasBudget ? `${catStats.percentageUsed.toFixed(1)}%` : "N/A"}
+          {onClick && <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
         </span>
       </div>
       {catStats.hasBudget ? (
@@ -233,7 +250,7 @@ export function FinancialHealthCard({
         <span>{formatCurrency(catStats.spent)}</span>
         <span>{catStats.hasBudget ? formatCurrency(catStats.budget) : "Sem budget"}</span>
       </div>
-    </div>
+    </button>
   );
 
   return (
@@ -266,30 +283,35 @@ export function FinancialHealthCard({
             icon={Users} 
             iconColor="text-blue-500" 
             stats={stats.freelancer} 
+            onClick={() => setDrillDownCategory("freelancer")}
           />
           <CategoryProgressBar 
             label="Manutenção" 
             icon={Wrench} 
             iconColor="text-amber-500" 
             stats={stats.maintenance} 
+            onClick={() => setDrillDownCategory("maintenance")}
           />
           <CategoryProgressBar 
             label="Uniformes" 
             icon={Shirt} 
             iconColor="text-purple-500" 
             stats={stats.uniforms} 
+            onClick={() => setDrillDownCategory("uniforms")}
           />
           <CategoryProgressBar 
             label="Limpeza" 
             icon={SprayCanIcon} 
             iconColor="text-cyan-500" 
             stats={stats.cleaning} 
+            onClick={() => setDrillDownCategory("cleaning")}
           />
           <CategoryProgressBar 
             label="Utensílios" 
             icon={UtensilsCrossed} 
             iconColor="text-rose-500" 
             stats={stats.utensils} 
+            onClick={() => setDrillDownCategory("utensils")}
           />
           <div className="pt-2 border-t">
             <CategoryProgressBar 
@@ -421,6 +443,26 @@ export function FinancialHealthCard({
           </div>
         )}
       </CardContent>
+
+      {/* Drill-down dialog */}
+      {drillDownCategory && (
+        <BudgetDrillDownDialog
+          open={!!drillDownCategory}
+          onOpenChange={(open) => { if (!open) setDrillDownCategory(null); }}
+          category={drillDownCategory}
+          freelancerEntries={freelancerEntries}
+          maintenanceEntries={maintenanceEntries}
+          operationalExpenses={opExpenses}
+          storeId={effectiveStoreId}
+          budgetAmount={
+            drillDownCategory === "freelancer" ? stats.freelancer.budget :
+            drillDownCategory === "maintenance" ? stats.maintenance.budget :
+            drillDownCategory === "uniforms" ? stats.uniforms.budget :
+            drillDownCategory === "cleaning" ? stats.cleaning.budget :
+            stats.utensils.budget
+          }
+        />
+      )}
     </Card>
   );
 }

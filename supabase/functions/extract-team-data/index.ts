@@ -99,7 +99,7 @@ async function processSpreadsheet(buffer: ArrayBuffer, mimeType: string, fileNam
   // For CSV files, decode as text and send directly
   if (fileName.endsWith(".csv")) {
     const text = new TextDecoder().decode(buffer);
-    const preview = text.slice(0, 15000); // limit to ~15k chars
+    const preview = text.slice(0, 15000);
     console.log(`Sending CSV text to AI (${preview.length} chars)`);
 
     const content = await callAI([
@@ -113,9 +113,34 @@ async function processSpreadsheet(buffer: ArrayBuffer, mimeType: string, fileNam
     return extractJSON(content);
   }
 
-  // For Excel files, send as base64 document for AI vision processing
+  // For Excel files (.xls/.xlsx): read with a simple text extraction approach
+  // Convert binary to base64 and try to extract readable text for AI processing
+  const uint8 = new Uint8Array(buffer);
+  
+  // Try to extract readable strings from the binary Excel file
+  const extractedText = extractReadableText(uint8);
+  
+  if (extractedText.length > 50) {
+    console.log(`Extracted ${extractedText.length} chars of text from Excel, sending to AI as text`);
+    const content = await callAI([
+      {
+        type: "text",
+        text: `Analise este conteúdo extraído de uma planilha Excel e extraia os funcionários conforme as regras.\n\nConteúdo da planilha:\n${extractedText.slice(0, 15000)}`,
+      },
+    ]);
+    console.log("AI Excel-text response:", content.substring(0, 300));
+    return extractJSON(content);
+  }
+
+  // Fallback: send as base64 image (works for .xlsx but not .xls)
   const base64 = toBase64(buffer);
   const detectedMime = mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  
+  // Skip if it's old .xls format (not supported by vision API)
+  if (detectedMime === "application/vnd.ms-excel" || fileName.endsWith(".xls")) {
+    throw new Error("Não foi possível extrair texto do arquivo .xls. Tente salvar como .xlsx ou .csv e enviar novamente.");
+  }
+  
   console.log(`Sending Excel as base64 to AI (${(buffer.byteLength / 1024).toFixed(0)}KB)`);
 
   const content = await callAI([
@@ -131,6 +156,47 @@ async function processSpreadsheet(buffer: ArrayBuffer, mimeType: string, fileNam
 
   console.log("AI Excel response:", content.substring(0, 300));
   return extractJSON(content);
+}
+
+/**
+ * Extract readable text strings from a binary file (works for .xls BIFF format).
+ * Scans for sequences of printable characters separated by nulls or control chars.
+ */
+function extractReadableText(data: Uint8Array): string {
+  const chunks: string[] = [];
+  let current = "";
+  
+  for (let i = 0; i < data.length; i++) {
+    const byte = data[i];
+    // Printable ASCII or common Latin-1 (accented chars)
+    if ((byte >= 32 && byte <= 126) || (byte >= 192 && byte <= 255)) {
+      current += String.fromCharCode(byte);
+    } else {
+      if (current.length >= 3) {
+        chunks.push(current.trim());
+      }
+      current = "";
+    }
+  }
+  if (current.length >= 3) {
+    chunks.push(current.trim());
+  }
+  
+  // Deduplicate and filter noise
+  const seen = new Set<string>();
+  const meaningful: string[] = [];
+  for (const chunk of chunks) {
+    // Skip very short or purely numeric noise
+    if (chunk.length < 2) continue;
+    if (/^[\d\s.,-]+$/.test(chunk) && chunk.length < 5) continue;
+    const key = chunk.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      meaningful.push(chunk);
+    }
+  }
+  
+  return meaningful.join(" | ");
 }
 
 async function processVisualDocument(buffer: ArrayBuffer, mimeType: string, fileName: string) {

@@ -295,6 +295,7 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
         valor: amount,
         descricao: descricao.trim() || null,
         anexo_url: anexoUrl,
+        boleto_url: null,
       });
     } else {
       // Simple expense (uniformes, limpeza, apoio)

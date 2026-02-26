@@ -56,6 +56,7 @@ export function useMaintenanceEntries() {
           valor: formData.valor,
           descricao: formData.descricao || null,
           anexo_url: formData.anexo_url,
+          boleto_url: formData.boleto_url,
           cpf_cnpj: formData.cpf_cnpj || null,
           chave_pix: formData.chave_pix || null,
           created_by: user?.id,

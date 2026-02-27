@@ -268,7 +268,7 @@ export function FreelancerForm() {
                 </SelectContent>
               </Select>
               {autoFilledFields.has("funcao") && (
-                <p className="text-xs text-green-600">Preenchido automaticamente</p>
+                <p className="text-xs text-green-600">Última função — pode alterar se necessário</p>
               )}
               {form.formState.errors.funcao && (
                 <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
@@ -301,7 +301,7 @@ export function FreelancerForm() {
                 </SelectContent>
               </Select>
               {autoFilledFields.has("gerencia") && (
-                <p className="text-xs text-green-600">Última gerência preenchida automaticamente</p>
+                <p className="text-xs text-green-600">Última gerência — pode alterar se necessário</p>
               )}
               {form.formState.errors.gerencia && (
                 <p className="text-sm text-destructive">{form.formState.errors.gerencia.message}</p>

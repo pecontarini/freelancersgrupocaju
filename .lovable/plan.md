@@ -1,64 +1,65 @@
 
+# Experiencia Interativa de Auditorias
 
-## Plano: Fixar Loja Selecionada Entre Lancamentos Consecutivos
+## Objetivo
+Transformar a visualizacao de auditorias em uma experiencia rica e interativa. Ao clicar no numero de auditorias (KPI card) ou em qualquer auditoria no historico, abrir um painel detalhado com a nota, o PDF original, e uma galeria de fotos de evidencia com navegacao fluida.
 
-### Problema
+## O que muda
 
-Quando um usuario com multiplas lojas (ex: 3 lojas) cadastra um freelancer e o formulario faz `form.reset()`, os campos `loja` e `loja_id` sao limpos. No proximo lancamento, o usuario precisa selecionar a loja novamente e, se nao perceber, recebe o erro "Loja e obrigatoria".
+### 1. KPI Card "Auditorias" se torna clicavel
+O card que mostra o total de auditorias realizadas passa a ser um botao. Ao clicar, abre um Dialog full-screen listando todas as auditorias do periodo, organizadas por data, com nota e tipo de checklist.
 
-A logica atual (linha 101-110 de `FreelancerForm.tsx`) so re-aplica a loja para usuarios com **uma unica loja** (`singleUnidade`). Usuarios com 2+ lojas perdem a selecao.
+### 2. Novo componente: AuditDetailViewer
+Um Dialog/Drawer rico que substitui o Sheet atual do historico. Ele tera:
 
-### Solucao
+- **Cabecalho**: Unidade, data formatada, tipo de checklist e nota em destaque com cor contextual
+- **Secao PDF**: Se a auditoria possui `pdf_url`, exibe um iframe embutido para visualizar o PDF diretamente no app, com botao para abrir em nova aba
+- **Secao Falhas**: Lista de nao conformidades com layout de cards, incluindo detalhes e status (pendente/corrigido/validado)
+- **Galeria de Fotos**: As fotos de evidencia (`url_foto_evidencia`) e fotos de resolucao (`resolution_photo_url`) sao exibidas em cards com preview clicavel que abre um lightbox/modal de zoom
+- **Navegacao entre auditorias**: Botoes "Anterior" e "Proxima" para navegar entre auditorias sem fechar o painel
 
-Salvar a loja selecionada antes do `form.reset()` e re-aplicar imediatamente depois, para **todos** os perfis (nao apenas `singleUnidade`).
+### 3. Novo componente: AuditListDialog
+Dialog que abre ao clicar no KPI card. Lista as auditorias em cards compactos com nota, unidade e data. Clicar em qualquer card abre o AuditDetailViewer.
 
-### Mudancas
+### 4. Galeria de fotos com lightbox
+Componente simples de lightbox para ampliar imagens de evidencia. Clicando na miniatura, a foto abre em overlay full-screen com botao de fechar.
 
-**Arquivo: `src/components/FreelancerForm.tsx`**
+## Detalhes Tecnicos
 
-Na funcao `onSubmit` (linhas 89-111):
+### Arquivos novos
+- `src/components/audit-diagnostic/AuditDetailViewer.tsx` — Dialog principal com tabs (PDF | Falhas | Fotos)
+- `src/components/audit-diagnostic/AuditListDialog.tsx` — Lista clicavel de auditorias (abre do KPI)
+- `src/components/audit-diagnostic/PhotoLightbox.tsx` — Lightbox para ampliar fotos
 
-1. Antes de `form.reset()`, capturar os valores atuais de `loja` e `loja_id`
-2. Apos `form.reset()`, re-aplicar esses valores salvos (independente do perfil)
-3. Remover a condicao `if (singleUnidade)` que limita a re-aplicacao
+### Arquivos editados
+- `src/components/audit-diagnostic/AuditKPICards.tsx` — Card "Auditorias" recebe onClick
+- `src/components/audit-diagnostic/AuditHistoryTable.tsx` — Substituir Sheet por AuditDetailViewer
+- `src/components/dashboard/AuditDiagnosticDashboard.tsx` — Gerenciar estado do AuditListDialog e passar callbacks
+- `src/components/audit-diagnostic/index.ts` — Exportar novos componentes
 
-Codigo atual:
+### Estrutura do AuditDetailViewer
+```text
++-----------------------------------------------+
+|  [<] Anterior    Auditoria     Proxima [>]     |
++-----------------------------------------------+
+|  CAMINITO ASS  |  26/02/2026  |  86.2%         |
+|  Supervisao de Front                           |
++-----------------------------------------------+
+|  [ PDF ]  [ Falhas (4) ]  [ Fotos (3) ]       |
++-----------------------------------------------+
+|                                                 |
+|  Tab PDF: iframe do PDF ou "sem PDF"           |
+|  Tab Falhas: cards com status + detalhes       |
+|  Tab Fotos: grid de miniaturas clicaveis       |
+|                                                 |
++-----------------------------------------------+
 ```
-form.reset();
-setCpfValue("");
-setValorValue("");
-setAutoFilledFields(new Set());
 
-// Re-apply unidade for gerente with single store
-if (singleUnidade) {
-  form.setValue("loja", singleUnidade.nome);
-  form.setValue("loja_id", singleUnidade.id);
-}
-```
+### Dados utilizados
+- `supervision_audits.pdf_url` — URL do PDF original
+- `supervision_failures.url_foto_evidencia` — Fotos de evidencia da nao conformidade
+- `supervision_failures.resolution_photo_url` — Fotos de correcao
+- `supervision_failures.detalhes_falha` — Detalhes textuais
 
-Codigo novo:
-```
-// Salvar loja selecionada antes do reset
-const currentLoja = data.loja;
-const currentLojaId = data.loja_id;
-
-form.reset();
-setCpfValue("");
-setValorValue("");
-setAutoFilledFields(new Set());
-
-// Re-aplicar loja para todos os perfis (single ou multi-loja)
-if (currentLojaId) {
-  form.setValue("loja", currentLoja);
-  form.setValue("loja_id", currentLojaId);
-}
-```
-
-### Impacto
-
-- **Admin**: mantem a loja selecionada entre lancamentos
-- **Socio Operador (multi-loja)**: corrige o bug reportado — loja fica fixa
-- **Gerente (single loja)**: continua funcionando normalmente
-- **Gerente (multi-loja)**: tambem corrigido
-
-Nenhuma outra mudanca necessaria. A correcao e cirurgica e universal.
+### Sem alteracoes no banco de dados
+Todos os dados necessarios ja existem nas tabelas `supervision_audits` e `supervision_failures`.

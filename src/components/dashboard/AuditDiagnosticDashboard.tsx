@@ -52,6 +52,7 @@ import {
   SectorReportGenerator,
   AIAnalysisButton,
   AlertsFeed,
+  AuditListDialog,
 } from "@/components/audit-diagnostic";
 import {
   ChecklistTemplateManager,
@@ -114,6 +115,7 @@ export function AuditDiagnosticDashboard({
   const [periodFilter, setPeriodFilter] = useState("30d");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [templateRefreshKey, setTemplateRefreshKey] = useState(0);
+  const [auditListOpen, setAuditListOpen] = useState(false);
 
   const dateRange = useMemo(() => getDateRange(periodFilter), [periodFilter]);
 
@@ -413,6 +415,19 @@ export function AuditDiagnosticDashboard({
         totalFailures={filteredFailures.length}
         criticalSector={criticalSector}
         recurringCount={recurringCount}
+        onAuditsClick={() => setAuditListOpen(true)}
+      />
+
+      <AuditListDialog
+        open={auditListOpen}
+        onOpenChange={setAuditListOpen}
+        audits={filteredAudits}
+        failures={filteredFailures}
+        getLojaName={getLojaName}
+        auditChecklistTypes={auditChecklistTypes}
+        onDeleteAudit={deleteAudit}
+        isDeletingAudit={isDeletingAudit}
+        isAdmin={isAdmin || userIsAdmin}
       />
 
       {/* ===== TABS ===== */}

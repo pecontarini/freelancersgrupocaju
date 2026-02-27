@@ -17,6 +17,7 @@ interface AuditKPICardsProps {
   totalFailures: number;
   criticalSector: { name: string; lostPoints: number } | null;
   recurringCount: number;
+  onAuditsClick?: () => void;
 }
 
 function getScoreColorClass(score: number | null): string {
@@ -40,6 +41,7 @@ export function AuditKPICards({
   totalFailures,
   criticalSector,
   recurringCount,
+  onAuditsClick,
 }: AuditKPICardsProps) {
   return (
     <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -71,14 +73,19 @@ export function AuditKPICards({
       </Card>
 
       {/* Auditorias Realizadas */}
-      <Card className="rounded-2xl shadow-card">
+      <Card
+        className={`rounded-2xl shadow-card transition-all ${onAuditsClick ? "cursor-pointer hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]" : ""}`}
+        onClick={onAuditsClick}
+      >
         <CardContent className="p-5">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-medium uppercase text-muted-foreground">Auditorias</p>
             <ClipboardCheck className="h-4 w-4 text-primary" />
           </div>
           <p className="text-3xl font-bold">{totalAudits}</p>
-          <p className="text-xs text-muted-foreground mt-1">realizadas</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {onAuditsClick ? "clique para ver →" : "realizadas"}
+          </p>
         </CardContent>
       </Card>
 

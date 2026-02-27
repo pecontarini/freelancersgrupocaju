@@ -12,27 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Separator } from "@/components/ui/separator";
 import type { SupervisionAudit, SupervisionFailure } from "@/hooks/useSupervisionAudits";
-import { categorizeItemToSector, SECTOR_POSITION_MAP } from "@/lib/sectorPositionMapping";
 import { AUDIT_TYPE_LABELS, type AuditChecklistType } from "@/lib/audit/auditTypes";
+import { AuditDetailViewer } from "./AuditDetailViewer";
 
 interface AuditHistoryTableProps {
   audits: SupervisionAudit[];
@@ -66,17 +48,6 @@ export function AuditHistoryTable({
   isAdmin = false,
 }: AuditHistoryTableProps) {
   const [selectedAudit, setSelectedAudit] = useState<SupervisionAudit | null>(null);
-
-  const auditFailures = selectedAudit
-    ? failures.filter((f) => f.audit_id === selectedAudit.id)
-    : [];
-
-  const handleDelete = async () => {
-    if (selectedAudit && onDeleteAudit) {
-      await onDeleteAudit(selectedAudit.id);
-      setSelectedAudit(null);
-    }
-  };
 
   return (
     <>
@@ -160,144 +131,19 @@ export function AuditHistoryTable({
         </CardContent>
       </Card>
 
-      {/* Drill-Down Sheet (Espelho do Checklist) */}
-      <Sheet open={!!selectedAudit} onOpenChange={(open) => !open && setSelectedAudit(null)}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2 text-lg">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              Espelho do Checklist
-            </SheetTitle>
-          </SheetHeader>
-
-          {selectedAudit && (
-            <div className="mt-4 space-y-4">
-              {/* Audit header info */}
-              <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{getLojaName(selectedAudit.loja_id)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(selectedAudit.audit_date + "T12:00:00").toLocaleDateString("pt-BR", {
-                      weekday: "long",
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                  {/* Checklist type badges */}
-                  {(auditChecklistTypes[selectedAudit.id] || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(auditChecklistTypes[selectedAudit.id] || []).map((t) => (
-                        <Badge key={t} variant="secondary" className="text-[10px]">
-                          {AUDIT_TYPE_LABELS[t as AuditChecklistType] || t}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`text-lg font-bold px-3 py-1 ${getScoreBadgeClass(selectedAudit.global_score)}`}
-                >
-                  {selectedAudit.global_score.toFixed(1)}%
-                </Badge>
-              </div>
-
-              <Separator />
-
-              {/* Failures list - "espelho" */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase text-muted-foreground">
-                  {auditFailures.length} item(ns) com perda de ponto
-                </p>
-                {auditFailures.length === 0 ? (
-                  <div className="flex flex-col items-center py-8 text-center">
-                    <CheckCircle className="h-10 w-10 text-emerald-500 mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma não conformidade registrada nesta auditoria.
-                    </p>
-                  </div>
-                ) : (
-                  auditFailures.map((f) => {
-                    const sector = categorizeItemToSector(f.item_name, f.category);
-                    const sectorName = SECTOR_POSITION_MAP[sector]?.displayName || sector;
-                    return (
-                      <div
-                        key={f.id}
-                        className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-1"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <XCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                            <p className="text-sm font-medium">{f.item_name}</p>
-                          </div>
-                          <Badge variant="outline" className="text-[10px] flex-shrink-0">
-                            {sectorName}
-                          </Badge>
-                        </div>
-                        {f.detalhes_falha && (
-                          <p className="text-xs text-muted-foreground pl-6">{f.detalhes_falha}</p>
-                        )}
-                        {f.url_foto_evidencia && (
-                          <a
-                            href={f.url_foto_evidencia}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-primary hover:underline pl-6 inline-flex items-center gap-1"
-                          >
-                            📷 Evidência <ExternalLink className="h-2.5 w-2.5" />
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Delete button (admin only) */}
-              {isAdmin && onDeleteAudit && (
-                <>
-                  <Separator />
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full gap-2"
-                        disabled={isDeletingAudit}
-                      >
-                        {isDeletingAudit ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        Excluir Auditoria
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir auditoria?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação é irreversível. A auditoria, suas falhas e scores setoriais serão permanentemente excluídos.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDelete}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      <AuditDetailViewer
+        open={!!selectedAudit}
+        onOpenChange={(o) => !o && setSelectedAudit(null)}
+        audit={selectedAudit}
+        allAudits={audits}
+        failures={failures}
+        getLojaName={getLojaName}
+        auditChecklistTypes={auditChecklistTypes}
+        onNavigate={setSelectedAudit}
+        onDeleteAudit={onDeleteAudit}
+        isDeletingAudit={isDeletingAudit}
+        isAdmin={isAdmin}
+      />
     </>
   );
 }

@@ -83,6 +83,28 @@ export function useMaintenanceEntries() {
     },
   });
 
+  const updateEntryMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<MaintenanceFormData> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("maintenance_entries")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
+      toast.success("Manutenção atualizada com sucesso!");
+    },
+    onError: (error: Error) => {
+      console.error("Error updating maintenance entry:", error);
+      toast.error("Erro ao atualizar manutenção");
+    },
+  });
+
   const deleteEntryMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -139,6 +161,7 @@ export function useMaintenanceEntries() {
     budgets,
     isLoading: isLoadingEntries || isLoadingBudgets,
     addEntry: addEntryMutation.mutateAsync,
+    updateEntry: updateEntryMutation.mutateAsync,
     deleteEntry: deleteEntryMutation.mutateAsync,
     updateBudget: updateBudgetMutation.mutateAsync,
     isAdding: addEntryMutation.isPending,

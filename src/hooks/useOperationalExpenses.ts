@@ -83,6 +83,36 @@ export function useOperationalExpenses() {
     },
   });
 
+  // Update expense mutation
+  const updateExpenseMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; category?: OperationalCategory; valor?: number; data_despesa?: string; descricao?: string | null }) => {
+      const { data, error } = await supabase
+        .from("operational_expenses")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["operational_expenses"] });
+      toast({
+        title: "Despesa atualizada",
+        description: "O registro foi atualizado com sucesso.",
+      });
+    },
+    onError: (error) => {
+      console.error("Error updating expense:", error);
+      toast({
+        title: "Erro ao atualizar despesa",
+        description: "Não foi possível atualizar o registro.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete expense mutation
   const deleteExpenseMutation = useMutation({
     mutationFn: async (expenseId: string) => {
@@ -141,6 +171,7 @@ export function useOperationalExpenses() {
     expenses,
     isLoading,
     addExpense: addExpenseMutation.mutateAsync,
+    updateExpense: updateExpenseMutation.mutateAsync,
     deleteExpense: deleteExpenseMutation.mutateAsync,
     getExpensesForStoreMonth,
     getTotalsForStoreMonth,

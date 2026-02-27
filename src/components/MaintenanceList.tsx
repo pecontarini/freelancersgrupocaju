@@ -1,4 +1,5 @@
 import { Trash2, ExternalLink, FileText } from "lucide-react";
+import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
 
 import {
   Table,
@@ -100,6 +101,8 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
                 <MaintenanceSingleExportButton entry={entry} />
               </TableCell>
               <TableCell>
+                <div className="flex items-center gap-1">
+                  <EditMaintenanceDialog entry={entry} />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -124,6 +127,7 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                </div>
               </TableCell>
             </TableRow>
           ))}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowUpDown, Trash2 } from "lucide-react";
-
+import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -156,7 +156,9 @@ export function EntriesTable({ entries }: EntriesTableProps) {
                     {formatCurrency(entry.valor)}
                   </TableCell>
                   <TableCell>
-                    <AlertDialog>
+                    <div className="flex items-center gap-1">
+                      <EditFreelancerDialog entry={entry} />
+                      <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button
                           variant="ghost"
@@ -186,6 +188,7 @@ export function EntriesTable({ entries }: EntriesTableProps) {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

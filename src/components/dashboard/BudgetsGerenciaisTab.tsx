@@ -48,6 +48,8 @@ import { MobileFreelancerCard } from "@/components/mobile/MobileFreelancerCard";
 import { MaintenanceSingleExportButton } from "@/components/MaintenanceSingleExportButton";
 import { MaintenanceReportModal } from "@/components/maintenance/MaintenanceReportModal";
 import { InlineBudgetEditor } from "@/components/InlineBudgetEditor";
+import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
+import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -536,6 +538,7 @@ export function BudgetsGerenciaisTab({
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      <EditFreelancerDialog entry={entry} />
                       <p className="font-semibold text-primary">
                         {formatCurrency(entry.valor)}
                       </p>
@@ -695,6 +698,7 @@ export function BudgetsGerenciaisTab({
                       <p className="font-semibold text-amber-600">
                         {formatCurrency(entry.valor)}
                       </p>
+                      <EditMaintenanceDialog entry={entry} />
                       <MaintenanceSingleExportButton entry={entry} />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>

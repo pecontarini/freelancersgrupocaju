@@ -1,5 +1,6 @@
 import { User, Trash2, Calendar, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -63,7 +64,8 @@ export function MobileFreelancerCard({ entry, onDelete }: MobileFreelancerCardPr
       </div>
       
       {/* Actions */}
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end gap-1">
+        <EditFreelancerDialog entry={entry} />
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button

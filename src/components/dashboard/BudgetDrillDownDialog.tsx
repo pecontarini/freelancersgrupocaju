@@ -25,6 +25,9 @@ import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";
 import { cn } from "@/lib/utils";
+import { EditOperationalExpenseDialog } from "@/components/EditOperationalExpenseDialog";
+import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
+import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
 import {
   Users,
   Wrench,
@@ -70,6 +73,9 @@ interface ExpenseItem {
   date: string;
   description: string;
   value: number;
+  originalFreelancer?: FreelancerEntry;
+  originalMaintenance?: MaintenanceEntry;
+  originalExpense?: OperationalExpense;
 }
 
 export function BudgetDrillDownDialog({
@@ -98,14 +104,14 @@ export function BudgetDrillDownDialog({
       freelancerEntries.forEach((e) => {
         const d = parseDateString(e.data_pop);
         if (d >= monthStart && d <= monthEnd && (!storeId || e.loja_id === storeId)) {
-          items.push({ id: e.id, date: e.data_pop, description: `${e.nome_completo} — ${e.funcao}`, value: e.valor });
+          items.push({ id: e.id, date: e.data_pop, description: `${e.nome_completo} — ${e.funcao}`, value: e.valor, originalFreelancer: e });
         }
       });
     } else if (category === "maintenance") {
       maintenanceEntries.forEach((e) => {
         const d = parseDateString(e.data_servico);
         if (d >= monthStart && d <= monthEnd && (!storeId || e.loja_id === storeId)) {
-          items.push({ id: e.id, date: e.data_servico, description: `${e.fornecedor} (NF ${e.numero_nf})`, value: e.valor });
+          items.push({ id: e.id, date: e.data_servico, description: `${e.fornecedor} (NF ${e.numero_nf})`, value: e.valor, originalMaintenance: e });
         }
       });
     } else {
@@ -113,7 +119,7 @@ export function BudgetDrillDownDialog({
       operationalExpenses.forEach((e) => {
         const d = parseDateString(e.data_despesa);
         if (e.category === opCat && d >= monthStart && d <= monthEnd && (!storeId || e.store_id === storeId)) {
-          items.push({ id: e.id, date: e.data_despesa, description: e.descricao || opCat, value: e.valor });
+          items.push({ id: e.id, date: e.data_despesa, description: e.descricao || opCat, value: e.valor, originalExpense: e });
         }
       });
     }
@@ -242,9 +248,14 @@ export function BudgetDrillDownDialog({
                         <p className="truncate font-medium">{item.description}</p>
                         <p className="text-xs text-muted-foreground">{`${d}/${m}/${y}`}</p>
                       </div>
-                      <Badge variant="secondary" className="ml-2 shrink-0">
-                        {formatCurrency(item.value)}
-                      </Badge>
+                      <div className="flex items-center gap-1 ml-2 shrink-0">
+                        {item.originalFreelancer && <EditFreelancerDialog entry={item.originalFreelancer} />}
+                        {item.originalMaintenance && <EditMaintenanceDialog entry={item.originalMaintenance} />}
+                        {item.originalExpense && <EditOperationalExpenseDialog expense={item.originalExpense} />}
+                        <Badge variant="secondary">
+                          {formatCurrency(item.value)}
+                        </Badge>
+                      </div>
                     </div>
                   );
                 })}

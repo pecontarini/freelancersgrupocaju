@@ -57,6 +57,28 @@ export function useFreelancerEntries() {
     },
   });
 
+  const updateEntry = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<FreelancerFormData> & { id: string }) => {
+      const { data, error } = await supabase
+        .from("freelancer_entries")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
+      toast.success("Lançamento atualizado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Error updating entry:", error);
+      toast.error("Erro ao atualizar lançamento.");
+    },
+  });
+
   const deleteEntry = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -65,35 +87,25 @@ export function useFreelancerEntries() {
         .eq("id", id);
       
       if (error) {
-        // Check for RLS policy violation
         if (error.code === "42501" || error.message.includes("policy")) {
           throw new Error("Você não tem permissão para excluir este lançamento.");
         }
         throw error;
       }
     },
-    // Optimistic update - remove item from UI immediately
     onMutate: async (id: string) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["freelancer-entries"] });
-
-      // Snapshot the previous value
       const previousEntries = queryClient.getQueryData<FreelancerEntry[]>(["freelancer-entries"]);
-
-      // Optimistically update to the new value
       queryClient.setQueryData<FreelancerEntry[]>(
         ["freelancer-entries"],
         (old) => old?.filter((entry) => entry.id !== id) ?? []
       );
-
-      // Return a context object with the snapshotted value
       return { previousEntries };
     },
     onSuccess: () => {
       toast.success("Lançamento excluído com sucesso!");
     },
     onError: (error, id, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousEntries) {
         queryClient.setQueryData(["freelancer-entries"], context.previousEntries);
       }
@@ -101,7 +113,6 @@ export function useFreelancerEntries() {
       toast.error(error instanceof Error ? error.message : "Erro ao excluir lançamento.");
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure cache is in sync
       queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
     },
   });
@@ -116,6 +127,7 @@ export function useFreelancerEntries() {
     isLoading,
     error,
     createEntry,
+    updateEntry,
     deleteEntry,
     uniqueFuncoes,
     uniqueGerencias,

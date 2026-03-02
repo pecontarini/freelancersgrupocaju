@@ -25,8 +25,8 @@ interface MaintenanceSingleExportButtonProps {
 export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExportButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Check if required fields are present
-  const canExport = entry.valor > 0 && entry.chave_pix && entry.descricao;
+  // Only require a positive value to allow export
+  const canExport = entry.valor > 0;
 
   const formatDate = (dateString: string) => {
     const [year, month, day] = dateString.split("-");
@@ -337,6 +337,89 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
         }
       }
 
+      // ========== BOLETO SECTION ==========
+      if (entry.boleto_url) {
+        // Recalculate currentY after NF section
+        if (!entry.anexo_url) {
+          // If no NF was rendered, currentY is still from approval section
+        }
+
+        if (currentY > pageHeight - 80) {
+          doc.addPage();
+          currentY = 20;
+        } else {
+          currentY += 10;
+        }
+
+        doc.setFillColor(100, 100, 100);
+        doc.rect(margin, currentY, pageWidth - margin * 2, 8, "F");
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.text("ANEXO - BOLETO", margin + 4, currentY + 5.5);
+
+        currentY += 14;
+
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
+
+        const isBoletoImage = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(entry.boleto_url);
+
+        if (isBoletoImage) {
+          try {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => {
+                try {
+                  const maxImgWidth = pageWidth - margin * 2;
+                  const maxImgHeight = pageHeight - currentY - 30;
+
+                  let imgWidth = img.width;
+                  let imgHeight = img.height;
+
+                  if (imgWidth > maxImgWidth) {
+                    const ratio = maxImgWidth / imgWidth;
+                    imgWidth = maxImgWidth;
+                    imgHeight = imgHeight * ratio;
+                  }
+
+                  if (imgHeight > maxImgHeight) {
+                    const ratio = maxImgHeight / imgHeight;
+                    imgHeight = maxImgHeight;
+                    imgWidth = imgWidth * ratio;
+                  }
+
+                  const xOffset = (pageWidth - imgWidth) / 2;
+                  doc.addImage(img, "JPEG", xOffset, currentY, imgWidth, imgHeight);
+                  resolve();
+                } catch (e) {
+                  reject(e);
+                }
+              };
+              img.onerror = () => reject(new Error("Failed to load boleto image"));
+              img.src = entry.boleto_url!;
+            });
+          } catch (e) {
+            console.error("Error adding boleto image:", e);
+            doc.text("Boleto disponível em:", margin, currentY);
+            const displayUrl = entry.boleto_url.length > 80
+              ? entry.boleto_url.substring(0, 80) + "..."
+              : entry.boleto_url;
+            doc.textWithLink(displayUrl, margin, currentY + 6, { url: entry.boleto_url });
+          }
+        } else {
+          doc.text("Boleto disponível em:", margin, currentY);
+          const displayUrl = entry.boleto_url.length > 80
+            ? entry.boleto_url.substring(0, 80) + "..."
+            : entry.boleto_url;
+          doc.textWithLink(displayUrl, margin, currentY + 6, { url: entry.boleto_url });
+        }
+      }
+
       // ========== FOOTER ==========
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
@@ -375,7 +458,7 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Preencha Valor, Chave PIX e Descrição para gerar PDF</p>
+            <p>O valor deve ser maior que zero para gerar o PDF</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

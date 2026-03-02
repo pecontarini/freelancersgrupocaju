@@ -62,9 +62,10 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
             <TableHead>Loja</TableHead>
             <TableHead>Descrição</TableHead>
             <TableHead className="text-right">Valor</TableHead>
-            <TableHead className="text-center">Anexo</TableHead>
+            <TableHead className="text-center">NF</TableHead>
+            <TableHead className="text-center">Boleto</TableHead>
             <TableHead className="text-center">PDF</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[80px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -84,12 +85,19 @@ export function MaintenanceList({ entries }: MaintenanceListProps) {
               </TableCell>
               <TableCell className="text-center">
                 {entry.anexo_url ? (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    asChild
-                  >
+                  <Button variant="ghost" size="icon" asChild>
                     <a href={entry.anexo_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell className="text-center">
+                {entry.boleto_url ? (
+                  <Button variant="ghost" size="icon" asChild>
+                    <a href={entry.boleto_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4" />
                     </a>
                   </Button>

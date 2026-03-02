@@ -86,8 +86,16 @@ export function BudgetsGerenciaisTab({
   // Effective store ID from filters or prop
   const effectiveStoreId = filters.lojaId || selectedUnidadeId;
 
+  // Derive month_year from the effective date range filter
+  const effectiveMonthYear = useMemo(() => {
+    if (filters.dateStart) {
+      return format(filters.dateStart, "yyyy-MM");
+    }
+    return getCurrentMonthYear();
+  }, [filters.dateStart, getCurrentMonthYear]);
+
   const budget = effectiveStoreId
-    ? getBudgetForStoreMonth(effectiveStoreId, getCurrentMonthYear())
+    ? getBudgetForStoreMonth(effectiveStoreId, effectiveMonthYear)
     : undefined;
 
   // Calculate effective date range: use filter dates or default to current month
@@ -210,13 +218,13 @@ export function BudgetsGerenciaisTab({
   const filteredExpenseTotal = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
   const filteredTotal = filteredFreelancerTotal + filteredMaintenanceTotal + filteredExpenseTotal;
 
-  // Calculate month totals (using filtered data within current month)
+  // Calculate month totals (using the effective month from filter)
   const monthFreelancerTotal = filteredFreelancers
-    .filter((e) => e.data_pop.startsWith(currentMonth))
+    .filter((e) => e.data_pop.startsWith(effectiveMonthYear))
     .reduce((sum, e) => sum + e.valor, 0);
 
   const monthMaintenanceTotal = filteredMaintenance
-    .filter((e) => e.data_servico.startsWith(currentMonth))
+    .filter((e) => e.data_servico.startsWith(effectiveMonthYear))
     .reduce((sum, e) => sum + e.valor, 0);
 
   // Budget calculations
@@ -233,11 +241,10 @@ export function BudgetsGerenciaisTab({
     ? Math.min((monthMaintenanceTotal / maintenanceBudget) * 100, 100)
     : 0;
 
-  const daysInMonth = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth() + 1,
-    0
-  ).getDate();
+  const daysInMonth = useMemo(() => {
+    const [year, month] = effectiveMonthYear.split("-").map(Number);
+    return new Date(year, month, 0).getDate();
+  }, [effectiveMonthYear]);
   const avgDailyBudget = totalMonthlyBudget / daysInMonth;
 
   const dailyConsumptionPercentage = avgDailyBudget

@@ -170,9 +170,14 @@ export function MaintenanceForm() {
 
       const { error: uploadError } = await supabase.storage
         .from("maintenance-attachments")
-        .upload(filePath, file);
+        .upload(filePath, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        if (uploadError.message?.includes("security") || uploadError.message?.includes("policy")) {
+          throw new Error("Permissão negada. Faça login novamente e tente outra vez.");
+        }
+        throw new Error(uploadError.message || "Erro ao enviar arquivo.");
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from("maintenance-attachments")
@@ -248,7 +253,8 @@ export function MaintenanceForm() {
       }
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error("Erro ao enviar arquivo. Verifique sua conexão.");
+      const msg = error instanceof Error ? error.message : "Erro ao enviar arquivo. Verifique sua conexão.";
+      toast.error(msg);
     } finally {
       setUploadProgress(100);
       setTimeout(() => setUploadProgress(0), 500);
@@ -292,9 +298,14 @@ export function MaintenanceForm() {
 
       const { error: uploadError } = await supabase.storage
         .from("maintenance-attachments")
-        .upload(fileName, file);
+        .upload(fileName, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        if (uploadError.message?.includes("security") || uploadError.message?.includes("policy")) {
+          throw new Error("Permissão negada. Faça login novamente e tente outra vez.");
+        }
+        throw new Error(uploadError.message || "Erro ao enviar boleto.");
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from("maintenance-attachments")
@@ -305,7 +316,8 @@ export function MaintenanceForm() {
       toast.success("Boleto enviado com sucesso!");
     } catch (error) {
       console.error("Boleto upload error:", error);
-      toast.error("Erro ao enviar boleto.");
+      const msg = error instanceof Error ? error.message : "Erro ao enviar boleto.";
+      toast.error(msg);
     } finally {
       setUploadProgressBoleto(100);
       setTimeout(() => setUploadProgressBoleto(0), 500);
@@ -416,7 +428,7 @@ export function MaintenanceForm() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,application/pdf,.pdf"
+                  accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,.pdf,.jpg,.jpeg,.png"
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload"

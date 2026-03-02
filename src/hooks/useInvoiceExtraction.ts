@@ -25,6 +25,10 @@ export function useInvoiceExtraction() {
       // Convert file to base64
       const base64 = await fileToBase64(file);
       
+      // Add timeout to prevent extraction from blocking the upload flow
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
       const { data, error } = await supabase.functions.invoke("extract-invoice-data", {
         body: {
           imageBase64: base64,
@@ -32,11 +36,13 @@ export function useInvoiceExtraction() {
         },
       });
 
+      clearTimeout(timeout);
+
       if (error) {
         throw new Error(error.message || "Erro ao extrair dados");
       }
 
-      if (data.error) {
+      if (data?.error) {
         throw new Error(data.error);
       }
 

@@ -1,53 +1,54 @@
 
+# Correcoes Definitivas: Budgets, Freelancer e Anexos de Manutencao
 
-# Correcoes: Budget por Mes Filtrado + Upload de Anexos
+## Problema 1: Socios Operadores nao conseguem registrar budgets
 
-## Problema 1: Budget nao acompanha o filtro de mes
-
-**Causa raiz**: Na linha 90 de `BudgetsGerenciaisTab.tsx`, o budget sempre busca o mes atual:
-```typescript
-const budget = effectiveStoreId
-  ? getBudgetForStoreMonth(effectiveStoreId, getCurrentMonthYear())
-  : undefined;
-```
-
-Quando o usuario filtra para fevereiro, o budget continua mostrando os valores de marco. Precisa derivar o mes do range de datas filtrado.
-
-**Solucao**: Calcular o `month_year` a partir do `effectiveDateRange` e passar para `getBudgetForStoreMonth`.
-
-### Arquivo: `src/components/dashboard/BudgetsGerenciaisTab.tsx`
-- Criar um `effectiveMonthYear` derivado do filtro de datas (usando o mes do `start` date do range)
-- Substituir `getCurrentMonthYear()` por `effectiveMonthYear` na chamada de budget (linha 90)
-- Ajustar os calculos de `monthFreelancerTotal` e `monthMaintenanceTotal` (linhas 214-220) para usar o mes efetivo em vez de `currentMonth`
-- Ajustar `daysInMonth` (linha 236) para calcular os dias do mes efetivo
-
----
-
-## Problema 2: Upload de anexos falha para alguns usuarios
-
-**Causa raiz**: Faltam politicas de UPDATE no bucket `maintenance-attachments`. Quando um arquivo e sobrescrito ou quando certos clientes tentam re-enviar, a operacao falha. Alem disso, o tratamento de erros no upload nao e robusto o suficiente para diagnosticar.
+**Causa raiz encontrada**: A politica RLS da tabela `store_budgets` permite que `gerente_unidade` apenas LEIA budgets (SELECT), mas nao grave. Porem, a interface permite que eles cliquem em "Editar Budgets". Ja o perfil `operator` possui politica ALL correta. Se alguns socios reportam erro, pode ser que estejam cadastrados como `gerente_unidade` em vez de `operator`. Para resolver de vez, vamos adicionar politica de INSERT/UPDATE para `gerente_unidade` tambem.
 
 **Solucao**:
+- Criar migration SQL adicionando politica INSERT e UPDATE em `store_budgets` para `gerente_unidade` com restricao a suas lojas vinculadas
 
-### Migration SQL
-- Adicionar politica de UPDATE para o bucket `maintenance-attachments` para usuarios autenticados
+## Problema 2: Tela "volta" apos cadastrar freelancer
+
+**Causa raiz encontrada**: No `FreelancerForm.tsx`, o `form.reset()` (linha 106) limpa todos os campos de uma vez, causando re-render completo do componente. Isso faz o formulario "saltar" para o topo ou perder o foco visual. Alem disso, o `createEntry.mutateAsync` pode causar scroll involuntario ao invalidar queries e re-renderizar a lista abaixo.
+
+**Solucao**:
+- Envolver o submit em try/catch para evitar que erros propaguem e causem comportamento inesperado
+- Usar `window.scrollTo` ou `scrollIntoView` para manter o formulario visivel apos o reset
+- Adicionar uma referencia ao formulario e rolar ate ele apos o submit bem-sucedido, garantindo que o usuario continue no mesmo ponto para lancar o proximo
+
+### Arquivo: `src/components/FreelancerForm.tsx`
+- Adicionar `useRef` no card do formulario
+- No `onSubmit`, envolver em try/catch e apos o reset, chamar `formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })`
+
+## Problema 3: Apenas um campo de anexo na manutencao (usuario nao ve NF e Boleto separados)
+
+**Causa raiz encontrada**: O codigo JA possui dois campos de upload (NF e Boleto), porem o primeiro esta rotulado como "Anexo (Boleto/NF)" -- um label confuso que faz o usuario pensar que e um campo unico para tudo. O segundo campo ("Anexo do Boleto") fica abaixo e nao se destaca visualmente. Na pratica, o usuario percebe apenas um campo.
+
+**Solucao**:
+- Renomear o primeiro upload de "Anexo (Boleto/NF)" para "Nota Fiscal (NF)" com icone de FileText
+- Renomear o segundo de "Anexo do Boleto (opcional)" para "Boleto" com icone distinto
+- Colocar os dois uploads lado a lado em um grid (desktop) para que fiquem visiveis simultaneamente
+- Adicionar bordas coloridas distintas: azul para NF, roxo para Boleto
+- Manter o OCR apenas no upload da NF
 
 ### Arquivo: `src/components/MaintenanceForm.tsx`
-- Melhorar o tratamento de erros no upload para exibir mensagens mais especificas (ex: permissao negada, arquivo invalido)
-- Adicionar `upsert: true` na chamada de `supabase.storage.upload()` para ambos os uploads (NF e boleto), evitando conflitos de nome de arquivo
-- Garantir que o `accept` do input de arquivo inclua tipos MIME explicitos para melhor compatibilidade mobile
-
-### Arquivo: `src/hooks/useInvoiceExtraction.ts`
-- Adicionar timeout e tratamento de erro mais robusto na chamada da edge function para evitar que a extracao trave o fluxo de upload
+- Alterar labels nas linhas 417-419 e 515-517
+- Envolver ambos em `div className="grid gap-4 sm:grid-cols-2"` para layout lado a lado
+- Estilizar com bordas de cor diferente
 
 ---
 
-## Resumo de arquivos
+## Resumo de alteracoes
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Editar budget para usar mes do filtro |
-| `src/components/MaintenanceForm.tsx` | Melhorar upload com upsert e erros claros |
-| `src/hooks/useInvoiceExtraction.ts` | Timeout na extracao |
-| Migration SQL | Adicionar UPDATE policy no storage |
+| Migration SQL | Adicionar INSERT/UPDATE policies para gerente_unidade em store_budgets |
+| `src/components/FreelancerForm.tsx` | Scroll para formulario apos submit + try/catch |
+| `src/components/MaintenanceForm.tsx` | Renomear labels, layout side-by-side para NF e Boleto |
 
+## Resultado esperado
+
+1. Tanto operadores quanto gerentes de unidade conseguem salvar budgets
+2. Apos salvar freelancer, o formulario limpa mas permanece visivel para o proximo lancamento
+3. Na manutencao, NF e Boleto aparecem como dois campos claros e distintos lado a lado

@@ -1,54 +1,54 @@
 
-# Correcoes Definitivas: Budgets, Freelancer e Anexos de Manutencao
 
-## Problema 1: Socios Operadores nao conseguem registrar budgets
+# Liquid Glass Demo — Premium Polish Plan
 
-**Causa raiz encontrada**: A politica RLS da tabela `store_budgets` permite que `gerente_unidade` apenas LEIA budgets (SELECT), mas nao grave. Porem, a interface permite que eles cliquem em "Editar Budgets". Ja o perfil `operator` possui politica ALL correta. Se alguns socios reportam erro, pode ser que estejam cadastrados como `gerente_unidade` em vez de `operator`. Para resolver de vez, vamos adicionar politica de INSERT/UPDATE para `gerente_unidade` tambem.
+## Current State Assessment
 
-**Solucao**:
-- Criar migration SQL adicionando politica INSERT e UPDATE em `store_budgets` para `gerente_unidade` com restricao a suas lojas vinculadas
+The demo exists at `/liquid-glass` with all 5 components, but has critical layout bugs and missing polish:
 
-## Problema 2: Tela "volta" apos cadastrar freelancer
+1. **GlassPanel layout bug**: The `className` (including `flex`, `gap`, padding) is applied to the outer wrapper, but children render inside a nested `<div className="relative z-10">` block div — meaning flex/grid layout classes have NO effect on actual children. This causes:
+   - **Nav bar**: Logo, links, and icons stack in rows instead of one horizontal line
+   - **Dock**: Icons stack vertically instead of horizontally (macOS-style)
+2. **Nav not properly centered** — content wrapping makes it shift
+3. **Visual polish gaps**: No hover brightness increase on nav, no interactive section content
 
-**Causa raiz encontrada**: No `FreelancerForm.tsx`, o `form.reset()` (linha 106) limpa todos os campos de uma vez, causando re-render completo do componente. Isso faz o formulario "saltar" para o topo ou perder o foco visual. Alem disso, o `createEntry.mutateAsync` pode causar scroll involuntario ao invalidar queries e re-renderizar a lista abaixo.
+## Fix Plan
 
-**Solucao**:
-- Envolver o submit em try/catch para evitar que erros propaguem e causem comportamento inesperado
-- Usar `window.scrollTo` ou `scrollIntoView` para manter o formulario visivel apos o reset
-- Adicionar uma referencia ao formulario e rolar ate ele apos o submit bem-sucedido, garantindo que o usuario continue no mesmo ponto para lancar o proximo
+### 1. Fix GlassPanel core layout bug
+**File**: `src/components/liquid-glass/GlassPanel.tsx`
 
-### Arquivo: `src/components/FreelancerForm.tsx`
-- Adicionar `useRef` no card do formulario
-- No `onSubmit`, envolver em try/catch e apos o reset, chamar `formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })`
+Move layout-related classes (`flex`, `grid`, `gap`, `items-*`, `justify-*`, `p-*`) from the outer container to the inner `z-10` content wrapper. The cleanest approach: add a new `contentClassName` approach OR simply apply the passed `className` to the content div instead.
 
-## Problema 3: Apenas um campo de anexo na manutencao (usuario nao ve NF e Boleto separados)
+**Solution**: Split — keep structural/visual styles on outer div, pass a new prop or forward `className` to the inner content div:
 
-**Causa raiz encontrada**: O codigo JA possui dois campos de upload (NF e Boleto), porem o primeiro esta rotulado como "Anexo (Boleto/NF)" -- um label confuso que faz o usuario pensar que e um campo unico para tudo. O segundo campo ("Anexo do Boleto") fica abaixo e nao se destaca visualmente. Na pratica, o usuario percebe apenas um campo.
+```tsx
+// Outer div gets: overflow-hidden, border-radius, backdrop-filter (visual)
+// Inner z-10 div gets: className passed by consumer (layout)
+<div ref={ref} style={{...glassStyles, ...style}} className="relative overflow-hidden" {...props}>
+  {/* specular highlight */}
+  <div className={cn("relative z-10", className)}>{children}</div>
+</div>
+```
 
-**Solucao**:
-- Renomear o primeiro upload de "Anexo (Boleto/NF)" para "Nota Fiscal (NF)" com icone de FileText
-- Renomear o segundo de "Anexo do Boleto (opcional)" para "Boleto" com icone distinto
-- Colocar os dois uploads lado a lado em um grid (desktop) para que fiquem visiveis simultaneamente
-- Adicionar bordas coloridas distintas: azul para NF, roxo para Boleto
-- Manter o OCR apenas no upload da NF
+### 2. Fix FloatingNav — single-row layout
+**File**: `src/components/liquid-glass/FloatingNav.tsx`
+- With GlassPanel fix, the `flex items-center gap-6` will now correctly apply to children
+- No other changes needed — layout will self-correct
 
-### Arquivo: `src/components/MaintenanceForm.tsx`
-- Alterar labels nas linhas 417-419 e 515-517
-- Envolver ambos em `div className="grid gap-4 sm:grid-cols-2"` para layout lado a lado
-- Estilizar com bordas de cor diferente
+### 3. Fix FloatingDock — horizontal layout
+**File**: `src/components/liquid-glass/FloatingDock.tsx`
+- With GlassPanel fix, `flex items-end gap-2` will correctly lay out icons horizontally
+- No other changes needed
 
----
+### 4. Polish additions (optional but premium)
+- Add subtle hover brightness increase on nav links
+- Ensure fonts load: verify `index.html` has Instrument Serif + DM Sans Google Fonts link (already present)
 
-## Resumo de alteracoes
+## Files to Edit
 
-| Arquivo | Acao |
-|---------|------|
-| Migration SQL | Adicionar INSERT/UPDATE policies para gerente_unidade em store_budgets |
-| `src/components/FreelancerForm.tsx` | Scroll para formulario apos submit + try/catch |
-| `src/components/MaintenanceForm.tsx` | Renomear labels, layout side-by-side para NF e Boleto |
+| File | Change |
+|------|--------|
+| `src/components/liquid-glass/GlassPanel.tsx` | Fix className targeting — apply to inner content div |
 
-## Resultado esperado
+This single fix resolves all 3 visible layout problems (nav, dock, sidebar) since they all stem from the same root cause.
 
-1. Tanto operadores quanto gerentes de unidade conseguem salvar budgets
-2. Apos salvar freelancer, o formulario limpa mas permanece visivel para o proximo lancamento
-3. Na manutencao, NF e Boleto aparecem como dois campos claros e distintos lado a lado

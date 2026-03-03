@@ -14,6 +14,7 @@ import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
 import NotFound from "./pages/NotFound";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
+import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ function App() {
                   }
                 />
                 <Route path="/liquid-glass" element={<LiquidGlassDemo />} />
+                <Route path="/liquid-glass-simulator" element={<LiquidGlassSimulator />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </TooltipProvider>

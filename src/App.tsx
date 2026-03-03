@@ -13,6 +13,7 @@ import ConfirmShift from "./pages/ConfirmShift";
 import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
 import NotFound from "./pages/NotFound";
+import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/liquid-glass" element={<LiquidGlassDemo />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </TooltipProvider>

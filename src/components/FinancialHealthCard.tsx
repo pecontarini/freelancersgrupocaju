@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth, subMonths, addMonths, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed, ChevronRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed, ChevronRight, ChevronLeft } from "lucide-react";
 import { BudgetDrillDownDialog, BudgetCategory } from "@/components/dashboard/BudgetDrillDownDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -37,24 +38,31 @@ export function FinancialHealthCard({
   selectedUnidadeId,
 }: FinancialHealthCardProps) {
   const [drillDownCategory, setDrillDownCategory] = useState<BudgetCategory | null>(null);
-  const { getBudgetForStoreMonth, getCurrentMonthYear, isLoading } = useStoreBudgets();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const { getBudgetForStoreMonth, isLoading } = useStoreBudgets();
   const { expenses: allOperationalExpenses, getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
   const opExpenses = operationalExpensesProp ?? allOperationalExpenses;
   const { options: lojas } = useConfigLojas();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
-  const currentMonthYear = getCurrentMonthYear();
+  const isCurrentMonth = isSameMonth(selectedDate, new Date());
+  const selectedMonthYear = format(selectedDate, "yyyy-MM");
+  const monthStart = startOfMonth(selectedDate);
+  const monthEnd = endOfMonth(selectedDate);
+  const totalDaysInMonth = getDaysInMonth(selectedDate);
   const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-  const totalDaysInMonth = getDaysInMonth(now);
-  const daysElapsed = differenceInDays(now, monthStart) + 1;
-  const daysRemaining = totalDaysInMonth - daysElapsed;
+  const daysElapsed = isCurrentMonth 
+    ? differenceInDays(now, monthStart) + 1 
+    : totalDaysInMonth;
+  const daysRemaining = isCurrentMonth ? totalDaysInMonth - daysElapsed : 0;
 
-  // Determine effective store ID: use selected or fallback to first assigned store for gerentes
+  const navigateMonth = (direction: "prev" | "next") => {
+    setSelectedDate(prev => direction === "prev" ? subMonths(prev, 1) : addMonths(prev, 1));
+  };
+
+  // Determine effective store ID
   const effectiveStoreId = useMemo(() => {
     if (selectedUnidadeId) return selectedUnidadeId;
-    // For gerentes without explicit selection, use their first assigned store
     if (isGerenteUnidade && !isAdmin && unidades.length > 0) {
       return unidades[0].id;
     }
@@ -62,34 +70,31 @@ export function FinancialHealthCard({
   }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
 
   const stats = useMemo(() => {
-    // Filter entries for current month and selected store
     const currentMonthFreelancerEntries = freelancerEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_pop);
-      const isCurrentMonth = entryDate >= monthStart && entryDate <= monthEnd;
+      const isInMonth = entryDate >= monthStart && entryDate <= monthEnd;
       const matchesStore = !effectiveStoreId || entry.loja_id === effectiveStoreId;
-      return isCurrentMonth && matchesStore;
+      return isInMonth && matchesStore;
     });
 
     const currentMonthMaintenanceEntries = maintenanceEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_servico);
-      const isCurrentMonth = entryDate >= monthStart && entryDate <= monthEnd;
+      const isInMonth = entryDate >= monthStart && entryDate <= monthEnd;
       const matchesStore = !effectiveStoreId || entry.loja_id === effectiveStoreId;
-      return isCurrentMonth && matchesStore;
+      return isInMonth && matchesStore;
     });
 
     const freelancerTotal = currentMonthFreelancerEntries.reduce((sum, e) => sum + e.valor, 0);
     const maintenanceTotal = currentMonthMaintenanceEntries.reduce((sum, e) => sum + e.valor, 0);
 
-    // Get operational expenses for the store
     const operationalTotals = effectiveStoreId 
-      ? getTotalsForStoreMonth(effectiveStoreId, currentMonthYear)
+      ? getTotalsForStoreMonth(effectiveStoreId, selectedMonthYear)
       : { uniformes: 0, limpeza: 0, utensilios: 0, total: 0 };
 
     const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios;
 
-    // Get budget for effective store
     const budget = effectiveStoreId 
-      ? getBudgetForStoreMonth(effectiveStoreId, currentMonthYear)
+      ? getBudgetForStoreMonth(effectiveStoreId, selectedMonthYear)
       : null;
     
     const freelancerBudget = budget?.freelancer_budget || 0;
@@ -99,61 +104,24 @@ export function FinancialHealthCard({
     const utensilsBudget = budget?.utensils_budget || 0;
     const totalBudget = budget?.total_budget || 0;
     
-    // Category stats
-    const freelancerStats: CategoryStats = {
-      spent: freelancerTotal,
-      budget: freelancerBudget,
-      percentageUsed: freelancerBudget > 0 ? (freelancerTotal / freelancerBudget) * 100 : 0,
-      remaining: freelancerBudget - freelancerTotal,
-      hasBudget: freelancerBudget > 0,
-    };
+    const mkStats = (spent: number, bgt: number): CategoryStats => ({
+      spent,
+      budget: bgt,
+      percentageUsed: bgt > 0 ? (spent / bgt) * 100 : 0,
+      remaining: bgt - spent,
+      hasBudget: bgt > 0,
+    });
 
-    const maintenanceStats: CategoryStats = {
-      spent: maintenanceTotal,
-      budget: maintenanceBudget,
-      percentageUsed: maintenanceBudget > 0 ? (maintenanceTotal / maintenanceBudget) * 100 : 0,
-      remaining: maintenanceBudget - maintenanceTotal,
-      hasBudget: maintenanceBudget > 0,
-    };
+    const freelancerStats = mkStats(freelancerTotal, freelancerBudget);
+    const maintenanceStats = mkStats(maintenanceTotal, maintenanceBudget);
+    const uniformsStats = mkStats(operationalTotals.uniformes, uniformsBudget);
+    const cleaningStats = mkStats(operationalTotals.limpeza, cleaningBudget);
+    const utensilsStats = mkStats(operationalTotals.utensilios, utensilsBudget);
+    const totalStats = mkStats(totalSpent, totalBudget);
 
-    const uniformsStats: CategoryStats = {
-      spent: operationalTotals.uniformes,
-      budget: uniformsBudget,
-      percentageUsed: uniformsBudget > 0 ? (operationalTotals.uniformes / uniformsBudget) * 100 : 0,
-      remaining: uniformsBudget - operationalTotals.uniformes,
-      hasBudget: uniformsBudget > 0,
-    };
-
-    const cleaningStats: CategoryStats = {
-      spent: operationalTotals.limpeza,
-      budget: cleaningBudget,
-      percentageUsed: cleaningBudget > 0 ? (operationalTotals.limpeza / cleaningBudget) * 100 : 0,
-      remaining: cleaningBudget - operationalTotals.limpeza,
-      hasBudget: cleaningBudget > 0,
-    };
-
-    const utensilsStats: CategoryStats = {
-      spent: operationalTotals.utensilios,
-      budget: utensilsBudget,
-      percentageUsed: utensilsBudget > 0 ? (operationalTotals.utensilios / utensilsBudget) * 100 : 0,
-      remaining: utensilsBudget - operationalTotals.utensilios,
-      hasBudget: utensilsBudget > 0,
-    };
-
-    const totalStats: CategoryStats = {
-      spent: totalSpent,
-      budget: totalBudget,
-      percentageUsed: totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0,
-      remaining: totalBudget - totalSpent,
-      hasBudget: totalBudget > 0,
-    };
-
-    // Calculate daily average and projection
     const dailyAverage = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
-    const projectedTotal = dailyAverage * totalDaysInMonth;
+    const projectedTotal = isCurrentMonth ? dailyAverage * totalDaysInMonth : totalSpent;
     const projectedOverBudget = totalBudget > 0 ? projectedTotal - totalBudget : 0;
-
-    // Performance indicator
     const performanceVsBudget = totalBudget > 0 
       ? ((totalBudget - projectedTotal) / totalBudget) * 100 
       : 0;
@@ -171,7 +139,7 @@ export function FinancialHealthCard({
       performanceVsBudget,
       hasBudget: totalBudget > 0,
     };
-  }, [freelancerEntries, maintenanceEntries, effectiveStoreId, monthStart, monthEnd, getBudgetForStoreMonth, getTotalsForStoreMonth, currentMonthYear, daysElapsed, totalDaysInMonth]);
+  }, [freelancerEntries, maintenanceEntries, effectiveStoreId, monthStart, monthEnd, getBudgetForStoreMonth, getTotalsForStoreMonth, selectedMonthYear, daysElapsed, totalDaysInMonth, isCurrentMonth]);
 
   const getProgressColor = (percentage: number) => {
     if (percentage > 90) return "bg-destructive";
@@ -264,7 +232,7 @@ export function FinancialHealthCard({
           {getStatusIcon()}
         </div>
         <CardDescription className="flex items-center justify-between">
-          <span>{selectedStoreName} • {format(now, "MMMM yyyy", { locale: ptBR })}</span>
+          <span>{selectedStoreName}</span>
           <span className={cn(
             "text-xs font-medium",
             stats.total.percentageUsed > 90 ? "text-destructive" :
@@ -273,6 +241,29 @@ export function FinancialHealthCard({
             {getStatusMessage()}
           </span>
         </CardDescription>
+        {/* Month Navigation */}
+        <div className="flex items-center justify-center gap-2 pt-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => navigateMonth("prev")}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[120px] text-center capitalize">
+            {format(selectedDate, "MMMM yyyy", { locale: ptBR })}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => navigateMonth("next")}
+            disabled={isCurrentMonth}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -325,7 +316,6 @@ export function FinancialHealthCard({
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-2">
-          {/* Saldo Freelancers */}
           <div className="space-y-1 rounded-lg bg-blue-50 dark:bg-blue-950/30 p-2">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Users className="h-3 w-3 text-blue-500" />
@@ -339,7 +329,6 @@ export function FinancialHealthCard({
             </p>
           </div>
 
-          {/* Saldo Manutenção */}
           <div className="space-y-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Wrench className="h-3 w-3 text-amber-500" />
@@ -353,7 +342,6 @@ export function FinancialHealthCard({
             </p>
           </div>
 
-          {/* Saldo Uniformes */}
           <div className="space-y-1 rounded-lg bg-purple-50 dark:bg-purple-950/30 p-2">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Shirt className="h-3 w-3 text-purple-500" />
@@ -367,7 +355,6 @@ export function FinancialHealthCard({
             </p>
           </div>
 
-          {/* Saldo Limpeza */}
           <div className="space-y-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 p-2">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <SprayCanIcon className="h-3 w-3 text-cyan-500" />
@@ -381,7 +368,6 @@ export function FinancialHealthCard({
             </p>
           </div>
 
-          {/* Saldo Utensílios */}
           <div className="space-y-1 rounded-lg bg-rose-50 dark:bg-rose-950/30 p-2">
             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <UtensilsCrossed className="h-3 w-3 text-rose-500" />
@@ -396,8 +382,8 @@ export function FinancialHealthCard({
           </div>
         </div>
 
-        {/* Projection */}
-        {stats.hasBudget && (
+        {/* Projection - only show for current month */}
+        {stats.hasBudget && isCurrentMonth && (
           <div className="rounded-lg bg-muted/50 p-3 space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -442,6 +428,33 @@ export function FinancialHealthCard({
             </p>
           </div>
         )}
+
+        {/* Past month summary */}
+        {stats.hasBudget && !isCurrentMonth && (
+          <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Resultado do Mês</span>
+              <div className={cn(
+                "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+                stats.total.remaining >= 0 
+                  ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                  : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              )}>
+                {stats.total.remaining >= 0 ? (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" />
+                    Dentro do budget
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="h-3 w-3" />
+                    Excedido em {formatCurrency(Math.abs(stats.total.remaining))}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
 
       {/* Drill-down dialog */}
@@ -454,6 +467,7 @@ export function FinancialHealthCard({
           maintenanceEntries={maintenanceEntries}
           operationalExpenses={opExpenses}
           storeId={effectiveStoreId}
+          monthYear={selectedMonthYear}
           budgetAmount={
             drillDownCategory === "freelancer" ? stats.freelancer.budget :
             drillDownCategory === "maintenance" ? stats.maintenance.budget :

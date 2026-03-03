@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDaysInMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDaysInMonth, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Dialog,
@@ -48,6 +48,7 @@ interface BudgetDrillDownDialogProps {
   operationalExpenses: OperationalExpense[];
   storeId: string | null;
   budgetAmount: number;
+  monthYear?: string; // "YYYY-MM" format, defaults to current month
 }
 
 const CATEGORY_CONFIG: Record<
@@ -87,13 +88,18 @@ export function BudgetDrillDownDialog({
   operationalExpenses,
   storeId,
   budgetAmount,
+  monthYear,
 }: BudgetDrillDownDialogProps) {
   const config = CATEGORY_CONFIG[category];
   const Icon = config.icon;
-  const now = new Date();
-  const monthStart = startOfMonth(now);
-  const monthEnd = endOfMonth(now);
-  const daysInMonth = getDaysInMonth(now);
+
+  // Parse month from prop or use current
+  const targetDate = monthYear 
+    ? parse(monthYear, "yyyy-MM", new Date()) 
+    : new Date();
+  const mStart = startOfMonth(targetDate);
+  const mEnd = endOfMonth(targetDate);
+  const daysInMonth = getDaysInMonth(targetDate);
   const dailyBudget = budgetAmount > 0 ? budgetAmount / daysInMonth : 0;
 
   // Get filtered expenses for category
@@ -103,14 +109,14 @@ export function BudgetDrillDownDialog({
     if (category === "freelancer") {
       freelancerEntries.forEach((e) => {
         const d = parseDateString(e.data_pop);
-        if (d >= monthStart && d <= monthEnd && (!storeId || e.loja_id === storeId)) {
+        if (d >= mStart && d <= mEnd && (!storeId || e.loja_id === storeId)) {
           items.push({ id: e.id, date: e.data_pop, description: `${e.nome_completo} — ${e.funcao}`, value: e.valor, originalFreelancer: e });
         }
       });
     } else if (category === "maintenance") {
       maintenanceEntries.forEach((e) => {
         const d = parseDateString(e.data_servico);
-        if (d >= monthStart && d <= monthEnd && (!storeId || e.loja_id === storeId)) {
+        if (d >= mStart && d <= mEnd && (!storeId || e.loja_id === storeId)) {
           items.push({ id: e.id, date: e.data_servico, description: `${e.fornecedor} (NF ${e.numero_nf})`, value: e.valor, originalMaintenance: e });
         }
       });
@@ -118,7 +124,7 @@ export function BudgetDrillDownDialog({
       const opCat = category === "uniforms" ? "uniformes" : category === "cleaning" ? "limpeza" : "utensilios";
       operationalExpenses.forEach((e) => {
         const d = parseDateString(e.data_despesa);
-        if (e.category === opCat && d >= monthStart && d <= monthEnd && (!storeId || e.store_id === storeId)) {
+        if (e.category === opCat && d >= mStart && d <= mEnd && (!storeId || e.store_id === storeId)) {
           items.push({ id: e.id, date: e.data_despesa, description: e.descricao || opCat, value: e.valor, originalExpense: e });
         }
       });
@@ -127,7 +133,7 @@ export function BudgetDrillDownDialog({
     items.sort((a, b) => a.date.localeCompare(b.date));
 
     // Build daily chart data
-    const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    const allDays = eachDayOfInterval({ start: mStart, end: mEnd });
     let cumulative = 0;
     const daily: DailyPoint[] = allDays.map((day) => {
       const dayStr = format(day, "yyyy-MM-dd");
@@ -146,11 +152,11 @@ export function BudgetDrillDownDialog({
       dailyData: daily,
       totalSpent: items.reduce((s, i) => s + i.value, 0),
     };
-  }, [category, freelancerEntries, maintenanceEntries, operationalExpenses, storeId, monthStart, monthEnd]);
+  }, [category, freelancerEntries, maintenanceEntries, operationalExpenses, storeId, mStart, mEnd]);
 
   const pct = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
 
-  const ChartTooltip = ({ active, payload, label }: any) => {
+  const ChartTooltip = ({ active, payload }: any) => {
     if (active && payload?.length) {
       const p = payload[0].payload as DailyPoint;
       return (
@@ -174,7 +180,7 @@ export function BudgetDrillDownDialog({
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5" />
-            {format(now, "MMMM yyyy", { locale: ptBR })}
+            {format(targetDate, "MMMM yyyy", { locale: ptBR })}
           </DialogDescription>
         </DialogHeader>
 

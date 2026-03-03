@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -264,16 +265,23 @@ export const CostEvolutionChart = ({
     });
   }, [filteredFreelancerEntries, filteredMaintenanceEntries, filteredOperationalExpenses]);
 
-  // MONTHLY DATA - Historical view across year
-  const monthlyData = useMemo((): ChartDataPoint[] => {
-    const monthMap: Record<string, ChartDataPoint> = {};
+  // MONTHLY DATA - Historical view across year with per-month budgets
+  const monthlyData = useMemo((): (ChartDataPoint & { budget?: number })[] => {
+    const monthMap: Record<string, ChartDataPoint & { budget?: number }> = {};
 
     // Initialize months for the current year
     const now = new Date();
     const currentYear = now.getFullYear();
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     for (let m = 0; m < 12; m++) {
       const monthKey = `${currentYear}-${String(m + 1).padStart(2, "0")}`;
-      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      // Get stored budget for this month
+      const monthBudget = effectiveStoreId 
+        ? getBudgetForStoreMonth(effectiveStoreId, monthKey)
+        : null;
+      const totalBudget = monthBudget 
+        ? (monthBudget.freelancer_budget || 0) + (monthBudget.maintenance_budget || 0) + (monthBudget.uniforms_budget || 0) + (monthBudget.cleaning_budget || 0) + (monthBudget.utensils_budget || 0)
+        : 0;
       monthMap[monthKey] = {
         name: monthNames[m],
         freelancers: 0,
@@ -282,6 +290,7 @@ export const CostEvolutionChart = ({
         limpeza: 0,
         total: 0,
         sortKey: monthKey,
+        budget: totalBudget > 0 ? totalBudget : undefined,
       };
     }
 
@@ -328,7 +337,7 @@ export const CostEvolutionChart = ({
     return Object.values(monthMap).sort((a, b) =>
       a.sortKey.localeCompare(b.sortKey)
     );
-  }, [filteredFreelancerEntries, filteredMaintenanceEntries, filteredOperationalExpenses]);
+  }, [filteredFreelancerEntries, filteredMaintenanceEntries, filteredOperationalExpenses, effectiveStoreId, getBudgetForStoreMonth]);
 
   // Select data based on view mode
   const chartData = useMemo(() => {
@@ -361,7 +370,7 @@ export const CostEvolutionChart = ({
   // Custom tooltip with category breakdown
   const DetailedTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const data = payload[0]?.payload as ChartDataPoint;
+      const data = payload[0]?.payload as (ChartDataPoint & { budget?: number });
       if (!data) return null;
 
       return (
@@ -424,6 +433,12 @@ export const CostEvolutionChart = ({
               <span className="font-medium text-foreground">Total</span>
               <span className="font-bold text-primary">{formatCurrency(data.total)}</span>
             </div>
+            {viewMode === "monthly" && data.budget && data.budget > 0 && (
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                <span>Budget</span>
+                <span className="font-medium">{formatCurrency(data.budget)}</span>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -529,7 +544,7 @@ export const CostEvolutionChart = ({
                 axisLine={false}
               />
               <Tooltip content={<DetailedTooltip />} />
-              {budgetReferenceValue > 0 && (
+              {budgetReferenceValue > 0 && viewMode !== "monthly" && (
                 <ReferenceLine
                   y={budgetReferenceValue}
                   stroke="hsl(var(--destructive))"
@@ -579,6 +594,18 @@ export const CostEvolutionChart = ({
                 strokeWidth={2}
                 animationDuration={500}
               />
+              {viewMode === "monthly" && (
+                <Line
+                  type="monotone"
+                  dataKey="budget"
+                  stroke="hsl(var(--destructive))"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={{ fill: "hsl(var(--destructive))", r: 3, strokeWidth: 0 }}
+                  connectNulls={false}
+                  animationDuration={500}
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -613,7 +640,7 @@ export const CostEvolutionChart = ({
             />
             <span className="text-muted-foreground">Limpeza</span>
           </div>
-          {budgetReferenceValue > 0 && (
+          {(budgetReferenceValue > 0 || viewMode === "monthly") && (
             <div className="flex items-center gap-2 text-sm">
               <div className="w-4 h-0.5 border-t-2 border-dashed border-destructive" />
               <span className="text-muted-foreground">Meta Budget</span>

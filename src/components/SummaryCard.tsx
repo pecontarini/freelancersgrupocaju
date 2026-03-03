@@ -13,7 +13,7 @@ export function SummaryCard({
   uniqueFreelancers,
 }: SummaryCardProps) {
   return (
-    <div className="summary-card text-primary-foreground fade-in">
+    <div className="summary-card glass-surface text-primary-foreground fade-in">
       <div className="relative z-10">
         <div className="flex items-center gap-2 text-sm opacity-90">
           <DollarSign className="h-4 w-4" />

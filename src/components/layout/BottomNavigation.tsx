@@ -40,7 +40,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
   return (
     <>
       {/* Mobile Header with Logo and Menu */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4 md:hidden">
+      <header className="glass-surface fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between px-4 md:hidden">
         <div className="flex items-center gap-2">
           <img src={grupoCajuLogo} alt="Grupo Caju" className="h-8 w-auto" />
         </div>
@@ -115,7 +115,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       </header>
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-sm md:hidden safe-area-bottom">
+      <nav className="glass-surface fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl md:hidden safe-area-bottom">
         <div className="flex h-16 items-stretch justify-around">
           {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -86,32 +86,43 @@ export function FreelancerForm() {
     }
   }, [singleUnidade, form]);
 
+  const formRef = useRef<HTMLDivElement>(null);
+
   const onSubmit = async (data: FormData) => {
-    await createEntry.mutateAsync({
-      loja: data.loja,
-      nome_completo: data.nome_completo,
-      funcao: data.funcao,
-      gerencia: data.gerencia,
-      data_pop: data.data_pop,
-      valor: data.valor,
-      cpf: data.cpf,
-      chave_pix: data.chave_pix,
-      loja_id: data.loja_id,
-    });
+    try {
+      await createEntry.mutateAsync({
+        loja: data.loja,
+        nome_completo: data.nome_completo,
+        funcao: data.funcao,
+        gerencia: data.gerencia,
+        data_pop: data.data_pop,
+        valor: data.valor,
+        cpf: data.cpf,
+        chave_pix: data.chave_pix,
+        loja_id: data.loja_id,
+      });
 
-    // Salvar loja selecionada antes do reset
-    const currentLoja = data.loja;
-    const currentLojaId = data.loja_id;
+      // Salvar loja selecionada antes do reset
+      const currentLoja = data.loja;
+      const currentLojaId = data.loja_id;
 
-    form.reset();
-    setCpfValue("");
-    setValorValue("");
-    setAutoFilledFields(new Set());
+      form.reset();
+      setCpfValue("");
+      setValorValue("");
+      setAutoFilledFields(new Set());
 
-    // Re-aplicar loja para todos os perfis (single ou multi-loja)
-    if (currentLojaId) {
-      form.setValue("loja", currentLoja);
-      form.setValue("loja_id", currentLojaId);
+      // Re-aplicar loja para todos os perfis (single ou multi-loja)
+      if (currentLojaId) {
+        form.setValue("loja", currentLoja);
+        form.setValue("loja_id", currentLojaId);
+      }
+
+      // Manter formulário visível após o submit
+      setTimeout(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (error) {
+      console.error("Erro ao salvar freelancer:", error);
     }
   };
 
@@ -178,7 +189,7 @@ export function FreelancerForm() {
   };
 
   return (
-    <Card className="glass-card fade-in">
+    <Card ref={formRef} className="glass-card fade-in">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-xl">
           <Plus className="h-5 w-5 text-primary" />

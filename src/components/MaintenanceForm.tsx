@@ -412,10 +412,13 @@ export function MaintenanceForm() {
               </Alert>
             )}
 
-            {/* Anexo - Moved to top for better UX */}
-            <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                Anexo (Boleto/NF)
+            {/* Attachments side by side */}
+            <div className="grid gap-4 sm:grid-cols-2">
+            {/* NF Attachment */}
+            <FormItem className="rounded-lg border-2 border-blue-200 dark:border-blue-800 p-3">
+              <FormLabel className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                <FileText className="h-4 w-4" />
+                Nota Fiscal (NF)
                 {isExtracting && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Sparkles className="h-3 w-3 animate-pulse text-primary" />
@@ -511,9 +514,10 @@ export function MaintenanceForm() {
             </FormItem>
 
             {/* Boleto Attachment */}
-            <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                Anexo do Boleto (opcional)
+            <FormItem className="rounded-lg border-2 border-purple-200 dark:border-purple-800 p-3">
+              <FormLabel className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                <Upload className="h-4 w-4" />
+                Boleto
               </FormLabel>
               <div className="space-y-3">
                 <input
@@ -575,6 +579,7 @@ export function MaintenanceForm() {
                 )}
               </div>
             </FormItem>
+            </div>{/* end attachments grid */}
 
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Loja */}

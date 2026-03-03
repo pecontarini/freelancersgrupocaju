@@ -22,6 +22,7 @@ import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 
+import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
@@ -246,6 +247,7 @@ const Index = () => {
   if (isMobile) {
     return (
       <SidebarProvider>
+        <AppGlassBackground />
         <div className="flex min-h-screen flex-col pb-20 pt-14 w-full">
           <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
           <div className="px-4 py-4">
@@ -265,6 +267,7 @@ const Index = () => {
   // Desktop layout with sidebar
   return (
     <SidebarProvider>
+      <AppGlassBackground />
       <div className="flex min-h-screen w-full">
         <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <SidebarInset>

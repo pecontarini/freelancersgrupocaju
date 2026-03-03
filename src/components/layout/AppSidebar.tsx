@@ -122,7 +122,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" className="glass-sidebar bg-sidebar/70">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (

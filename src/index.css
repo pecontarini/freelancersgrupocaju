@@ -140,8 +140,32 @@
 
   /* Glass effect for cards */
   .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border border-border/50;
-    box-shadow: var(--shadow-card);
+    @apply bg-card/70 border border-border/40;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,0.12);
+    border-top-color: rgba(255,255,255,0.2);
+  }
+
+  /* Glass sidebar */
+  .glass-sidebar {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-right: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* Glass header */
+  .glass-header {
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* Glass nav bar */
+  .glass-nav {
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border-top: 1px solid rgba(255,255,255,0.12);
   }
 
   /* Input focus ring animation */

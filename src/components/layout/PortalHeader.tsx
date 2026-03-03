@@ -54,7 +54,7 @@ export function PortalHeader({
 
   // Desktop layout
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b bg-card/80 px-6 backdrop-blur-sm">
+    <header className="flex h-16 shrink-0 items-center justify-between bg-card/60 px-6 glass-header">
       <div className="flex items-center gap-4">
         <SidebarTrigger />
         <div>

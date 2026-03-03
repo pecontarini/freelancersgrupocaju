@@ -17,7 +17,7 @@ export const GlassPanel = React.forwardRef<HTMLDivElement, GlassPanelProps>(
     return (
       <div
         ref={ref}
-        className="relative overflow-hidden"
+        className={cn("relative overflow-hidden", className)}
         style={{
           backdropFilter: "blur(28px) saturate(180%)",
           WebkitBackdropFilter: "blur(28px) saturate(180%)",
@@ -40,7 +40,7 @@ export const GlassPanel = React.forwardRef<HTMLDivElement, GlassPanelProps>(
             background: "radial-gradient(ellipse at top center, rgba(255,255,255,0.18) 0%, transparent 60%)",
           }}
         />
-        <div className={cn("relative z-10", className)}>{children}</div>
+        <div className="relative z-10">{children}</div>
       </div>
     );
   }

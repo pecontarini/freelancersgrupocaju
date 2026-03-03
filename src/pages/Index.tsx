@@ -246,7 +246,7 @@ const Index = () => {
   if (isMobile) {
     return (
       <SidebarProvider>
-        <div className="flex min-h-screen flex-col pb-20 pt-14 w-full bg-gradient-to-br from-background via-background to-muted/30">
+        <div className="flex min-h-screen flex-col pb-20 pt-14 w-full">
           <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
           <div className="px-4 py-4">
             <PortalHeader
@@ -265,7 +265,7 @@ const Index = () => {
   // Desktop layout with sidebar
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-gradient-to-br from-background via-background to-muted/30">
+      <div className="flex min-h-screen w-full">
         <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <SidebarInset>
           <PortalHeader

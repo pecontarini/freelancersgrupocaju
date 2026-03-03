@@ -1,44 +1,54 @@
-# Aplicar Liquid Glass ao App Inteiro — Análise de Viabilidade
 
-## Resposta curta: É possível, mas NÃO recomendado
+# Correcoes Definitivas: Budgets, Freelancer e Anexos de Manutencao
 
-Aplicar o design Liquid Glass (fundo com orbs animados, painéis translúcidos com backdrop-blur, texto branco) em **todo o aplicativo** traria problemas sérios:
+## Problema 1: Socios Operadores nao conseguem registrar budgets
 
-### Problemas Técnicos
+**Causa raiz encontrada**: A politica RLS da tabela `store_budgets` permite que `gerente_unidade` apenas LEIA budgets (SELECT), mas nao grave. Porem, a interface permite que eles cliquem em "Editar Budgets". Ja o perfil `operator` possui politica ALL correta. Se alguns socios reportam erro, pode ser que estejam cadastrados como `gerente_unidade` em vez de `operator`. Para resolver de vez, vamos adicionar politica de INSERT/UPDATE para `gerente_unidade` tambem.
 
-1. **Performance**: `backdrop-filter: blur(28px)` é extremamente pesado para GPU. Em uma página com 20+ cards, tabelas, formulários e gráficos, o app ficaria lento — especialmente em celulares Android que os gerentes usam no dia a dia
-2. **Legibilidade**: Texto branco sobre fundo translúcido funciona bem em demos com 5 elementos. Em tabelas com 50+ linhas, formulários com 15 campos, e gráficos de barras, a legibilidade cai drasticamente
-3. **Escopo**: O app tem **100+ componentes** (budgets, CMV, escalas, auditoria, manutenção, freelancers...). Refatorar todos para glass significaria reescrever praticamente toda a interface
-4. **Impressão/PDF**: Os relatórios institucionais seguem padrão visual do Grupo Caju (fundo branco, vermelho #D05937) — glass quebraria essa identidade
-5. **Acessibilidade**: Contraste insuficiente para uso prolongado em ambiente de trabalho
+**Solucao**:
+- Criar migration SQL adicionando politica INSERT e UPDATE em `store_budgets` para `gerente_unidade` com restricao a suas lojas vinculadas
 
-### O que PODE ser feito: Liquid Glass seletivo
+## Problema 2: Tela "volta" apos cadastrar freelancer
 
-Aplicar elementos glass apenas nos pontos de destaque, mantendo a base sólida atual:
+**Causa raiz encontrada**: No `FreelancerForm.tsx`, o `form.reset()` (linha 106) limpa todos os campos de uma vez, causando re-render completo do componente. Isso faz o formulario "saltar" para o topo ou perder o foco visual. Alem disso, o `createEntry.mutateAsync` pode causar scroll involuntario ao invalidar queries e re-renderizar a lista abaixo.
 
+**Solucao**:
+- Envolver o submit em try/catch para evitar que erros propaguem e causem comportamento inesperado
+- Usar `window.scrollTo` ou `scrollIntoView` para manter o formulario visivel apos o reset
+- Adicionar uma referencia ao formulario e rolar ate ele apos o submit bem-sucedido, garantindo que o usuario continue no mesmo ponto para lancar o proximo
 
-| Componente              | Tratamento Glass                           |
-| ----------------------- | ------------------------------------------ |
-| **Sidebar (desktop)**   | Fundo glass com blur sobre gradient sutil  |
-| **Header móvel**        | Barra top com glass blur                   |
-| **Bottom navigation**   | Dock glass no estilo do FloatingDock       |
-| **Cards de KPI/resumo** | GlassPanel nos 4 cards de topo de cada aba |
-| **Modais e sheets**     | Overlay glass em vez de fundo opaco        |
+### Arquivo: `src/components/FreelancerForm.tsx`
+- Adicionar `useRef` no card do formulario
+- No `onSubmit`, envolver em try/catch e apos o reset, chamar `formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })`
 
+## Problema 3: Apenas um campo de anexo na manutencao (usuario nao ve NF e Boleto separados)
 
-### Arquivos que seriam alterados
+**Causa raiz encontrada**: O codigo JA possui dois campos de upload (NF e Boleto), porem o primeiro esta rotulado como "Anexo (Boleto/NF)" -- um label confuso que faz o usuario pensar que e um campo unico para tudo. O segundo campo ("Anexo do Boleto") fica abaixo e nao se destaca visualmente. Na pratica, o usuario percebe apenas um campo.
 
+**Solucao**:
+- Renomear o primeiro upload de "Anexo (Boleto/NF)" para "Nota Fiscal (NF)" com icone de FileText
+- Renomear o segundo de "Anexo do Boleto (opcional)" para "Boleto" com icone distinto
+- Colocar os dois uploads lado a lado em um grid (desktop) para que fiquem visiveis simultaneamente
+- Adicionar bordas coloridas distintas: azul para NF, roxo para Boleto
+- Manter o OCR apenas no upload da NF
 
-| Arquivo                                      | Mudança                                                  |
-| -------------------------------------------- | -------------------------------------------------------- |
-| `src/index.css`                              | Adicionar variáveis CSS para glass no tema dark          |
-| `src/components/layout/AppSidebar.tsx`       | Aplicar GlassPanel como container da sidebar             |
-| `src/components/layout/BottomNavigation.tsx` | Trocar barra inferior por dock glass                     |
-| `src/components/layout/PortalHeader.tsx`     | Header com backdrop-blur glass                           |
-| `src/components/SummaryCard.tsx`             | Versão glass para cards de resumo                        |
-| `src/pages/Index.tsx`                        | Background gradient sutil (não orbs animados) no wrapper |
+### Arquivo: `src/components/MaintenanceForm.tsx`
+- Alterar labels nas linhas 417-419 e 515-517
+- Envolver ambos em `div className="grid gap-4 sm:grid-cols-2"` para layout lado a lado
+- Estilizar com bordas de cor diferente
 
+---
 
-### Resultado
+## Resumo de alteracoes
 
-A interface ganha a sofisticação visual do Liquid Glass nos pontos de contato principais, sem sacrificar performance, legibilidade ou a funcionalidade de um app corporativo usado diariamente por dezenas de gerentes em celulares. Pode aplicar nessas áreas. 
+| Arquivo | Acao |
+|---------|------|
+| Migration SQL | Adicionar INSERT/UPDATE policies para gerente_unidade em store_budgets |
+| `src/components/FreelancerForm.tsx` | Scroll para formulario apos submit + try/catch |
+| `src/components/MaintenanceForm.tsx` | Renomear labels, layout side-by-side para NF e Boleto |
+
+## Resultado esperado
+
+1. Tanto operadores quanto gerentes de unidade conseguem salvar budgets
+2. Apos salvar freelancer, o formulario limpa mas permanece visivel para o proximo lancamento
+3. Na manutencao, NF e Boleto aparecem como dois campos claros e distintos lado a lado

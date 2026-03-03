@@ -122,8 +122,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   };
 
   return (
-    <Sidebar collapsible="icon" className="glass-surface border-r-0">
-      <SidebarHeader className="border-b border-border/30 p-4">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -207,7 +207,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-border/30 pt-4 space-y-2">
+      <SidebarFooter className="border-t border-sidebar-border pt-4 space-y-2">
         <div className="flex justify-center">
           <ThemeToggle />
         </div>

@@ -9,13 +9,32 @@ export function useFreelancerEntries() {
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ["freelancer-entries"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("freelancer_entries")
-        .select("*")
-        .order("data_pop", { ascending: false });
-      
-      if (error) throw error;
-      return data as FreelancerEntry[];
+      // Supabase has a default limit of 1000 rows per query.
+      // We need to paginate to fetch all entries.
+      const allData: FreelancerEntry[] = [];
+      const pageSize = 1000;
+      let from = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from("freelancer_entries")
+          .select("*")
+          .order("data_pop", { ascending: false })
+          .range(from, from + pageSize - 1);
+
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allData.push(...(data as FreelancerEntry[]));
+          from += pageSize;
+          hasMore = data.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      return allData;
     },
   });
 

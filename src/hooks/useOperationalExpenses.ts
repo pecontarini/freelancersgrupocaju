@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios" | "outros";
 
@@ -25,13 +26,12 @@ export function useOperationalExpenses() {
   const { data: expenses = [], isLoading } = useQuery({
     queryKey: ["operational_expenses"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("operational_expenses")
-        .select("*")
-        .order("data_despesa", { ascending: false });
-
-      if (error) throw error;
-      return data as OperationalExpense[];
+      return fetchAllRows<OperationalExpense>(
+        () => supabase
+          .from("operational_expenses")
+          .select("*")
+          .order("data_despesa", { ascending: false })
+      );
     },
   });
 

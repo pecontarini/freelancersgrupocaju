@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export interface SupervisionAudit {
   id: string;
@@ -51,32 +52,30 @@ export function useSupervisionAudits(
   const { data: audits = [], isLoading: isLoadingAudits } = useQuery({
     queryKey: ["supervision-audits", lojaId, monthYear, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      let query = supabase.from("supervision_audits").select("*");
-      
-      if (lojaId) {
-        query = query.eq("loja_id", lojaId);
-      }
-      
-      // Date range filter takes precedence over monthYear
-      if (dateRange?.from) {
-        const startDate = dateRange.from.toISOString().split("T")[0];
-        query = query.gte("audit_date", startDate);
+      return fetchAllRows<SupervisionAudit>(() => {
+        let query = supabase.from("supervision_audits").select("*");
         
-        if (dateRange.to) {
-          const endDate = dateRange.to.toISOString().split("T")[0];
-          query = query.lte("audit_date", endDate);
+        if (lojaId) {
+          query = query.eq("loja_id", lojaId);
         }
-      } else if (monthYear) {
-        const [year, month] = monthYear.split("-");
-        const startDate = `${year}-${month}-01`;
-        const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split("T")[0];
-        query = query.gte("audit_date", startDate).lte("audit_date", endDate);
-      }
-      
-      const { data, error } = await query.order("audit_date", { ascending: false });
-      
-      if (error) throw error;
-      return data as SupervisionAudit[];
+        
+        if (dateRange?.from) {
+          const startDate = dateRange.from.toISOString().split("T")[0];
+          query = query.gte("audit_date", startDate);
+          
+          if (dateRange.to) {
+            const endDate = dateRange.to.toISOString().split("T")[0];
+            query = query.lte("audit_date", endDate);
+          }
+        } else if (monthYear) {
+          const [year, month] = monthYear.split("-");
+          const startDate = `${year}-${month}-01`;
+          const endDate = new Date(parseInt(year), parseInt(month), 0).toISOString().split("T")[0];
+          query = query.gte("audit_date", startDate).lte("audit_date", endDate);
+        }
+        
+        return query.order("audit_date", { ascending: false });
+      });
     },
     enabled: true,
   });
@@ -85,36 +84,32 @@ export function useSupervisionAudits(
   const { data: failures = [], isLoading: isLoadingFailures } = useQuery({
     queryKey: ["supervision-failures", lojaId, dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      let query = supabase
-        .from("supervision_failures")
-        .select("*");
-      
-      // If date range is provided, use it; otherwise default to 60 days for recurrence
-      if (dateRange?.from) {
-        const startDate = dateRange.from.toISOString();
-        query = query.gte("created_at", startDate);
+      return fetchAllRows<SupervisionFailure>(() => {
+        let query = supabase
+          .from("supervision_failures")
+          .select("*");
         
-        if (dateRange.to) {
-          // Add 1 day to include the entire end date
-          const endDate = new Date(dateRange.to);
-          endDate.setDate(endDate.getDate() + 1);
-          query = query.lt("created_at", endDate.toISOString());
+        if (dateRange?.from) {
+          const startDate = dateRange.from.toISOString();
+          query = query.gte("created_at", startDate);
+          
+          if (dateRange.to) {
+            const endDate = new Date(dateRange.to);
+            endDate.setDate(endDate.getDate() + 1);
+            query = query.lt("created_at", endDate.toISOString());
+          }
+        } else {
+          const sixtyDaysAgo = new Date();
+          sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+          query = query.gte("created_at", sixtyDaysAgo.toISOString());
         }
-      } else {
-        // Default: 60 days for recurrence detection
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        query = query.gte("created_at", sixtyDaysAgo.toISOString());
-      }
-      
-      if (lojaId) {
-        query = query.eq("loja_id", lojaId);
-      }
-      
-      const { data, error } = await query.order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data as SupervisionFailure[];
+        
+        if (lojaId) {
+          query = query.eq("loja_id", lojaId);
+        }
+        
+        return query.order("created_at", { ascending: false });
+      });
     },
     enabled: true,
   });

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MaintenanceEntry, MaintenanceFormData, MaintenanceBudget } from "@/types/maintenance";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export function useMaintenanceEntries() {
   const { user } = useAuth();
@@ -11,17 +12,12 @@ export function useMaintenanceEntries() {
   const { data: entries = [], isLoading: isLoadingEntries } = useQuery({
     queryKey: ["maintenance-entries"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("maintenance_entries")
-        .select("*")
-        .order("data_servico", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching maintenance entries:", error);
-        throw error;
-      }
-
-      return data as MaintenanceEntry[];
+      return fetchAllRows<MaintenanceEntry>(
+        () => supabase
+          .from("maintenance_entries")
+          .select("*")
+          .order("data_servico", { ascending: false })
+      );
     },
     enabled: !!user,
   });

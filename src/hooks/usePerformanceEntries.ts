@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMemo } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export interface PerformanceEntry {
   id: string;
@@ -54,15 +55,14 @@ export function usePerformanceEntries(monthYear?: string) {
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ['performance_entries', currentMonthYear],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('store_performance_entries')
-        .select('*')
-        .gte('entry_date', monthStart)
-        .lte('entry_date', monthEnd)
-        .order('entry_date', { ascending: false });
-
-      if (error) throw error;
-      return data as PerformanceEntry[];
+      return fetchAllRows<PerformanceEntry>(
+        () => supabase
+          .from('store_performance_entries')
+          .select('*')
+          .gte('entry_date', monthStart)
+          .lte('entry_date', monthEnd)
+          .order('entry_date', { ascending: false })
+      );
     },
   });
 

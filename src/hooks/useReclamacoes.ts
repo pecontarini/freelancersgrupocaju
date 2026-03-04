@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMemo } from "react";
 import { format } from "date-fns";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export type FonteReclamacao = 'google' | 'ifood' | 'tripadvisor' | 'getin' | 'manual' | 'sheets';
 export type TipoOperacao = 'salao' | 'delivery';
@@ -68,24 +69,27 @@ export function useReclamacoes(lojaId?: string, referenciaMes?: string) {
   const { data: reclamacoes = [], isLoading, refetch } = useQuery({
     queryKey: ['reclamacoes', lojaId, referenciaMes],
     queryFn: async () => {
-      let query = supabase
-        .from('reclamacoes')
-        .select('*')
-        .order('data_reclamacao', { ascending: false });
+      const buildQuery = () => {
+        let query = supabase
+          .from('reclamacoes')
+          .select('*')
+          .order('data_reclamacao', { ascending: false });
 
-      if (lojaId) {
-        query = query.eq('loja_id', lojaId);
-      }
+        if (lojaId) {
+          query = query.eq('loja_id', lojaId);
+        }
 
-      if (referenciaMes) {
-        query = query.eq('referencia_mes', referenciaMes);
-      }
+        if (referenciaMes) {
+          query = query.eq('referencia_mes', referenciaMes);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
+        return query;
+      };
+
+      const data = await fetchAllRows<any>(buildQuery);
       
       // Parse JSON fields
-      return (data || []).map((r) => ({
+      return data.map((r) => ({
         ...r,
         temas: Array.isArray(r.temas) ? r.temas : [],
         palavras_chave: Array.isArray(r.palavras_chave) ? r.palavras_chave : [],

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export interface StoreBudget {
   id: string;
@@ -25,13 +26,12 @@ export function useStoreBudgets() {
   const { data: budgets = [], isLoading } = useQuery({
     queryKey: ["store_budgets"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("store_budgets")
-        .select("*")
-        .order("month_year", { ascending: false });
-
-      if (error) throw error;
-      return data as StoreBudget[];
+      return fetchAllRows<StoreBudget>(
+        () => supabase
+          .from("store_budgets")
+          .select("*")
+          .order("month_year", { ascending: false })
+      );
     },
   });
 

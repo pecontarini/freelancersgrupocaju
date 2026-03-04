@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 
 export interface DailySale {
   id: string;
@@ -321,22 +322,22 @@ export function useDailySales(unitId?: string, startDate?: string, endDate?: str
     queryFn: async () => {
       if (!unitId) return [];
 
-      let query = supabase
-        .from("daily_sales")
-        .select("*")
-        .eq("unit_id", unitId)
-        .order("sale_date", { ascending: false });
+      return fetchAllRows<DailySale>(() => {
+        let query = supabase
+          .from("daily_sales")
+          .select("*")
+          .eq("unit_id", unitId)
+          .order("sale_date", { ascending: false });
 
-      if (startDate) {
-        query = query.gte("sale_date", startDate);
-      }
-      if (endDate) {
-        query = query.lte("sale_date", endDate);
-      }
+        if (startDate) {
+          query = query.gte("sale_date", startDate);
+        }
+        if (endDate) {
+          query = query.lte("sale_date", endDate);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as DailySale[];
+        return query;
+      });
     },
     enabled: !!unitId,
   });

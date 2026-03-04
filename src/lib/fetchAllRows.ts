@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 
 /**
  * Fetches all rows from a Supabase query, paginating in chunks of 1000
@@ -7,11 +6,13 @@ import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
  * 
  * Usage:
  *   const data = await fetchAllRows<MyType>(
- *     supabase.from("my_table").select("*").order("created_at", { ascending: false })
+ *     () => supabase.from("my_table").select("*").order("created_at", { ascending: false })
  *   );
+ * 
+ * The factory function is called for each page with .range() applied.
  */
 export async function fetchAllRows<T>(
-  queryBuilder: PostgrestFilterBuilder<any, any, any>,
+  queryFactory: () => any,
   pageSize = 1000
 ): Promise<T[]> {
   const allData: T[] = [];
@@ -19,7 +20,7 @@ export async function fetchAllRows<T>(
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await queryBuilder.range(from, from + pageSize - 1);
+    const { data, error } = await queryFactory().range(from, from + pageSize - 1);
 
     if (error) throw error;
 

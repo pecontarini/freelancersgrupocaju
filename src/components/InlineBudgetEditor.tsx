@@ -135,6 +135,8 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
       if (error) {
         setPasswordError("Senha incorreta. Tente novamente.");
       } else {
+        // Re-validate cached data after re-auth (token may have refreshed)
+        const { queryClient } = await import("@tanstack/react-query");
         setStep("editor");
         setPassword("");
       }
@@ -161,6 +163,8 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
         utensils_budget: parseAmount(utensilsBudget),
         apoio_venda_budget: parseAmount(apoioVendaBudget),
       });
+      setEditingBudgetId(null);
+      resetBudgetFields();
       setIsOpen(false);
     } catch (err) {
       console.error("Erro ao salvar budget:", err);

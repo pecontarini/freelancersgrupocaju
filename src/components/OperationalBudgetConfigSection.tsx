@@ -185,7 +185,7 @@ export function BudgetConfigSection() {
             <DollarSign className="h-5 w-5 text-primary" />
             <CardTitle>Orçamento Mensal por Loja</CardTitle>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => { setIsDialogOpen(open); if (!open) { resetForm(); } }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1">
                 <Plus className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function BudgetConfigSection() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Definir Orçamento Mensal</DialogTitle>
+                <DialogTitle>{editingBudgetId ? "Editar Orçamento" : "Definir Orçamento Mensal"}</DialogTitle>
                 <DialogDescription>
                   Configure os limites de gastos para cada categoria operacional.
                 </DialogDescription>
@@ -204,7 +204,7 @@ export function BudgetConfigSection() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="store">Loja/Unidade</Label>
-                    <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+                    <Select value={selectedStoreId} onValueChange={setSelectedStoreId} disabled={!!editingBudgetId}>
                       <SelectTrigger id="store">
                         <SelectValue placeholder="Selecione a loja" />
                       </SelectTrigger>
@@ -223,7 +223,7 @@ export function BudgetConfigSection() {
 
                   <div className="space-y-2">
                     <Label htmlFor="month">Mês de Referência</Label>
-                    <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear}>
+                    <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear} disabled={!!editingBudgetId}>
                       <SelectTrigger id="month">
                         <SelectValue placeholder="Selecione o mês" />
                       </SelectTrigger>

@@ -80,18 +80,20 @@ export function useStoreBudgets() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store_budgets"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["store_budgets"] });
+      await queryClient.refetchQueries({ queryKey: ["store_budgets"] });
       toast({
-        title: "Budget atualizado",
+        title: "✅ Budget salvo",
         description: "O orçamento foi salvo com sucesso.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Error updating budget:", error);
+      const msg = error?.message || "Não foi possível salvar o orçamento.";
       toast({
         title: "Erro ao atualizar budget",
-        description: "Não foi possível salvar o orçamento.",
+        description: msg,
         variant: "destructive",
       });
     },

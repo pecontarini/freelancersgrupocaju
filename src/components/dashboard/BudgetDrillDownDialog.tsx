@@ -35,9 +35,10 @@ import {
   SprayCanIcon,
   UtensilsCrossed,
   Calendar,
+  ShoppingBag,
 } from "lucide-react";
 
-export type BudgetCategory = "freelancer" | "maintenance" | "uniforms" | "cleaning" | "utensils";
+export type BudgetCategory = "freelancer" | "maintenance" | "uniforms" | "cleaning" | "utensils" | "apoio_venda";
 
 interface BudgetDrillDownDialogProps {
   open: boolean;
@@ -60,6 +61,7 @@ const CATEGORY_CONFIG: Record<
   uniforms: { label: "Uniformes", icon: Shirt, color: "text-purple-500", barColor: "hsl(271, 76%, 53%)" },
   cleaning: { label: "Limpeza", icon: SprayCanIcon, color: "text-cyan-500", barColor: "hsl(197, 71%, 52%)" },
   utensils: { label: "Utensílios", icon: UtensilsCrossed, color: "text-rose-500", barColor: "hsl(350, 65%, 52%)" },
+  apoio_venda: { label: "Apoio à Venda", icon: ShoppingBag, color: "text-green-500", barColor: "hsl(142, 71%, 45%)" },
 };
 
 interface DailyPoint {
@@ -121,7 +123,7 @@ export function BudgetDrillDownDialog({
         }
       });
     } else {
-      const opCat = category === "uniforms" ? "uniformes" : category === "cleaning" ? "limpeza" : "utensilios";
+      const opCat = category === "uniforms" ? "uniformes" : category === "cleaning" ? "limpeza" : category === "apoio_venda" ? "apoio_venda" : "utensilios";
       operationalExpenses.forEach((e) => {
         const d = parseDateString(e.data_despesa);
         if (e.category === opCat && d >= mStart && d <= mEnd && (!storeId || e.store_id === storeId)) {

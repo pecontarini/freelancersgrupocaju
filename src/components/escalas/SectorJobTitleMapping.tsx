@@ -15,9 +15,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUnidade } from "@/contexts/UnidadeContext";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSectors } from "@/hooks/useStaffingMatrix";
 import { useJobTitles } from "@/hooks/useJobTitles";
 import {
@@ -26,9 +33,10 @@ import {
 } from "@/hooks/useSectorJobTitles";
 
 export function SectorJobTitleMapping() {
-  const { effectiveUnidadeId: unitId } = useUnidade();
-  const { data: sectors = [], isLoading: loadingSectors } = useSectors(unitId);
-  const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(unitId);
+  const lojas = useConfigLojas();
+  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
+  const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(selectedUnit);
   const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
   const { data: mappings = [], isLoading: loadingMap } = useSectorJobTitles(sectorIds);
   const setSectorJT = useSetSectorJobTitles();

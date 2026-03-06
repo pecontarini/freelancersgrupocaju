@@ -1,59 +1,59 @@
 
 
-# Aplicar Liquid Glass ao Aplicativo Real
+# Plano: Parser dedicado para planilhas "Listagem de Funcionários" (Rel090N2)
 
-## Por que não apareceu no app?
+## Contexto
 
-O simulador é uma página isolada (`/liquid-glass-simulator`) com seu próprio background escuro e componentes glass. O portal real (`/`) usa o design system padrão (Tailwind CSS variables, `bg-background`, `bg-card`, etc.) — são dois mundos separados. Para o glass funcionar, ele precisa de um fundo com cores/profundidade por trás dos elementos translúcidos.
+As 3 planilhas enviadas seguem o mesmo layout padrao do sistema de RH da empresa (relatorio "Rel090N2"):
+- Colunas: Matrícula, Nome do Funcionário, Cargo, Escala, Data Nasc., Data Adm., **Data Desl.**, Horário
+- Linhas de ruído: "Tomador:", "Setor:", "Total no Setor:", "Total no Tomador:", cabeçalhos repetidos, linhas vazias
+- Funcionários com **Data Desl.** preenchida são **desligados** e devem ser excluídos
+- Formato .xls (binário legado), que o SheetJS consegue ler
 
-## Estratégia: Glass Theme no Portal Real
+O parser local atual (`parseSpreadsheetLocally`) falha porque:
+1. Procura headers na primeira linha, mas neste layout os headers estão na linha 5-6
+2. Não filtra linhas de totais e seções
+3. Não exclui desligados
 
-Aplicar os efeitos glass **na interface real** sem quebrar o layout existente. O fundo permanece com as cores do tema (claro/escuro), mas os componentes ganham o tratamento glass.
+## Solução
 
-### Mudanças Planejadas
+Criar uma função `parseRel090N2` no `BulkImportTab.tsx` que detecta e processa este layout específico. O fluxo existente (`parseSpreadsheetLocally`) tentará primeiro o parser padrão; se falhar (coluna de nome não encontrada), tentará o parser Rel090N2 antes de cair no fallback de IA.
 
-**1. Background Sutil com Orbs (Index.tsx)**
-- Adicionar uma versão suave dos orbs animados como fundo do app principal
-- No tema claro: orbs com opacidade muito baixa (~0.08) em tons coral/gray
-- No tema escuro: orbs mais visíveis (~0.25) em tons purple/blue
-- Componente `AppGlassBackground` que respeita o tema atual
+## Mudanças em `src/components/escalas/BulkImportTab.tsx`
 
-**2. Sidebar Glass (AppSidebar.tsx)**
-- Aplicar `backdrop-filter: blur(20px)` e fundo semi-transparente na sidebar
-- Menu items ativos com "glass pill" highlight (como no simulador)
-- Bordas sutis com gradiente de opacidade (mais claro no topo)
+### 1. Nova função `parseRel090N2(workbook)`
+- Percorre todas as linhas procurando o header que contém "Matrícula" + "Nome do Funcionário" + "Cargo"
+- Identifica os índices das colunas: nome, cargo, data desligamento
+- Itera as linhas seguintes, ignorando:
+  - Linhas com "Total no", "Tomador:", "Setor:" 
+  - Linhas vazias ou com nome < 3 caracteres
+  - **Funcionários com Data Desl. preenchida** (desligados)
+- Normaliza nomes com Capitalize Each Word
+- Retorna `ParsedEmployee[]`
 
-**3. Cards Glass (CSS + componentes)**
-- Substituir a classe `.glass-card` existente por propriedades glass reais
-- Cards com `backdrop-filter: blur(16px)`, bordas semi-transparentes
-- Hover lift com shadow aumentado
-- Aplicar nos cards de KPI, FinancialHealthCard, SummaryCard
+### 2. Atualizar `parseSpreadsheetLocally`
+- Após o `XLSX.read`, antes de tentar o parser genérico, checar se alguma linha contém "LISTAGEM DE FUNCIONÁRIOS" ou "Rel090N2"
+- Se sim, desviar para `parseRel090N2(workbook)` 
+- Se não, manter o fluxo genérico atual
 
-**4. Header Glass (PortalHeader.tsx)**
-- Header com blur e transparência, estilo floating nav do simulador
-- Borda inferior sutil com gradiente
+### 3. Zero mudanças no backend
+- Não precisa de IA nem Edge Function — o SheetJS lê .xls localmente
+- Não precisa de migração de banco
 
-**5. Bottom Navigation Glass (BottomNavigation.tsx - mobile)**
-- Barra inferior com glass blur
-- Ícone ativo com glow sutil na cor de destaque
+## Lógica de filtragem de desligados
 
-**6. Novo componente: AppGlassBackground**
-- Versão mais sutil do `LiquidBackground` que funciona com ambos os temas
-- Orbs menores, mais transparentes, cores que combinam com o tema coral/terracotta
+```text
+Se coluna "Data Desl." tem valor → funcionário desligado → IGNORAR
+Se coluna "Data Desl." vazia → funcionário ativo → IMPORTAR
+```
 
-### Arquivos a Criar/Editar
+## Resultado esperado
+- Usuário faz upload do .xls no "Importação em Massa" nas Escalas
+- O sistema detecta o formato Rel090N2, extrai apenas os ativos com nome e cargo
+- Exibe a tabela de revisão normalmente, pronta para confirmar
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/layout/AppGlassBackground.tsx` | Criar — background sutil com orbs |
-| `src/index.css` | Editar — atualizar `.glass-card`, adicionar utilitários glass |
-| `src/pages/Index.tsx` | Editar — adicionar AppGlassBackground |
-| `src/components/layout/AppSidebar.tsx` | Editar — aplicar glass na sidebar |
-| `src/components/layout/BottomNavigation.tsx` | Editar — glass na barra mobile |
-| `src/components/layout/PortalHeader.tsx` | Editar — header com blur |
-| `src/components/SummaryCard.tsx` | Editar — glass no card principal |
-| `src/components/ui/card.tsx` | Editar — variante glass opcional |
-
-### Resultado Esperado
-O app inteiro terá a sensação de "vidro líquido" — sidebar, cards, header e navegação com blur e transparência — mantendo as cores da marca, a legibilidade e a funcionalidade existente intactas.
+## Arquivos editados
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/escalas/BulkImportTab.tsx` | Adicionar `parseRel090N2` e integrar na detecção de formato |
 

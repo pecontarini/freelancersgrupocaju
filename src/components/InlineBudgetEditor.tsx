@@ -135,8 +135,6 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
       if (error) {
         setPasswordError("Senha incorreta. Tente novamente.");
       } else {
-        // Re-validate cached data after re-auth (token may have refreshed)
-        const { queryClient } = await import("@tanstack/react-query");
         setStep("editor");
         setPassword("");
       }

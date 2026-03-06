@@ -310,6 +310,19 @@ export function BudgetConfigSection() {
                       onChange={(e) => setUtensilsBudget(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apoio-venda-amount" className="flex items-center gap-1.5">
+                      <ShoppingBag className="h-3.5 w-3.5 text-green-500" />
+                      Apoio à Venda
+                    </Label>
+                    <Input
+                      id="apoio-venda-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={apoioVendaBudget}
+                      onChange={(e) => setApoioVendaBudget(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded-lg bg-muted/50 p-3">

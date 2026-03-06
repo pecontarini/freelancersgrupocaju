@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Settings, Loader2, Calendar, Store, Users, Wrench, Shirt, SprayCanIcon, Trash2, Lock } from "lucide-react";
+import { Settings, Loader2, Calendar, Store, Users, Wrench, Shirt, SprayCanIcon, Trash2, Lock, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useStoreBudgets } from "@/hooks/useStoreBudgets";
+import { useStoreBudgets, StoreBudget } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCurrency } from "@/lib/formatters";
@@ -43,7 +43,7 @@ interface InlineBudgetEditorProps {
 export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isAdmin, isOperator, isGerenteUnidade, unidades } = useUserProfile();
+  const { isAdmin, isOperator, unidades } = useUserProfile();
   const { options: lojas } = useConfigLojas();
   const { budgets, upsertBudget, deleteBudget, isUpdating, isDeleting, getCurrentMonthYear } = useStoreBudgets();
 
@@ -62,9 +62,10 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
   const [uniformsBudget, setUniformsBudget] = useState("");
   const [cleaningBudget, setCleaningBudget] = useState("");
   const [utensilsBudget, setUtensilsBudget] = useState("");
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
 
-  // Only show for operator/gerente
-  if (!isOperator && !isGerenteUnidade && !isAdmin) return null;
+  // Only admin and operator can access
+  if (!isOperator && !isAdmin) return null;
 
   const getMonthOptions = () => {
     const options = [];
@@ -93,6 +94,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     setStep("password");
     setPassword("");
     setPasswordError("");
+    setEditingBudgetId(null);
     setSelectedStoreId(preselectedStoreId || (availableLojas.length === 1 ? availableLojas[0].id : ""));
     setSelectedMonthYear(getCurrentMonthYear());
     resetBudgetFields();
@@ -104,6 +106,17 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     setUniformsBudget("");
     setCleaningBudget("");
     setUtensilsBudget("");
+  };
+
+  const handleEditBudget = (budget: StoreBudget) => {
+    setEditingBudgetId(budget.id);
+    setSelectedStoreId(budget.store_id);
+    setSelectedMonthYear(budget.month_year);
+    setFreelancerBudget(budget.freelancer_budget > 0 ? String(budget.freelancer_budget) : "");
+    setMaintenanceBudget(budget.maintenance_budget > 0 ? String(budget.maintenance_budget) : "");
+    setUniformsBudget(budget.uniforms_budget > 0 ? String(budget.uniforms_budget) : "");
+    setCleaningBudget(budget.cleaning_budget > 0 ? String(budget.cleaning_budget) : "");
+    setUtensilsBudget(budget.utensils_budget > 0 ? String(budget.utensils_budget) : "");
   };
 
   const handlePasswordConfirm = async () => {
@@ -134,22 +147,34 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     const total = calculateTotal();
     if (total === 0) return;
 
-    await upsertBudget({
-      store_id: selectedStoreId,
-      month_year: selectedMonthYear,
-      freelancer_budget: parseAmount(freelancerBudget),
-      maintenance_budget: parseAmount(maintenanceBudget),
-      uniforms_budget: parseAmount(uniformsBudget),
-      cleaning_budget: parseAmount(cleaningBudget),
-      utensils_budget: parseAmount(utensilsBudget),
-    });
-
-    setIsOpen(false);
+    try {
+      await upsertBudget({
+        store_id: selectedStoreId,
+        month_year: selectedMonthYear,
+        freelancer_budget: parseAmount(freelancerBudget),
+        maintenance_budget: parseAmount(maintenanceBudget),
+        uniforms_budget: parseAmount(uniformsBudget),
+        cleaning_budget: parseAmount(cleaningBudget),
+        utensils_budget: parseAmount(utensilsBudget),
+      });
+      setIsOpen(false);
+    } catch (err) {
+      console.error("Erro ao salvar budget:", err);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o orçamento. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDelete = async (budgetId: string) => {
     if (confirm("Tem certeza que deseja remover este orçamento?")) {
-      await deleteBudget(budgetId);
+      try {
+        await deleteBudget(budgetId);
+      } catch (err) {
+        console.error("Erro ao remover budget:", err);
+      }
     }
   };
 
@@ -224,7 +249,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>Editar Budgets</DialogTitle>
+                <DialogTitle>{editingBudgetId ? "Editar Budget" : "Novo Budget"}</DialogTitle>
                 <DialogDescription>
                   Configure os limites de gastos para cada categoria operacional.
                 </DialogDescription>
@@ -234,7 +259,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Loja/Unidade</Label>
-                    <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+                    <Select value={selectedStoreId} onValueChange={setSelectedStoreId} disabled={!!editingBudgetId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a loja" />
                       </SelectTrigger>
@@ -252,7 +277,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                   </div>
                   <div className="space-y-2">
                     <Label>Mês de Referência</Label>
-                    <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear}>
+                    <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear} disabled={!!editingBudgetId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o mês" />
                       </SelectTrigger>
@@ -327,19 +352,29 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                             <TableHead>Loja</TableHead>
                             <TableHead>Mês</TableHead>
                             <TableHead className="text-right">Total</TableHead>
-                            <TableHead className="w-[40px]" />
+                            <TableHead className="w-[80px]" />
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {activeBudgets.map((b) => (
-                            <TableRow key={b.id}>
+                            <TableRow key={b.id} className={editingBudgetId === b.id ? "bg-primary/5" : ""}>
                               <TableCell className="text-sm">{getStoreName(b.store_id)}</TableCell>
                               <TableCell className="text-sm capitalize">{formatMonthYear(b.month_year)}</TableCell>
                               <TableCell className="text-right text-sm font-semibold text-primary">{formatCurrency(b.total_budget)}</TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(b.id)} disabled={isDeleting}>
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                    onClick={() => handleEditBudget(b)}
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(b.id)} disabled={isDeleting}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}

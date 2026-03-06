@@ -2483,6 +2483,7 @@ export type Database = {
       }
       store_budgets: {
         Row: {
+          apoio_venda_budget: number
           cleaning_budget: number
           created_at: string
           freelancer_budget: number
@@ -2496,6 +2497,7 @@ export type Database = {
           utensils_budget: number
         }
         Insert: {
+          apoio_venda_budget?: number
           cleaning_budget?: number
           created_at?: string
           freelancer_budget?: number
@@ -2509,6 +2511,7 @@ export type Database = {
           utensils_budget?: number
         }
         Update: {
+          apoio_venda_budget?: number
           cleaning_budget?: number
           created_at?: string
           freelancer_budget?: number

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon } from "lucide-react";
+import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -86,6 +86,20 @@ export function BudgetConfigSection() {
     return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget);
   };
 
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+
+  const handleEditBudget = (budget: typeof budgets[0]) => {
+    setEditingBudgetId(budget.id);
+    setSelectedStoreId(budget.store_id);
+    setSelectedMonthYear(budget.month_year);
+    setFreelancerBudget(budget.freelancer_budget > 0 ? String(budget.freelancer_budget) : "");
+    setMaintenanceBudget(budget.maintenance_budget > 0 ? String(budget.maintenance_budget) : "");
+    setUniformsBudget(budget.uniforms_budget > 0 ? String(budget.uniforms_budget) : "");
+    setCleaningBudget(budget.cleaning_budget > 0 ? String(budget.cleaning_budget) : "");
+    setUtensilsBudget(budget.utensils_budget > 0 ? String(budget.utensils_budget) : "");
+    setIsDialogOpen(true);
+  };
+
   const handleSubmit = async () => {
     if (!selectedStoreId || !selectedMonthYear) return;
 
@@ -97,18 +111,22 @@ export function BudgetConfigSection() {
 
     if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0) return;
 
-    await upsertBudget({
-      store_id: selectedStoreId,
-      month_year: selectedMonthYear,
-      freelancer_budget: freelancerAmount,
-      maintenance_budget: maintenanceAmount,
-      uniforms_budget: uniformsAmount,
-      cleaning_budget: cleaningAmount,
-      utensils_budget: utensilsAmount,
-    });
-
-    setIsDialogOpen(false);
-    resetForm();
+    try {
+      await upsertBudget({
+        store_id: selectedStoreId,
+        month_year: selectedMonthYear,
+        freelancer_budget: freelancerAmount,
+        maintenance_budget: maintenanceAmount,
+        uniforms_budget: uniformsAmount,
+        cleaning_budget: cleaningAmount,
+        utensils_budget: utensilsAmount,
+      });
+      setIsDialogOpen(false);
+      setEditingBudgetId(null);
+      resetForm();
+    } catch (err) {
+      console.error("Erro ao salvar budget:", err);
+    }
   };
 
   const resetForm = () => {
@@ -118,6 +136,7 @@ export function BudgetConfigSection() {
     setUniformsBudget("");
     setCleaningBudget("");
     setUtensilsBudget("");
+    setEditingBudgetId(null);
   };
 
   const handleDelete = async (budgetId: string) => {
@@ -395,15 +414,25 @@ export function BudgetConfigSection() {
                       {formatCurrency(budget.total_budget)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(budget.id)}
-                        disabled={isDeleting}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => handleEditBudget(budget)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(budget.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

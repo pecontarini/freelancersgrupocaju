@@ -349,7 +349,7 @@ export function BudgetConfigSection() {
           </Dialog>
         </div>
         <CardDescription>
-        Defina orçamentos para Freelancers, Manutenção, Uniformes, Limpeza e Utensílios.
+        Defina orçamentos para Freelancers, Manutenção, Uniformes, Limpeza, Utensílios e Apoio à Venda.
         </CardDescription>
       </CardHeader>
 

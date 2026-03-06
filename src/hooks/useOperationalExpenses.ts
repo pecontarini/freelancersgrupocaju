@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 
-export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios" | "outros";
+export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios" | "apoio_venda" | "outros";
 
 export interface OperationalExpense {
   id: string;

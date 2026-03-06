@@ -23,6 +23,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   uniformes: "Uniformes",
   limpeza: "Limpeza",
   utensilios: "Utensílios",
+  apoio_venda: "Apoio à Venda",
   apoio: "Apoio/Outros",
 };
 

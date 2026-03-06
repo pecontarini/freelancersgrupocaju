@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Loader2, Shirt, SprayCanIcon, UtensilsCrossed, PackageOpen } from "lucide-react";
+import { Plus, Loader2, Shirt, SprayCanIcon, UtensilsCrossed, PackageOpen, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,7 @@ const CATEGORIES = [
   { value: "uniformes", label: "Uniformes", icon: Shirt, color: "text-purple-500" },
   { value: "limpeza", label: "Material de Limpeza", icon: SprayCanIcon, color: "text-cyan-500" },
   { value: "utensilios", label: "Utensílios", icon: UtensilsCrossed, color: "text-orange-500" },
+  { value: "apoio_venda", label: "Apoio à Venda", icon: ShoppingBag, color: "text-emerald-500" },
   { value: "apoio", label: "Outros", icon: PackageOpen, color: "text-gray-500" },
 ] as const;
 

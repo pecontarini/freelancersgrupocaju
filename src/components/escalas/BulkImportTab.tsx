@@ -85,6 +85,23 @@ const NAME_COLS = ["nome", "name", "nome_completo", "full_name", "funcionario", 
 const ROLE_COLS = ["cargo", "role", "funcao", "função", "job_title", "job", "profissão", "profissao"];
 const PHONE_COLS = ["telefone", "phone", "celular", "whatsapp", "fone", "tel"];
 
+// Header candidates for Rel090N2 format
+const REL090_HEADER_CANDIDATES = ["matrícula", "matricula"];
+const REL090_NAME_CANDIDATES = ["nome do funcionário", "nome do funcionario", "nome funcionário", "nome funcionario"];
+const REL090_ROLE_CANDIDATES = ["cargo"];
+const REL090_DISMISS_CANDIDATES = ["data desl.", "data desl", "data desligamento", "dt desl"];
+const REL090_NOISE_PATTERNS = ["total no", "tomador:", "setor:"];
+
+function capitalizeWords(str: string): string {
+  const lowerWords = new Set(["de", "da", "do", "das", "dos", "e"]);
+  return str
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word, i) => (i > 0 && lowerWords.has(word)) ? word : word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function findColumn(headers: string[], candidates: string[]): number {
   const normalized = headers.map((h) => (h || "").toString().toLowerCase().trim());
   for (const c of candidates) {
@@ -99,6 +116,69 @@ function findColumn(headers: string[], candidates: string[]): number {
   return -1;
 }
 
+/**
+ * Parser for Rel090N2 "Listagem de Funcionários" spreadsheets.
+ * Detects the header row dynamically, filters dismissed employees and noise rows.
+ */
+function parseRel090N2(workbook: XLSX.WorkBook): ParsedEmployee[] | null {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+  // Find the header row by scanning for "Matrícula" + "Nome do Funcionário"
+  let headerRowIdx = -1;
+  let nameIdx = -1;
+  let roleIdx = -1;
+  let dismissIdx = -1;
+
+  for (let i = 0; i < Math.min(rows.length, 20); i++) {
+    const rowNorm = rows[i].map((c) => String(c || "").toLowerCase().trim());
+    const matIdx = rowNorm.findIndex((c) => REL090_HEADER_CANDIDATES.some((h) => c.includes(h)));
+    const nIdx = rowNorm.findIndex((c) => REL090_NAME_CANDIDATES.some((h) => c.includes(h)));
+    if (matIdx >= 0 && nIdx >= 0) {
+      headerRowIdx = i;
+      nameIdx = nIdx;
+      roleIdx = rowNorm.findIndex((c) => REL090_ROLE_CANDIDATES.some((h) => c.includes(h)));
+      dismissIdx = rowNorm.findIndex((c) => REL090_DISMISS_CANDIDATES.some((h) => c.includes(h)));
+      break;
+    }
+  }
+
+  if (headerRowIdx === -1) return null; // Not a Rel090N2 format
+
+  const employees: ParsedEmployee[] = [];
+
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    const rawName = String(row[nameIdx] || "").trim();
+
+    // Skip empty / short names
+    if (!rawName || rawName.length < 3) continue;
+
+    // Skip noise rows
+    const rowJoined = row.map((c) => String(c || "")).join(" ").toLowerCase();
+    if (REL090_NOISE_PATTERNS.some((p) => rowJoined.includes(p))) continue;
+
+    // Skip dismissed employees (Data Desl. filled)
+    if (dismissIdx >= 0) {
+      const dismissVal = String(row[dismissIdx] || "").trim();
+      if (dismissVal.length > 0) continue;
+    }
+
+    const rawRole = roleIdx >= 0 ? String(row[roleIdx] || "").trim() : "";
+    const name = capitalizeWords(rawName);
+    const job_title = rawRole ? capitalizeWords(rawRole) : "";
+
+    employees.push({
+      name,
+      job_title,
+      phone: "",
+      confidence: assessConfidence({ name, job_title, phone: "" }),
+    });
+  }
+
+  return employees.length > 0 ? employees : null;
+}
+
 function parseSpreadsheetLocally(file: File): Promise<ParsedEmployee[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -106,6 +186,16 @@ function parseSpreadsheetLocally(file: File): Promise<ParsedEmployee[]> {
       try {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: "array" });
+
+        // 1) Try Rel090N2 parser first (handles complex HR reports)
+        const rel090Result = parseRel090N2(workbook);
+        if (rel090Result) {
+          console.log(`Rel090N2 parser: extracted ${rel090Result.length} employees`);
+          resolve(rel090Result);
+          return;
+        }
+
+        // 2) Fallback: generic column-based parser
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });

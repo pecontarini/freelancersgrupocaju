@@ -1,59 +1,56 @@
 
 
-# Aplicar Liquid Glass ao Aplicativo Real
+# Plano: Correções de Budgets Gerenciais e Filtros
 
-## Por que não apareceu no app?
+## Problema 1: Budgets nao salvando + Botao de edicao
 
-O simulador é uma página isolada (`/liquid-glass-simulator`) com seu próprio background escuro e componentes glass. O portal real (`/`) usa o design system padrão (Tailwind CSS variables, `bg-background`, `bg-card`, etc.) — são dois mundos separados. Para o glass funcionar, ele precisa de um fundo com cores/profundidade por trás dos elementos translúcidos.
+### Diagnostico
+Investigando o banco, os dados de `store_budgets` existem e a estrutura esta correta (coluna `total_budget` e gerada automaticamente). As politicas RLS permitem INSERT/UPDATE para admin e operator. O problema provavel e um **erro silencioso** -- o `handleSubmit` no `InlineBudgetEditor` e no `OperationalBudgetConfigSection` usa `mutateAsync` sem `try/catch`, entao se o upsert falhar (ex: timeout, conflito de sessao apos re-autenticacao), o toast de erro aparece mas pode ser ignorado pelo usuario.
 
-## Estratégia: Glass Theme no Portal Real
+Alem disso, o fluxo de **re-autenticacao por senha** (`signInWithPassword`) pode causar um refresh de sessao que invalida o token no meio da operacao.
 
-Aplicar os efeitos glass **na interface real** sem quebrar o layout existente. O fundo permanece com as cores do tema (claro/escuro), mas os componentes ganham o tratamento glass.
+### Solucao
+1. **Adicionar `try/catch`** nos handlers de submit para garantir feedback claro ao usuario
+2. **Adicionar botao de edicao (lapiz)** na tabela de budgets ativos -- ao clicar, preenche o formulario com os valores existentes para edicao
+3. **Restringir acesso**: Somente Admin e Socio Operador podem editar (remover `isGerenteUnidade` do acesso ao editor inline)
+4. **Proteger com senha**: Manter o fluxo de confirmacao de senha existente
 
-### Mudanças Planejadas
+### Arquivos a editar
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/InlineBudgetEditor.tsx` | Adicionar botao de lapiz na tabela, carregar valores existentes ao clicar, try/catch no submit, remover gerente do acesso |
+| `src/components/OperationalBudgetConfigSection.tsx` | Adicionar botao de lapiz na tabela de budgets, carregar valores para edicao, try/catch no submit |
+| `src/hooks/useStoreBudgets.ts` | Adicionar logs de erro mais detalhados |
 
-**1. Background Sutil com Orbs (Index.tsx)**
-- Adicionar uma versão suave dos orbs animados como fundo do app principal
-- No tema claro: orbs com opacidade muito baixa (~0.08) em tons coral/gray
-- No tema escuro: orbs mais visíveis (~0.25) em tons purple/blue
-- Componente `AppGlassBackground` que respeita o tema atual
+### Logica do botao de edicao
+- Na tabela de budgets ativos, cada linha tera um icone de lapiz ao lado do icone de lixeira
+- Ao clicar no lapiz: preenche `selectedStoreId`, `selectedMonthYear` e todos os campos de valor com os dados do budget existente
+- O formulario passa a funcionar como "edicao" (upsert ja cobre isso naturalmente)
+- Fluxo de senha se aplica antes de qualquer alteracao
 
-**2. Sidebar Glass (AppSidebar.tsx)**
-- Aplicar `backdrop-filter: blur(20px)` e fundo semi-transparente na sidebar
-- Menu items ativos com "glass pill" highlight (como no simulador)
-- Bordas sutis com gradiente de opacidade (mais claro no topo)
+---
 
-**3. Cards Glass (CSS + componentes)**
-- Substituir a classe `.glass-card` existente por propriedades glass reais
-- Cards com `backdrop-filter: blur(16px)`, bordas semi-transparentes
-- Hover lift com shadow aumentado
-- Aplicar nos cards de KPI, FinancialHealthCard, SummaryCard
+## Problema 2: Filtros aplicando valores errados com alto volume
 
-**4. Header Glass (PortalHeader.tsx)**
-- Header com blur e transparência, estilo floating nav do simulador
-- Borda inferior sutil com gradiente
+### Diagnostico
+O `BudgetsGerenciaisTab` inicializa o filtro com `lojaId: selectedUnidadeId` mas a funcao `isInDateRange` e definida inline (nao memoizada) e depende de `effectiveDateRange`. O `useMemo` do `filteredFreelancers` lista `filters.dateStart` e `filters.dateEnd` nas dependencias, mas usa `isInDateRange` que captura `effectiveDateRange` por closure. Isso pode causar **stale closures** quando o estado muda rapidamente.
 
-**5. Bottom Navigation Glass (BottomNavigation.tsx - mobile)**
-- Barra inferior com glass blur
-- Ícone ativo com glow sutil na cor de destaque
+Alem disso, o default do filtro e o mes atual (`startOfMonth` a `endOfMonth`), mas quando o usuario muda o periodo, a funcao `isInDateRange` pode estar usando o range antigo na primeira renderizacao.
 
-**6. Novo componente: AppGlassBackground**
-- Versão mais sutil do `LiquidBackground` que funciona com ambos os temas
-- Orbs menores, mais transparentes, cores que combinam com o tema coral/terracotta
+### Solucao
+1. **Memoizar `isInDateRange`** com `useCallback` ou mover a logica diretamente para dentro dos `useMemo` dos filtros
+2. **Incluir `effectiveDateRange` nas dependencias** dos `useMemo` de filtragem para evitar stale closures
+3. **Garantir que o estado de filtro reseta corretamente** ao trocar de unidade
 
-### Arquivos a Criar/Editar
+### Arquivos a editar
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Refatorar `isInDateRange` para dentro dos useMemo, corrigir dependencias, resetar filtros ao trocar unidade |
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/layout/AppGlassBackground.tsx` | Criar — background sutil com orbs |
-| `src/index.css` | Editar — atualizar `.glass-card`, adicionar utilitários glass |
-| `src/pages/Index.tsx` | Editar — adicionar AppGlassBackground |
-| `src/components/layout/AppSidebar.tsx` | Editar — aplicar glass na sidebar |
-| `src/components/layout/BottomNavigation.tsx` | Editar — glass na barra mobile |
-| `src/components/layout/PortalHeader.tsx` | Editar — header com blur |
-| `src/components/SummaryCard.tsx` | Editar — glass no card principal |
-| `src/components/ui/card.tsx` | Editar — variante glass opcional |
+---
 
-### Resultado Esperado
-O app inteiro terá a sensação de "vidro líquido" — sidebar, cards, header e navegação com blur e transparência — mantendo as cores da marca, a legibilidade e a funcionalidade existente intactas.
+## Resumo de impacto
+- **6 pontos de mudanca** em 4 arquivos
+- Zero mudancas no banco de dados (estrutura ja esta correta)
+- Foco em robustez do salvamento e consistencia dos filtros
 

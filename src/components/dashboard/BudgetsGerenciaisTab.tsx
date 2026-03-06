@@ -135,63 +135,45 @@ export function BudgetsGerenciaisTab({
     return `Acumulado - ${effectiveDateRange.label.charAt(0).toUpperCase() + effectiveDateRange.label.slice(1)}`;
   }, [effectiveDateRange, filters.dateStart, filters.dateEnd]);
 
-  // Helper function to check if date is within effective range
-  const isInDateRange = (dateStr: string) => {
-    const date = parseISO(dateStr);
-    return isWithinInterval(date, { start: effectiveDateRange.start, end: effectiveDateRange.end });
-  };
-
-  // Filter entries by all criteria
+  // Filter entries by all criteria - inline date check to avoid stale closures
   const filteredFreelancers = useMemo(() => {
+    const { start, end } = effectiveDateRange;
     return freelancerEntries.filter((entry) => {
-      // Store filter
       if (effectiveStoreId && entry.loja_id !== effectiveStoreId) return false;
-      
-      // Search filter
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
         if (!entry.nome_completo.toLowerCase().includes(searchLower)) return false;
       }
-      
-      // Function filter (multi-select)
       if (filters.funcoes.length > 0 && !filters.funcoes.includes(entry.funcao)) return false;
-      
-      // Date range filter
-      if (!isInDateRange(entry.data_pop)) return false;
-      
+      const date = parseISO(entry.data_pop);
+      if (!isWithinInterval(date, { start, end })) return false;
       return true;
     });
-  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcoes, filters.dateStart, filters.dateEnd]);
+  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcoes, effectiveDateRange]);
 
   const filteredMaintenance = useMemo(() => {
+    const { start, end } = effectiveDateRange;
     return maintenanceEntries.filter((entry) => {
-      // Store filter
       if (effectiveStoreId && entry.loja_id !== effectiveStoreId) return false;
-      
-      // Search filter
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
         if (!entry.fornecedor.toLowerCase().includes(searchLower)) return false;
       }
-      
-      // Date range filter
-      if (!isInDateRange(entry.data_servico)) return false;
-      
+      const date = parseISO(entry.data_servico);
+      if (!isWithinInterval(date, { start, end })) return false;
       return true;
     });
-  }, [maintenanceEntries, effectiveStoreId, filters.searchTerm, filters.dateStart, filters.dateEnd]);
+  }, [maintenanceEntries, effectiveStoreId, filters.searchTerm, effectiveDateRange]);
 
   const filteredExpenses = useMemo(() => {
+    const { start, end } = effectiveDateRange;
     return operationalExpenses.filter((expense) => {
-      // Store filter
       if (effectiveStoreId && expense.store_id !== effectiveStoreId) return false;
-      
-      // Date range filter
-      if (!isInDateRange(expense.data_despesa)) return false;
-      
+      const date = parseISO(expense.data_despesa);
+      if (!isWithinInterval(date, { start, end })) return false;
       return true;
     });
-  }, [operationalExpenses, effectiveStoreId, filters.dateStart, filters.dateEnd]);
+  }, [operationalExpenses, effectiveStoreId, effectiveDateRange]);
 
   // Filter today's entries (from filtered data)
   const todayFreelancers = useMemo(() => {

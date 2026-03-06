@@ -13,6 +13,7 @@ export interface StoreBudget {
   uniforms_budget: number;
   cleaning_budget: number;
   utensils_budget: number;
+  apoio_venda_budget: number;
   total_budget: number;
   created_at: string;
   updated_at: string;
@@ -56,6 +57,7 @@ export function useStoreBudgets() {
       uniforms_budget,
       cleaning_budget,
       utensils_budget,
+      apoio_venda_budget,
     }: {
       store_id: string;
       month_year: string;
@@ -64,11 +66,14 @@ export function useStoreBudgets() {
       uniforms_budget: number;
       cleaning_budget: number;
       utensils_budget: number;
+      apoio_venda_budget: number;
     }) => {
       const { data, error } = await supabase
         .from("store_budgets")
         .upsert(
-          { store_id, month_year, freelancer_budget, maintenance_budget, uniforms_budget, cleaning_budget, utensils_budget },
+          { store_id, month_year, freelancer_budget, maintenance_budget, uniforms_budget, cleaning_budget, utensils_budget, apoio_venda_budget },
+          { onConflict: "store_id,month_year" }
+        )
           { onConflict: "store_id,month_year" }
         )
         .select()

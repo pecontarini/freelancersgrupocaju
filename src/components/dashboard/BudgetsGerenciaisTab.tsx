@@ -215,7 +215,8 @@ export function BudgetsGerenciaisTab({
       budget.maintenance_budget +
       budget.uniforms_budget +
       budget.cleaning_budget +
-      budget.utensils_budget
+      budget.utensils_budget +
+      (budget.apoio_venda_budget || 0)
     : 0;
 
   const maintenanceBudget = budget?.maintenance_budget || 0;

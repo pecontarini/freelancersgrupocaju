@@ -1,59 +1,37 @@
 
 
-# Aplicar Liquid Glass ao Aplicativo Real
+# Plano: Garantir funcionamento definitivo de criacao e edicao de Budgets
 
-## Por que não apareceu no app?
+## Diagnostico
 
-O simulador é uma página isolada (`/liquid-glass-simulator`) com seu próprio background escuro e componentes glass. O portal real (`/`) usa o design system padrão (Tailwind CSS variables, `bg-background`, `bg-card`, etc.) — são dois mundos separados. Para o glass funcionar, ele precisa de um fundo com cores/profundidade por trás dos elementos translúcidos.
+Revisei todo o codigo atual e o banco de dados. A estrutura esta correta: a tabela `store_budgets` tem a coluna `apoio_venda_budget`, o indice unico `(store_id, month_year)` existe, e as politicas RLS permitem INSERT/UPDATE para admin e operator. Os componentes `InlineBudgetEditor` e `OperationalBudgetConfigSection` ja possuem o botao de edicao (lapiz) e try/catch.
 
-## Estratégia: Glass Theme no Portal Real
+Porem, identifiquei problemas sutis que podem causar falhas silenciosas:
 
-Aplicar os efeitos glass **na interface real** sem quebrar o layout existente. O fundo permanece com as cores do tema (claro/escuro), mas os componentes ganham o tratamento glass.
+### Problema 1: Re-autenticacao quebrando a sessao
+O `InlineBudgetEditor` usa `signInWithPassword` para validar a senha. Isso pode causar um **refresh de token** que invalida queries em cache e causa comportamento inesperado no submit subsequente. A solucao e garantir que apos a re-autenticacao, as queries sejam re-validadas.
 
-### Mudanças Planejadas
+### Problema 2: Upsert com `total_budget` como GENERATED column
+O upsert envia apenas as colunas de input (sem `total_budget`), o que esta correto. Mas se houver qualquer campo extra no payload, o Postgres rejeitara silenciosamente. Preciso garantir que o payload esta limpo.
 
-**1. Background Sutil com Orbs (Index.tsx)**
-- Adicionar uma versão suave dos orbs animados como fundo do app principal
-- No tema claro: orbs com opacidade muito baixa (~0.08) em tons coral/gray
-- No tema escuro: orbs mais visíveis (~0.25) em tons purple/blue
-- Componente `AppGlassBackground` que respeita o tema atual
+### Problema 3: BudgetDrillDownDialog nao suporta "apoio_venda"
+O tipo `BudgetCategory` nao inclui `apoio_venda`, entao clicar nessa categoria no dashboard nao abre drill-down.
 
-**2. Sidebar Glass (AppSidebar.tsx)**
-- Aplicar `backdrop-filter: blur(20px)` e fundo semi-transparente na sidebar
-- Menu items ativos com "glass pill" highlight (como no simulador)
-- Bordas sutis com gradiente de opacidade (mais claro no topo)
+### Problema 4: Feedback visual insuficiente
+Apos salvar com sucesso, o dialog fecha mas nao ha confirmacao visual clara (o toast pode ser ignorado). Alem disso, o formulario de edicao na `OperationalBudgetConfigSection` nao trava os campos de Loja/Mes durante edicao.
 
-**3. Cards Glass (CSS + componentes)**
-- Substituir a classe `.glass-card` existente por propriedades glass reais
-- Cards com `backdrop-filter: blur(16px)`, bordas semi-transparentes
-- Hover lift com shadow aumentado
-- Aplicar nos cards de KPI, FinancialHealthCard, SummaryCard
+## Mudancas planejadas
 
-**4. Header Glass (PortalHeader.tsx)**
-- Header com blur e transparência, estilo floating nav do simulador
-- Borda inferior sutil com gradiente
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/hooks/useStoreBudgets.ts` | Apos upsert bem-sucedido, invalidar queries imediatamente e aguardar refetch. Adicionar log detalhado de erro. |
+| `src/components/InlineBudgetEditor.tsx` | Apos re-autenticacao por senha, forcar `queryClient.invalidateQueries` para renovar dados em cache. Adicionar feedback visual mais claro no submit. |
+| `src/components/OperationalBudgetConfigSection.tsx` | Travar Loja/Mes durante edicao (`disabled={!!editingBudgetId}`). Mudar titulo do dialog para "Editar Orcamento" quando em modo edicao. Resetar `editingBudgetId` ao fechar dialog. |
+| `src/components/dashboard/BudgetDrillDownDialog.tsx` | Adicionar "apoio_venda" ao tipo `BudgetCategory` e ao `CATEGORY_CONFIG`. |
+| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Garantir que o card de "Apoio a Venda" existe e que o drill-down funciona para essa categoria. |
 
-**5. Bottom Navigation Glass (BottomNavigation.tsx - mobile)**
-- Barra inferior com glass blur
-- Ícone ativo com glow sutil na cor de destaque
-
-**6. Novo componente: AppGlassBackground**
-- Versão mais sutil do `LiquidBackground` que funciona com ambos os temas
-- Orbs menores, mais transparentes, cores que combinam com o tema coral/terracotta
-
-### Arquivos a Criar/Editar
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/layout/AppGlassBackground.tsx` | Criar — background sutil com orbs |
-| `src/index.css` | Editar — atualizar `.glass-card`, adicionar utilitários glass |
-| `src/pages/Index.tsx` | Editar — adicionar AppGlassBackground |
-| `src/components/layout/AppSidebar.tsx` | Editar — aplicar glass na sidebar |
-| `src/components/layout/BottomNavigation.tsx` | Editar — glass na barra mobile |
-| `src/components/layout/PortalHeader.tsx` | Editar — header com blur |
-| `src/components/SummaryCard.tsx` | Editar — glass no card principal |
-| `src/components/ui/card.tsx` | Editar — variante glass opcional |
-
-### Resultado Esperado
-O app inteiro terá a sensação de "vidro líquido" — sidebar, cards, header e navegação com blur e transparência — mantendo as cores da marca, a legibilidade e a funcionalidade existente intactas.
+## Resumo
+- 5 arquivos editados
+- Zero mudancas no banco (estrutura ja esta correta)
+- Foco em robustez do salvamento, feedback ao usuario e suporte completo a "Apoio a Venda"
 

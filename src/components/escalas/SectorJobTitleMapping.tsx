@@ -15,9 +15,16 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUnidade } from "@/contexts/UnidadeContext";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSectors } from "@/hooks/useStaffingMatrix";
 import { useJobTitles } from "@/hooks/useJobTitles";
 import {
@@ -26,9 +33,10 @@ import {
 } from "@/hooks/useSectorJobTitles";
 
 export function SectorJobTitleMapping() {
-  const { effectiveUnidadeId: unitId } = useUnidade();
-  const { data: sectors = [], isLoading: loadingSectors } = useSectors(unitId);
-  const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(unitId);
+  const lojas = useConfigLojas();
+  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
+  const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(selectedUnit);
   const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
   const { data: mappings = [], isLoading: loadingMap } = useSectorJobTitles(sectorIds);
   const setSectorJT = useSetSectorJobTitles();
@@ -60,6 +68,38 @@ export function SectorJobTitleMapping() {
     setSectorJT.mutate({ sectorId, jobTitleIds: next });
   }
 
+  if (!selectedUnit) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Cargos por Setor</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Defina quais cargos podem atuar em cada setor da operação.
+          </p>
+        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Selecione a Unidade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value="" onValueChange={(v) => setSelectedUnit(v)}>
+              <SelectTrigger className="w-[260px]">
+                <SelectValue placeholder="Escolha a unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                {lojas.options.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -80,11 +120,25 @@ export function SectorJobTitleMapping() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold text-foreground">Cargos por Setor</h3>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Defina quais cargos podem atuar em cada setor da operação.
-        </p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Cargos por Setor</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Defina quais cargos podem atuar em cada setor da operação.
+          </p>
+        </div>
+        <Select value={selectedUnit} onValueChange={(v) => setSelectedUnit(v)}>
+          <SelectTrigger className="w-[220px]">
+            <SelectValue placeholder="Trocar unidade" />
+          </SelectTrigger>
+          <SelectContent>
+            {lojas.options.map((l) => (
+              <SelectItem key={l.id} value={l.id}>
+                {l.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon, Pencil } from "lucide-react";
+import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon, Pencil, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ export function BudgetConfigSection() {
   const [uniformsBudget, setUniformsBudget] = useState<string>("");
   const [cleaningBudget, setCleaningBudget] = useState<string>("");
   const [utensilsBudget, setUtensilsBudget] = useState<string>("");
+  const [apoioVendaBudget, setApoioVendaBudget] = useState<string>("");
 
   // Generate month options for the last 12 months and next 6 months
   const getMonthOptions = () => {
@@ -83,7 +84,7 @@ export function BudgetConfigSection() {
   };
 
   const calculateTotal = () => {
-    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget);
+    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget) + parseAmount(apoioVendaBudget);
   };
 
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);

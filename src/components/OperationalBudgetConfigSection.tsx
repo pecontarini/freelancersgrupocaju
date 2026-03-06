@@ -395,10 +395,16 @@ export function BudgetConfigSection() {
                     <span className="flex items-center justify-end gap-1">
                       <Wrench className="h-3.5 w-3.5 text-rose-500" />
                       Utens.
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">
+                     <span className="flex items-center justify-end gap-1">
+                       <ShoppingBag className="h-3.5 w-3.5 text-green-500" />
+                       Apoio
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">Total</TableHead>
+                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -427,6 +433,9 @@ export function BudgetConfigSection() {
                     </TableCell>
                     <TableCell className="text-right text-rose-600">
                       {formatCurrency(budget.utensils_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-green-600">
+                      {formatCurrency(budget.apoio_venda_budget)}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
                       {formatCurrency(budget.total_budget)}

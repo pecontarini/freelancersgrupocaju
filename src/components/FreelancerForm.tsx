@@ -46,6 +46,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export function FreelancerForm() {
+  const [formKey, setFormKey] = useState(0);
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
@@ -117,10 +118,15 @@ export function FreelancerForm() {
         form.setValue("loja_id", currentLojaId);
       }
 
-      // Manter formulário visível após o submit
+      // Forçar remontagem dos Selects para limpar estado visual do Radix
+      setFormKey(k => k + 1);
+
+      // Manter formulário visível e focar no CPF para próximo lançamento
       setTimeout(() => {
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+        const cpfInput = document.getElementById("cpf");
+        cpfInput?.focus();
+      }, 150);
     } catch (error) {
       console.error("Erro ao salvar freelancer:", error);
     }
@@ -197,7 +203,7 @@ export function FreelancerForm() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form key={formKey} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Loja */}
             <div className="space-y-2">

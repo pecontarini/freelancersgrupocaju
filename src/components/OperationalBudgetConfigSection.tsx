@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon, Pencil } from "lucide-react";
+import { DollarSign, Calendar, Loader2, Store, Plus, Trash2, Users, Wrench, Shirt, SprayCanIcon, Pencil, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,7 @@ export function BudgetConfigSection() {
   const [uniformsBudget, setUniformsBudget] = useState<string>("");
   const [cleaningBudget, setCleaningBudget] = useState<string>("");
   const [utensilsBudget, setUtensilsBudget] = useState<string>("");
+  const [apoioVendaBudget, setApoioVendaBudget] = useState<string>("");
 
   // Generate month options for the last 12 months and next 6 months
   const getMonthOptions = () => {
@@ -83,7 +84,7 @@ export function BudgetConfigSection() {
   };
 
   const calculateTotal = () => {
-    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget);
+    return parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget) + parseAmount(apoioVendaBudget);
   };
 
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
@@ -97,6 +98,7 @@ export function BudgetConfigSection() {
     setUniformsBudget(budget.uniforms_budget > 0 ? String(budget.uniforms_budget) : "");
     setCleaningBudget(budget.cleaning_budget > 0 ? String(budget.cleaning_budget) : "");
     setUtensilsBudget(budget.utensils_budget > 0 ? String(budget.utensils_budget) : "");
+    setApoioVendaBudget(budget.apoio_venda_budget > 0 ? String(budget.apoio_venda_budget) : "");
     setIsDialogOpen(true);
   };
 
@@ -108,8 +110,9 @@ export function BudgetConfigSection() {
     const uniformsAmount = parseAmount(uniformsBudget);
     const cleaningAmount = parseAmount(cleaningBudget);
     const utensilsAmount = parseAmount(utensilsBudget);
+    const apoioVendaAmount = parseAmount(apoioVendaBudget);
 
-    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0) return;
+    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0 && apoioVendaAmount === 0) return;
 
     try {
       await upsertBudget({
@@ -120,6 +123,7 @@ export function BudgetConfigSection() {
         uniforms_budget: uniformsAmount,
         cleaning_budget: cleaningAmount,
         utensils_budget: utensilsAmount,
+        apoio_venda_budget: apoioVendaAmount,
       });
       setIsDialogOpen(false);
       setEditingBudgetId(null);
@@ -136,6 +140,7 @@ export function BudgetConfigSection() {
     setUniformsBudget("");
     setCleaningBudget("");
     setUtensilsBudget("");
+    setApoioVendaBudget("");
     setEditingBudgetId(null);
   };
 
@@ -305,6 +310,19 @@ export function BudgetConfigSection() {
                       onChange={(e) => setUtensilsBudget(e.target.value)}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="apoio-venda-amount" className="flex items-center gap-1.5">
+                      <ShoppingBag className="h-3.5 w-3.5 text-green-500" />
+                      Apoio à Venda
+                    </Label>
+                    <Input
+                      id="apoio-venda-amount"
+                      type="text"
+                      placeholder="R$ 0,00"
+                      value={apoioVendaBudget}
+                      onChange={(e) => setApoioVendaBudget(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="rounded-lg bg-muted/50 p-3">
@@ -331,7 +349,7 @@ export function BudgetConfigSection() {
           </Dialog>
         </div>
         <CardDescription>
-        Defina orçamentos para Freelancers, Manutenção, Uniformes, Limpeza e Utensílios.
+        Defina orçamentos para Freelancers, Manutenção, Uniformes, Limpeza, Utensílios e Apoio à Venda.
         </CardDescription>
       </CardHeader>
 
@@ -377,10 +395,16 @@ export function BudgetConfigSection() {
                     <span className="flex items-center justify-end gap-1">
                       <Wrench className="h-3.5 w-3.5 text-rose-500" />
                       Utens.
-                    </span>
-                  </TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">
+                     <span className="flex items-center justify-end gap-1">
+                       <ShoppingBag className="h-3.5 w-3.5 text-green-500" />
+                       Apoio
+                     </span>
+                   </TableHead>
+                   <TableHead className="text-right">Total</TableHead>
+                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -409,6 +433,9 @@ export function BudgetConfigSection() {
                     </TableCell>
                     <TableCell className="text-right text-rose-600">
                       {formatCurrency(budget.utensils_budget)}
+                    </TableCell>
+                    <TableCell className="text-right text-green-600">
+                      {formatCurrency(budget.apoio_venda_budget)}
                     </TableCell>
                     <TableCell className="text-right font-semibold text-primary">
                       {formatCurrency(budget.total_budget)}

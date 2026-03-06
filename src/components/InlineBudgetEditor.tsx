@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Settings, Loader2, Calendar, Store, Users, Wrench, Shirt, SprayCanIcon, Trash2, Lock, Pencil } from "lucide-react";
+import { Settings, Loader2, Calendar, Store, Users, Wrench, Shirt, SprayCanIcon, Trash2, Lock, Pencil, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,6 +62,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
   const [uniformsBudget, setUniformsBudget] = useState("");
   const [cleaningBudget, setCleaningBudget] = useState("");
   const [utensilsBudget, setUtensilsBudget] = useState("");
+  const [apoioVendaBudget, setApoioVendaBudget] = useState("");
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
 
   // Only admin and operator can access
@@ -87,7 +88,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
   };
 
   const calculateTotal = () =>
-    parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget);
+    parseAmount(freelancerBudget) + parseAmount(maintenanceBudget) + parseAmount(uniformsBudget) + parseAmount(cleaningBudget) + parseAmount(utensilsBudget) + parseAmount(apoioVendaBudget);
 
   const handleOpen = () => {
     setIsOpen(true);
@@ -106,6 +107,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     setUniformsBudget("");
     setCleaningBudget("");
     setUtensilsBudget("");
+    setApoioVendaBudget("");
   };
 
   const handleEditBudget = (budget: StoreBudget) => {
@@ -117,6 +119,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     setUniformsBudget(budget.uniforms_budget > 0 ? String(budget.uniforms_budget) : "");
     setCleaningBudget(budget.cleaning_budget > 0 ? String(budget.cleaning_budget) : "");
     setUtensilsBudget(budget.utensils_budget > 0 ? String(budget.utensils_budget) : "");
+    setApoioVendaBudget(budget.apoio_venda_budget > 0 ? String(budget.apoio_venda_budget) : "");
   };
 
   const handlePasswordConfirm = async () => {
@@ -156,6 +159,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
         uniforms_budget: parseAmount(uniformsBudget),
         cleaning_budget: parseAmount(cleaningBudget),
         utensils_budget: parseAmount(utensilsBudget),
+        apoio_venda_budget: parseAmount(apoioVendaBudget),
       });
       setIsOpen(false);
     } catch (err) {
@@ -187,7 +191,6 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
     return format(date, "MMMM yyyy", { locale: ptBR });
   };
 
-  // Filter budgets for selected store
   const storeIds = new Set(availableLojas.map((l) => l.id));
   const visibleBudgets = isAdmin ? budgets : budgets.filter((b) => storeIds.has(b.store_id));
   const currentMonthYear = getCurrentMonthYear();
@@ -197,12 +200,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5 text-xs"
-        onClick={handleOpen}
-      >
+      <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleOpen}>
         <Settings className="h-3.5 w-3.5" />
         Editar Budgets
       </Button>
@@ -237,9 +235,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancelar
-                </Button>
+                <Button variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
                 <Button onClick={handlePasswordConfirm} disabled={!password || isVerifying}>
                   {isVerifying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Confirmar
@@ -250,9 +246,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
             <>
               <DialogHeader>
                 <DialogTitle>{editingBudgetId ? "Editar Budget" : "Novo Budget"}</DialogTitle>
-                <DialogDescription>
-                  Configure os limites de gastos para cada categoria operacional.
-                </DialogDescription>
+                <DialogDescription>Configure os limites de gastos para cada categoria operacional.</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
@@ -260,16 +254,11 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                   <div className="space-y-2">
                     <Label>Loja/Unidade</Label>
                     <Select value={selectedStoreId} onValueChange={setSelectedStoreId} disabled={!!editingBudgetId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a loja" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Selecione a loja" /></SelectTrigger>
                       <SelectContent>
                         {availableLojas.map((loja) => (
                           <SelectItem key={loja.id} value={loja.id}>
-                            <div className="flex items-center gap-2">
-                              <Store className="h-4 w-4" />
-                              {loja.nome}
-                            </div>
+                            <div className="flex items-center gap-2"><Store className="h-4 w-4" />{loja.nome}</div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -278,16 +267,11 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                   <div className="space-y-2">
                     <Label>Mês de Referência</Label>
                     <Select value={selectedMonthYear} onValueChange={setSelectedMonthYear} disabled={!!editingBudgetId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o mês" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Selecione o mês" /></SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {getMonthOptions().map((option) => (
                           <SelectItem key={option.value} value={option.value}>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4" />
-                              <span className="capitalize">{option.label}</span>
-                            </div>
+                            <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span className="capitalize">{option.label}</span></div>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -297,42 +281,31 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 text-blue-500" />
-                      Freelancers
-                    </Label>
+                    <Label className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-blue-500" />Freelancers</Label>
                     <Input type="text" placeholder="R$ 0,00" value={freelancerBudget} onChange={(e) => setFreelancerBudget(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Wrench className="h-3.5 w-3.5 text-amber-500" />
-                      Manutenção
-                    </Label>
+                    <Label className="flex items-center gap-1.5"><Wrench className="h-3.5 w-3.5 text-amber-500" />Manutenção</Label>
                     <Input type="text" placeholder="R$ 0,00" value={maintenanceBudget} onChange={(e) => setMaintenanceBudget(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Shirt className="h-3.5 w-3.5 text-purple-500" />
-                      Uniformes
-                    </Label>
+                    <Label className="flex items-center gap-1.5"><Shirt className="h-3.5 w-3.5 text-purple-500" />Uniformes</Label>
                     <Input type="text" placeholder="R$ 0,00" value={uniformsBudget} onChange={(e) => setUniformsBudget(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <SprayCanIcon className="h-3.5 w-3.5 text-cyan-500" />
-                      Limpeza
-                    </Label>
+                    <Label className="flex items-center gap-1.5"><SprayCanIcon className="h-3.5 w-3.5 text-cyan-500" />Limpeza</Label>
                     <Input type="text" placeholder="R$ 0,00" value={cleaningBudget} onChange={(e) => setCleaningBudget(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">
-                      <Wrench className="h-3.5 w-3.5 text-rose-500" />
-                      Utensílios
-                    </Label>
+                    <Label className="flex items-center gap-1.5"><Wrench className="h-3.5 w-3.5 text-rose-500" />Utensílios</Label>
                     <Input type="text" placeholder="R$ 0,00" value={utensilsBudget} onChange={(e) => setUtensilsBudget(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-green-500" />Apoio à Venda</Label>
+                    <Input type="text" placeholder="R$ 0,00" value={apoioVendaBudget} onChange={(e) => setApoioVendaBudget(e.target.value)} />
                   </div>
                 </div>
 
@@ -341,7 +314,6 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                   <p className="text-lg font-bold text-primary">{formatCurrency(calculateTotal())}</p>
                 </div>
 
-                {/* Active budgets table */}
                 {activeBudgets.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-muted-foreground">Budgets ativos</p>
@@ -363,12 +335,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
                               <TableCell className="text-right text-sm font-semibold text-primary">{formatCurrency(b.total_budget)}</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
-                                    onClick={() => handleEditBudget(b)}
-                                  >
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleEditBudget(b)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
                                   <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(b.id)} disabled={isDeleting}>
@@ -386,9 +353,7 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsOpen(false)}>
-                  Cancelar
-                </Button>
+                <Button variant="outline" onClick={() => setIsOpen(false)}>Cancelar</Button>
                 <Button onClick={handleSubmit} disabled={!selectedStoreId || !selectedMonthYear || calculateTotal() === 0 || isUpdating}>
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar

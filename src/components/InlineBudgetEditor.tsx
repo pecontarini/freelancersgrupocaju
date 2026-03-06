@@ -161,6 +161,8 @@ export function InlineBudgetEditor({ preselectedStoreId }: InlineBudgetEditorPro
         utensils_budget: parseAmount(utensilsBudget),
         apoio_venda_budget: parseAmount(apoioVendaBudget),
       });
+      setEditingBudgetId(null);
+      resetBudgetFields();
       setIsOpen(false);
     } catch (err) {
       console.error("Erro ao salvar budget:", err);

@@ -98,6 +98,7 @@ export function BudgetConfigSection() {
     setUniformsBudget(budget.uniforms_budget > 0 ? String(budget.uniforms_budget) : "");
     setCleaningBudget(budget.cleaning_budget > 0 ? String(budget.cleaning_budget) : "");
     setUtensilsBudget(budget.utensils_budget > 0 ? String(budget.utensils_budget) : "");
+    setApoioVendaBudget(budget.apoio_venda_budget > 0 ? String(budget.apoio_venda_budget) : "");
     setIsDialogOpen(true);
   };
 
@@ -109,8 +110,9 @@ export function BudgetConfigSection() {
     const uniformsAmount = parseAmount(uniformsBudget);
     const cleaningAmount = parseAmount(cleaningBudget);
     const utensilsAmount = parseAmount(utensilsBudget);
+    const apoioVendaAmount = parseAmount(apoioVendaBudget);
 
-    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0) return;
+    if (freelancerAmount === 0 && maintenanceAmount === 0 && uniformsAmount === 0 && cleaningAmount === 0 && utensilsAmount === 0 && apoioVendaAmount === 0) return;
 
     try {
       await upsertBudget({
@@ -121,6 +123,7 @@ export function BudgetConfigSection() {
         uniforms_budget: uniformsAmount,
         cleaning_budget: cleaningAmount,
         utensils_budget: utensilsAmount,
+        apoio_venda_budget: apoioVendaAmount,
       });
       setIsDialogOpen(false);
       setEditingBudgetId(null);
@@ -137,6 +140,7 @@ export function BudgetConfigSection() {
     setUniformsBudget("");
     setCleaningBudget("");
     setUtensilsBudget("");
+    setApoioVendaBudget("");
     setEditingBudgetId(null);
   };
 

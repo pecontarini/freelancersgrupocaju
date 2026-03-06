@@ -74,8 +74,6 @@ export function useStoreBudgets() {
           { store_id, month_year, freelancer_budget, maintenance_budget, uniforms_budget, cleaning_budget, utensils_budget, apoio_venda_budget },
           { onConflict: "store_id,month_year" }
         )
-          { onConflict: "store_id,month_year" }
-        )
         .select()
         .single();
 

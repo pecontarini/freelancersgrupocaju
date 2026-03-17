@@ -80,6 +80,7 @@ const PERIOD_OPTIONS = [
   { value: "this_month", label: "Este Mês" },
   { value: "last_month", label: "Mês Passado" },
   { value: "90d", label: "Últimos 90 dias" },
+  { value: "all", label: "Todo o Período" },
 ];
 
 function getDateRange(periodKey: string): { from: Date; to: Date } {

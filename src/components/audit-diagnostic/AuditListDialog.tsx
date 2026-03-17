@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ interface AuditListDialogProps {
   onDeleteAudit?: (auditId: string) => Promise<void>;
   isDeletingAudit?: boolean;
   isAdmin?: boolean;
+  initialAuditId?: string | null;
+  onInitialAuditHandled?: () => void;
 }
 
 function getScoreBg(score: number) {
@@ -40,8 +42,21 @@ export function AuditListDialog({
   onDeleteAudit,
   isDeletingAudit,
   isAdmin,
+  initialAuditId,
+  onInitialAuditHandled,
 }: AuditListDialogProps) {
   const [selectedAudit, setSelectedAudit] = useState<SupervisionAudit | null>(null);
+
+  // Auto-open detail viewer when initialAuditId is set
+  useEffect(() => {
+    if (initialAuditId && audits.length > 0) {
+      const found = audits.find((a) => a.id === initialAuditId);
+      if (found) {
+        setSelectedAudit(found);
+        onInitialAuditHandled?.();
+      }
+    }
+  }, [initialAuditId, audits, onInitialAuditHandled]);
 
   return (
     <>

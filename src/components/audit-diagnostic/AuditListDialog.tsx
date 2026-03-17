@@ -47,7 +47,7 @@ export function AuditListDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] p-0 gap-0 overflow-hidden">
+        <DialogContent className="max-w-2xl h-[85vh] max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-3">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <ClipboardCheck className="h-5 w-5 text-primary" />
@@ -58,7 +58,7 @@ export function AuditListDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 px-6 pb-6">
+          <ScrollArea className="flex-1 min-h-0 px-6 pb-6">
             {audits.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <ClipboardCheck className="h-12 w-12 mb-3 opacity-30" />

@@ -22,6 +22,8 @@ interface AuditListDialogProps {
   onDeleteAudit?: (auditId: string) => Promise<void>;
   isDeletingAudit?: boolean;
   isAdmin?: boolean;
+  initialAuditId?: string | null;
+  onInitialAuditHandled?: () => void;
 }
 
 function getScoreBg(score: number) {

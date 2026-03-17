@@ -7,7 +7,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClipboardCheck, FileText, AlertTriangle } from "lucide-react";
 import type { SupervisionAudit, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { AuditDetailViewer } from "./AuditDetailViewer";
@@ -58,7 +57,7 @@ export function AuditListDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 min-h-0 px-6 pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
             {audits.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                 <ClipboardCheck className="h-12 w-12 mb-3 opacity-30" />
@@ -123,7 +122,7 @@ export function AuditListDialog({
                 })}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
 

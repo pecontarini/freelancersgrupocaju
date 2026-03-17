@@ -422,8 +422,11 @@ export function AuditDiagnosticDashboard({
       />
 
       <AuditListDialog
-        open={auditListOpen}
-        onOpenChange={setAuditListOpen}
+        open={auditListOpen || !!chartSelectedAuditId}
+        onOpenChange={(o) => {
+          setAuditListOpen(o);
+          if (!o) setChartSelectedAuditId(null);
+        }}
         audits={filteredAudits}
         failures={filteredFailures}
         getLojaName={getLojaName}
@@ -431,6 +434,8 @@ export function AuditDiagnosticDashboard({
         onDeleteAudit={deleteAudit}
         isDeletingAudit={isDeletingAudit}
         isAdmin={isAdmin || userIsAdmin}
+        initialAuditId={chartSelectedAuditId}
+        onInitialAuditHandled={() => setChartSelectedAuditId(null)}
       />
 
       {/* ===== TABS ===== */}

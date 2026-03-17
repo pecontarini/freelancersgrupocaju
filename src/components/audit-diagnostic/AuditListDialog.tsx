@@ -42,8 +42,21 @@ export function AuditListDialog({
   onDeleteAudit,
   isDeletingAudit,
   isAdmin,
+  initialAuditId,
+  onInitialAuditHandled,
 }: AuditListDialogProps) {
   const [selectedAudit, setSelectedAudit] = useState<SupervisionAudit | null>(null);
+
+  // Auto-open detail viewer when initialAuditId is set
+  useEffect(() => {
+    if (initialAuditId && audits.length > 0) {
+      const found = audits.find((a) => a.id === initialAuditId);
+      if (found) {
+        setSelectedAudit(found);
+        onInitialAuditHandled?.();
+      }
+    }
+  }, [initialAuditId, audits, onInitialAuditHandled]);
 
   return (
     <>

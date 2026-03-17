@@ -233,11 +233,11 @@ export function AuditDiagnosticDashboard({
     ? `Marca: ${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)}`
     : "Todas as Unidades";
 
-  // Handle drill-down from chart click
+  // Handle drill-down from chart click — open detail viewer directly
+  const [chartSelectedAuditId, setChartSelectedAuditId] = useState<string | null>(null);
   const handleAuditChartClick = useCallback(
     (auditId: string) => {
-      // The Sheet in history tab handles this — we switch tab and let user click
-      // For now this is a no-op; clicking the dot gives visual feedback
+      setChartSelectedAuditId(auditId);
     },
     []
   );

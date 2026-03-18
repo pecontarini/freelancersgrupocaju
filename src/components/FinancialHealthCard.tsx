@@ -390,6 +390,19 @@ export function FinancialHealthCard({
               {stats.utensils.hasBudget ? formatCurrency(stats.utensils.remaining) : "N/A"}
             </p>
           </div>
+
+          <div className="space-y-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <ShoppingBag className="h-3 w-3 text-emerald-500" />
+              Saldo Apoio à Venda
+            </p>
+            <p className={cn(
+              "text-sm font-bold",
+              stats.apoioVenda.remaining >= 0 ? "text-emerald-600" : "text-destructive"
+            )}>
+              {stats.apoioVenda.hasBudget ? formatCurrency(stats.apoioVenda.remaining) : "N/A"}
+            </p>
+          </div>
         </div>
 
         {/* Projection - only show for current month */}

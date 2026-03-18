@@ -134,6 +134,7 @@ export function FinancialHealthCard({
       uniforms: uniformsStats,
       cleaning: cleaningStats,
       utensils: utensilsStats,
+      apoioVenda: apoioVendaStats,
       total: totalStats,
       dailyAverage,
       projectedTotal,

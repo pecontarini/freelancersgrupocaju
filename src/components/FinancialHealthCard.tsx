@@ -307,6 +307,13 @@ export function FinancialHealthCard({
             stats={stats.utensils} 
             onClick={() => setDrillDownCategory("utensils")}
           />
+          <CategoryProgressBar 
+            label="Apoio à Venda" 
+            icon={ShoppingBag} 
+            iconColor="text-emerald-500" 
+            stats={stats.apoioVenda} 
+            onClick={() => setDrillDownCategory("apoio_venda")}
+          />
           <div className="pt-2 border-t">
             <CategoryProgressBar 
               label="Total Geral" 

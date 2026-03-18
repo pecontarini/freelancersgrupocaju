@@ -1,0 +1,2 @@
+ALTER TABLE public.operational_expenses DROP CONSTRAINT operational_expenses_category_check;
+ALTER TABLE public.operational_expenses ADD CONSTRAINT operational_expenses_category_check CHECK (category = ANY (ARRAY['uniformes'::text, 'limpeza'::text, 'utensilios'::text, 'apoio'::text, 'apoio_venda'::text, 'outros'::text]));

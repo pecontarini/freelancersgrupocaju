@@ -89,9 +89,9 @@ export function FinancialHealthCard({
 
     const operationalTotals = effectiveStoreId 
       ? getTotalsForStoreMonth(effectiveStoreId, selectedMonthYear)
-      : { uniformes: 0, limpeza: 0, utensilios: 0, total: 0 };
+      : { uniformes: 0, limpeza: 0, utensilios: 0, apoio_venda: 0, total: 0 };
 
-    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios;
+    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
 
     const budget = effectiveStoreId 
       ? getBudgetForStoreMonth(effectiveStoreId, selectedMonthYear)

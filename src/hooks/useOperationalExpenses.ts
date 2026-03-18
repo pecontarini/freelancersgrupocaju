@@ -163,8 +163,11 @@ export function useOperationalExpenses() {
     const apoio = filtered
       .filter((e) => e.category === "apoio")
       .reduce((sum, e) => sum + e.valor, 0);
+    const apoio_venda = filtered
+      .filter((e) => e.category === "apoio_venda")
+      .reduce((sum, e) => sum + e.valor, 0);
     
-    return { uniformes, limpeza, utensilios, apoio, total: uniformes + limpeza + utensilios + apoio };
+    return { uniformes, limpeza, utensilios, apoio, apoio_venda, total: uniformes + limpeza + utensilios + apoio + apoio_venda };
   };
 
   return {

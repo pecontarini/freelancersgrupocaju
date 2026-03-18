@@ -301,7 +301,7 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
       });
     } else {
       // Simple expense (uniformes, limpeza, apoio)
-      const operationalCategory = category as "uniformes" | "limpeza" | "apoio" | "utensilios";
+      const operationalCategory = category as "uniformes" | "limpeza" | "apoio" | "utensilios" | "apoio_venda";
       await addExpense({
         store_id: effectiveStoreId,
         category: operationalCategory,

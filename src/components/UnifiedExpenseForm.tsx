@@ -57,12 +57,13 @@ interface UnifiedExpenseFormProps {
   storeId: string | null;
 }
 
-type CategoryType = "uniformes" | "limpeza" | "apoio" | "utensilios" | "manutencao";
+type CategoryType = "uniformes" | "limpeza" | "apoio" | "utensilios" | "apoio_venda" | "manutencao";
 
 const CATEGORIES = [
   { value: "uniformes", label: "Uniformes", icon: Shirt, color: "text-purple-500" },
   { value: "limpeza", label: "Material de Limpeza", icon: SprayCanIcon, color: "text-cyan-500" },
   { value: "utensilios", label: "Utensílios", icon: Wrench, color: "text-rose-500" },
+  { value: "apoio_venda", label: "Apoio à Venda", icon: ShoppingBag, color: "text-emerald-500" },
   { value: "apoio", label: "Apoio/Outros", icon: HelpCircle, color: "text-gray-500" },
   { value: "manutencao", label: "Manutenção", icon: Wrench, color: "text-orange-500" },
 ] as const;

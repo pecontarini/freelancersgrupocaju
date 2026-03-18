@@ -8,6 +8,7 @@ import {
   SprayCanIcon,
   Wrench,
   HelpCircle,
+  ShoppingBag,
   Upload,
   X,
   Camera,

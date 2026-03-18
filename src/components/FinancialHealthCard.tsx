@@ -102,6 +102,7 @@ export function FinancialHealthCard({
     const uniformsBudget = budget?.uniforms_budget || 0;
     const cleaningBudget = budget?.cleaning_budget || 0;
     const utensilsBudget = budget?.utensils_budget || 0;
+    const apoioVendaBudget = budget?.apoio_venda_budget || 0;
     const totalBudget = budget?.total_budget || 0;
     
     const mkStats = (spent: number, bgt: number): CategoryStats => ({
@@ -117,6 +118,7 @@ export function FinancialHealthCard({
     const uniformsStats = mkStats(operationalTotals.uniformes, uniformsBudget);
     const cleaningStats = mkStats(operationalTotals.limpeza, cleaningBudget);
     const utensilsStats = mkStats(operationalTotals.utensilios, utensilsBudget);
+    const apoioVendaStats = mkStats(operationalTotals.apoio_venda, apoioVendaBudget);
     const totalStats = mkStats(totalSpent, totalBudget);
 
     const dailyAverage = daysElapsed > 0 ? totalSpent / daysElapsed : 0;

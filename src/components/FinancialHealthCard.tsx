@@ -496,6 +496,7 @@ export function FinancialHealthCard({
             drillDownCategory === "maintenance" ? stats.maintenance.budget :
             drillDownCategory === "uniforms" ? stats.uniforms.budget :
             drillDownCategory === "cleaning" ? stats.cleaning.budget :
+            drillDownCategory === "apoio_venda" ? stats.apoioVenda.budget :
             stats.utensils.budget
           }
         />

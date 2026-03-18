@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth, subMonths, addMonths, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed, ChevronRight, ChevronLeft } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2, Target, Wallet, Users, Wrench, Shirt, SprayCanIcon, UtensilsCrossed, ShoppingBag, ChevronRight, ChevronLeft } from "lucide-react";
 import { BudgetDrillDownDialog, BudgetCategory } from "@/components/dashboard/BudgetDrillDownDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -89,9 +89,9 @@ export function FinancialHealthCard({
 
     const operationalTotals = effectiveStoreId 
       ? getTotalsForStoreMonth(effectiveStoreId, selectedMonthYear)
-      : { uniformes: 0, limpeza: 0, utensilios: 0, total: 0 };
+      : { uniformes: 0, limpeza: 0, utensilios: 0, apoio_venda: 0, total: 0 };
 
-    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios;
+    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
 
     const budget = effectiveStoreId 
       ? getBudgetForStoreMonth(effectiveStoreId, selectedMonthYear)
@@ -102,6 +102,7 @@ export function FinancialHealthCard({
     const uniformsBudget = budget?.uniforms_budget || 0;
     const cleaningBudget = budget?.cleaning_budget || 0;
     const utensilsBudget = budget?.utensils_budget || 0;
+    const apoioVendaBudget = budget?.apoio_venda_budget || 0;
     const totalBudget = budget?.total_budget || 0;
     
     const mkStats = (spent: number, bgt: number): CategoryStats => ({
@@ -117,6 +118,7 @@ export function FinancialHealthCard({
     const uniformsStats = mkStats(operationalTotals.uniformes, uniformsBudget);
     const cleaningStats = mkStats(operationalTotals.limpeza, cleaningBudget);
     const utensilsStats = mkStats(operationalTotals.utensilios, utensilsBudget);
+    const apoioVendaStats = mkStats(operationalTotals.apoio_venda, apoioVendaBudget);
     const totalStats = mkStats(totalSpent, totalBudget);
 
     const dailyAverage = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
@@ -132,6 +134,7 @@ export function FinancialHealthCard({
       uniforms: uniformsStats,
       cleaning: cleaningStats,
       utensils: utensilsStats,
+      apoioVenda: apoioVendaStats,
       total: totalStats,
       dailyAverage,
       projectedTotal,
@@ -304,6 +307,13 @@ export function FinancialHealthCard({
             stats={stats.utensils} 
             onClick={() => setDrillDownCategory("utensils")}
           />
+          <CategoryProgressBar 
+            label="Apoio à Venda" 
+            icon={ShoppingBag} 
+            iconColor="text-emerald-500" 
+            stats={stats.apoioVenda} 
+            onClick={() => setDrillDownCategory("apoio_venda")}
+          />
           <div className="pt-2 border-t">
             <CategoryProgressBar 
               label="Total Geral" 
@@ -378,6 +388,19 @@ export function FinancialHealthCard({
               stats.utensils.remaining >= 0 ? "text-rose-600" : "text-destructive"
             )}>
               {stats.utensils.hasBudget ? formatCurrency(stats.utensils.remaining) : "N/A"}
+            </p>
+          </div>
+
+          <div className="space-y-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 p-2">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <ShoppingBag className="h-3 w-3 text-emerald-500" />
+              Saldo Apoio à Venda
+            </p>
+            <p className={cn(
+              "text-sm font-bold",
+              stats.apoioVenda.remaining >= 0 ? "text-emerald-600" : "text-destructive"
+            )}>
+              {stats.apoioVenda.hasBudget ? formatCurrency(stats.apoioVenda.remaining) : "N/A"}
             </p>
           </div>
         </div>
@@ -473,6 +496,7 @@ export function FinancialHealthCard({
             drillDownCategory === "maintenance" ? stats.maintenance.budget :
             drillDownCategory === "uniforms" ? stats.uniforms.budget :
             drillDownCategory === "cleaning" ? stats.cleaning.budget :
+            drillDownCategory === "apoio_venda" ? stats.apoioVenda.budget :
             stats.utensils.budget
           }
         />

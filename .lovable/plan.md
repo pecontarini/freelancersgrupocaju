@@ -1,59 +1,49 @@
 
 
-# Aplicar Liquid Glass ao Aplicativo Real
+# Plano: Adicionar "Apoio à Venda" ao Card de Saúde Financeira e Formulário Unificado
 
-## Por que não apareceu no app?
+## Diagnóstico
 
-O simulador é uma página isolada (`/liquid-glass-simulator`) com seu próprio background escuro e componentes glass. O portal real (`/`) usa o design system padrão (Tailwind CSS variables, `bg-background`, `bg-card`, etc.) — são dois mundos separados. Para o glass funcionar, ele precisa de um fundo com cores/profundidade por trás dos elementos translúcidos.
+A categoria "Apoio à Venda" já existe no banco de dados (`store_budgets.apoio_venda_budget`), no hook `useOperationalExpenses` (category `apoio_venda`), no `BudgetDrillDownDialog`, e no `OperationalExpenseForm`. Porém, está ausente em dois lugares críticos:
 
-## Estratégia: Glass Theme no Portal Real
+1. **FinancialHealthCard** -- não calcula, não exibe barra de progresso, nem saldo para "Apoio à Venda"
+2. **UnifiedExpenseForm** -- tem apenas `"apoio"` (Apoio/Outros), falta `"apoio_venda"` como opção separada
 
-Aplicar os efeitos glass **na interface real** sem quebrar o layout existente. O fundo permanece com as cores do tema (claro/escuro), mas os componentes ganham o tratamento glass.
+## Mudanças
 
-### Mudanças Planejadas
+### 1. `src/components/FinancialHealthCard.tsx`
 
-**1. Background Sutil com Orbs (Index.tsx)**
-- Adicionar uma versão suave dos orbs animados como fundo do app principal
-- No tema claro: orbs com opacidade muito baixa (~0.08) em tons coral/gray
-- No tema escuro: orbs mais visíveis (~0.25) em tons purple/blue
-- Componente `AppGlassBackground` que respeita o tema atual
+- Importar ícone `ShoppingBag` de lucide-react
+- No `useMemo` de `stats`:
+  - Extrair `apoioVenda` do `operationalTotals` (já retornado pelo hook como `.apoio` -- **nota**: o hook `getTotalsForStoreMonth` não calcula `apoio_venda` separadamente, apenas `apoio`. Precisa ajustar o hook primeiro)
+  - Pegar `apoioVendaBudget` do budget (`budget?.apoio_venda_budget || 0`)
+  - Criar `apoioVendaStats` via `mkStats`
+  - Somar `apoioVenda` no `totalSpent`
+  - Somar `apoioVendaBudget` no `totalBudget`
+- Adicionar `CategoryProgressBar` para "Apoio à Venda" (ícone ShoppingBag, cor green-500, drill-down `"apoio_venda"`)
+- Adicionar card de saldo "Saldo Apoio à Venda" no grid (bg-green-50)
+- Atualizar a lógica do `budgetAmount` no `BudgetDrillDownDialog` para incluir o caso `apoio_venda`
 
-**2. Sidebar Glass (AppSidebar.tsx)**
-- Aplicar `backdrop-filter: blur(20px)` e fundo semi-transparente na sidebar
-- Menu items ativos com "glass pill" highlight (como no simulador)
-- Bordas sutis com gradiente de opacidade (mais claro no topo)
+### 2. `src/hooks/useOperationalExpenses.ts`
 
-**3. Cards Glass (CSS + componentes)**
-- Substituir a classe `.glass-card` existente por propriedades glass reais
-- Cards com `backdrop-filter: blur(16px)`, bordas semi-transparentes
-- Hover lift com shadow aumentado
-- Aplicar nos cards de KPI, FinancialHealthCard, SummaryCard
+- No `getTotalsForStoreMonth`, adicionar cálculo de `apoio_venda`:
+  ```typescript
+  const apoio_venda = filtered
+    .filter((e) => e.category === "apoio_venda")
+    .reduce((sum, e) => sum + e.valor, 0);
+  ```
+- Retornar `apoio_venda` no objeto e somá-lo ao `total`
 
-**4. Header Glass (PortalHeader.tsx)**
-- Header com blur e transparência, estilo floating nav do simulador
-- Borda inferior sutil com gradiente
+### 3. `src/components/UnifiedExpenseForm.tsx`
 
-**5. Bottom Navigation Glass (BottomNavigation.tsx - mobile)**
-- Barra inferior com glass blur
-- Ícone ativo com glow sutil na cor de destaque
+- Adicionar `"apoio_venda"` ao `CategoryType`
+- Adicionar entrada `{ value: "apoio_venda", label: "Apoio à Venda", icon: ShoppingBag, color: "text-green-500" }` ao array `CATEGORIES`
 
-**6. Novo componente: AppGlassBackground**
-- Versão mais sutil do `LiquidBackground` que funciona com ambos os temas
-- Orbs menores, mais transparentes, cores que combinam com o tema coral/terracotta
+## Arquivos editados
 
-### Arquivos a Criar/Editar
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/layout/AppGlassBackground.tsx` | Criar — background sutil com orbs |
-| `src/index.css` | Editar — atualizar `.glass-card`, adicionar utilitários glass |
-| `src/pages/Index.tsx` | Editar — adicionar AppGlassBackground |
-| `src/components/layout/AppSidebar.tsx` | Editar — aplicar glass na sidebar |
-| `src/components/layout/BottomNavigation.tsx` | Editar — glass na barra mobile |
-| `src/components/layout/PortalHeader.tsx` | Editar — header com blur |
-| `src/components/SummaryCard.tsx` | Editar — glass no card principal |
-| `src/components/ui/card.tsx` | Editar — variante glass opcional |
-
-### Resultado Esperado
-O app inteiro terá a sensação de "vidro líquido" — sidebar, cards, header e navegação com blur e transparência — mantendo as cores da marca, a legibilidade e a funcionalidade existente intactas.
+| Arquivo | Mudança |
+|---------|---------|
+| `src/hooks/useOperationalExpenses.ts` | Calcular `apoio_venda` separadamente no `getTotalsForStoreMonth` |
+| `src/components/FinancialHealthCard.tsx` | Adicionar barra de progresso, saldo e drill-down para "Apoio à Venda" |
+| `src/components/UnifiedExpenseForm.tsx` | Adicionar categoria "Apoio à Venda" ao formulário |
 

@@ -38,6 +38,8 @@ export default function FreelancerCheckin() {
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regPhotoBase64, setRegPhotoBase64] = useState<string | null>(null);
+  const [regTipoChavePix, setRegTipoChavePix] = useState("");
+  const [regChavePix, setRegChavePix] = useState("");
 
   // Selfie capture
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);

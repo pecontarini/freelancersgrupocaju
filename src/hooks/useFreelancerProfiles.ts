@@ -7,6 +7,8 @@ export interface FreelancerProfile {
   nome_completo: string;
   telefone: string | null;
   foto_url: string | null;
+  tipo_chave_pix: string | null;
+  chave_pix: string | null;
   created_at: string;
 }
 
@@ -24,7 +26,14 @@ export function useFreelancerProfiles() {
   };
 
   const createProfile = useMutation({
-    mutationFn: async (profile: { cpf: string; nome_completo: string; telefone?: string; foto_url?: string }) => {
+    mutationFn: async (profile: {
+      cpf: string;
+      nome_completo: string;
+      telefone?: string;
+      foto_url?: string;
+      tipo_chave_pix?: string;
+      chave_pix?: string;
+    }) => {
       const { data, error } = await supabase
         .from("freelancer_profiles")
         .insert(profile)

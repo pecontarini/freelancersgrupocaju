@@ -412,6 +412,11 @@ export default function FreelancerCheckin() {
                   <p className="font-medium text-foreground">{profile.nome_completo}</p>
                   <p className="text-sm text-muted-foreground">{cpf}</p>
                   {profile.telefone && <p className="text-sm text-muted-foreground">{profile.telefone}</p>}
+                  {profile.chave_pix && (
+                    <p className="text-sm text-muted-foreground">
+                      Pix ({profile.tipo_chave_pix}): {profile.chave_pix}
+                    </p>
+                  )}
                 </div>
               </div>
 

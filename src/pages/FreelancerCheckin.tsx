@@ -58,6 +58,7 @@ export default function FreelancerCheckin() {
 
   const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
   const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
+  const { lookupFreelancerByCpf } = useCpfLookup();
 
   // Load unit name
   useEffect(() => {

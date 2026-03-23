@@ -71,6 +71,8 @@ export function FinancialHealthCard({
     return null;
   }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
 
+  const { total: checkinBudgetTotal } = useCheckinBudgetEntries(effectiveStoreId, selectedMonthYear);
+
   const stats = useMemo(() => {
     const currentMonthFreelancerEntries = freelancerEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_pop);

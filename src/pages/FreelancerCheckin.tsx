@@ -167,6 +167,12 @@ export default function FreelancerCheckin() {
         }
         setStep("confirm");
       } else {
+        // No profile yet — try to pre-fill from freelancer_entries (budget history)
+        const legacy = await lookupFreelancerByCpf(cpf);
+        if (legacy) {
+          setRegName(legacy.nome_completo);
+          setRegChavePix(legacy.chave_pix || "");
+        }
         setStep("register");
       }
     } catch (err: any) {

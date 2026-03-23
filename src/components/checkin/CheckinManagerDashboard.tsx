@@ -94,11 +94,11 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
                 />
               ))}
 
-              {pendingCount > 0 && (
+              {readyToSign.length > 0 && (
                 <CheckinBatchApproval
                   lojaId={selectedUnidadeId || ""}
                   date={selectedDate}
-                  checkins={checkins.filter((c) => c.status === "completed")}
+                  checkins={readyToSign}
                   userId={user?.id || ""}
                 />
               )}

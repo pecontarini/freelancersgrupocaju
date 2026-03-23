@@ -21,6 +21,7 @@ import { RedeTab } from "@/components/dashboard/RedeTab";
 import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
+import { CheckinManagerDashboard } from "@/components/checkin";
 
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";

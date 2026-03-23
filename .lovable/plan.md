@@ -1,29 +1,17 @@
 
 
-# Diagnóstico: Página de Check-in via QR Code
+# Correção: Página /checkin retornando 404 na URL publicada
 
-## Status Atual
+## Diagnóstico
 
-A página `/checkin?unidade=UUID` **já está completa e funcional**. Todos os componentes necessários existem:
+A rota `/checkin` **existe no código** (App.tsx linha 46) e o componente `FreelancerCheckin.tsx` está corretamente importado. O 404 ocorre na **URL publicada** porque a versão publicada está desatualizada — as mudanças recentes (adição da rota `/checkin`, página de cadastro, hooks) ainda não foram publicadas.
 
-### Fluxo implementado
-1. **CPF** — input com formatação automática
-2. **Cadastro** (novo) — nome, telefone, foto de perfil obrigatória (câmera), tipo de chave Pix e chave Pix obrigatórios
-3. **Confirmação** (existente) — exibe dados + foto cadastrada, detecta check-in aberto para auto-checkout
-4. **Selfie** — captura obrigatória via câmera frontal
-5. **Valor** — freelancer informa valor esperado (R$)
-6. **Check-in/Check-out** — registro salvo com selfie, geolocalização e valor
+## Solução
 
-### Infraestrutura verificada
-- **RLS**: `anon` pode SELECT e INSERT em `freelancer_profiles` e `freelancer_checkins`
-- **Edge Function** `checkin-upload-photo`: aceita base64, faz upload com `service_role`, retorna URL pública
-- **Storage bucket** `freelancer-checkin-photos`: configurado
-- **Unique index**: `(freelancer_id, loja_id, checkin_date)` impede duplicatas
-- **Generated column** `checkin_date`: auto-calculada a partir de `checkin_at`
-- **Rota pública**: `/checkin` sem `ProtectedRoute` no `App.tsx`
-- **QR Code Generator**: disponível no painel admin, gera URL `{PRODUCTION_URL}/checkin?unidade={ID}`
+1. **Republicar o projeto** — clicar em "Share" → "Publish" no painel do Lovable para que a versão publicada inclua a rota `/checkin`
+2. **Testar no preview primeiro** — acessar `https://id-preview--53a5f1f8-d20a-49fd-8c28-c4cc96d363e7.lovable.app/checkin?unidade=ID_DA_UNIDADE` para confirmar que funciona antes de publicar
 
-## Conclusão
+## Nenhuma mudança de código necessária
 
-**Não há implementação pendente.** O sistema está pronto para uso. Recomendo testar o fluxo completo em um celular real escaneando o QR Code gerado pelo painel.
+O código está completo e funcional. O problema é exclusivamente de deploy.
 

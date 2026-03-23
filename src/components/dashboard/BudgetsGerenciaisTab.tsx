@@ -50,6 +50,7 @@ import { MaintenanceReportModal } from "@/components/maintenance/MaintenanceRepo
 import { InlineBudgetEditor } from "@/components/InlineBudgetEditor";
 import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
+import { useCheckinBudgetEntries, CheckinBudgetEntry } from "@/hooks/useCheckinBudgetEntries";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];

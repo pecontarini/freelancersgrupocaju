@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  ScanFace,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -85,6 +86,12 @@ const menuItems = [
     id: "escalas",
     icon: CalendarClock,
     description: "Matriz de efetivo mínimo",
+  },
+  {
+    title: "PRESENÇA FREELANCERS",
+    id: "presenca",
+    icon: ScanFace,
+    description: "Check-in/check-out via QR",
   },
 ];
 

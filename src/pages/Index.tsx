@@ -21,6 +21,7 @@ import { RedeTab } from "@/components/dashboard/RedeTab";
 import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
+import { CheckinManagerDashboard } from "@/components/checkin";
 
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
@@ -52,6 +53,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   cmv: {
     title: "CMV (Unitários)",
     subtitle: "Controle de insumos e estoque",
+  },
+  presenca: {
+    title: "Presença Freelancers",
+    subtitle: "Check-in/check-out e validação de presença",
   },
   configuracoes: {
     title: "Configurações",
@@ -227,6 +232,8 @@ const Index = () => {
         return <CMVTab />;
       case "escalas":
         return <EscalasTab />;
+      case "presenca":
+        return <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

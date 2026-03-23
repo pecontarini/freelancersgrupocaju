@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import ConfirmShift from "./pages/ConfirmShift";
 import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
+import FreelancerCheckin from "./pages/FreelancerCheckin";
 import NotFound from "./pages/NotFound";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
@@ -42,6 +43,7 @@ function App() {
                   path="/checklist-corrections/:responseId/:accessToken"
                   element={<ChecklistCorrections />}
                 />
+                <Route path="/checkin" element={<FreelancerCheckin />} />
                 <Route
                   path="/"
                   element={

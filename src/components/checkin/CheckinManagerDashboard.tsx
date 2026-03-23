@@ -22,7 +22,7 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
   const { checkins, isLoading, approvePresence, rejectPresence, approveValue } = useFreelancerCheckins(
-    unidadeId || undefined,
+    selectedUnidadeId || undefined,
     selectedDate
   );
 

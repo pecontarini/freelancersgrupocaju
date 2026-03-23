@@ -92,7 +92,7 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
 
               {pendingCount > 0 && (
                 <CheckinBatchApproval
-                  lojaId={unidadeId || ""}
+                  lojaId={selectedUnidadeId || ""}
                   date={selectedDate}
                   checkins={checkins.filter((c) => c.status === "completed")}
                   userId={user?.id || ""}

@@ -232,6 +232,8 @@ const Index = () => {
         return <CMVTab />;
       case "escalas":
         return <EscalasTab />;
+      case "presenca":
+        return <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

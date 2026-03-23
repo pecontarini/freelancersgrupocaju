@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useFreelancerProfiles, FreelancerProfile } from "@/hooks/useFreelancerProfiles";
 import { useFreelancerCheckins } from "@/hooks/useFreelancerCheckins";
+import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -57,6 +58,7 @@ export default function FreelancerCheckin() {
 
   const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
   const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
+  const { lookupFreelancerByCpf } = useCpfLookup();
 
   // Load unit name
   useEffect(() => {
@@ -165,6 +167,12 @@ export default function FreelancerCheckin() {
         }
         setStep("confirm");
       } else {
+        // No profile yet — try to pre-fill from freelancer_entries (budget history)
+        const legacy = await lookupFreelancerByCpf(cpf);
+        if (legacy) {
+          setRegName(legacy.nome_completo);
+          setRegChavePix(legacy.chave_pix || "");
+        }
         setStep("register");
       }
     } catch (err: any) {

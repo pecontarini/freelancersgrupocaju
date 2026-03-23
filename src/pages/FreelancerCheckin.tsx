@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useFreelancerProfiles, FreelancerProfile } from "@/hooks/useFreelancerProfiles";
 import { useFreelancerCheckins } from "@/hooks/useFreelancerCheckins";
+import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 

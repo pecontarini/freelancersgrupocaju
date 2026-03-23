@@ -87,6 +87,12 @@ const menuItems = [
     icon: CalendarClock,
     description: "Matriz de efetivo mínimo",
   },
+  {
+    title: "PRESENÇA FREELANCERS",
+    id: "presenca",
+    icon: ScanFace,
+    description: "Check-in/check-out via QR",
+  },
 ];
 
 const adminMenuItems = [

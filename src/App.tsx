@@ -43,6 +43,7 @@ function App() {
                   path="/checklist-corrections/:responseId/:accessToken"
                   element={<ChecklistCorrections />}
                 />
+                <Route path="/checkin" element={<FreelancerCheckin />} />
                 <Route
                   path="/"
                   element={

@@ -10,6 +10,7 @@ import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
+import { useCheckinBudgetEntries } from "@/hooks/useCheckinBudgetEntries";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";
@@ -42,6 +43,7 @@ export function FinancialHealthCard({
   const { getBudgetForStoreMonth, isLoading } = useStoreBudgets();
   const { expenses: allOperationalExpenses, getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
   const opExpenses = operationalExpensesProp ?? allOperationalExpenses;
+  
   const { options: lojas } = useConfigLojas();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 
@@ -69,6 +71,8 @@ export function FinancialHealthCard({
     return null;
   }, [selectedUnidadeId, isGerenteUnidade, isAdmin, unidades]);
 
+  const { total: checkinBudgetTotal } = useCheckinBudgetEntries(effectiveStoreId, selectedMonthYear);
+
   const stats = useMemo(() => {
     const currentMonthFreelancerEntries = freelancerEntries.filter((entry) => {
       const entryDate = parseDateString(entry.data_pop);
@@ -85,13 +89,15 @@ export function FinancialHealthCard({
     });
 
     const freelancerTotal = currentMonthFreelancerEntries.reduce((sum, e) => sum + e.valor, 0);
+    const checkinPresenceTotal = checkinBudgetTotal;
+    const combinedFreelancerTotal = freelancerTotal + checkinPresenceTotal;
     const maintenanceTotal = currentMonthMaintenanceEntries.reduce((sum, e) => sum + e.valor, 0);
 
     const operationalTotals = effectiveStoreId 
       ? getTotalsForStoreMonth(effectiveStoreId, selectedMonthYear)
       : { uniformes: 0, limpeza: 0, utensilios: 0, apoio_venda: 0, total: 0 };
 
-    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
+    const totalSpent = combinedFreelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
 
     const budget = effectiveStoreId 
       ? getBudgetForStoreMonth(effectiveStoreId, selectedMonthYear)
@@ -113,7 +119,7 @@ export function FinancialHealthCard({
       hasBudget: bgt > 0,
     });
 
-    const freelancerStats = mkStats(freelancerTotal, freelancerBudget);
+    const freelancerStats = mkStats(combinedFreelancerTotal, freelancerBudget);
     const maintenanceStats = mkStats(maintenanceTotal, maintenanceBudget);
     const uniformsStats = mkStats(operationalTotals.uniformes, uniformsBudget);
     const cleaningStats = mkStats(operationalTotals.limpeza, cleaningBudget);

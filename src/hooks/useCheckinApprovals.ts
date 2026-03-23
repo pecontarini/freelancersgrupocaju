@@ -26,9 +26,16 @@ export function useCheckinApprovals() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      // Promote approved checkins to budget entries
+      try {
+        await supabase.rpc("promote_approved_checkins", { p_approval_id: data.id });
+      } catch (err) {
+        console.error("Error promoting checkins to budget:", err);
+      }
       queryClient.invalidateQueries({ queryKey: ["freelancer-checkins"] });
       queryClient.invalidateQueries({ queryKey: ["checkin-approvals"] });
+      queryClient.invalidateQueries({ queryKey: ["checkin-budget-entries"] });
     },
   });
 

@@ -50,6 +50,7 @@ import { MaintenanceReportModal } from "@/components/maintenance/MaintenanceRepo
 import { InlineBudgetEditor } from "@/components/InlineBudgetEditor";
 import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
+import { useCheckinBudgetEntries, CheckinBudgetEntry } from "@/hooks/useCheckinBudgetEntries";
 
 interface BudgetsGerenciaisTabProps {
   freelancerEntries: FreelancerEntry[];
@@ -85,6 +86,17 @@ export function BudgetsGerenciaisTab({
 
   // Effective store ID from filters or prop
   const effectiveStoreId = filters.lojaId || selectedUnidadeId;
+
+  // Checkin budget entries (presence-based freelancer costs)
+  const effectiveMonthYearForCheckin = useMemo(() => {
+    if (filters.dateStart) return format(filters.dateStart, "yyyy-MM");
+    return getCurrentMonthYear();
+  }, [filters.dateStart, getCurrentMonthYear]);
+
+  const { entries: checkinBudgetEntries, total: checkinBudgetTotal } = useCheckinBudgetEntries(
+    effectiveStoreId,
+    effectiveMonthYearForCheckin
+  );
 
   // Derive month_year from the effective date range filter
   const effectiveMonthYear = useMemo(() => {
@@ -198,7 +210,7 @@ export function BudgetsGerenciaisTab({
   const filteredFreelancerTotal = filteredFreelancers.reduce((sum, e) => sum + e.valor, 0);
   const filteredMaintenanceTotal = filteredMaintenance.reduce((sum, e) => sum + e.valor, 0);
   const filteredExpenseTotal = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
-  const filteredTotal = filteredFreelancerTotal + filteredMaintenanceTotal + filteredExpenseTotal;
+  const filteredTotal = filteredFreelancerTotal + filteredMaintenanceTotal + filteredExpenseTotal + checkinBudgetTotal;
 
   // Calculate month totals (using the effective month from filter)
   const monthFreelancerTotal = filteredFreelancers
@@ -340,10 +352,11 @@ export function BudgetsGerenciaisTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(filteredFreelancerTotal)}
+              {formatCurrency(filteredFreelancerTotal + checkinBudgetTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {filteredFreelancers.length} lançamento(s)
+              {filteredFreelancers.length} lançamento(s) manual(is)
+              {checkinBudgetEntries.length > 0 && ` + ${checkinBudgetEntries.length} via check-in`}
             </p>
           </CardContent>
         </Card>

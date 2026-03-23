@@ -474,6 +474,82 @@ export type Database = {
           },
         ]
       }
+      checkin_budget_entries: {
+        Row: {
+          approval_id: string | null
+          chave_pix: string | null
+          checkin_at: string
+          checkin_id: string
+          checkout_at: string | null
+          cpf: string
+          created_at: string
+          data_servico: string
+          freelancer_name: string
+          id: string
+          loja_id: string
+          signed_at: string
+          signed_by: string
+          tipo_chave_pix: string | null
+          valor: number
+        }
+        Insert: {
+          approval_id?: string | null
+          chave_pix?: string | null
+          checkin_at: string
+          checkin_id: string
+          checkout_at?: string | null
+          cpf: string
+          created_at?: string
+          data_servico: string
+          freelancer_name: string
+          id?: string
+          loja_id: string
+          signed_at?: string
+          signed_by: string
+          tipo_chave_pix?: string | null
+          valor: number
+        }
+        Update: {
+          approval_id?: string | null
+          chave_pix?: string | null
+          checkin_at?: string
+          checkin_id?: string
+          checkout_at?: string | null
+          cpf?: string
+          created_at?: string
+          data_servico?: string
+          freelancer_name?: string
+          id?: string
+          loja_id?: string
+          signed_at?: string
+          signed_by?: string
+          tipo_chave_pix?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_budget_entries_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_budget_entries_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: true
+            referencedRelation: "freelancer_checkins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_budget_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_corrections: {
         Row: {
           corrected_at: string
@@ -3037,6 +3113,10 @@ export type Database = {
       }
       is_first_user: { Args: never; Returns: boolean }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
+      promote_approved_checkins: {
+        Args: { p_approval_id: string }
+        Returns: number
+      }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }

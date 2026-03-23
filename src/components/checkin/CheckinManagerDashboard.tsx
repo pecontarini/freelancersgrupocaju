@@ -30,9 +30,9 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "completed" || (c.status !== "approved" && c.status !== "rejected")
   ).length;
 
-  const approvedCheckins = checkins.filter(
-    (c) => c.status === "approved" && c.valor_status === "approved"
-  );
+  const pendingValueCount = checkins.filter(
+    (c) => c.status === "approved" && c.valor_status !== "approved"
+  ).length;
 
   return (
     <div className="space-y-4 fade-in">
@@ -103,7 +103,12 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
-          <CheckinPaymentOrder checkins={approvedCheckins} date={selectedDate} unitName={""} />
+          <CheckinPaymentOrder
+            lojaId={selectedUnidadeId || ""}
+            date={selectedDate}
+            unitName={""}
+            pendingApprovalCount={pendingCount + pendingValueCount}
+          />
         </TabsContent>
 
         <TabsContent value="qrcode" className="mt-4">

@@ -43,6 +43,7 @@ export function FinancialHealthCard({
   const { getBudgetForStoreMonth, isLoading } = useStoreBudgets();
   const { expenses: allOperationalExpenses, getTotalsForStoreMonth, isLoading: isLoadingExpenses } = useOperationalExpenses();
   const opExpenses = operationalExpensesProp ?? allOperationalExpenses;
+  const { total: checkinBudgetTotal } = useCheckinBudgetEntries(effectiveStoreId, selectedMonthYear);
   const { options: lojas } = useConfigLojas();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
 

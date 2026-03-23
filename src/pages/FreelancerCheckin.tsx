@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Camera, CheckCircle, MapPin, DollarSign, User, Loader2, ArrowLeft } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,6 +24,15 @@ function formatCpf(value: string) {
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function FreelancerCheckin() {
   const [searchParams] = useSearchParams();
   const unidadeId = searchParams.get("unidade");
@@ -43,12 +52,10 @@ export default function FreelancerCheckin() {
   const [regTipoChavePix, setRegTipoChavePix] = useState("");
   const [regChavePix, setRegChavePix] = useState("");
 
-  // Selfie capture
+  // Selfie capture (native file input)
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [cameraActive, setCameraActive] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
+  const profilePhotoRef = useRef<HTMLInputElement>(null);
+  const selfieInputRef = useRef<HTMLInputElement>(null);
 
   // Geolocation
   const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
@@ -83,40 +90,21 @@ export default function FreelancerCheckin() {
     }
   }, []);
 
-  const startCamera = useCallback(async () => {
+  const handleFileCapture = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    setter: (val: string) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
-      setCameraActive(true);
+      const base64 = await readFileAsBase64(file);
+      setter(base64);
     } catch {
-      toast.error("Não foi possível acessar a câmera.");
+      toast.error("Erro ao ler a foto.");
     }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setCameraActive(false);
-  }, []);
-
-  const capturePhoto = useCallback((): string | null => {
-    if (!videoRef.current || !canvasRef.current) return null;
-    const canvas = canvasRef.current;
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    stopCamera();
-    return dataUrl;
-  }, [stopCamera]);
+    // Reset input so re-selecting same file triggers onChange
+    e.target.value = "";
+  };
 
   const uploadPhoto = async (base64: string, folder: string): Promise<string> => {
     const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
@@ -145,6 +133,17 @@ export default function FreelancerCheckin() {
       toast.error("Unidade não identificada no QR Code.");
       return;
     }
+
+    // Reset all state to avoid stale data
+    setRegName("");
+    setRegPhone("");
+    setRegPhotoBase64(null);
+    setRegTipoChavePix("");
+    setRegChavePix("");
+    setSelfieBase64(null);
+    setProfile(null);
+    setIsCheckout(false);
+    setOpenCheckinId(null);
 
     setIsLoading(true);
     try {
@@ -202,7 +201,6 @@ export default function FreelancerCheckin() {
       setProfile(newProfile);
       setIsCheckout(false);
       setStep("selfie");
-      startCamera();
     } catch (err: any) {
       toast.error("Erro ao cadastrar: " + err.message);
     } finally {
@@ -247,18 +245,14 @@ export default function FreelancerCheckin() {
     }
     
     setStep("selfie");
-    startCamera();
   };
 
-  const handleCaptureSelfie = () => {
-    const photo = capturePhoto();
-    if (photo) {
-      setSelfieBase64(photo);
-      if (isCheckout) {
-        handleFinishCheckout(photo);
-      } else {
-        setStep("value");
-      }
+  const handleSelfieCapture = async (base64: string) => {
+    setSelfieBase64(base64);
+    if (isCheckout) {
+      handleFinishCheckout(base64);
+    } else {
+      setStep("value");
     }
   };
 
@@ -310,11 +304,6 @@ export default function FreelancerCheckin() {
     }
   };
 
-  const handleRegPhotoCapture = () => {
-    const photo = capturePhoto();
-    if (photo) setRegPhotoBase64(photo);
-  };
-
   if (!unidadeId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -329,7 +318,33 @@ export default function FreelancerCheckin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary/5 to-background flex flex-col items-center p-4">
-      <canvas ref={canvasRef} className="hidden" />
+      {/* Hidden native file inputs for camera capture */}
+      <input
+        type="file"
+        accept="image/*"
+        capture="user"
+        hidden
+        ref={profilePhotoRef}
+        onChange={(e) => handleFileCapture(e, setRegPhotoBase64)}
+      />
+      <input
+        type="file"
+        accept="image/*"
+        capture="user"
+        hidden
+        ref={selfieInputRef}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            const base64 = await readFileAsBase64(file);
+            handleSelfieCapture(base64);
+          } catch {
+            toast.error("Erro ao ler a selfie.");
+          }
+          e.target.value = "";
+        }}
+      />
 
       <div className="w-full max-w-md space-y-4">
         {/* Header */}
@@ -407,32 +422,25 @@ export default function FreelancerCheckin() {
                 <Input value={regChavePix} onChange={(e) => setRegChavePix(e.target.value)} placeholder="Sua chave Pix" />
               </div>
 
-              {/* Profile photo */}
+              {/* Profile photo — native file capture */}
               <div className="space-y-2">
                 <Label>Foto de Perfil *</Label>
                 {regPhotoBase64 ? (
                   <div className="space-y-2">
                     <img src={regPhotoBase64} alt="Foto" className="w-32 h-32 object-cover rounded-full mx-auto border-2 border-primary" />
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => { setRegPhotoBase64(null); startCamera(); }}>
-                      Tirar outra foto
-                    </Button>
-                  </div>
-                ) : cameraActive ? (
-                  <div className="space-y-2">
-                    <video ref={videoRef} className="w-full rounded-lg" autoPlay playsInline muted />
-                    <Button onClick={handleRegPhotoCapture} className="w-full">
-                      <Camera className="h-4 w-4 mr-2" /> Capturar Foto
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => profilePhotoRef.current?.click()}>
+                      <Camera className="h-4 w-4 mr-2" /> Tirar outra foto
                     </Button>
                   </div>
                 ) : (
-                  <Button variant="outline" className="w-full" onClick={startCamera}>
-                    <Camera className="h-4 w-4 mr-2" /> Abrir Câmera
+                  <Button variant="outline" className="w-full" onClick={() => profilePhotoRef.current?.click()}>
+                    <Camera className="h-4 w-4 mr-2" /> Tirar Foto de Perfil
                   </Button>
                 )}
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { stopCamera(); setStep("cpf"); }}>
+                <Button variant="outline" onClick={() => setStep("cpf")}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Button onClick={handleRegister} disabled={isLoading} className="flex-1">
@@ -454,20 +462,18 @@ export default function FreelancerCheckin() {
                 {regPhotoBase64 ? (
                   <>
                     <img src={regPhotoBase64} alt="Foto" className="w-20 h-20 rounded-full object-cover border-2 border-primary" />
-                    <Button variant="ghost" size="sm" onClick={() => { setRegPhotoBase64(null); startCamera(); }}>
+                    <Button variant="ghost" size="sm" onClick={() => profilePhotoRef.current?.click()}>
                       <Camera className="h-3.5 w-3.5 mr-1" /> Trocar foto
                     </Button>
                   </>
-                ) : cameraActive ? (
-                  <div className="w-full space-y-2">
-                    <video ref={videoRef} className="w-full rounded-lg" autoPlay playsInline muted />
-                    <Button onClick={handleRegPhotoCapture} className="w-full" size="sm">
-                      <Camera className="h-4 w-4 mr-2" /> Capturar
-                    </Button>
-                  </div>
                 ) : (
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-8 w-8 text-primary" />
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-8 w-8 text-primary" />
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => profilePhotoRef.current?.click()}>
+                      <Camera className="h-3.5 w-3.5 mr-1" /> Adicionar foto
+                    </Button>
                   </div>
                 )}
               </div>
@@ -512,7 +518,7 @@ export default function FreelancerCheckin() {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { stopCamera(); setStep("cpf"); }}>
+                <Button variant="outline" onClick={() => setStep("cpf")}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Button onClick={handleConfirmProceed} disabled={isLoading} className="flex-1">
@@ -524,7 +530,7 @@ export default function FreelancerCheckin() {
           </Card>
         )}
 
-        {/* Step: Selfie */}
+        {/* Step: Selfie — native file capture */}
         {step === "selfie" && (
           <Card>
             <CardHeader>
@@ -537,21 +543,28 @@ export default function FreelancerCheckin() {
                 Tire uma selfie para confirmar sua {isCheckout ? "saída" : "presença"}.
               </p>
 
-              {selfieBase64 && !isCheckout ? (
+              {selfieBase64 ? (
                 <div className="space-y-2">
                   <img src={selfieBase64} alt="Selfie" className="w-full rounded-lg" />
-                  <Button variant="outline" className="w-full" onClick={() => { setSelfieBase64(null); startCamera(); }}>
-                    Tirar outra
+                  <Button variant="outline" className="w-full" onClick={() => { setSelfieBase64(null); selfieInputRef.current?.click(); }}>
+                    <Camera className="h-4 w-4 mr-2" /> Tirar outra
                   </Button>
                 </div>
               ) : (
-                <>
-                  <video ref={videoRef} className="w-full rounded-lg" autoPlay playsInline muted />
-                  <Button onClick={handleCaptureSelfie} disabled={!cameraActive || isLoading} className="w-full">
+                <div className="space-y-2">
+                  <div className="w-full aspect-[4/3] rounded-lg bg-muted flex flex-col items-center justify-center gap-3">
+                    <Camera className="h-12 w-12 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Toque no botão abaixo para abrir a câmera</p>
+                  </div>
+                  <Button
+                    onClick={() => selfieInputRef.current?.click()}
+                    disabled={isLoading}
+                    className="w-full"
+                  >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Camera className="h-4 w-4 mr-2" />}
-                    {isCheckout ? "Capturar e Registrar Saída" : "Capturar Selfie"}
+                    {isCheckout ? "Tirar Selfie e Registrar Saída" : "Tirar Selfie"}
                   </Button>
-                </>
+                </div>
               )}
 
               {geo && (
@@ -586,7 +599,7 @@ export default function FreelancerCheckin() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { setStep("selfie"); startCamera(); setSelfieBase64(null); }}>
+                <Button variant="outline" onClick={() => { setStep("selfie"); setSelfieBase64(null); }}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <Button onClick={handleFinishCheckin} disabled={isLoading} className="flex-1">

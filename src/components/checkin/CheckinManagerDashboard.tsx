@@ -34,6 +34,10 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "approved" && c.valor_status !== "approved"
   ).length;
 
+  const readyToSign = checkins.filter(
+    (c) => c.status === "approved" && c.valor_status === "approved"
+  );
+
   return (
     <div className="space-y-4 fade-in">
       <Tabs defaultValue="presenca" className="w-full">

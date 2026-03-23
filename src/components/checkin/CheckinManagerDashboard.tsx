@@ -13,8 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { CalendarClock, QrCode, FileText } from "lucide-react";
 
-export function CheckinManagerDashboard() {
-  const { unidadeId } = useUnidade();
+interface Props {
+  selectedUnidadeId: string | null;
+}
+
+export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
 

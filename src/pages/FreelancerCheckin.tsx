@@ -339,6 +339,25 @@ export default function FreelancerCheckin() {
                 <Input value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
               </div>
 
+              <div className="space-y-2">
+                <Label>Tipo de Chave Pix *</Label>
+                <Select value={regTipoChavePix} onValueChange={setRegTipoChavePix}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpf">CPF</SelectItem>
+                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="telefone">Telefone</SelectItem>
+                    <SelectItem value="aleatoria">Chave Aleatória</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Chave Pix *</Label>
+                <Input value={regChavePix} onChange={(e) => setRegChavePix(e.target.value)} placeholder="Sua chave Pix" />
+              </div>
+
               {/* Profile photo */}
               <div className="space-y-2">
                 <Label>Foto de Perfil *</Label>

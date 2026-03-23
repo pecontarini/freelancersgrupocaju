@@ -1537,28 +1537,34 @@ export type Database = {
       }
       freelancer_profiles: {
         Row: {
+          chave_pix: string | null
           cpf: string
           created_at: string
           foto_url: string | null
           id: string
           nome_completo: string
           telefone: string | null
+          tipo_chave_pix: string | null
         }
         Insert: {
+          chave_pix?: string | null
           cpf: string
           created_at?: string
           foto_url?: string | null
           id?: string
           nome_completo: string
           telefone?: string | null
+          tipo_chave_pix?: string | null
         }
         Update: {
+          chave_pix?: string | null
           cpf?: string
           created_at?: string
           foto_url?: string | null
           id?: string
           nome_completo?: string
           telefone?: string | null
+          tipo_chave_pix?: string | null
         }
         Relationships: []
       }

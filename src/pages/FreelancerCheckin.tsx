@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Camera, CheckCircle, MapPin, DollarSign, User, Loader2, ArrowLeft } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,8 @@ export default function FreelancerCheckin() {
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regPhotoBase64, setRegPhotoBase64] = useState<string | null>(null);
+  const [regTipoChavePix, setRegTipoChavePix] = useState("");
+  const [regChavePix, setRegChavePix] = useState("");
 
   // Selfie capture
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
@@ -168,6 +171,8 @@ export default function FreelancerCheckin() {
   const handleRegister = async () => {
     if (!regName.trim()) { toast.error("Nome é obrigatório."); return; }
     if (!regPhotoBase64) { toast.error("Foto de perfil é obrigatória."); return; }
+    if (!regTipoChavePix) { toast.error("Tipo de chave Pix é obrigatório."); return; }
+    if (!regChavePix.trim()) { toast.error("Chave Pix é obrigatória."); return; }
 
     setIsLoading(true);
     try {
@@ -177,6 +182,8 @@ export default function FreelancerCheckin() {
         nome_completo: regName.trim(),
         telefone: regPhone.trim() || undefined,
         foto_url: fotoUrl,
+        tipo_chave_pix: regTipoChavePix,
+        chave_pix: regChavePix.trim(),
       });
       setProfile(newProfile);
       setIsCheckout(false);
@@ -332,6 +339,25 @@ export default function FreelancerCheckin() {
                 <Input value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
               </div>
 
+              <div className="space-y-2">
+                <Label>Tipo de Chave Pix *</Label>
+                <Select value={regTipoChavePix} onValueChange={setRegTipoChavePix}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpf">CPF</SelectItem>
+                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="telefone">Telefone</SelectItem>
+                    <SelectItem value="aleatoria">Chave Aleatória</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Chave Pix *</Label>
+                <Input value={regChavePix} onChange={(e) => setRegChavePix(e.target.value)} placeholder="Sua chave Pix" />
+              </div>
+
               {/* Profile photo */}
               <div className="space-y-2">
                 <Label>Foto de Perfil *</Label>
@@ -386,6 +412,11 @@ export default function FreelancerCheckin() {
                   <p className="font-medium text-foreground">{profile.nome_completo}</p>
                   <p className="text-sm text-muted-foreground">{cpf}</p>
                   {profile.telefone && <p className="text-sm text-muted-foreground">{profile.telefone}</p>}
+                  {profile.chave_pix && (
+                    <p className="text-sm text-muted-foreground">
+                      Pix ({profile.tipo_chave_pix}): {profile.chave_pix}
+                    </p>
+                  )}
                 </div>
               </div>
 

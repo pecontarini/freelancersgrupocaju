@@ -433,6 +433,47 @@ export type Database = {
         }
         Relationships: []
       }
+      checkin_approvals: {
+        Row: {
+          approval_date: string
+          approved_at: string
+          approved_by: string
+          checkin_ids: string[]
+          created_at: string
+          id: string
+          loja_id: string
+          pin_hash: string | null
+        }
+        Insert: {
+          approval_date: string
+          approved_at?: string
+          approved_by: string
+          checkin_ids?: string[]
+          created_at?: string
+          id?: string
+          loja_id: string
+          pin_hash?: string | null
+        }
+        Update: {
+          approval_date?: string
+          approved_at?: string
+          approved_by?: string
+          checkin_ids?: string[]
+          created_at?: string
+          id?: string
+          loja_id?: string
+          pin_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_approvals_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_corrections: {
         Row: {
           corrected_at: string
@@ -1351,6 +1392,96 @@ export type Database = {
           },
         ]
       }
+      freelancer_checkins: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          checkin_at: string
+          checkin_date: string | null
+          checkin_lat: number | null
+          checkin_lng: number | null
+          checkin_selfie_url: string
+          checkout_at: string | null
+          checkout_lat: number | null
+          checkout_lng: number | null
+          checkout_selfie_url: string | null
+          created_at: string
+          freelancer_id: string
+          id: string
+          loja_id: string
+          rejection_reason: string | null
+          status: string
+          valor_approved_at: string | null
+          valor_approved_by: string | null
+          valor_aprovado: number | null
+          valor_informado: number | null
+          valor_status: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_at?: string
+          checkin_date?: string | null
+          checkin_lat?: number | null
+          checkin_lng?: number | null
+          checkin_selfie_url: string
+          checkout_at?: string | null
+          checkout_lat?: number | null
+          checkout_lng?: number | null
+          checkout_selfie_url?: string | null
+          created_at?: string
+          freelancer_id: string
+          id?: string
+          loja_id: string
+          rejection_reason?: string | null
+          status?: string
+          valor_approved_at?: string | null
+          valor_approved_by?: string | null
+          valor_aprovado?: number | null
+          valor_informado?: number | null
+          valor_status?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          checkin_at?: string
+          checkin_date?: string | null
+          checkin_lat?: number | null
+          checkin_lng?: number | null
+          checkin_selfie_url?: string
+          checkout_at?: string | null
+          checkout_lat?: number | null
+          checkout_lng?: number | null
+          checkout_selfie_url?: string | null
+          created_at?: string
+          freelancer_id?: string
+          id?: string
+          loja_id?: string
+          rejection_reason?: string | null
+          status?: string
+          valor_approved_at?: string | null
+          valor_approved_by?: string | null
+          valor_aprovado?: number | null
+          valor_informado?: number | null
+          valor_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freelancer_checkins_freelancer_id_fkey"
+            columns: ["freelancer_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freelancer_checkins_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freelancer_entries: {
         Row: {
           chave_pix: string
@@ -1403,6 +1534,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      freelancer_profiles: {
+        Row: {
+          cpf: string
+          created_at: string
+          foto_url: string | null
+          id: string
+          nome_completo: string
+          telefone: string | null
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          nome_completo: string
+          telefone?: string | null
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          foto_url?: string | null
+          id?: string
+          nome_completo?: string
+          telefone?: string | null
+        }
+        Relationships: []
       }
       inventory_transactions: {
         Row: {

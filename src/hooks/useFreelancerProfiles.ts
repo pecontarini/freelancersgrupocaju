@@ -45,5 +45,27 @@ export function useFreelancerProfiles() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["freelancer-profiles"] }),
   });
 
-  return { lookupByCpf, createProfile };
+  const updateProfile = useMutation({
+    mutationFn: async (params: {
+      id: string;
+      nome_completo?: string;
+      telefone?: string | null;
+      foto_url?: string | null;
+      tipo_chave_pix?: string | null;
+      chave_pix?: string | null;
+    }) => {
+      const { id, ...updates } = params;
+      const { data, error } = await supabase
+        .from("freelancer_profiles")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as FreelancerProfile;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["freelancer-profiles"] }),
+  });
+
+  return { lookupByCpf, createProfile, updateProfile };
 }

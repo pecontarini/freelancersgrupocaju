@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useUnidade } from "@/contexts/UnidadeContext";
 import { useFreelancerCheckins, FreelancerCheckin } from "@/hooks/useFreelancerCheckins";
 import { useAuth } from "@/contexts/AuthContext";
 import { CheckinApprovalCard } from "./CheckinApprovalCard";

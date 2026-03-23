@@ -490,13 +490,13 @@ export function BudgetsGerenciaisTab({
         />
       </div>
 
-      {/* Freelancers List - Shows filtered data */}
+      {/* Freelancers List - Shows filtered data + checkin entries */}
       <Card className="rounded-2xl shadow-card">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base uppercase">
             {hasActiveFilters 
-              ? `Freelancers Filtrados (${filteredFreelancers.length})` 
-              : "Freelancers Escalados Hoje"}
+              ? `Freelancers (${filteredFreelancers.length + checkinBudgetEntries.length})` 
+              : "Freelancers Escalados"}
           </CardTitle>
           {filteredFreelancers.length > 0 && (
             <ExportReportButton 
@@ -508,10 +508,59 @@ export function BudgetsGerenciaisTab({
           )}
         </CardHeader>
         <CardContent>
-          {filteredFreelancers.length > 0 ? (
+          {(filteredFreelancers.length > 0 || checkinBudgetEntries.length > 0) ? (
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {/* Checkin budget entries */}
+              {checkinBudgetEntries.map((entry) => {
+                const [year, month, day] = entry.data_servico.split("-");
+                if (isMobile) {
+                  return (
+                    <div key={`checkin-${entry.id}`} className="rounded-xl bg-muted/50 p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{entry.freelancer_name}</p>
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 text-[10px] px-1.5">
+                            Via Check-in
+                          </Badge>
+                        </div>
+                        <p className="font-semibold text-primary">{formatCurrency(entry.valor)}</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Freelancer • {`${day}/${month}/${year}`}
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={`checkin-${entry.id}`}
+                    className="flex items-center justify-between rounded-xl bg-muted/50 p-4 transition-colors hover:bg-muted"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{entry.freelancer_name}</p>
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-200 dark:text-emerald-400 dark:border-emerald-800 text-[10px] px-1.5">
+                            Via Check-in
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Freelancer • CPF: {entry.cpf} • {`${day}/${month}/${year}`}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="font-semibold text-primary">
+                      {formatCurrency(entry.valor)}
+                    </p>
+                  </div>
+                );
+              })}
+
+              {/* Manual freelancer entries */}
               {filteredFreelancers.slice(0, 20).map((entry) => {
-                // Mobile: use card component
                 if (isMobile) {
                   return (
                     <MobileFreelancerCard
@@ -521,8 +570,6 @@ export function BudgetsGerenciaisTab({
                     />
                   );
                 }
-
-                // Desktop: inline row
                 const [year, month, day] = entry.data_pop.split("-");
                 return (
                   <div
@@ -580,7 +627,7 @@ export function BudgetsGerenciaisTab({
               })}
               {filteredFreelancers.length > 20 && (
                 <p className="text-center text-sm text-muted-foreground pt-2">
-                  Mostrando 20 de {filteredFreelancers.length} registros
+                  Mostrando 20 de {filteredFreelancers.length} registros manuais
                 </p>
               )}
             </div>

@@ -34,6 +34,10 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "approved" && c.valor_status !== "approved"
   ).length;
 
+  const readyToSign = checkins.filter(
+    (c) => c.status === "approved" && c.valor_status === "approved"
+  );
+
   return (
     <div className="space-y-4 fade-in">
       <Tabs defaultValue="presenca" className="w-full">
@@ -90,11 +94,11 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
                 />
               ))}
 
-              {pendingCount > 0 && (
+              {readyToSign.length > 0 && (
                 <CheckinBatchApproval
                   lojaId={selectedUnidadeId || ""}
                   date={selectedDate}
-                  checkins={checkins.filter((c) => c.status === "completed")}
+                  checkins={readyToSign}
                   userId={user?.id || ""}
                 />
               )}

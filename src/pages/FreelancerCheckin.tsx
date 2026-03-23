@@ -202,7 +202,42 @@ export default function FreelancerCheckin() {
     }
   };
 
-  const handleConfirmProceed = () => {
+  const handleConfirmProceed = async () => {
+    if (!profile) return;
+    
+    // Check if any data changed
+    const nameChanged = regName.trim() !== profile.nome_completo;
+    const phoneChanged = (regPhone.trim() || null) !== (profile.telefone || null);
+    const tipoPixChanged = (regTipoChavePix || null) !== (profile.tipo_chave_pix || null);
+    const chavePixChanged = (regChavePix.trim() || null) !== (profile.chave_pix || null);
+    const photoChanged = regPhotoBase64 !== profile.foto_url && regPhotoBase64 !== null && !regPhotoBase64.startsWith("http");
+    
+    const hasChanges = nameChanged || phoneChanged || tipoPixChanged || chavePixChanged || photoChanged;
+    
+    if (hasChanges) {
+      setIsLoading(true);
+      try {
+        let newFotoUrl = profile.foto_url;
+        if (photoChanged && regPhotoBase64) {
+          newFotoUrl = await uploadPhoto(regPhotoBase64, "profiles");
+        }
+        const updated = await updateProfile.mutateAsync({
+          id: profile.id,
+          nome_completo: regName.trim(),
+          telefone: regPhone.trim() || null,
+          tipo_chave_pix: regTipoChavePix || null,
+          chave_pix: regChavePix.trim() || null,
+          foto_url: newFotoUrl,
+        });
+        setProfile(updated);
+      } catch (err: any) {
+        toast.error("Erro ao atualizar dados: " + err.message);
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(false);
+    }
+    
     setStep("selfie");
     startCamera();
   };

@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import ConfirmShift from "./pages/ConfirmShift";
 import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
+import FreelancerCheckin from "./pages/FreelancerCheckin";
 import NotFound from "./pages/NotFound";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";

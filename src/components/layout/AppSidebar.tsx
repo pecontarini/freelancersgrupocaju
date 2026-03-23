@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   BarChart3,
   CalendarClock,
+  ScanFace,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 

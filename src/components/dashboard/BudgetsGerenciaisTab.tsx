@@ -210,7 +210,7 @@ export function BudgetsGerenciaisTab({
   const filteredFreelancerTotal = filteredFreelancers.reduce((sum, e) => sum + e.valor, 0);
   const filteredMaintenanceTotal = filteredMaintenance.reduce((sum, e) => sum + e.valor, 0);
   const filteredExpenseTotal = filteredExpenses.reduce((sum, e) => sum + e.valor, 0);
-  const filteredTotal = filteredFreelancerTotal + filteredMaintenanceTotal + filteredExpenseTotal;
+  const filteredTotal = filteredFreelancerTotal + filteredMaintenanceTotal + filteredExpenseTotal + checkinBudgetTotal;
 
   // Calculate month totals (using the effective month from filter)
   const monthFreelancerTotal = filteredFreelancers

@@ -53,6 +53,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "CMV (Unitários)",
     subtitle: "Controle de insumos e estoque",
   },
+  presenca: {
+    title: "Presença Freelancers",
+    subtitle: "Check-in/check-out e validação de presença",
+  },
   configuracoes: {
     title: "Configurações",
     subtitle: "Gerenciar sistema e usuários",

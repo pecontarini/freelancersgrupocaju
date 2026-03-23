@@ -103,7 +103,12 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
         </TabsContent>
 
         <TabsContent value="pagamento" className="mt-4">
-          <CheckinPaymentOrder checkins={approvedCheckins} date={selectedDate} unitName={""} />
+          <CheckinPaymentOrder
+            lojaId={selectedUnidadeId || ""}
+            date={selectedDate}
+            unitName={""}
+            pendingApprovalCount={pendingCount + pendingValueCount}
+          />
         </TabsContent>
 
         <TabsContent value="qrcode" className="mt-4">

@@ -58,6 +58,12 @@ const menuItems = [
     description: "Controle diário de gastos",
   },
   {
+    title: "PRESENÇA FREELANCERS",
+    id: "presenca",
+    icon: ScanFace,
+    description: "Check-in/check-out via QR",
+  },
+  {
     title: "REMUNERAÇÃO VARIÁVEL",
     id: "remuneracao",
     icon: TrendingUp,
@@ -86,12 +92,6 @@ const menuItems = [
     id: "escalas",
     icon: CalendarClock,
     description: "Matriz de efetivo mínimo",
-  },
-  {
-    title: "PRESENÇA FREELANCERS",
-    id: "presenca",
-    icon: ScanFace,
-    description: "Check-in/check-out via QR",
   },
 ];
 

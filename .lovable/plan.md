@@ -1,59 +1,181 @@
 
 
-# Aplicar Liquid Glass ao Aplicativo Real
+# Plano Revisado: Sistema de Check-in/Check-out de Freelancers via QR Code
 
-## Por que não apareceu no app?
+## Visão Geral
 
-O simulador é uma página isolada (`/liquid-glass-simulator`) com seu próprio background escuro e componentes glass. O portal real (`/`) usa o design system padrão (Tailwind CSS variables, `bg-background`, `bg-card`, etc.) — são dois mundos separados. Para o glass funcionar, ele precisa de um fundo com cores/profundidade por trás dos elementos translúcidos.
+Sistema completo de controle de presença via QR Code, com fluxo público mobile-first, validação pelo gestor (foto + valor) e geração de ordem de pagamento condicionada à dupla aprovação.
 
-## Estratégia: Glass Theme no Portal Real
+## 1. Banco de Dados
 
-Aplicar os efeitos glass **na interface real** sem quebrar o layout existente. O fundo permanece com as cores do tema (claro/escuro), mas os componentes ganham o tratamento glass.
+### Tabela `freelancer_profiles`
 
-### Mudanças Planejadas
+| Coluna | Tipo | Notas |
+|--------|------|-------|
+| id | uuid PK | |
+| cpf | text UNIQUE NOT NULL | Identificador principal |
+| nome_completo | text NOT NULL | |
+| telefone | text | |
+| foto_url | text | Foto de cadastro (Storage) |
+| created_at | timestamptz | default now() |
 
-**1. Background Sutil com Orbs (Index.tsx)**
-- Adicionar uma versão suave dos orbs animados como fundo do app principal
-- No tema claro: orbs com opacidade muito baixa (~0.08) em tons coral/gray
-- No tema escuro: orbs mais visíveis (~0.25) em tons purple/blue
-- Componente `AppGlassBackground` que respeita o tema atual
+### Tabela `freelancer_checkins`
 
-**2. Sidebar Glass (AppSidebar.tsx)**
-- Aplicar `backdrop-filter: blur(20px)` e fundo semi-transparente na sidebar
-- Menu items ativos com "glass pill" highlight (como no simulador)
-- Bordas sutis com gradiente de opacidade (mais claro no topo)
+| Coluna | Tipo | Notas |
+|--------|------|-------|
+| id | uuid PK | |
+| freelancer_id | uuid FK → freelancer_profiles | |
+| loja_id | uuid FK → config_lojas | |
+| checkin_at | timestamptz NOT NULL | |
+| checkin_selfie_url | text NOT NULL | **Obrigatório** — selfie no check-in |
+| checkin_lat / checkin_lng | numeric | Geolocalização |
+| checkout_at | timestamptz | null = em aberto |
+| checkout_selfie_url | text | **Obrigatório no check-out** |
+| checkout_lat / checkout_lng | numeric | |
+| valor_informado | numeric | Valor preenchido pelo freelancer |
+| valor_aprovado | numeric | Valor confirmado pelo gestor/admin |
+| valor_status | text | 'pending', 'approved', 'adjusted' |
+| status | text | 'open', 'completed', 'approved', 'rejected' |
+| approved_by | uuid | gestor que aprovou presença |
+| approved_at | timestamptz | |
+| valor_approved_by | uuid | quem confirmou o valor |
+| valor_approved_at | timestamptz | |
+| rejection_reason | text | |
+| created_at | timestamptz | |
 
-**3. Cards Glass (CSS + componentes)**
-- Substituir a classe `.glass-card` existente por propriedades glass reais
-- Cards com `backdrop-filter: blur(16px)`, bordas semi-transparentes
-- Hover lift com shadow aumentado
-- Aplicar nos cards de KPI, FinancialHealthCard, SummaryCard
+Constraint UNIQUE: `(freelancer_id, loja_id, DATE(checkin_at))`
 
-**4. Header Glass (PortalHeader.tsx)**
-- Header com blur e transparência, estilo floating nav do simulador
-- Borda inferior sutil com gradiente
+### Tabela `checkin_approvals`
+Assinatura em lote do gestor.
 
-**5. Bottom Navigation Glass (BottomNavigation.tsx - mobile)**
-- Barra inferior com glass blur
-- Ícone ativo com glow sutil na cor de destaque
+| Coluna | Tipo | Notas |
+|--------|------|-------|
+| id | uuid PK | |
+| loja_id | uuid FK | |
+| approval_date | date NOT NULL | |
+| approved_by | uuid FK | |
+| approved_at | timestamptz | |
+| pin_hash | text | |
+| checkin_ids | uuid[] | |
 
-**6. Novo componente: AppGlassBackground**
-- Versão mais sutil do `LiquidBackground` que funciona com ambos os temas
-- Orbs menores, mais transparentes, cores que combinam com o tema coral/terracotta
+### Storage
+- Bucket `freelancer-checkin-photos` (público) — selfies e fotos de perfil
 
-### Arquivos a Criar/Editar
+### Edge Function
+- `checkin-upload-photo` — recebe base64, faz upload via service_role, retorna URL pública
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/layout/AppGlassBackground.tsx` | Criar — background sutil com orbs |
-| `src/index.css` | Editar — atualizar `.glass-card`, adicionar utilitários glass |
-| `src/pages/Index.tsx` | Editar — adicionar AppGlassBackground |
-| `src/components/layout/AppSidebar.tsx` | Editar — aplicar glass na sidebar |
-| `src/components/layout/BottomNavigation.tsx` | Editar — glass na barra mobile |
-| `src/components/layout/PortalHeader.tsx` | Editar — header com blur |
-| `src/components/SummaryCard.tsx` | Editar — glass no card principal |
-| `src/components/ui/card.tsx` | Editar — variante glass opcional |
+### RLS
+- `freelancer_profiles`: SELECT/INSERT público (lookup e cadastro via QR)
+- `freelancer_checkins`: INSERT público (check-in/out), SELECT/UPDATE para gestores autenticados
+- `checkin_approvals`: INSERT/SELECT para autenticados com acesso à loja
 
-### Resultado Esperado
-O app inteiro terá a sensação de "vidro líquido" — sidebar, cards, header e navegação com blur e transparência — mantendo as cores da marca, a legibilidade e a funcionalidade existente intactas.
+## 2. Fluxo do Freelancer (página pública `/checkin?unidade=UUID`)
+
+```text
+Escaneia QR → Digita CPF
+       │
+   ┌───┴───┐
+   │ Novo? │
+   └───┬───┘
+  Sim  │  Não
+   │   │   │
+   ▼   │   ▼
+Cadastro│ Confirma dados
+(nome,  │
+ foto   │
+ obrig.)│
+   └───┬───┘
+       │
+ Tem check-in aberto hoje?
+   ┌───┴───┐
+  Sim     Não
+   │       │
+   ▼       ▼
+Check-out  Check-in
+- selfie   - selfie OBRIGATÓRIA
+  OBRIG.   - geolocalização
+- geo      - valor (R$) informado
+- horário    pelo freelancer
+       │
+       ▼
+ Registro salvo (valor_status = 'pending')
+```
+
+**Regras de foto:**
+- Check-in: selfie obrigatória antes de registrar. Sem foto = sem check-in.
+- Check-out: selfie obrigatória antes de registrar saída.
+- Cadastro novo: foto de perfil obrigatória.
+
+**Valor informado:**
+- O freelancer preenche o valor (R$) que espera receber no momento do check-in.
+- O valor fica com status `pending` até confirmação do gestor.
+
+## 3. Painel do Gestor (dupla validação)
+
+### Validação de Presença (já prevista)
+- Foto cadastro vs selfie check-in lado a lado
+- Selfie do check-out
+- Horários, geolocalização
+- Aprovar ou rejeitar presença
+
+### Validação de Valor (nova)
+- Exibe o valor informado pelo freelancer
+- Gestor/Admin pode: **confirmar** o valor ou **ajustar** (informando novo valor)
+- Somente após ambas validações (presença + valor) o registro fica apto para pagamento
+- Campo `valor_aprovado` recebe o valor final
+
+```text
+Gestor abre painel do dia
+       │
+       ▼
+Lista de freelancers com:
+- Fotos (cadastro vs selfie) ← COMPARAÇÃO VISUAL
+- Horários entrada/saída
+- Valor informado pelo freelancer
+       │
+       ▼
+Para cada registro:
+1. Aprovar/Rejeitar PRESENÇA
+2. Confirmar/Ajustar VALOR
+       │
+       ▼
+Assina lote com PIN
+       │
+       ▼
+Ordem de pagamento liberada
+(usa valor_aprovado, não valor_informado)
+```
+
+## 4. Ordem de Pagamento
+- Só gera para registros com `status = 'approved'` E `valor_status = 'approved'`
+- Usa `valor_aprovado` (não o informado)
+- Lista freelancers com entrada, saída e valor confirmado
+
+## 5. Componentes
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/pages/FreelancerCheckin.tsx` | Página pública mobile-first |
+| `src/components/checkin/CheckinManagerDashboard.tsx` | Painel gestor com dupla validação |
+| `src/components/checkin/CheckinApprovalCard.tsx` | Card: fotos lado a lado + valor |
+| `src/components/checkin/CheckinBatchApproval.tsx` | Assinatura em lote com PIN |
+| `src/components/checkin/CheckinPaymentOrder.tsx` | Ordem de pagamento (aprovados) |
+| `src/components/checkin/QRCodeGenerator.tsx` | Gerador QR na aba Configurações |
+| `src/hooks/useFreelancerProfiles.ts` | CRUD perfis |
+| `src/hooks/useFreelancerCheckins.ts` | Registros de presença |
+| `src/hooks/useCheckinApprovals.ts` | Aprovações |
+| `supabase/functions/checkin-upload-photo/index.ts` | Upload de fotos |
+| `src/App.tsx` | Rota `/checkin` pública |
+| `src/components/layout/AppSidebar.tsx` | Tab "Presença" |
+| `src/pages/Index.tsx` | Renderizar painel do gestor |
+
+## 6. Ordem de Implementação
+
+1. Migração SQL — tabelas, bucket, RLS, constraints
+2. Edge Function — upload de foto
+3. Página pública `/checkin` — fluxo completo (CPF → cadastro/lookup → selfie obrigatória → valor → registro)
+4. QR Code Generator — aba Configurações
+5. Painel do Gestor — validação de presença (fotos) + validação de valor
+6. Ordem de Pagamento — condicionada a presença aprovada + valor confirmado
+7. Rota no App.tsx
 

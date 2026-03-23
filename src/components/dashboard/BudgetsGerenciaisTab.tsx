@@ -352,10 +352,11 @@ export function BudgetsGerenciaisTab({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(filteredFreelancerTotal)}
+              {formatCurrency(filteredFreelancerTotal + checkinBudgetTotal)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {filteredFreelancers.length} lançamento(s)
+              {filteredFreelancers.length} lançamento(s) manual(is)
+              {checkinBudgetEntries.length > 0 && ` + ${checkinBudgetEntries.length} via check-in`}
             </p>
           </CardContent>
         </Card>

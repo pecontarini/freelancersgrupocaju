@@ -116,7 +116,7 @@ export function FinancialHealthCard({
       hasBudget: bgt > 0,
     });
 
-    const freelancerStats = mkStats(freelancerTotal, freelancerBudget);
+    const freelancerStats = mkStats(combinedFreelancerTotal, freelancerBudget);
     const maintenanceStats = mkStats(maintenanceTotal, maintenanceBudget);
     const uniformsStats = mkStats(operationalTotals.uniformes, uniformsBudget);
     const cleaningStats = mkStats(operationalTotals.limpeza, cleaningBudget);

@@ -1,39 +1,48 @@
 
 
-# Problema e Correção: Fluxo de Aprovação → Budget
+# Plano: Mostrar freelancers aprovados via check-in na lista de Budgets Gerenciais
 
-## Como funciona o fluxo (na prática)
+## Problema
 
-O processo tem **3 etapas obrigatórias** para um check-in virar lançamento no budget:
+O fluxo funciona tecnicamente: após assinar o lote com senha, a função `promote_approved_checkins` cria registros em `checkin_budget_entries`. Esses registros **já são somados nos totais** do card "Freelancers" (linha 355 do BudgetsGerenciaisTab). Porém, **não aparecem na lista de freelancers** abaixo dos cards — apenas lançamentos manuais (`freelancer_entries`) são exibidos ali. Isso faz parecer que nada aconteceu.
 
-1. **Aprovar Presença** — gestor clica "Aprovar Presença" no card (compara selfie com foto cadastro)
-2. **Confirmar Valor** — gestor clica "Confirmar Valor" e define o R$ aprovado
-3. **Assinar com PIN** — gestor digita um PIN para assinar o lote → isso dispara a função `promote_approved_checkins` que cria o registro em `checkin_budget_entries`
+## Solução
 
-**Sem a etapa 3 (PIN), nada sobe para o budget.**
+Unificar a lista de freelancers para exibir **ambas** as fontes:
+1. Lançamentos manuais (`freelancer_entries`) — como já funciona
+2. Lançamentos via check-in (`checkin_budget_entries`) — com badge visual "Via Check-in"
 
-## O Bug
+### `src/components/dashboard/BudgetsGerenciaisTab.tsx`
 
-O card "Assinatura em Lote" (etapa 3) **desaparece** após a etapa 1. Isso acontece porque:
+- Criar uma lista unificada (`unifiedFreelancerList`) que combina `filteredFreelancers` + `checkinBudgetEntries` filtrados por data
+- Cada item terá um campo `source: "manual" | "checkin"` para diferenciar visualmente
+- Ordenar por data descendente
+- Na renderização da lista, exibir um badge "Check-in" nos itens vindos do check-in
+- Itens de check-in não terão botão "Editar" nem "Excluir" (são gerenciados pelo fluxo de aprovação)
+- Atualizar o contador de registros para refletir o total unificado
 
-- O card só aparece quando `pendingCount > 0`
-- `pendingCount` conta checkins com `status === "completed"`
-- Após aprovar a presença, o status muda para `"approved"` → `pendingCount` cai para 0 → card some
-
-O gestor fica preso: aprovou presença, confirmou valor, mas não tem onde digitar o PIN.
-
-## Correção
-
-### `src/components/checkin/CheckinManagerDashboard.tsx`
-
-Adicionar uma nova variável `readyToSign` que filtra checkins com **ambas** as aprovações completas (`status === "approved"` E `valor_status === "approved"`), e mostrar o `CheckinBatchApproval` quando houver registros prontos para assinar.
+### Estrutura do item unificado
 
 ```text
-Antes:  pendingCount > 0 → mostra batch (filtra status="completed")
-Depois: readyToSign.length > 0 → mostra batch (filtra status="approved" + valor_status="approved")
+type UnifiedEntry = {
+  id: string
+  nome: string
+  funcao: string  // "Freelancer" para checkin entries
+  loja: string
+  data: string    // YYYY-MM-DD
+  valor: number
+  source: "manual" | "checkin"
+  original: FreelancerEntry | CheckinBudgetEntry
+}
 ```
+
+### Mudanças visuais
+
+- Badge verde "Via Check-in" ao lado do nome para entradas do check-in
+- Sem botões de edição/exclusão para entradas do check-in
+- Texto do card atualizado: "X lançamento(s) manual(is) + Y via check-in"
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/checkin/CheckinManagerDashboard.tsx` | Corrigir condição e filtro do CheckinBatchApproval |
+| `src/components/dashboard/BudgetsGerenciaisTab.tsx` | Unificar lista de freelancers com checkin_budget_entries |
 

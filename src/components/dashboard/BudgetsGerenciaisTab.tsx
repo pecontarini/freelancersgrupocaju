@@ -87,6 +87,17 @@ export function BudgetsGerenciaisTab({
   // Effective store ID from filters or prop
   const effectiveStoreId = filters.lojaId || selectedUnidadeId;
 
+  // Checkin budget entries (presence-based freelancer costs)
+  const effectiveMonthYearForCheckin = useMemo(() => {
+    if (filters.dateStart) return format(filters.dateStart, "yyyy-MM");
+    return getCurrentMonthYear();
+  }, [filters.dateStart, getCurrentMonthYear]);
+
+  const { entries: checkinBudgetEntries, total: checkinBudgetTotal } = useCheckinBudgetEntries(
+    effectiveStoreId,
+    effectiveMonthYearForCheckin
+  );
+
   // Derive month_year from the effective date range filter
   const effectiveMonthYear = useMemo(() => {
     if (filters.dateStart) {

@@ -170,6 +170,8 @@ export default function FreelancerCheckin() {
   const handleRegister = async () => {
     if (!regName.trim()) { toast.error("Nome é obrigatório."); return; }
     if (!regPhotoBase64) { toast.error("Foto de perfil é obrigatória."); return; }
+    if (!regTipoChavePix) { toast.error("Tipo de chave Pix é obrigatório."); return; }
+    if (!regChavePix.trim()) { toast.error("Chave Pix é obrigatória."); return; }
 
     setIsLoading(true);
     try {
@@ -179,6 +181,8 @@ export default function FreelancerCheckin() {
         nome_completo: regName.trim(),
         telefone: regPhone.trim() || undefined,
         foto_url: fotoUrl,
+        tipo_chave_pix: regTipoChavePix,
+        chave_pix: regChavePix.trim(),
       });
       setProfile(newProfile);
       setIsCheckout(false);

@@ -10,6 +10,7 @@ import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
+import { useCheckinBudgetEntries } from "@/hooks/useCheckinBudgetEntries";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";

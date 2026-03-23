@@ -30,9 +30,9 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "completed" || (c.status !== "approved" && c.status !== "rejected")
   ).length;
 
-  const approvedCheckins = checkins.filter(
-    (c) => c.status === "approved" && c.valor_status === "approved"
-  );
+  const pendingValueCount = checkins.filter(
+    (c) => c.status === "approved" && c.valor_status !== "approved"
+  ).length;
 
   return (
     <div className="space-y-4 fade-in">

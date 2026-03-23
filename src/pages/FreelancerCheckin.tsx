@@ -55,7 +55,7 @@ export default function FreelancerCheckin() {
   // Value
   const [valor, setValor] = useState("");
 
-  const { lookupByCpf, createProfile } = useFreelancerProfiles();
+  const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
   const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
 
   // Load unit name
@@ -149,6 +149,12 @@ export default function FreelancerCheckin() {
       const existing = await lookupByCpf(cpf);
       if (existing) {
         setProfile(existing);
+        // Pre-fill editable fields with existing data
+        setRegName(existing.nome_completo);
+        setRegPhone(existing.telefone || "");
+        setRegTipoChavePix(existing.tipo_chave_pix || "");
+        setRegChavePix(existing.chave_pix || "");
+        setRegPhotoBase64(existing.foto_url || null);
         const today = format(new Date(), "yyyy-MM-dd");
         const open = await findOpenCheckin(existing.id, unidadeId, today);
         if (open) {
@@ -196,7 +202,42 @@ export default function FreelancerCheckin() {
     }
   };
 
-  const handleConfirmProceed = () => {
+  const handleConfirmProceed = async () => {
+    if (!profile) return;
+    
+    // Check if any data changed
+    const nameChanged = regName.trim() !== profile.nome_completo;
+    const phoneChanged = (regPhone.trim() || null) !== (profile.telefone || null);
+    const tipoPixChanged = (regTipoChavePix || null) !== (profile.tipo_chave_pix || null);
+    const chavePixChanged = (regChavePix.trim() || null) !== (profile.chave_pix || null);
+    const photoChanged = regPhotoBase64 !== profile.foto_url && regPhotoBase64 !== null && !regPhotoBase64.startsWith("http");
+    
+    const hasChanges = nameChanged || phoneChanged || tipoPixChanged || chavePixChanged || photoChanged;
+    
+    if (hasChanges) {
+      setIsLoading(true);
+      try {
+        let newFotoUrl = profile.foto_url;
+        if (photoChanged && regPhotoBase64) {
+          newFotoUrl = await uploadPhoto(regPhotoBase64, "profiles");
+        }
+        const updated = await updateProfile.mutateAsync({
+          id: profile.id,
+          nome_completo: regName.trim(),
+          telefone: regPhone.trim() || null,
+          tipo_chave_pix: regTipoChavePix || null,
+          chave_pix: regChavePix.trim() || null,
+          foto_url: newFotoUrl,
+        });
+        setProfile(updated);
+      } catch (err: any) {
+        toast.error("Erro ao atualizar dados: " + err.message);
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(false);
+    }
+    
     setStep("selfie");
     startCamera();
   };
@@ -395,44 +436,79 @@ export default function FreelancerCheckin() {
           </Card>
         )}
 
-        {/* Step: Confirm identity */}
+        {/* Step: Confirm identity (editable) */}
         {step === "confirm" && profile && (
           <Card>
             <CardHeader><CardTitle className="text-base">Confirme seus dados</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                {profile.foto_url ? (
-                  <img src={profile.foto_url} alt="Foto" className="w-16 h-16 rounded-full object-cover border-2 border-primary" />
+              {/* Photo */}
+              <div className="flex flex-col items-center gap-2">
+                {regPhotoBase64 ? (
+                  <>
+                    <img src={regPhotoBase64} alt="Foto" className="w-20 h-20 rounded-full object-cover border-2 border-primary" />
+                    <Button variant="ghost" size="sm" onClick={() => { setRegPhotoBase64(null); startCamera(); }}>
+                      <Camera className="h-3.5 w-3.5 mr-1" /> Trocar foto
+                    </Button>
+                  </>
+                ) : cameraActive ? (
+                  <div className="w-full space-y-2">
+                    <video ref={videoRef} className="w-full rounded-lg" autoPlay playsInline muted />
+                    <Button onClick={handleRegPhotoCapture} className="w-full" size="sm">
+                      <Camera className="h-4 w-4 mr-2" /> Capturar
+                    </Button>
+                  </div>
                 ) : (
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                     <User className="h-8 w-8 text-primary" />
                   </div>
                 )}
-                <div>
-                  <p className="font-medium text-foreground">{profile.nome_completo}</p>
-                  <p className="text-sm text-muted-foreground">{cpf}</p>
-                  {profile.telefone && <p className="text-sm text-muted-foreground">{profile.telefone}</p>}
-                  {profile.chave_pix && (
-                    <p className="text-sm text-muted-foreground">
-                      Pix ({profile.tipo_chave_pix}): {profile.chave_pix}
-                    </p>
-                  )}
-                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Nome Completo</Label>
+                <Input value={regName} onChange={(e) => setRegName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF</Label>
+                <Input value={cpf} disabled />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="(00) 00000-0000" inputMode="tel" />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de Chave Pix</Label>
+                <Select value={regTipoChavePix} onValueChange={setRegTipoChavePix}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cpf">CPF</SelectItem>
+                    <SelectItem value="email">E-mail</SelectItem>
+                    <SelectItem value="telefone">Telefone</SelectItem>
+                    <SelectItem value="aleatoria">Chave Aleatória</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Chave Pix</Label>
+                <Input value={regChavePix} onChange={(e) => setRegChavePix(e.target.value)} placeholder="Sua chave Pix" />
               </div>
 
               <div className="rounded-lg bg-muted p-3 text-center">
                 <p className="text-sm font-medium">
                   {isCheckout
                     ? "Você tem um check-in em aberto. Vamos registrar sua saída."
-                    : "Pronto para registrar sua entrada."}
+                    : "Confira ou atualize seus dados antes de prosseguir."}
                 </p>
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep("cpf")}>
+                <Button variant="outline" onClick={() => { stopCamera(); setStep("cpf"); }}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
-                <Button onClick={handleConfirmProceed} className="flex-1">
+                <Button onClick={handleConfirmProceed} disabled={isLoading} className="flex-1">
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                   {isCheckout ? "Fazer Check-out" : "Fazer Check-in"}
                 </Button>
               </div>

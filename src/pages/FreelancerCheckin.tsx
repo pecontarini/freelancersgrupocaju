@@ -149,6 +149,12 @@ export default function FreelancerCheckin() {
       const existing = await lookupByCpf(cpf);
       if (existing) {
         setProfile(existing);
+        // Pre-fill editable fields with existing data
+        setRegName(existing.nome_completo);
+        setRegPhone(existing.telefone || "");
+        setRegTipoChavePix(existing.tipo_chave_pix || "");
+        setRegChavePix(existing.chave_pix || "");
+        setRegPhotoBase64(existing.foto_url || null);
         const today = format(new Date(), "yyyy-MM-dd");
         const open = await findOpenCheckin(existing.id, unidadeId, today);
         if (open) {

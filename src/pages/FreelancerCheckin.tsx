@@ -55,7 +55,7 @@ export default function FreelancerCheckin() {
   // Value
   const [valor, setValor] = useState("");
 
-  const { lookupByCpf, createProfile } = useFreelancerProfiles();
+  const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
   const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
 
   // Load unit name

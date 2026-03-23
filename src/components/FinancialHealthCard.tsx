@@ -86,13 +86,15 @@ export function FinancialHealthCard({
     });
 
     const freelancerTotal = currentMonthFreelancerEntries.reduce((sum, e) => sum + e.valor, 0);
+    const checkinPresenceTotal = checkinBudgetTotal;
+    const combinedFreelancerTotal = freelancerTotal + checkinPresenceTotal;
     const maintenanceTotal = currentMonthMaintenanceEntries.reduce((sum, e) => sum + e.valor, 0);
 
     const operationalTotals = effectiveStoreId 
       ? getTotalsForStoreMonth(effectiveStoreId, selectedMonthYear)
       : { uniformes: 0, limpeza: 0, utensilios: 0, apoio_venda: 0, total: 0 };
 
-    const totalSpent = freelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
+    const totalSpent = combinedFreelancerTotal + maintenanceTotal + operationalTotals.uniformes + operationalTotals.limpeza + operationalTotals.utensilios + operationalTotals.apoio_venda;
 
     const budget = effectiveStoreId 
       ? getBudgetForStoreMonth(effectiveStoreId, selectedMonthYear)

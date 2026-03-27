@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function CMVPracaGrid({ semanaId, items, entries, onUpsert, readOnly }: Props) {
-  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const lookup = useMemo(() => {
     const m: Record<string, Record<string, PracaEntry>> = {};

@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function CMVCamaraGrid({ semana, items, entries, onUpsert, readOnly }: Props) {
-  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Build lookup: itemId -> dia -> entry
   const lookup = useMemo(() => {

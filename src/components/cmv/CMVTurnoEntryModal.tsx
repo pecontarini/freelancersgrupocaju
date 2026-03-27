@@ -51,7 +51,7 @@ export function CMVTurnoEntryModal({ semanaId, items, entries, onUpsert, dataIni
   const [dia, setDia] = useState<DiaSemana>(() => getTodayDia(dataInicio));
   const [turno, setTurno] = useState<string>("t1_abertura");
   const [localValues, setLocalValues] = useState<Record<string, string>>({});
-  const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const firstEmptyRef = useRef<HTMLInputElement | null>(null);
 
   const lookup = useMemo(() => {

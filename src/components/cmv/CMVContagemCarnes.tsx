@@ -6,7 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Beef, Snowflake, ChefHat, Plus, Lock, Calendar } from "lucide-react";
+import { Beef, Snowflake, ChefHat, Plus, Lock, Calendar, BarChart3 } from "lucide-react";
 import { useSemanasCMV, useCamaraData, usePracaData, DIAS } from "@/hooks/useCMVSemanas";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -18,6 +18,7 @@ import { CMVCamaraGrid } from "./CMVCamaraGrid";
 import { CMVPracaGrid } from "./CMVPracaGrid";
 import { CMVTurnoEntryModal } from "./CMVTurnoEntryModal";
 import { CMVDesvioResumo } from "./CMVDesvioResumo";
+import { CMVVendasDesvioGrid } from "./CMVVendasDesvioGrid";
 import { toast } from "sonner";
 
 type CMVItem = { id: string; nome: string; unidade: string };
@@ -25,7 +26,7 @@ type CMVItem = { id: string; nome: string; unidade: string };
 export function CMVContagemCarnes() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin } = useUserProfile();
-  const [quadro, setQuadro] = useState<"camara" | "praca">("camara");
+  const [quadro, setQuadro] = useState<"camara" | "praca" | "vendas">("camara");
   const [newSemanaOpen, setNewSemanaOpen] = useState(false);
   const [responsavel, setResponsavel] = useState("");
 
@@ -186,10 +187,13 @@ export function CMVContagemCarnes() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ToggleGroup type="single" value={quadro} onValueChange={(v) => v && setQuadro(v as any)}>
                 <ToggleGroupItem value="camara" className="gap-1.5">
-                  <Snowflake className="h-4 w-4" /> Câmara Congelada
+                  <Snowflake className="h-4 w-4" /> Câmara
                 </ToggleGroupItem>
                 <ToggleGroupItem value="praca" className="gap-1.5">
-                  <ChefHat className="h-4 w-4" /> Praça / Operação
+                  <ChefHat className="h-4 w-4" /> Praça
+                </ToggleGroupItem>
+                <ToggleGroupItem value="vendas" className="gap-1.5">
+                  <BarChart3 className="h-4 w-4" /> Vendas & Desvio
                 </ToggleGroupItem>
               </ToggleGroup>
 
@@ -205,7 +209,7 @@ export function CMVContagemCarnes() {
             </div>
 
             {/* Grid */}
-            {quadro === "camara" ? (
+            {quadro === "camara" && (
               <CMVCamaraGrid
                 semana={semanaAtual}
                 items={cmvItems}
@@ -213,12 +217,22 @@ export function CMVContagemCarnes() {
                 onUpsert={(p) => camaraUpsert.mutate(p)}
                 readOnly={isReadOnly}
               />
-            ) : (
+            )}
+            {quadro === "praca" && (
               <CMVPracaGrid
                 semanaId={semanaAtual.id}
                 items={cmvItems}
                 entries={pracaEntries}
                 onUpsert={(p) => pracaUpsert.mutate(p)}
+                readOnly={isReadOnly}
+              />
+            )}
+            {quadro === "vendas" && (
+              <CMVVendasDesvioGrid
+                semana={semanaAtual}
+                items={cmvItems}
+                camaraEntries={camaraEntries}
+                pracaEntries={pracaEntries}
                 readOnly={isReadOnly}
               />
             )}

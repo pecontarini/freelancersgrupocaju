@@ -1317,6 +1317,54 @@ export type Database = {
           },
         ]
       }
+      cmv_vendas_ajuste: {
+        Row: {
+          cmv_item_id: string
+          created_at: string | null
+          dia: string
+          id: string
+          notas: string | null
+          quantidade_manual: number | null
+          semana_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string | null
+          dia: string
+          id?: string
+          notas?: string | null
+          quantidade_manual?: number | null
+          semana_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string | null
+          dia?: string
+          id?: string
+          notas?: string | null
+          quantidade_manual?: number | null
+          semana_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_vendas_ajuste_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_vendas_ajuste_semana_id_fkey"
+            columns: ["semana_id"]
+            isOneToOne: false
+            referencedRelation: "semanas_cmv"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_funcoes: {
         Row: {
           created_at: string

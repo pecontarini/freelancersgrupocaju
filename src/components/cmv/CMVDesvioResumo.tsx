@@ -3,6 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingDown } from "lucide-react";
 import { DIAS, type CamaraEntry, type PracaEntry, type SemanaCMV } from "@/hooks/useCMVSemanas";
+import {
+  useVendasAjuste,
+  useWeeklySales,
+  useSalesMappings,
+  useDesvioCalculation,
+} from "@/hooks/useCMVVendasDesvio";
 
 type CMVItem = { id: string; nome: string; unidade: string };
 
@@ -16,6 +22,15 @@ interface Props {
 const META = 0.6;
 
 export function CMVDesvioResumo({ semana, items, camaraEntries, pracaEntries }: Props) {
+  const { entries: ajusteEntries } = useVendasAjuste(semana.id);
+  const { data: salesData = [] } = useWeeklySales(semana.data_inicio, semana.data_fim);
+  const { data: mappings = [] } = useSalesMappings();
+
+  const { desvioRows } = useDesvioCalculation(
+    semana, items, camaraEntries, pracaEntries, ajusteEntries, salesData, mappings
+  );
+
+  // Classic câmara stats (saídas vs base)
   const camaraStats = useMemo(() => {
     let totalSaidas = 0;
     let totalBase = 0;
@@ -41,6 +56,7 @@ export function CMVDesvioResumo({ semana, items, camaraEntries, pracaEntries }: 
     return { globalDesvio, topDesvios };
   }, [items, camaraEntries, semana.saldo_anterior_json]);
 
+  // Classic praça stats
   const pracaStats = useMemo(() => {
     let totalVar = 0;
     let totalT1 = 0;
@@ -68,6 +84,23 @@ export function CMVDesvioResumo({ semana, items, camaraEntries, pracaEntries }: 
     return { globalDesvio, topDesvios };
   }, [items, pracaEntries]);
 
+  // Vendas vs real stats
+  const vendasStats = useMemo(() => {
+    const withData = desvioRows.filter((r) => r.vendasTotal > 0);
+    if (!withData.length) return null;
+
+    const totalConsumo = withData.reduce((s, r) => s + r.consumoCamara, 0);
+    const totalVendas = withData.reduce((s, r) => s + r.vendasTotal, 0);
+    const desvioGlobal = totalVendas > 0 ? ((totalConsumo - totalVendas) / totalVendas) * 100 : 0;
+
+    const topDesvios = [...withData]
+      .sort((a, b) => Math.abs(b.desvioCamaraPct) - Math.abs(a.desvioCamaraPct))
+      .slice(0, 3)
+      .map((r) => ({ nome: r.itemNome, desvio: r.desvioCamaraPct }));
+
+    return { globalDesvio: desvioGlobal, topDesvios };
+  }, [desvioRows]);
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -77,50 +110,39 @@ export function CMVDesvioResumo({ semana, items, camaraEntries, pracaEntries }: 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Câmara */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Câmara</span>
-              <Badge variant={camaraStats.globalDesvio > META ? "destructive" : "default"}>
-                {camaraStats.globalDesvio.toFixed(2)}% {camaraStats.globalDesvio > META ? "🔴" : "🟢"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">Meta: ≤ {META}%</p>
-            {camaraStats.topDesvios.length > 0 && (
-              <ul className="text-xs space-y-0.5">
-                {camaraStats.topDesvios.map((d) => (
-                  <li key={d.nome} className="flex justify-between">
-                    <span>• {d.nome}</span>
-                    <span className="font-medium">{d.desvio.toFixed(1)}%</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
+          <DesvioBlock label="Câmara" stats={camaraStats} />
           {/* Praça */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Praça</span>
-              <Badge variant={pracaStats.globalDesvio > META ? "destructive" : "default"}>
-                {pracaStats.globalDesvio.toFixed(2)}% {pracaStats.globalDesvio > META ? "🔴" : "🟢"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">Meta: ≤ {META}%</p>
-            {pracaStats.topDesvios.length > 0 && (
-              <ul className="text-xs space-y-0.5">
-                {pracaStats.topDesvios.map((d) => (
-                  <li key={d.nome} className="flex justify-between">
-                    <span>• {d.nome}</span>
-                    <span className="font-medium">{d.desvio.toFixed(1)}%</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <DesvioBlock label="Praça" stats={pracaStats} />
+          {/* Vendas vs Real */}
+          {vendasStats && <DesvioBlock label="Real vs Vendas" stats={vendasStats} />}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function DesvioBlock({ label, stats }: { label: string; stats: { globalDesvio: number; topDesvios: { nome: string; desvio: number }[] } }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{label}</span>
+        <Badge variant={Math.abs(stats.globalDesvio) > META ? "destructive" : "default"}>
+          {stats.globalDesvio.toFixed(2)}% {Math.abs(stats.globalDesvio) > META ? "🔴" : "🟢"}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground">Meta: ≤ {META}%</p>
+      {stats.topDesvios.length > 0 && (
+        <ul className="text-xs space-y-0.5">
+          {stats.topDesvios.map((d) => (
+            <li key={d.nome} className="flex justify-between">
+              <span>• {d.nome}</span>
+              <span className="font-medium">{d.desvio.toFixed(1)}%</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

@@ -197,6 +197,17 @@ export function CMVContagemCarnes() {
                 </ToggleGroupItem>
               </ToggleGroup>
 
+              {quadro === "praca" && !isReadOnly && (
+                <CMVTurnoEntryModal
+                  semanaId={semanaAtual.id}
+                  items={cmvItems}
+                  entries={pracaEntries}
+                  onUpsert={(p) => pracaUpsert.mutate(p)}
+                  dataInicio={semanaAtual.data_inicio}
+                />
+              )}
+            </div>
+
             {/* Grid */}
             {quadro === "camara" && (
               <CMVCamaraGrid

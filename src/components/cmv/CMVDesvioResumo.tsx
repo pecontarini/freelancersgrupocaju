@@ -98,7 +98,7 @@ export function CMVDesvioResumo({ semana, items, camaraEntries, pracaEntries }: 
       .slice(0, 3)
       .map((r) => ({ nome: r.itemNome, desvio: r.desvioCamaraPct }));
 
-    return { desvioGlobal, topDesvios };
+    return { globalDesvio: desvioGlobal, topDesvios };
   }, [desvioRows]);
 
   return (

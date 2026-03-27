@@ -187,26 +187,18 @@ export function CMVContagemCarnes() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <ToggleGroup type="single" value={quadro} onValueChange={(v) => v && setQuadro(v as any)}>
                 <ToggleGroupItem value="camara" className="gap-1.5">
-                  <Snowflake className="h-4 w-4" /> Câmara Congelada
+                  <Snowflake className="h-4 w-4" /> Câmara
                 </ToggleGroupItem>
                 <ToggleGroupItem value="praca" className="gap-1.5">
-                  <ChefHat className="h-4 w-4" /> Praça / Operação
+                  <ChefHat className="h-4 w-4" /> Praça
+                </ToggleGroupItem>
+                <ToggleGroupItem value="vendas" className="gap-1.5">
+                  <BarChart3 className="h-4 w-4" /> Vendas & Desvio
                 </ToggleGroupItem>
               </ToggleGroup>
 
-              {quadro === "praca" && !isReadOnly && (
-                <CMVTurnoEntryModal
-                  semanaId={semanaAtual.id}
-                  items={cmvItems}
-                  entries={pracaEntries}
-                  onUpsert={(p) => pracaUpsert.mutate(p)}
-                  dataInicio={semanaAtual.data_inicio}
-                />
-              )}
-            </div>
-
             {/* Grid */}
-            {quadro === "camara" ? (
+            {quadro === "camara" && (
               <CMVCamaraGrid
                 semana={semanaAtual}
                 items={cmvItems}
@@ -214,12 +206,22 @@ export function CMVContagemCarnes() {
                 onUpsert={(p) => camaraUpsert.mutate(p)}
                 readOnly={isReadOnly}
               />
-            ) : (
+            )}
+            {quadro === "praca" && (
               <CMVPracaGrid
                 semanaId={semanaAtual.id}
                 items={cmvItems}
                 entries={pracaEntries}
                 onUpsert={(p) => pracaUpsert.mutate(p)}
+                readOnly={isReadOnly}
+              />
+            )}
+            {quadro === "vendas" && (
+              <CMVVendasDesvioGrid
+                semana={semanaAtual}
+                items={cmvItems}
+                camaraEntries={camaraEntries}
+                pracaEntries={pracaEntries}
                 readOnly={isReadOnly}
               />
             )}

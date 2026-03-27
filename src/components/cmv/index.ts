@@ -25,3 +25,4 @@ export { CMVCamaraGrid } from "./CMVCamaraGrid";
 export { CMVPracaGrid } from "./CMVPracaGrid";
 export { CMVTurnoEntryModal } from "./CMVTurnoEntryModal";
 export { CMVDesvioResumo } from "./CMVDesvioResumo";
+export { CMVVendasDesvioGrid } from "./CMVVendasDesvioGrid";

@@ -22,6 +22,7 @@ import {
   CMVKardexDashboard,
   CMVClosingReport,
   CMVLiveStockCard,
+  CMVContagemCarnes,
 } from "@/components/cmv";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -151,6 +152,9 @@ export function CMVTab() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Contagem de Carnes por Turno */}
+              <CMVContagemCarnes />
 
               {/* Live Stock Valuation */}
               <CMVLiveStockCard />

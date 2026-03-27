@@ -20,3 +20,8 @@ export { CMVClosingReport } from "./CMVClosingReport";
 export { CMVSmartSalesImporter } from "./CMVSmartSalesImporter";
 export { CMVLiveStockCard } from "./CMVLiveStockCard";
 export { CMVChecklistFacilImporter } from "./CMVChecklistFacilImporter";
+export { CMVContagemCarnes } from "./CMVContagemCarnes";
+export { CMVCamaraGrid } from "./CMVCamaraGrid";
+export { CMVPracaGrid } from "./CMVPracaGrid";
+export { CMVTurnoEntryModal } from "./CMVTurnoEntryModal";
+export { CMVDesvioResumo } from "./CMVDesvioResumo";

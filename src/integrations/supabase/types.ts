@@ -844,6 +844,54 @@ export type Database = {
           },
         ]
       }
+      cmv_camara: {
+        Row: {
+          cmv_item_id: string
+          created_at: string | null
+          dia: string
+          entrada: number | null
+          id: string
+          saida: number | null
+          semana_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string | null
+          dia: string
+          entrada?: number | null
+          id?: string
+          saida?: number | null
+          semana_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string | null
+          dia?: string
+          entrada?: number | null
+          id?: string
+          saida?: number | null
+          semana_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_camara_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_camara_semana_id_fkey"
+            columns: ["semana_id"]
+            isOneToOne: false
+            referencedRelation: "semanas_cmv"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cmv_contagens: {
         Row: {
           cmv_item_id: string
@@ -1129,6 +1177,60 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cmv_praca: {
+        Row: {
+          cmv_item_id: string
+          created_at: string | null
+          dia: string
+          id: string
+          semana_id: string
+          t1_abertura: number | null
+          t2_almoco: number | null
+          t3_fechamento: number | null
+          turno_encerrado_em: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cmv_item_id: string
+          created_at?: string | null
+          dia: string
+          id?: string
+          semana_id: string
+          t1_abertura?: number | null
+          t2_almoco?: number | null
+          t3_fechamento?: number | null
+          turno_encerrado_em?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cmv_item_id?: string
+          created_at?: string | null
+          dia?: string
+          id?: string
+          semana_id?: string
+          t1_abertura?: number | null
+          t2_almoco?: number | null
+          t3_fechamento?: number | null
+          turno_encerrado_em?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cmv_praca_cmv_item_id_fkey"
+            columns: ["cmv_item_id"]
+            isOneToOne: false
+            referencedRelation: "cmv_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_praca_semana_id_fkey"
+            columns: ["semana_id"]
+            isOneToOne: false
+            referencedRelation: "semanas_cmv"
             referencedColumns: ["id"]
           },
         ]
@@ -2494,6 +2596,53 @@ export type Database = {
           {
             foreignKeyName: "sectors_unit_id_fkey"
             columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      semanas_cmv: {
+        Row: {
+          created_at: string | null
+          data_fim: string
+          data_inicio: string
+          encerrada_em: string | null
+          encerrada_por: string | null
+          id: string
+          loja_id: string
+          responsavel: string | null
+          saldo_anterior_json: Json | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          data_fim: string
+          data_inicio: string
+          encerrada_em?: string | null
+          encerrada_por?: string | null
+          id?: string
+          loja_id: string
+          responsavel?: string | null
+          saldo_anterior_json?: Json | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          data_fim?: string
+          data_inicio?: string
+          encerrada_em?: string | null
+          encerrada_por?: string | null
+          id?: string
+          loja_id?: string
+          responsavel?: string | null
+          saldo_anterior_json?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "semanas_cmv_loja_id_fkey"
+            columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]

@@ -149,7 +149,7 @@ export default function Auth() {
                   className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   Esqueceu a senha?
-                </button>
+              </form>
             </TabsContent>
             
             <TabsContent value="signup">

@@ -143,7 +143,13 @@ export default function Auth() {
                     "Entrar"
                   )}
                 </Button>
-              </form>
+                <button
+                  type="button"
+                  onClick={() => setForgotPassword(true)}
+                  className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Esqueceu a senha?
+                </button>
             </TabsContent>
             
             <TabsContent value="signup">

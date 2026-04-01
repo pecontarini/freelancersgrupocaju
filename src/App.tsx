@@ -14,6 +14,7 @@ import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
 import FreelancerCheckin from "./pages/FreelancerCheckin";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 
@@ -31,6 +32,7 @@ function App() {
                 <Sonner />
               <Routes>
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route
                   path="/confirm-shift/:scheduleId"
                   element={<ConfirmShift />}

@@ -15,6 +15,26 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [forgotPassword, setForgotPassword] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error("Informe seu e-mail.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Link de recuperação enviado! Verifique seu e-mail.");
+      setForgotPassword(false);
+    }
+    setLoading(false);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,17 +78,66 @@ export default function Auth() {
     setLoading(false);
   };
 
+  if (forgotPassword) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
+        <Card className="w-full max-w-md rounded-2xl shadow-card">
+          <CardHeader className="text-center space-y-4 pb-2">
+            <div className="flex justify-center">
+              <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
+                <img src={grupoCajuLogo} alt="Grupo Caju" className="h-auto w-full object-contain" />
+              </div>
+            </div>
+            <CardDescription className="text-base">Recuperação de Senha</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">E-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-9"
+                    required
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar link de recuperação"
+                )}
+              </Button>
+              <button
+                type="button"
+                onClick={() => setForgotPassword(false)}
+                className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                Voltar ao login
+              </button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
       <Card className="w-full max-w-md rounded-2xl shadow-card">
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
             <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-              <img
-                src={grupoCajuLogo}
-                alt="Grupo Caju"
-                className="h-auto w-full object-contain"
-              />
+              <img src={grupoCajuLogo} alt="Grupo Caju" className="h-auto w-full object-contain" />
             </div>
           </div>
           <CardDescription className="text-base">Portal da Liderança</CardDescription>
@@ -79,7 +148,7 @@ export default function Auth() {
               <TabsTrigger value="login">Entrar</TabsTrigger>
               <TabsTrigger value="signup">Criar Conta</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4 mt-4">
                 <div className="space-y-2">
@@ -123,9 +192,16 @@ export default function Auth() {
                     "Entrar"
                   )}
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setForgotPassword(true)}
+                  className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Esqueceu a senha?
+                </button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4 mt-4">
                 <div className="space-y-2">

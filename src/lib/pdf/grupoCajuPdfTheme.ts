@@ -4,7 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
 /**
- * GRUPO CAJU - INSTITUTIONAL PDF THEME
+ * CAJUPAR - INSTITUTIONAL PDF THEME
  * 
  * Design System:
  * - Predominant white background

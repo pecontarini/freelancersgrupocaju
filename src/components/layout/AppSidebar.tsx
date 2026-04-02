@@ -123,6 +123,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { isAdmin, isChefeSetor, unidades, profile } = useUserProfile();
   const { state } = useSidebar();
+  const { resolvedTheme } = useTheme();
+  const logoSrc = resolvedTheme === "dark" ? cajuparLogoLight : cajuparLogoDark;
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);

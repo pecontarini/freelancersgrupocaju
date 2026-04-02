@@ -138,15 +138,15 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <span className="font-display text-sm font-bold">C</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+              <img src={cajuparSymbol} alt="CajuPAR" className="h-8 w-8 object-contain" />
             </div>
           ) : (
             <>
               <div className="w-full overflow-hidden rounded-xl">
                 <img
-                  src={grupoCajuLogo}
-                  alt="Grupo Caju"
+                  src={logoSrc}
+                  alt="CajuPAR"
                   className="h-auto w-full object-contain"
                 />
               </div>

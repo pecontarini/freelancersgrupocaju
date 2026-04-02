@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
-import logoImg from "@/assets/grupo-caju-logo.png";
+import logoImg from "@/assets/cajupar-logo-dark.png";
 
 interface NCItem {
   id: string;

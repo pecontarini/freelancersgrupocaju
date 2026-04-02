@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { SupervisionAudit, SupervisionFailure } from "@/hooks/useSupervisionAudits";
 import { categorizeItemToSector, SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
-import logoUrl from "@/assets/grupo-caju-logo.png";
+import logoUrl from "@/assets/cajupar-logo-dark.png";
 
 interface AuditReportGeneratorProps {
   audits: SupervisionAudit[];

@@ -43,7 +43,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       {/* Mobile Header with Logo and Menu */}
       <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between bg-background/60 px-4 md:hidden glass-header">
         <div className="flex items-center gap-2">
-          <img src={grupoCajuLogo} alt="Grupo Caju" className="h-8 w-auto" />
+          <img src={theme === "dark" ? cajuparLogoLight : cajuparLogoDark} alt="CajuPAR" className="h-8 w-auto" />
         </div>
         
         <Sheet>

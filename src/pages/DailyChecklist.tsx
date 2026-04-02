@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
-import logoImg from "@/assets/grupo-caju-logo.png";
+import logoImg from "@/assets/cajupar-logo-dark.png";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PDF_COLORS, PDF_LAYOUT, addPageFooter, addContinuationHeader } from "@/lib/pdf/grupoCajuPdfTheme";

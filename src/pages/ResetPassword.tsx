@@ -77,7 +77,7 @@ export default function ResetPassword() {
           <CardHeader className="space-y-4 pb-2">
             <div className="flex justify-center">
               <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-                <img src={grupoCajuLogo} alt="Grupo Caju" className="h-auto w-full object-contain" />
+                <img src={cajuparLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
               </div>
             </div>
             <CardDescription className="text-base">

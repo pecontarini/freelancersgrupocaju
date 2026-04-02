@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Loader2, Lock, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
+import cajuparLogo from "@/assets/cajupar-logo-dark.png";
 
 export default function ResetPassword() {
   const navigate = useNavigate();

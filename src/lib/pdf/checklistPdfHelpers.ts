@@ -6,7 +6,7 @@ import { PDF_COLORS, PDF_LAYOUT, getScoreColor, addPageFooter, addContinuationHe
 import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
 /**
- * GRUPO CAJU - CHECKLIST PDF HELPERS
+ * CAJUPAR - CHECKLIST PDF HELPERS
  * 
  * Helpers específicos para PDFs de Checklist Diário e Relatório NC.
  * Seguem o design system institucional definido em grupoCajuPdfTheme.ts.

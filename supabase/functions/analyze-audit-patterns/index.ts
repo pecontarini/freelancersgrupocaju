@@ -36,7 +36,7 @@ serve(async (req) => {
       .map(([name, count]) => `${name}: ${count} falhas`)
       .join("\n");
 
-    const systemPrompt = `Você é um consultor sênior de operações de restaurantes do Grupo Caju, especializado em auditorias operacionais e gestão de qualidade.
+    const systemPrompt = `Você é um consultor sênior de operações de restaurantes do CajuPAR, especializado em auditorias operacionais e gestão de qualidade.
 
 Analise os dados de auditoria fornecidos e retorne uma análise estruturada usando a ferramenta fornecida.
 

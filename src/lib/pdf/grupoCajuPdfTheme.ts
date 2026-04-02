@@ -4,7 +4,7 @@ import { ptBR } from "date-fns/locale";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
 /**
- * GRUPO CAJU - INSTITUTIONAL PDF THEME
+ * CAJUPAR - INSTITUTIONAL PDF THEME
  * 
  * Design System:
  * - Predominant white background
@@ -272,7 +272,7 @@ export function addExecutiveCover(doc: jsPDF, params: CoverPageParams): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • Grupo Caju", centerX, pageHeight - 30, { align: "center" });
+  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 30, { align: "center" });
 }
 
 /**
@@ -550,7 +550,7 @@ export function addSignaturePage(doc: jsPDF): void {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Este documento faz parte do sistema de gestão de qualidade do Grupo Caju", centerX, pageHeight - 35, { align: "center" });
+  doc.text("Este documento faz parte do sistema de gestão de qualidade do CajuPAR", centerX, pageHeight - 35, { align: "center" });
 }
 
 /**
@@ -575,7 +575,7 @@ export function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number): 
   doc.text(format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }), margin, pageHeight - 7);
 
   // Center: Brand
-  doc.text("Grupo Caju • Auditoria Operacional", pageWidth / 2, pageHeight - 7, { align: "center" });
+  doc.text("CajuPAR • Auditoria Operacional", pageWidth / 2, pageHeight - 7, { align: "center" });
 
   // Right: Pagination
   doc.text(`${pageNum}/${totalPages}`, pageWidth - margin, pageHeight - 7, { align: "right" });

@@ -6,7 +6,7 @@ import { PDF_COLORS, PDF_LAYOUT, getScoreColor, addPageFooter, addContinuationHe
 import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
 /**
- * GRUPO CAJU - CHECKLIST PDF HELPERS
+ * CAJUPAR - CHECKLIST PDF HELPERS
  * 
  * Helpers específicos para PDFs de Checklist Diário e Relatório NC.
  * Seguem o design system institucional definido em grupoCajuPdfTheme.ts.
@@ -192,7 +192,7 @@ export function addChecklistCover(doc: jsPDF, params: ChecklistCoverParams): voi
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • Grupo Caju", centerX, pageHeight - 30, { align: "center" });
+  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 30, { align: "center" });
 }
 
 // ============================================================

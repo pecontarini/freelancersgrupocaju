@@ -216,7 +216,7 @@ function generateSectorPDF(
         doc.setFontSize(7);
         doc.setTextColor(...PDF_COLORS.gray400);
         doc.text(
-          `Documento interno • Grupo Caju • ${group.displayName}`,
+          `Documento interno • CajuPAR • ${group.displayName}`,
           pageWidth / 2,
           pageH - 10,
           { align: "center" }

@@ -23,7 +23,7 @@ interface ExportReportButtonProps {
   dateRange?: { start: string | null; end: string | null };
 }
 
-// Colors for PDF styling - Using Grupo Caju brand colors (Coral/Terracotta: HSL 14, 70%, 48%)
+// Colors for PDF styling - Using CajuPAR brand colors (Coral/Terracotta: HSL 14, 70%, 48%)
 // Converted to RGB: hsl(14, 70%, 48%) ≈ rgb(208, 89, 55)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta brand color
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
@@ -146,7 +146,7 @@ export function ExportReportButton({
         doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
-        doc.text(`GRUPO CAJU - ${unidadeName.toUpperCase()}`, margin + 35, 18);
+        doc.text(`CAJUPAR - ${unidadeName.toUpperCase()}`, margin + 35, 18);
 
         // Subtitle
         doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);

@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, CheckCircle2, XCircle, Clock, MapPin, User, AlertTriangle, PartyPopper } from "lucide-react";
-import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
+import cajuparLogo from "@/assets/cajupar-logo-dark.png";
 
 interface ScheduleInfo {
   id: string;
@@ -179,7 +179,7 @@ export default function ConfirmShift() {
 
   const shell = (children: React.ReactNode) => (
     <div className="min-h-screen bg-muted flex flex-col items-center px-4 py-6">
-      <img src={grupoCajuLogo} alt="Grupo Caju" className="h-10 mb-6" />
+      <img src={cajuparLogo} alt="CajuPAR" className="h-10 mb-6" />
       {children}
     </div>
   );

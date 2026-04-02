@@ -46,7 +46,7 @@ function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number) {
   doc.setFontSize(7);
   doc.setTextColor(...PDF_COLORS.gray400);
   doc.text(format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR }), margin, pageHeight - 10);
-  doc.text("Grupo Caju — Escala Operacional", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text("CajuPAR — Escala Operacional", pageWidth / 2, pageHeight - 10, { align: "center" });
   doc.text(`Página ${pageNum} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: "right" });
 }
 
@@ -119,7 +119,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • Grupo Caju", centerX, pageHeight - 22, { align: "center" });
+  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 22, { align: "center" });
 
   // ── SECTOR PAGES ──
   for (const sector of sectors) {

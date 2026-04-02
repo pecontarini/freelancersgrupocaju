@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Loader2, Lock, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
-import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
+import cajuparLogo from "@/assets/cajupar-logo-dark.png";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -77,7 +77,7 @@ export default function ResetPassword() {
           <CardHeader className="space-y-4 pb-2">
             <div className="flex justify-center">
               <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-                <img src={grupoCajuLogo} alt="Grupo Caju" className="h-auto w-full object-contain" />
+                <img src={cajuparLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
               </div>
             </div>
             <CardDescription className="text-base">
@@ -100,7 +100,7 @@ export default function ResetPassword() {
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
             <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-              <img src={grupoCajuLogo} alt="Grupo Caju" className="h-auto w-full object-contain" />
+              <img src={cajuparLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
             </div>
           </div>
           <CardDescription className="text-base">Defina sua nova senha</CardDescription>

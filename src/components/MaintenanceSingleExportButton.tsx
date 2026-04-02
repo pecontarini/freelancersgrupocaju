@@ -13,7 +13,7 @@ import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
-// Brand colors (Grupo Caju)
+// Brand colors (CajuPAR)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
 const HEADER_BG: [number, number, number] = [245, 245, 245]; // Light gray background
@@ -431,7 +431,7 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Documento gerado automaticamente pelo Sistema Grupo Caju", margin, pageHeight - 12);
+        doc.text("Documento gerado automaticamente pelo Sistema CajuPAR", margin, pageHeight - 12);
         doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: "right" });
       }
 

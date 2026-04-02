@@ -43,7 +43,10 @@ import { Button } from "@/components/ui/button";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
+import { useTheme } from "next-themes";
+import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
+import cajuparLogoLight from "@/assets/cajupar-logo-light.png";
+import cajuparSymbol from "@/assets/cajupar-symbol.png";
 
 interface AppSidebarProps {
   activeTab: string;
@@ -120,6 +123,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { isAdmin, isChefeSetor, unidades, profile } = useUserProfile();
   const { state } = useSidebar();
+  const { resolvedTheme } = useTheme();
+  const logoSrc = resolvedTheme === "dark" ? cajuparLogoLight : cajuparLogoDark;
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
@@ -133,15 +138,15 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <span className="font-display text-sm font-bold">C</span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+              <img src={cajuparSymbol} alt="CajuPAR" className="h-8 w-8 object-contain" />
             </div>
           ) : (
             <>
               <div className="w-full overflow-hidden rounded-xl">
                 <img
-                  src={grupoCajuLogo}
-                  alt="Grupo Caju"
+                  src={logoSrc}
+                  alt="CajuPAR"
                   className="h-auto w-full object-contain"
                 />
               </div>

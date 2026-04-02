@@ -7,7 +7,7 @@ import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 
-// Brand colors (Grupo Caju)
+// Brand colors (CajuPAR)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
 const HEADER_BG: [number, number, number] = [245, 245, 245]; // Light gray background
@@ -62,7 +62,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Documento gerado automaticamente pelo Sistema Grupo Caju", margin, pageHeight - 12);
+        doc.text("Documento gerado automaticamente pelo Sistema CajuPAR", margin, pageHeight - 12);
         doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: "right" });
       };
 
@@ -92,7 +92,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text(`GRUPO CAJU - ${displayLoja.toUpperCase()}`, margin + 48, 26);
+      doc.text(`CAJUPAR - ${displayLoja.toUpperCase()}`, margin + 48, 26);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");

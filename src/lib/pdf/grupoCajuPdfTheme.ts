@@ -550,7 +550,7 @@ export function addSignaturePage(doc: jsPDF): void {
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Este documento faz parte do sistema de gestão de qualidade do Grupo Caju", centerX, pageHeight - 35, { align: "center" });
+  doc.text("Este documento faz parte do sistema de gestão de qualidade do CajuPAR", centerX, pageHeight - 35, { align: "center" });
 }
 
 /**

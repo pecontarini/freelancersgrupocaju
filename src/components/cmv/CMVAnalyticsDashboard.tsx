@@ -270,7 +270,7 @@ export function CMVAnalyticsDashboard() {
       doc.setFontSize(8);
       doc.setTextColor(128, 128, 128);
       doc.text(
-        `Página ${i} de ${pageCount} | Grupo Caju - CMV Carnes`,
+        `Página ${i} de ${pageCount} | CajuPAR - CMV Carnes`,
         doc.internal.pageSize.width / 2,
         doc.internal.pageSize.height - 10,
         { align: "center" }

@@ -4,7 +4,7 @@ import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
 import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
 /**
- * GRUPO CAJU - CORPORATE OCCURRENCE CARDS
+ * CAJUPAR - CORPORATE OCCURRENCE CARDS
  * 
  * Professional, minimalist cards for audit non-conformities.
  * - Clean bordered boxes

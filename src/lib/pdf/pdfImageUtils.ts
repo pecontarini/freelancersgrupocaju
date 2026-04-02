@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import { PDF_COLORS } from "@/lib/pdf/grupoCajuPdfTheme";
 
 /**
- * GRUPO CAJU - PDF IMAGE UTILITIES
+ * CAJUPAR - PDF IMAGE UTILITIES
  * 
  * Professional image handling for audit reports.
  * - No placeholder text when images fail to load

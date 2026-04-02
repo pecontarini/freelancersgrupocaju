@@ -43,7 +43,10 @@ import { Button } from "@/components/ui/button";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import grupoCajuLogo from "@/assets/grupo-caju-logo.png";
+import { useTheme } from "next-themes";
+import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
+import cajuparLogoLight from "@/assets/cajupar-logo-light.png";
+import cajuparSymbol from "@/assets/cajupar-symbol.png";
 
 interface AppSidebarProps {
   activeTab: string;

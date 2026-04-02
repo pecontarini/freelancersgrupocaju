@@ -272,7 +272,7 @@ export function addExecutiveCover(doc: jsPDF, params: CoverPageParams): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • Grupo Caju", centerX, pageHeight - 30, { align: "center" });
+  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 30, { align: "center" });
 }
 
 /**

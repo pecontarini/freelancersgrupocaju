@@ -119,7 +119,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • Grupo Caju", centerX, pageHeight - 22, { align: "center" });
+  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 22, { align: "center" });
 
   // ── SECTOR PAGES ──
   for (const sector of sectors) {

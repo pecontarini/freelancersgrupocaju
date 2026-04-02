@@ -41,7 +41,7 @@ serve(async (req) => {
 Analise os dados de auditoria fornecidos e retorne uma análise estruturada usando a ferramenta fornecida.
 
 Contexto do negócio:
-- Grupo Caju opera restaurantes com marcas Caminito, Nazo, Caju e Fosters
+- Grupo CajuPAR opera restaurantes com marcas Caminito, Nazo, Caju e Fosters
 - Setores operacionais: Salão, Bar, Cozinha, Parrilla, Sushi, Estoque, DML, Delivery, ASG, Manutenção, Brinquedoteca, Recepção, Lavagem, Documentos
 - Hierarquia: Chefes de Setor → Gerentes (Front/Back) → Diretoria
 - Auditorias avaliam conformidade operacional, higiene, organização e processos`;

@@ -575,7 +575,7 @@ export function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number): 
   doc.text(format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }), margin, pageHeight - 7);
 
   // Center: Brand
-  doc.text("Grupo Caju • Auditoria Operacional", pageWidth / 2, pageHeight - 7, { align: "center" });
+  doc.text("CajuPAR • Auditoria Operacional", pageWidth / 2, pageHeight - 7, { align: "center" });
 
   // Right: Pagination
   doc.text(`${pageNum}/${totalPages}`, pageWidth - margin, pageHeight - 7, { align: "right" });

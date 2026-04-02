@@ -92,7 +92,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text(`GRUPO CAJU - ${displayLoja.toUpperCase()}`, margin + 48, 26);
+      doc.text(`CAJUPAR - ${displayLoja.toUpperCase()}`, margin + 48, 26);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");

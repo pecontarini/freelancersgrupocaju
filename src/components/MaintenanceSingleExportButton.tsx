@@ -431,7 +431,7 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Documento gerado automaticamente pelo Sistema Grupo Caju", margin, pageHeight - 12);
+        doc.text("Documento gerado automaticamente pelo Sistema CajuPAR", margin, pageHeight - 12);
         doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: "right" });
       }
 

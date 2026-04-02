@@ -46,7 +46,7 @@ function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number) {
   doc.setFontSize(7);
   doc.setTextColor(...PDF_COLORS.gray400);
   doc.text(format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR }), margin, pageHeight - 10);
-  doc.text("Grupo Caju — Escala Operacional", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text("CajuPAR — Escala Operacional", pageWidth / 2, pageHeight - 10, { align: "center" });
   doc.text(`Página ${pageNum} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: "right" });
 }
 

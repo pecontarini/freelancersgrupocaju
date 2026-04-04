@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
-import cajuparLogo from "@/assets/cajupar-logo-dark.png";
+import cajuparLogo from "@/assets/07f6fb04-f853-4127-a812-fa0223cf735a.png";
 
 export default function Auth() {
   const navigate = useNavigate();

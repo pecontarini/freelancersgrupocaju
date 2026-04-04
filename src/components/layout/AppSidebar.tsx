@@ -45,7 +45,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "next-themes";
 import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
-import cajuparLogoLight from "@/assets/cajupar-logo-light.png";
+import cajuparLogoLight from "@/assets/ce45fbcb-19ce-4532-9dff-74730bd22da7.png";
 import cajuparSymbol from "@/assets/cajupar-symbol.png";
 
 interface AppSidebarProps {

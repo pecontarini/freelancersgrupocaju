@@ -1,87 +1,91 @@
 
 
-# Plano: Rebranding Grupo Caju → CajuPAR
+# Plano: Feature 1 (Resumo de Horas) + Feature 2 (Dashboard POP)
 
-## Resumo
+## Diagnóstico
 
-Substituir toda a identidade visual "Grupo Caju" pela nova marca "CajuPAR" em todo o sistema: logos, textos, metadados, PDFs e favicons.
+| Item | Valor confirmado |
+|------|-----------------|
+| Tabela de turnos | `schedules` |
+| Campos de horário | `start_time`, `end_time` (time), `break_duration` (int, minutos) |
+| Tabela POP | `staffing_matrix` (campos: `sector_id`, `day_of_week`, `shift_type`, `required_count`, `extras_count`) |
+| Tabela de setores | `sectors` (campo `unit_id` vincula à loja) |
+| Roles | `admin`, `operator` (sócio), `gerente_unidade`, `chefe_setor`, `employee` — via `useUserProfile` |
+| Editor de escalas | `ManualScheduleGrid.tsx` — já carrega `schedules`, `employees`, `sectors`, `staffingMatrix` |
+| Tabs de Escalas | `EscalasTab.tsx` — 6 sub-abas existentes |
 
-## Assets Recebidos
+---
 
-| Imagem | Uso |
-|--------|-----|
-| `Logo_principal_preta_PNG.png` | Sidebar (tema claro), Auth, PDFs |
-| `Logo_principal_branca_PNG.png` | Sidebar (tema escuro), mobile header dark |
-| `Simbolo_PNG.png` | Favicon, sidebar colapsada, ícone mobile |
-| `Simbolo_branco_monocromatico_PNG.png` | Ícone em fundos escuros |
-| `Simbolo_preto_monocromatico_PNG.png` | Ícone em fundos claros |
-| `Logo_principal_branca_monocromatica_PNG.png` | PDFs (fundo escuro), rodapés |
-| `Logo_principal_preta_monocromatica_PNG.png` | PDFs (fundo claro) |
+## FEATURE 1 — Somatório de Horas Semanais
 
-## Alterações
+### Arquivo novo: `src/components/escalas/WeeklyHoursSummary.tsx`
 
-### 1. Copiar assets para o projeto
-- Copiar logos para `src/assets/cajupar-logo-dark.png` (logo preta, para fundo claro) e `src/assets/cajupar-logo-light.png` (logo branca, para fundo escuro)
-- Copiar símbolo colorido para `src/assets/cajupar-symbol.png`
-- Copiar símbolo preto para `public/favicon-cajupar.png` e gerar favicon
+Componente colapsável que recebe `schedules`, `employees` e `weekDays` como props do `ManualScheduleGrid`.
 
-### 2. Sidebar (`src/components/layout/AppSidebar.tsx`)
-- Trocar import de `grupo-caju-logo.png` por logos CajuPAR
-- Usar logo escura no tema claro, logo branca no tema escuro (via `useTheme`)
-- Sidebar colapsada: mostrar símbolo CajuPAR em vez da letra "C"
-- Atualizar alt text e subtítulo "Portal da Liderança" mantido
+**Lógica de cálculo:**
+- Para cada schedule `working`, calcula duração = `end_time - start_time` (se cruza meia-noite, soma 24h)
+- Subtrai `break_duration` em minutos
+- Agrupa por `employee_id` e dia
+- Soma por semana
 
-### 3. Bottom Navigation (`src/components/layout/BottomNavigation.tsx`)
-- Trocar logo no header mobile pelo símbolo/logo CajuPAR
-- Theme-aware: logo escura em fundo claro, branca em fundo escuro
+**Tabela renderizada:**
+- Colunas: Funcionário | Seg | Ter | Qua | Qui | Sex | Sáb | Dom | Total
+- Célula do dia: "6h" ou "8h30" ou "—"
+- Célula vermelha se > 10h no dia
+- Total verde (≤44h), amarelo (44-48h), vermelho (>48h)
 
-### 4. Auth + Reset Password (`src/pages/Auth.tsx`, `src/pages/ResetPassword.tsx`)
-- Trocar logo para CajuPAR
-- Atualizar alt text de "Grupo Caju" para "CajuPAR"
+**UI:** Usa `Collapsible` do shadcn, posicionado abaixo da grade semanal.
 
-### 5. Confirm Shift (`src/pages/ConfirmShift.tsx`)
-- Trocar logo e alt text
+### Arquivo modificado: `src/components/escalas/ManualScheduleGrid.tsx`
 
-### 6. Daily Checklist + Checklist Corrections (`src/pages/DailyChecklist.tsx`, `src/pages/ChecklistCorrections.tsx`)
-- Trocar import de logo
+- Importa e renderiza `<WeeklyHoursSummary>` após a tabela de escalas, passando `schedules`, `employees` e `weekDays`
+- Atualiza automaticamente pois usa os mesmos dados reativos do React Query
 
-### 7. PDF Generators (6 arquivos)
-- `src/lib/pdf/grupoCajuPdfTheme.ts` — Atualizar textos "Grupo Caju" para "CajuPAR", atualizar `LOGO_BASE64` com novo logo
-- `src/lib/scheduleMasterPdf.ts` — Trocar referências textuais
-- `src/components/ExportReportButton.tsx` — Trocar título "GRUPO CAJU"
-- `src/components/MaintenanceExportButton.tsx` — Trocar referências
-- `src/components/audit-diagnostic/AuditReportGenerator.tsx` — Trocar logo import
-- `src/lib/logoBase64.ts` — Regenerar base64 com o novo logo CajuPAR
+---
 
-### 8. Edge Function (`supabase/functions/analyze-audit-patterns/index.ts`)
-- Trocar "Grupo Caju" no prompt do sistema por "CajuPAR"
+## FEATURE 2 — Dashboard POP
 
-### 9. Metadados (`index.html`)
-- Title: "CajuPAR - Portal da Liderança"
-- Atualizar og:title, og:description, meta author, etc.
+### Arquivo novo: `src/hooks/usePopCompliance.ts`
 
-### 10. Busca global por referências remanescentes
-- Varrer todos os arquivos por "Grupo Caju" e "grupo-caju" para garantir cobertura completa
+Hook que:
+1. Busca todas as `config_lojas`
+2. Para cada loja, busca `sectors` → `staffing_matrix` + `schedules` da semana
+3. Calcula conformidade por loja/setor/dia comparando escalados vs meta POP
+4. Retorna dados estruturados para o dashboard
 
-## Arquivos Impactados
+### Arquivo novo: `src/components/escalas/PopComplianceDashboard.tsx`
+
+Dashboard com 4 blocos conforme especificado:
+
+**Bloco 1 — 4 Cards:** Total setores, conformes (verde), com gaps (amarelo), críticos (vermelho)
+
+**Bloco 2 — Mapa de conformidade:** Tabela lojas × dias com badges coloridos. Clique expande detalhamento por setor com setores, escalados, meta, diferença.
+
+**Bloco 3 — Ranking de gaps:** Bar chart (Recharts, já usado no projeto) dos 10 setores com mais dias abaixo do POP.
+
+**Bloco 4 — Heatmap semanal:** Grade 7 colunas × N lojas com quadrados coloridos.
+
+**Filtros no topo:** Navegação de semana, multi-select de lojas, seletor de turno (Almoço/Jantar/Ambos).
+
+**Acesso restrito:** Visível apenas para `isAdmin || isOperator`.
+
+### Arquivo modificado: `src/components/escalas/EscalasTab.tsx`
+
+- Adiciona nova tab `"pop-dashboard"` com ícone `BarChart3`
+- Renderiza `<PopComplianceDashboard>` condicionalmente quando `isAdmin || isOperator`
+- Usa `useUserProfile` para controle de visibilidade
+
+---
+
+## Resumo de arquivos
 
 | Arquivo | Ação |
 |---------|------|
-| `src/assets/` | Adicionar 3+ novos assets CajuPAR |
-| `public/` | Novo favicon |
-| `index.html` | Atualizar metadados |
-| `src/components/layout/AppSidebar.tsx` | Logo + tema |
-| `src/components/layout/BottomNavigation.tsx` | Logo mobile |
-| `src/pages/Auth.tsx` | Logo login |
-| `src/pages/ResetPassword.tsx` | Logo reset |
-| `src/pages/ConfirmShift.tsx` | Logo |
-| `src/pages/DailyChecklist.tsx` | Logo |
-| `src/pages/ChecklistCorrections.tsx` | Logo |
-| `src/lib/logoBase64.ts` | Novo base64 |
-| `src/lib/pdf/grupoCajuPdfTheme.ts` | Textos PDF |
-| `src/lib/scheduleMasterPdf.ts` | Textos PDF |
-| `src/components/ExportReportButton.tsx` | Textos PDF |
-| `src/components/MaintenanceExportButton.tsx` | Textos PDF |
-| `src/components/audit-diagnostic/AuditReportGenerator.tsx` | Logo PDF |
-| `supabase/functions/analyze-audit-patterns/index.ts` | Prompt AI |
+| `src/components/escalas/WeeklyHoursSummary.tsx` | Criar |
+| `src/components/escalas/ManualScheduleGrid.tsx` | Modificar (adicionar painel de horas) |
+| `src/hooks/usePopCompliance.ts` | Criar |
+| `src/components/escalas/PopComplianceDashboard.tsx` | Criar |
+| `src/components/escalas/EscalasTab.tsx` | Modificar (adicionar tab Dashboard POP) |
+
+Nenhuma alteração no banco de dados é necessária. Todos os cálculos são feitos no frontend a partir de dados existentes.
 

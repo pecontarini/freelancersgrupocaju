@@ -79,8 +79,17 @@ export function usePopCompliance(
       }
 
       // Fetch schedules for the week across all units
-      const schedules = await fetchAllRows(
-        supabase
+      interface ScheduleRow {
+        id: string;
+        employee_id: string;
+        schedule_date: string;
+        sector_id: string;
+        schedule_type: string;
+        start_time: string | null;
+        end_time: string | null;
+      }
+      const schedules = await fetchAllRows<ScheduleRow>(
+        () => supabase
           .from("schedules")
           .select("id, employee_id, schedule_date, sector_id, schedule_type, start_time, end_time")
           .gte("schedule_date", weekStart)

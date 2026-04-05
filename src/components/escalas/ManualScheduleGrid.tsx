@@ -56,6 +56,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { MasterExportButton } from "./MasterExportButton";
+import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -601,6 +602,15 @@ export function ManualScheduleGrid() {
               )}
             </CardContent>
           </Card>
+
+          {/* Weekly Hours Summary */}
+          {schedules.length > 0 && employees.length > 0 && (
+            <WeeklyHoursSummary
+              schedules={schedules}
+              employees={employees}
+              weekDays={weekDays}
+            />
+          )}
         </>
       )}
 

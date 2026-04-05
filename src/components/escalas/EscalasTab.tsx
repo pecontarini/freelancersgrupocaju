@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3 } from "lucide-react";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";
 import { TeamManagement } from "./TeamManagement";
 import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
+import { PopComplianceDashboard } from "./PopComplianceDashboard";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface EscalasTabProps {
   defaultTab?: string;
@@ -17,9 +19,11 @@ interface EscalasTabProps {
 export function EscalasTab({ defaultTab }: EscalasTabProps) {
   
   const { data: confirmations } = usePendingConfirmations();
+  const { isAdmin, isOperator } = useUserProfile();
 
   const hasRisk = (confirmations?.pending ?? 0) > 0 || (confirmations?.denied ?? 0) > 0;
   const [tab, setTab] = useState(defaultTab || "scheduler");
+  const showPopDashboard = isAdmin || isOperator;
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -44,6 +48,13 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Quadro Operacional</span>
           <span className="sm:hidden">Quadro</span>
         </TabsTrigger>
+        {showPopDashboard && (
+          <TabsTrigger value="pop-dashboard" className="gap-1.5">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Dashboard POP</span>
+            <span className="sm:hidden">POP</span>
+          </TabsTrigger>
+        )}
         <TabsTrigger value="equipe" className="gap-1.5">
           <Users className="h-4 w-4" />
           Equipe
@@ -69,6 +80,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="quadro">
         <OperationalDashboard />
       </TabsContent>
+      {showPopDashboard && (
+        <TabsContent value="pop-dashboard">
+          <PopComplianceDashboard />
+        </TabsContent>
+      )}
       <TabsContent value="equipe">
         <TeamManagement />
       </TabsContent>

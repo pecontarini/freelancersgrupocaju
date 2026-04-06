@@ -1,91 +1,50 @@
 
 
-# Plano: Feature 1 (Resumo de Horas) + Feature 2 (Dashboard POP)
+# Plano: Freelancers escalados aparecem automaticamente na aba Presença
 
-## Diagnóstico
+## Problema
 
-| Item | Valor confirmado |
-|------|-----------------|
-| Tabela de turnos | `schedules` |
-| Campos de horário | `start_time`, `end_time` (time), `break_duration` (int, minutos) |
-| Tabela POP | `staffing_matrix` (campos: `sector_id`, `day_of_week`, `shift_type`, `required_count`, `extras_count`) |
-| Tabela de setores | `sectors` (campo `unit_id` vincula à loja) |
-| Roles | `admin`, `operator` (sócio), `gerente_unidade`, `chefe_setor`, `employee` — via `useUserProfile` |
-| Editor de escalas | `ManualScheduleGrid.tsx` — já carrega `schedules`, `employees`, `sectors`, `staffingMatrix` |
-| Tabs de Escalas | `EscalasTab.tsx` — 6 sub-abas existentes |
+O sistema de escalas (`employees` + `schedules`) e o sistema de check-in (`freelancer_profiles` + `freelancer_checkins`) são independentes. Quando um freelancer é adicionado na escala, ele não aparece na aba "Presença" (CheckinManagerDashboard) porque nenhum registro é criado em `freelancer_checkins`.
 
----
+## Abordagem
 
-## FEATURE 1 — Somatório de Horas Semanais
+Em vez de forçar integração no banco (que exigiria CPF no modal de escalas e criação de `freelancer_profiles`), a solução é **exibir freelancers escalados diretamente no CheckinManagerDashboard**, consultando a tabela `schedules` + `employees` para o dia selecionado.
 
-### Arquivo novo: `src/components/escalas/WeeklyHoursSummary.tsx`
+O dashboard mostrará uma seção **"Agendados na Escala"** acima dos cards de check-in existentes, listando freelancers que foram escalados mas ainda não fizeram check-in. Freelancers que já têm um `freelancer_checkins` correspondente (match por nome) serão marcados como "Check-in realizado".
 
-Componente colapsável que recebe `schedules`, `employees` e `weekDays` como props do `ManualScheduleGrid`.
+## Mudanças
 
-**Lógica de cálculo:**
-- Para cada schedule `working`, calcula duração = `end_time - start_time` (se cruza meia-noite, soma 24h)
-- Subtrai `break_duration` em minutos
-- Agrupa por `employee_id` e dia
-- Soma por semana
+### 1. Novo hook: `src/hooks/useScheduledFreelancers.ts`
 
-**Tabela renderizada:**
-- Colunas: Funcionário | Seg | Ter | Qua | Qui | Sex | Sáb | Dom | Total
-- Célula do dia: "6h" ou "8h30" ou "—"
-- Célula vermelha se > 10h no dia
-- Total verde (≤44h), amarelo (44-48h), vermelho (>48h)
+- Recebe `unitId` e `date`
+- Busca `schedules` com status `working` para a data, fazendo join com `employees` onde `worker_type = 'freelancer'`
+- Retorna lista: `{ employeeName, jobTitle, startTime, endTime, agreedRate, scheduleDate }`
 
-**UI:** Usa `Collapsible` do shadcn, posicionado abaixo da grade semanal.
+### 2. Modificar: `src/components/checkin/CheckinManagerDashboard.tsx`
 
-### Arquivo modificado: `src/components/escalas/ManualScheduleGrid.tsx`
+- Importar o novo hook
+- Na tab "Presença", acima dos cards de check-in, renderizar uma seção "Agendados na Escala" com cards compactos mostrando:
+  - Nome do freelancer
+  - Cargo
+  - Horário escalado (ex: 08:00 – 16:20)
+  - Valor da diária (R$)
+  - Badge de status: "Aguardando Check-in" (amarelo) ou "Check-in realizado" (verde, se houver match por nome em `freelancer_checkins`)
+- A seção só aparece se houver freelancers escalados
+- Design usa os mesmos componentes de Card/Badge do sistema existente
 
-- Importa e renderiza `<WeeklyHoursSummary>` após a tabela de escalas, passando `schedules`, `employees` e `weekDays`
-- Atualiza automaticamente pois usa os mesmos dados reativos do React Query
+### 3. Lógica de match
 
----
+Para determinar se um freelancer escalado já fez check-in:
+- Compara `employee.name` (da escala) com `freelancer_profiles.nome_completo` (do check-in) via normalização (lowercase, trim)
+- Se houver match, o card mostra "Check-in realizado" em verde
+- Se não, mostra "Aguardando Check-in" em amarelo/warning
 
-## FEATURE 2 — Dashboard POP
-
-### Arquivo novo: `src/hooks/usePopCompliance.ts`
-
-Hook que:
-1. Busca todas as `config_lojas`
-2. Para cada loja, busca `sectors` → `staffing_matrix` + `schedules` da semana
-3. Calcula conformidade por loja/setor/dia comparando escalados vs meta POP
-4. Retorna dados estruturados para o dashboard
-
-### Arquivo novo: `src/components/escalas/PopComplianceDashboard.tsx`
-
-Dashboard com 4 blocos conforme especificado:
-
-**Bloco 1 — 4 Cards:** Total setores, conformes (verde), com gaps (amarelo), críticos (vermelho)
-
-**Bloco 2 — Mapa de conformidade:** Tabela lojas × dias com badges coloridos. Clique expande detalhamento por setor com setores, escalados, meta, diferença.
-
-**Bloco 3 — Ranking de gaps:** Bar chart (Recharts, já usado no projeto) dos 10 setores com mais dias abaixo do POP.
-
-**Bloco 4 — Heatmap semanal:** Grade 7 colunas × N lojas com quadrados coloridos.
-
-**Filtros no topo:** Navegação de semana, multi-select de lojas, seletor de turno (Almoço/Jantar/Ambos).
-
-**Acesso restrito:** Visível apenas para `isAdmin || isOperator`.
-
-### Arquivo modificado: `src/components/escalas/EscalasTab.tsx`
-
-- Adiciona nova tab `"pop-dashboard"` com ícone `BarChart3`
-- Renderiza `<PopComplianceDashboard>` condicionalmente quando `isAdmin || isOperator`
-- Usa `useUserProfile` para controle de visibilidade
-
----
-
-## Resumo de arquivos
+## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/WeeklyHoursSummary.tsx` | Criar |
-| `src/components/escalas/ManualScheduleGrid.tsx` | Modificar (adicionar painel de horas) |
-| `src/hooks/usePopCompliance.ts` | Criar |
-| `src/components/escalas/PopComplianceDashboard.tsx` | Criar |
-| `src/components/escalas/EscalasTab.tsx` | Modificar (adicionar tab Dashboard POP) |
+| `src/hooks/useScheduledFreelancers.ts` | Criar |
+| `src/components/checkin/CheckinManagerDashboard.tsx` | Modificar (adicionar seção de agendados) |
 
-Nenhuma alteração no banco de dados é necessária. Todos os cálculos são feitos no frontend a partir de dados existentes.
+Nenhuma alteração no banco de dados necessária. Os dados já existem nas tabelas `schedules` e `employees`.
 

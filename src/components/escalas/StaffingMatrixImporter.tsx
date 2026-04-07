@@ -196,7 +196,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
         }
 
         for (const d of row.days) {
-          onUpsert({
+          await onUpsert({
             sector_id: sectorId,
             day_of_week: d.day,
             shift_type: row.shiftType,

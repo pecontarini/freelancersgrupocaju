@@ -62,7 +62,7 @@ interface Props {
     shift_type: string;
     required_count: number;
     extras_count: number;
-  }) => void;
+  }) => Promise<void>;
   onAddSector: (params: { unit_id: string; name: string }) => Promise<void>;
 }
 

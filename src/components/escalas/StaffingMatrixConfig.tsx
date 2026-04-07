@@ -181,7 +181,7 @@ export function StaffingMatrixConfig() {
               <StaffingMatrixImporter
                 selectedUnit={selectedUnit}
                 sectors={sectors}
-                onUpsert={(row) => upsertMatrix.mutate(row)}
+                onUpsert={async (row) => { await upsertMatrix.mutateAsync(row); }}
                 onAddSector={async (params) => { addSector.mutateAsync(params); }}
               />
             </>

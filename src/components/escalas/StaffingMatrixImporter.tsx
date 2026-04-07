@@ -62,7 +62,7 @@ interface Props {
     shift_type: string;
     required_count: number;
     extras_count: number;
-  }) => void;
+  }) => Promise<void>;
   onAddSector: (params: { unit_id: string; name: string }) => Promise<void>;
 }
 
@@ -196,7 +196,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
         }
 
         for (const d of row.days) {
-          onUpsert({
+          await onUpsert({
             sector_id: sectorId,
             day_of_week: d.day,
             shift_type: row.shiftType,

@@ -1,50 +1,89 @@
 
 
-# Plano: Freelancers escalados aparecem automaticamente na aba Presença
+# Plano: Importação Inteligente da Matriz POP via Imagem
 
-## Problema
+## Resumo
 
-O sistema de escalas (`employees` + `schedules`) e o sistema de check-in (`freelancer_profiles` + `freelancer_checkins`) são independentes. Quando um freelancer é adicionado na escala, ele não aparece na aba "Presença" (CheckinManagerDashboard) porque nenhum registro é criado em `freelancer_checkins`.
+Criar um botão "Importar via IA" na tela da Matriz de Efetivo Mínimo (StaffingMatrixConfig) que aceita uma foto/imagem da tabela de efetivos. A IA (Gemini 2.5 Flash, com visão) interpreta a imagem e extrai setores, dias da semana, turnos, efetivos e extras. O resultado é exibido numa tela de revisão antes de ser aplicado à matriz.
 
-## Abordagem
+---
 
-Em vez de forçar integração no banco (que exigiria CPF no modal de escalas e criação de `freelancer_profiles`), a solução é **exibir freelancers escalados diretamente no CheckinManagerDashboard**, consultando a tabela `schedules` + `employees` para o dia selecionado.
+## Edge Function: `supabase/functions/extract-staffing-matrix/index.ts`
 
-O dashboard mostrará uma seção **"Agendados na Escala"** acima dos cards de check-in existentes, listando freelancers que foram escalados mas ainda não fizeram check-in. Freelancers que já têm um `freelancer_checkins` correspondente (match por nome) serão marcados como "Check-in realizado".
+- Recebe imagem (base64 + mimeType) via POST
+- Prompt de sistema instruindo a IA a:
+  - Identificar o nome da unidade (cabeçalho)
+  - Separar por setor (GARÇOM + CHEFIAS, CUMINS, HOSTESS, etc.)
+  - Para cada setor, extrair por turno (ALMOÇO/JANTAR) e dia (Seg-Dom)
+  - Interpretar "5+2" como `{ efetivos: 5, extras: 2 }` e "5" como `{ efetivos: 5, extras: 0 }`
+  - Ignorar colunas "Nº PESSOAS NECESSÁRIAS" e "Nº DOBRAS"
+- Retorna JSON:
+  ```json
+  {
+    "unit_name": "CAMINITO PARRILLA ASA SUL",
+    "sectors": [
+      {
+        "name": "GARÇOM + CHEFIAS",
+        "shifts": [
+          {
+            "type": "ALMOÇO",
+            "days": [
+              { "day": 0, "efetivos": 6, "extras": 0 },
+              { "day": 1, "efetivos": 7, "extras": 0 },
+              ...
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- Usa `google/gemini-2.5-flash` (visão multimodal) via `ai.gateway.lovable.dev`
+- Segue o mesmo padrão de `extract-team-data` (CORS, error handling, JSON extraction)
 
-## Mudanças
+---
 
-### 1. Novo hook: `src/hooks/useScheduledFreelancers.ts`
+## Componente: `src/components/escalas/StaffingMatrixImporter.tsx`
 
-- Recebe `unitId` e `date`
-- Busca `schedules` com status `working` para a data, fazendo join com `employees` onde `worker_type = 'freelancer'`
-- Retorna lista: `{ employeeName, jobTitle, startTime, endTime, agreedRate, scheduleDate }`
+Dialog/modal com 3 etapas:
 
-### 2. Modificar: `src/components/checkin/CheckinManagerDashboard.tsx`
+**Etapa 1 — Upload:** Input de imagem (câmera ou galeria). Mostra preview da imagem.
 
-- Importar o novo hook
-- Na tab "Presença", acima dos cards de check-in, renderizar uma seção "Agendados na Escala" com cards compactos mostrando:
-  - Nome do freelancer
-  - Cargo
-  - Horário escalado (ex: 08:00 – 16:20)
-  - Valor da diária (R$)
-  - Badge de status: "Aguardando Check-in" (amarelo) ou "Check-in realizado" (verde, se houver match por nome em `freelancer_checkins`)
-- A seção só aparece se houver freelancers escalados
-- Design usa os mesmos componentes de Card/Badge do sistema existente
+**Etapa 2 — Processamento:** Spinner enquanto a IA processa. Chamada à edge function via `supabase.functions.invoke("extract-staffing-matrix", ...)`.
 
-### 3. Lógica de match
+**Etapa 3 — Revisão:** Tabela editável mostrando o resultado da IA:
+- Coluna de setor com match automático contra setores existentes (fuzzy match)
+- Se o setor não existir, opção de criar automaticamente
+- Campos de efetivos e extras editáveis antes de confirmar
+- Botão "Aplicar" que faz upsert em massa via `useUpsertStaffingMatrix`
 
-Para determinar se um freelancer escalado já fez check-in:
-- Compara `employee.name` (da escala) com `freelancer_profiles.nome_completo` (do check-in) via normalização (lowercase, trim)
-- Se houver match, o card mostra "Check-in realizado" em verde
-- Se não, mostra "Aguardando Check-in" em amarelo/warning
+---
+
+## Modificação: `src/components/escalas/StaffingMatrixConfig.tsx`
+
+- Adicionar botão "Importar via IA" (ícone Camera/Upload) ao lado do botão "Novo Setor"
+- Renderizar `<StaffingMatrixImporter>` quando aberto
+- Passa `selectedUnit`, `sectors` e `upsertMatrix` como props
+- Após importação, os dados preenchem a matriz existente (campos continuam editáveis)
+
+---
+
+## Fluxo completo
+
+```text
+[Foto da tabela] → [Upload no modal] → [Edge Function + IA]
+    → [Tela de revisão com setores/dias/efetivos/extras]
+    → [Criar setores faltantes] → [Upsert em massa na staffing_matrix]
+    → [Matriz preenchida e editável]
+```
 
 ## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/hooks/useScheduledFreelancers.ts` | Criar |
-| `src/components/checkin/CheckinManagerDashboard.tsx` | Modificar (adicionar seção de agendados) |
+| `supabase/functions/extract-staffing-matrix/index.ts` | Criar |
+| `src/components/escalas/StaffingMatrixImporter.tsx` | Criar |
+| `src/components/escalas/StaffingMatrixConfig.tsx` | Modificar (adicionar botão de importação) |
 
-Nenhuma alteração no banco de dados necessária. Os dados já existem nas tabelas `schedules` e `employees`.
+Nenhuma alteração no banco de dados necessária.
 

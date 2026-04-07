@@ -36,6 +36,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { StaffingMatrixImporter } from "./StaffingMatrixImporter";
 
 const DAYS = [
   { value: 0, label: "Seg" },

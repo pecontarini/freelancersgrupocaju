@@ -154,29 +154,37 @@ export function StaffingMatrixConfig() {
           </Select>
 
           {selectedUnit && (
-            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1">
-                  <Plus className="h-4 w-4" /> Novo Setor
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Adicionar Setor</DialogTitle>
-                </DialogHeader>
-                <div className="flex gap-2 pt-2">
-                  <Input
-                    placeholder="Ex: Cozinha, Salão, Bar..."
-                    value={newSectorName}
-                    onChange={(e) => setNewSectorName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddSector()}
-                  />
-                  <Button onClick={handleAddSector} disabled={addSector.isPending}>
-                    Adicionar
+            <>
+              <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Plus className="h-4 w-4" /> Novo Setor
                   </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Adicionar Setor</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex gap-2 pt-2">
+                    <Input
+                      placeholder="Ex: Cozinha, Salão, Bar..."
+                      value={newSectorName}
+                      onChange={(e) => setNewSectorName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddSector()}
+                    />
+                    <Button onClick={handleAddSector} disabled={addSector.isPending}>
+                      Adicionar
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <StaffingMatrixImporter
+                selectedUnit={selectedUnit}
+                sectors={sectors}
+                onUpsert={(row) => upsertMatrix.mutate(row)}
+                onAddSector={async (params) => { addSector.mutateAsync(params); }}
+              />
+            </>
           )}
         </CardContent>
       </Card>

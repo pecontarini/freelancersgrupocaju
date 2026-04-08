@@ -280,6 +280,13 @@ export function ManualScheduleGrid() {
               weekDays={weekDays}
               sectorName={sectors.find((s) => s.id === activeSectorId)?.name || "Setor"}
               sectorId={activeSectorId}
+              unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || ""}
+              allUnitEmployees={(employees || []).map((e) => ({
+                id: e.id,
+                name: e.name,
+                job_title: e.job_title,
+                worker_type: e.worker_type || "clt",
+              }))}
             />
           )}
         </div>

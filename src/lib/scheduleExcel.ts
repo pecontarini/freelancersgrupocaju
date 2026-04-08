@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { format, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { normalizeString, stringSimilarity } from "@/lib/fuzzyMatch";
 
 // ─── Types ───
 
@@ -28,169 +29,154 @@ export interface ScheduleParseError {
   message: string;
 }
 
+export interface UnmatchedEmployee {
+  rowIndex: number;
+  name: string;
+  cargo: string;
+}
+
 export interface ScheduleParseResult {
   entries: ParsedScheduleEntry[];
   errors: ScheduleParseError[];
   workingCount: number;
   offCount: number;
-  /** ISO date of the first date found in the file's meta row (original week) */
   originalMonday: string | null;
+  unmatchedEmployees: UnmatchedEmployee[];
 }
 
-// ─── Template Generator ───
+// ─── Constants ───
 
+const DAY_NAMES = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+const DAY_NAMES_NORM = DAY_NAMES.map((d) => normalizeString(d));
+const SUB_HEADERS = ["ENTRADA", "INTERV.", "SAÍDA"];
+const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas"]);
 const METADATA_ROW_KEY = "__CAJU_SCHEDULE_META__";
+
+// ─── Template Generator (3 columns per day) ───
 
 export function generateScheduleTemplate(
   employees: ScheduleEmployee[],
   weekDays: Date[],
-  sectorName: string
+  sectorName: string,
+  unitName?: string
 ): void {
   const wb = XLSX.utils.book_new();
+  const days = weekDays.length >= 7 ? weekDays.slice(0, 7) : weekDays;
 
-  // Row 1 (metadata): marker + employee IDs in col A, ISO dates in cols B-H
-  const metaRow: string[] = [METADATA_ROW_KEY];
-  weekDays.forEach((d) => metaRow.push(format(d, "yyyy-MM-dd")));
+  // ── ESCALA sheet ──
+  const titleStr = `${sectorName.toUpperCase()} — ${(unitName || "").toUpperCase()} — SEMANA ${format(days[0], "dd/MM")} a ${format(days[days.length - 1], "dd/MM")}`;
 
-  // Row 2 (ID row): employee IDs will go here per data row
-  // Row 3 (header): visible header
-  const headerRow = ["Funcionário"];
-  weekDays.forEach((d) => {
-    const dayLabel = format(d, "EEE", { locale: ptBR });
-    const dateLabel = format(d, "dd/MM");
-    headerRow.push(`${dayLabel} (${dateLabel})`);
+  // Row 1: title merged across
+  // Row 2: NOME | CARGO | SEGUNDA | | | TERÇA | | | ...
+  // Row 3:       |       | ENTRADA | INTERV. | SAÍDA | ...
+  // Row 4+: data
+
+  const totalCols = 2 + days.length * 3; // NOME + CARGO + 3 per day
+
+  // Build header rows
+  const row1: string[] = [titleStr];
+  for (let i = 1; i < totalCols; i++) row1.push("");
+
+  const row2: string[] = ["NOME", "CARGO"];
+  const row3: string[] = ["", ""];
+  days.forEach((d, idx) => {
+    const dayLabel = DAY_NAMES[idx] || format(d, "EEEE", { locale: ptBR }).toUpperCase();
+    row2.push(dayLabel, "", "");
+    row3.push(...SUB_HEADERS);
   });
 
-  // Build sheet data
-  const sheetData: (string | number)[][] = [];
-  sheetData.push(metaRow);
-
-  // ID row (hidden)
-  const idRowHeader = ["__IDS__"];
-  weekDays.forEach(() => idRowHeader.push(""));
-  sheetData.push(idRowHeader);
-
-  // Visible header
-  sheetData.push(headerRow);
-
-  // Employee rows
+  // Employee data rows
+  const dataRows: string[][] = [];
   employees.forEach((emp) => {
-    const row: string[] = [emp.name];
-    weekDays.forEach(() => row.push("")); // empty cells for filling
-    sheetData.push(row);
-
-    // Store ID in the hidden ID row concept — we'll use a different approach:
-    // Put ID as a comment-like value in metadata
+    const row: string[] = [emp.name, emp.job_title || ""];
+    days.forEach(() => row.push("", "", ""));
+    dataRows.push(row);
   });
 
-  // Actually, let's use a cleaner approach: put IDs in a separate hidden sheet
+  const sheetData = [row1, row2, row3, ...dataRows];
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-  // Force meta row date cells to be TEXT so Excel doesn't convert to serial numbers
-  for (let c = 1; c <= weekDays.length; c++) {
-    const cellRef = XLSX.utils.encode_cell({ r: 0, c });
-    if (ws[cellRef]) {
-      ws[cellRef].t = "s"; // force string type
-      ws[cellRef].z = "@"; // text number format
-    }
+  // Merge title row
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }];
+
+  // Merge day name cells (each spans 3 cols)
+  for (let d = 0; d < days.length; d++) {
+    const startCol = 2 + d * 3;
+    ws["!merges"].push({ s: { r: 1, c: startCol }, e: { r: 1, c: startCol + 2 } });
   }
 
-  // Set column widths
-  ws["!cols"] = [
-    { wch: 25 }, // Employee name
-    ...weekDays.map(() => ({ wch: 18 })),
-  ];
-
-  // Hide rows 1 and 2 (metadata + IDs)
-  ws["!rows"] = [{ hidden: true }, { hidden: true }];
-
-  // Add cell comments/instructions to data cells
-  for (let r = 3; r < 3 + employees.length; r++) {
-    for (let c = 1; c <= weekDays.length; c++) {
-      const cellRef = XLSX.utils.encode_cell({ r, c });
-      if (!ws[cellRef]) {
-        ws[cellRef] = { t: "s", v: "" };
-      }
-    }
+  // Column widths
+  const cols: XLSX.ColInfo[] = [{ wch: 25 }, { wch: 18 }];
+  for (let d = 0; d < days.length; d++) {
+    cols.push({ wch: 10 }, { wch: 8 }, { wch: 8 });
   }
+  ws["!cols"] = cols;
 
-  XLSX.utils.book_append_sheet(wb, ws, "Escala");
+  // Style: make header rows bold via cell formatting (xlsx doesn't support rich styles, but xlsx-js-style might be available)
+  // We'll keep it simple — the structure itself is clear enough.
 
-  // Hidden metadata sheet with employee IDs
-  const metaSheetData: string[][] = [["employee_id", "employee_name", "worker_type"]];
-  employees.forEach((emp) => {
-    metaSheetData.push([emp.id, emp.name, emp.worker_type]);
-  });
-  const metaWs = XLSX.utils.aoa_to_sheet(metaSheetData);
+  XLSX.utils.book_append_sheet(wb, ws, "ESCALA");
+
+  // ── __meta__ sheet (hidden) ──
+  const metaHeader = ["employee_id", "employee_name", "worker_type"];
+  const metaRows = [metaHeader, ...employees.map((e) => [e.id, e.name, e.worker_type])];
+  // Also store dates
+  const dateRow = [METADATA_ROW_KEY, ...days.map((d) => format(d, "yyyy-MM-dd"))];
+  metaRows.push(dateRow);
+  const metaWs = XLSX.utils.aoa_to_sheet(metaRows);
   XLSX.utils.book_append_sheet(wb, metaWs, "__meta__");
 
-  // Instructions sheet
+  // ── Instructions sheet ──
   const instrData = [
-    ["INSTRUÇÕES DE PREENCHIMENTO"],
+    ["📋 COLETA DE ESCALA — " + sectorName.toUpperCase()],
+    [`UNIDADE: ${(unitName || "").toUpperCase()} | SEMANA: ${format(days[0], "dd/MM")} a ${format(days[days.length - 1], "dd/MM")}`],
     [""],
-    ["1. Preencha os horários no formato: 08:00 - 16:00"],
-    ["2. Para especificar intervalo: 08:00 - 16:00 (30m) ou (1h) ou (3h)"],
-    ["3. Se omitido, turnos > 6h assumem intervalo de 1h"],
-    ["4. Para FOLGA, digite: FOLGA (ou F, OFF)"],
-    ["5. Para dobra (turno longo), ex: 11:00 - 23:00"],
-    ["6. Deixe vazio para não programar nada"],
-    ["7. NÃO altere os nomes dos funcionários na coluna A"],
-    ["8. NÃO altere a aba __meta__ (dados do sistema)"],
-    ["9. IMPORTANTE: Formate as células de horário como TEXTO no Excel"],
+    ["═══════════════════════════════════════════════════════"],
+    ["📌 COMO PREENCHER:"],
+    ['1. Vá para a aba "ESCALA" (próxima aba)'],
+    ["2. Para cada dia, preencha 3 campos:"],
+    ["   ENTRADA → horário de início (ex: 11:00)"],
+    ["   INTERV. → duração do intervalo (ex: 1h ou 3h)"],
+    ["   SAÍDA   → horário de saída (ex: 23:00)"],
+    ['3. Para dias de FOLGA → digite "FOLGA" na ENTRADA'],
+    ['   Também aceito: "FDS MÊS", "FÉRIAS", "BANCO DE HORAS"'],
+    ["   Deixe INTERVALO e SAÍDA em branco"],
     [""],
-    [`Setor: ${sectorName}`],
-    [`Semana: ${format(weekDays[0], "dd/MM/yyyy")} a ${format(weekDays[6], "dd/MM/yyyy")}`],
-    [`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`],
+    ["═══════════════════════════════════════════════════════"],
+    ["⚠️ ATENÇÃO:"],
+    ["• Horários SEMPRE no formato HH:MM (24 horas)"],
+    ["• Se sai após meia-noite, use 00:00 ou 01:00"],
+    ["• NÃO altere cabeçalhos, NÃO adicione colunas"],
+    ["• Intervalo mínimo: 01:00 | máximo: 04:00"],
+    [""],
+    ["═══════════════════════════════════════════════════════"],
+    ["📤 APÓS PREENCHER:"],
+    ["• Salve o arquivo (Ctrl+S)"],
+    ["• Importe de volta no sistema pelo botão Importar Planilha"],
   ];
-  const instrWs = XLSX.utils.aoa_to_sheet(instrData.map((row) => [row[0] || ""]));
-  instrWs["!cols"] = [{ wch: 60 }];
+  const instrWs = XLSX.utils.aoa_to_sheet(instrData.map((r) => [r[0] || ""]));
+  instrWs["!cols"] = [{ wch: 65 }];
   XLSX.utils.book_append_sheet(wb, instrWs, "Instruções");
 
-  const filename = `escala_${sectorName.toLowerCase().replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
+  const filename = `ESCALA_${sectorName.toUpperCase().replace(/\s+/g, "_")}_${format(days[0], "ddMM")}_${format(days[days.length - 1], "ddMM")}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
-// ─── Importer / Parser ───
+// ─── Helpers ───
 
-const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg"]);
-
-function parseBreakDuration(cellValue: string, startTime: string, endTime: string): number {
-  // Look for break info in parentheses: (1h), (60m), (30m), (15m), (3h), etc.
-  const breakPattern = /\(\s*(\d+)\s*(h|m|min|hr)\s*\)/i;
-  const match = cellValue.match(breakPattern);
-  if (match) {
-    const value = parseInt(match[1], 10);
-    const unit = match[2].toLowerCase();
-    if (unit === "h" || unit === "hr") return value * 60;
-    return value; // already minutes
+function cellToString(cell: any): string {
+  if (cell === null || cell === undefined) return "";
+  if (typeof cell === "string") return cell.trim();
+  if (typeof cell === "number") {
+    // Excel time fraction (0-1) → HH:MM
+    if (cell >= 0 && cell < 1) return excelTimeToHHMM(cell);
+    if (cell >= 1 && cell < 2) return excelTimeToHHMM(cell - 1); // e.g. 1.0 = 24:00 → 0:00
+    return String(cell);
   }
-
-  // Default: 60 min for shifts > 6h, 0 otherwise
-  const sMin = timeToMinutes(startTime);
-  let eMin = timeToMinutes(endTime);
-  if (eMin <= sMin) eMin += 1440;
-  const shiftLength = eMin - sMin;
-  return shiftLength > 360 ? 60 : 0;
+  if (cell instanceof Date) return format(cell, "yyyy-MM-dd");
+  return String(cell).trim();
 }
 
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-
-/** Convert an Excel serial date number to ISO YYYY-MM-DD string */
-function excelSerialToISO(serial: number): string {
-  // Excel epoch is 1900-01-01, but has a leap year bug (day 60 = Feb 29, 1900 which doesn't exist)
-  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-  const ms = excelEpoch.getTime() + serial * 86400000;
-  const d = new Date(ms);
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-/** Convert an Excel time fraction (0–1) to HH:MM string */
 function excelTimeToHHMM(fraction: number): string {
   const totalMinutes = Math.round(fraction * 1440);
   const h = Math.floor(totalMinutes / 60) % 24;
@@ -198,101 +184,450 @@ function excelTimeToHHMM(fraction: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** Normalize a cell value to a string, handling Excel serial dates/times */
-function cellToString(cell: any): string {
-  if (cell === null || cell === undefined) return "";
-  if (typeof cell === "string") return cell.trim();
-  if (typeof cell === "number") {
-    // Could be an Excel time fraction (0 < x < 1) — but schedule cells are text, so just stringify
-    return String(cell);
-  }
-  if (cell instanceof Date) {
-    return format(cell, "yyyy-MM-dd");
-  }
-  return String(cell).trim();
+function excelSerialToISO(serial: number): string {
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+  const ms = excelEpoch.getTime() + serial * 86400000;
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
-/** Extract a date string from a meta-row cell that may be ISO text or Excel serial number */
 function parseDateCell(cell: any): string | null {
   if (cell === null || cell === undefined) return null;
-
-  // Already an ISO string
   if (typeof cell === "string") {
     const trimmed = cell.trim();
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-    // Try parsing dd/MM/yyyy
     const brMatch = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
     return null;
   }
-
-  // Excel serial date number (typically > 40000 for modern dates)
-  if (typeof cell === "number" && cell > 30000 && cell < 200000) {
-    return excelSerialToISO(cell);
-  }
-
-  // JS Date object
-  if (cell instanceof Date) {
-    return format(cell, "yyyy-MM-dd");
-  }
-
+  if (typeof cell === "number" && cell > 30000 && cell < 200000) return excelSerialToISO(cell);
+  if (cell instanceof Date) return format(cell, "yyyy-MM-dd");
   return null;
 }
 
-function parseTimeRange(cellValue: string): {
-  start_time: string;
-  end_time: string;
-  break_duration: number;
-} | null {
-  const cleaned = cellValue
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+/** Parse break duration from interval cell: "1h", "3h", "3:00", "01:00", 60min fraction */
+function parseBreakFromCell(cell: any): number {
+  const val = cellToString(cell);
+  if (!val) return 60; // default
 
-  // If cell is empty after cleaning, skip
+  // "3h", "1h"
+  const hMatch = val.match(/^(\d+)\s*h$/i);
+  if (hMatch) return parseInt(hMatch[1], 10) * 60;
+
+  // "HH:MM" format → interpret as duration in hours:minutes
+  const hmMatch = val.match(/^(\d{1,2}):(\d{2})$/);
+  if (hmMatch) return parseInt(hmMatch[1], 10) * 60 + parseInt(hmMatch[2], 10);
+
+  // raw number (Excel fraction)
+  if (typeof cell === "number" && cell > 0 && cell < 1) {
+    return Math.round(cell * 1440);
+  }
+
+  return 60;
+}
+
+/** Parse a time string like "9:00", "23:00", "0:00" to "HH:MM" */
+function parseTimeStr(cell: any): string | null {
+  const val = cellToString(cell);
+  if (!val) return null;
+  const m = val.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return `${m[1].padStart(2, "0")}:${m[2]}`;
+  return null;
+}
+
+function isOffKeyword(val: string): boolean {
+  return OFF_KEYWORDS.has(val.toLowerCase().trim());
+}
+
+// ─── Detect format ───
+
+function detect3ColFormat(rawData: any[][]): boolean {
+  // Look for ENTRADA/INTERV./SAÍDA in any of the first 5 rows
+  for (let r = 0; r < Math.min(5, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const v = cellToString(row[c]).toUpperCase();
+      if (v === "ENTRADA") return true;
+    }
+  }
+  return false;
+}
+
+function detectLegacyFormat(rawData: any[][]): boolean {
+  if (rawData.length > 0) {
+    const firstCell = cellToString(rawData[0]?.[0]);
+    if (firstCell === METADATA_ROW_KEY) return true;
+  }
+  return false;
+}
+
+// ─── 3-Column Parser ───
+
+function parse3ColSheet(
+  rawData: any[][],
+  targetMonday: string | null,
+  metaEmployees: Map<string, { id: string; name: string }> | null,
+  allEmployees?: ScheduleEmployee[]
+): ScheduleParseResult {
+  const entries: ParsedScheduleEntry[] = [];
+  const errors: ScheduleParseError[] = [];
+  const unmatchedEmployees: UnmatchedEmployee[] = [];
+  let workingCount = 0;
+  let offCount = 0;
+
+  // Find the sub-header row (ENTRADA)
+  let subHeaderRow = -1;
+  let dayHeaderRow = -1;
+  let titleRow = -1;
+  for (let r = 0; r < Math.min(10, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const v = cellToString(row[c]).toUpperCase();
+      if (v === "ENTRADA") {
+        subHeaderRow = r;
+        dayHeaderRow = r - 1;
+        titleRow = r - 2;
+        break;
+      }
+    }
+    if (subHeaderRow >= 0) break;
+  }
+
+  if (subHeaderRow < 0) {
+    return { entries, errors, workingCount, offCount, originalMonday: null, unmatchedEmployees };
+  }
+
+  // Parse day columns: find all ENTRADA positions
+  const dayColumns: number[] = []; // start column of each day (where ENTRADA is)
+  const subRow = rawData[subHeaderRow];
+  for (let c = 0; c < subRow.length; c++) {
+    if (cellToString(subRow[c]).toUpperCase() === "ENTRADA") {
+      dayColumns.push(c);
+    }
+  }
+
+  const numDays = dayColumns.length;
+
+  // Try to extract original monday from title row
+  let originalMonday: string | null = null;
+  if (titleRow >= 0 && rawData[titleRow]) {
+    const titleStr = cellToString(rawData[titleRow][0]);
+    // "... SEMANA dd/MM a dd/MM" or "... SEMANA dd/MM/yyyy a dd/MM/yyyy"
+    const semanaMatch = titleStr.match(/SEMANA\s+(\d{2})\/(\d{2})(?:\/(\d{4}))?\s+a/i);
+    if (semanaMatch) {
+      const day = semanaMatch[1];
+      const month = semanaMatch[2];
+      const year = semanaMatch[3] || new Date().getFullYear().toString();
+      originalMonday = `${year}-${month}-${day}`;
+    }
+  }
+
+  // Determine dates to use
+  let dates: string[];
+  if (targetMonday) {
+    dates = [];
+    for (let i = 0; i < numDays; i++) {
+      dates.push(format(addDays(new Date(targetMonday + "T12:00:00"), i), "yyyy-MM-dd"));
+    }
+  } else if (originalMonday) {
+    dates = [];
+    for (let i = 0; i < numDays; i++) {
+      dates.push(format(addDays(new Date(originalMonday + "T12:00:00"), i), "yyyy-MM-dd"));
+    }
+  } else {
+    // Fallback: current week
+    const now = new Date();
+    const monday = addDays(now, -(((now.getDay() + 6) % 7)));
+    dates = [];
+    for (let i = 0; i < numDays; i++) {
+      dates.push(format(addDays(monday, i), "yyyy-MM-dd"));
+    }
+  }
+
+  // Build name→id map for fuzzy matching
+  const nameMap = new Map<string, { id: string; name: string }>();
+  if (metaEmployees) {
+    metaEmployees.forEach((v, k) => nameMap.set(k, v));
+  }
+  if (allEmployees) {
+    for (const emp of allEmployees) {
+      const norm = normalizeString(emp.name);
+      if (!nameMap.has(norm)) {
+        nameMap.set(norm, { id: emp.id, name: emp.name });
+      }
+    }
+  }
+
+  // Parse data rows (start after sub-header)
+  const dataStart = subHeaderRow + 1;
+  for (let r = dataStart; r < rawData.length; r++) {
+    const row = rawData[r];
+    if (!row) continue;
+
+    const empName = cellToString(row[0]);
+    if (!empName) continue;
+
+    const cargo = cellToString(row[1]);
+    const normName = normalizeString(empName);
+
+    // Try exact match first
+    let empId: string | null = null;
+    let resolvedName = empName;
+
+    if (nameMap.has(normName)) {
+      const match = nameMap.get(normName)!;
+      empId = match.id;
+      resolvedName = match.name;
+    } else {
+      // Fuzzy match
+      let bestSim = 0;
+      let bestMatch: { id: string; name: string } | null = null;
+      nameMap.forEach((val) => {
+        const sim = stringSimilarity(empName, val.name);
+        if (sim > bestSim) {
+          bestSim = sim;
+          bestMatch = val;
+        }
+      });
+
+      if (bestMatch && bestSim >= 0.85) {
+        empId = bestMatch.id;
+        resolvedName = bestMatch.name;
+      } else {
+        unmatchedEmployees.push({ rowIndex: r, name: empName, cargo });
+        continue;
+      }
+    }
+
+    // Parse each day
+    for (let d = 0; d < numDays; d++) {
+      const colBase = dayColumns[d]; // ENTRADA col
+      const entradaRaw = row[colBase];
+      const intervRaw = row[colBase + 1];
+      const saidaRaw = row[colBase + 2];
+
+      const entradaStr = cellToString(entradaRaw);
+      if (!entradaStr) continue; // empty = no schedule
+
+      const dateStr = dates[d];
+      const dateLabel = format(new Date(dateStr + "T12:00:00"), "EEE dd/MM", { locale: ptBR });
+
+      // Check off keywords
+      if (isOffKeyword(entradaStr)) {
+        entries.push({
+          employee_id: empId,
+          employee_name: resolvedName,
+          date: dateStr,
+          schedule_type: "off",
+          start_time: null,
+          end_time: null,
+          break_duration: 0,
+        });
+        offCount++;
+        continue;
+      }
+
+      // Parse times
+      const startTime = parseTimeStr(entradaRaw);
+      const endTime = parseTimeStr(saidaRaw);
+
+      if (!startTime) {
+        errors.push({
+          row: r + 1,
+          employeeName: resolvedName,
+          dateLabel,
+          message: `Horário de entrada inválido: "${entradaStr}"`,
+        });
+        continue;
+      }
+
+      if (!endTime) {
+        errors.push({
+          row: r + 1,
+          employeeName: resolvedName,
+          dateLabel,
+          message: `Horário de saída não informado ou inválido.`,
+        });
+        continue;
+      }
+
+      const breakDuration = parseBreakFromCell(intervRaw);
+
+      entries.push({
+        employee_id: empId,
+        employee_name: resolvedName,
+        date: dateStr,
+        schedule_type: "working",
+        start_time: startTime,
+        end_time: endTime,
+        break_duration: breakDuration,
+      });
+      workingCount++;
+    }
+  }
+
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees };
+}
+
+// ─── Legacy Parser (1 col per day) ───
+
+function parseLegacySheet(
+  rawData: any[][],
+  metaData: { employee_id: string; employee_name: string; worker_type: string }[],
+  targetMonday: string | null
+): ScheduleParseResult {
+  const entries: ParsedScheduleEntry[] = [];
+  const errors: ScheduleParseError[] = [];
+  let workingCount = 0;
+  let offCount = 0;
+
+  const metaRow = rawData[0];
+  const fileDates: string[] = [];
+  for (let c = 1; c < metaRow.length; c++) {
+    const dateStr = parseDateCell(metaRow[c]);
+    if (dateStr) fileDates.push(dateStr);
+  }
+
+  const originalMonday = fileDates.length > 0 ? fileDates[0] : null;
+
+  let dates: string[];
+  if (targetMonday) {
+    const numCols = Math.max(fileDates.length, 7);
+    dates = [];
+    for (let i = 0; i < numCols; i++) {
+      dates.push(format(addDays(new Date(targetMonday + "T12:00:00"), i), "yyyy-MM-dd"));
+    }
+  } else {
+    dates = fileDates;
+  }
+
+  if (dates.length === 0) {
+    return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+  }
+
+  const nameToMeta = new Map<string, (typeof metaData)[0]>();
+  for (const m of metaData) {
+    nameToMeta.set(m.employee_name.trim().toUpperCase(), m);
+  }
+
+  for (let r = 3; r < rawData.length; r++) {
+    const row = rawData[r];
+    const employeeName = cellToString(row[0]);
+    if (!employeeName) continue;
+
+    const empMeta = nameToMeta.get(employeeName.toUpperCase());
+    if (!empMeta) {
+      errors.push({ row: r + 1, employeeName, dateLabel: "", message: "Funcionário não encontrado na aba __meta__." });
+      continue;
+    }
+
+    for (let c = 0; c < dates.length; c++) {
+      const rawCell = row[c + 1];
+      if (typeof rawCell === "number" && rawCell > 0 && rawCell < 1) {
+        errors.push({
+          row: r + 1,
+          employeeName: empMeta.employee_name,
+          dateLabel: format(new Date(dates[c] + "T12:00:00"), "EEE dd/MM", { locale: ptBR }),
+          message: "Célula formatada como horário pelo Excel. Use formato texto.",
+        });
+        continue;
+      }
+
+      const cellValue = cellToString(rawCell);
+      if (!cellValue) continue;
+
+      const dateStr = dates[c];
+      const dateLabel = format(new Date(dateStr + "T12:00:00"), "EEE dd/MM", { locale: ptBR });
+      const cellLower = cellValue.toLowerCase().trim();
+
+      if (OFF_KEYWORDS.has(cellLower)) {
+        entries.push({
+          employee_id: empMeta.employee_id,
+          employee_name: empMeta.employee_name,
+          date: dateStr,
+          schedule_type: "off",
+          start_time: null,
+          end_time: null,
+          break_duration: 0,
+        });
+        offCount++;
+        continue;
+      }
+
+      const parsed = parseTimeRange(cellValue);
+      if (parsed) {
+        entries.push({
+          employee_id: empMeta.employee_id,
+          employee_name: empMeta.employee_name,
+          date: dateStr,
+          schedule_type: "working",
+          start_time: parsed.start_time,
+          end_time: parsed.end_time,
+          break_duration: parsed.break_duration,
+        });
+        workingCount++;
+        continue;
+      }
+
+      errors.push({
+        row: r + 1,
+        employeeName: empMeta.employee_name,
+        dateLabel,
+        message: `Formato inválido: "${cellValue}". Use HH:MM - HH:MM ou FOLGA.`,
+      });
+    }
+  }
+
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+}
+
+/** Legacy time range parser for "HH:MM - HH:MM (break)" format */
+function parseTimeRange(cellValue: string): { start_time: string; end_time: string; break_duration: number } | null {
+  const cleaned = cellValue.replace(/\s+/g, " ").trim().toLowerCase();
   if (!cleaned) return null;
 
   const separators = [" - ", " – ", " — ", "-", "–", "—", " as ", " a ", " até ", " ate "];
-
   for (const sep of separators) {
     const idx = cleaned.indexOf(sep);
     if (idx > 0) {
       const left = cleaned.slice(0, idx).trim();
-      // Right side: take only the time part (strip break info)
       const rightRaw = cleaned.slice(idx + sep.length).trim();
       const rightTime = rightRaw.match(/^(\d{1,2}:\d{2})/);
-
       const startMatch = left.match(/^(\d{1,2}):(\d{2})$/);
-
       if (startMatch && rightTime) {
         const endParts = rightTime[1].match(/^(\d{1,2}):(\d{2})$/);
         if (endParts) {
-          const sh = startMatch[1].padStart(2, "0");
-          const sm = startMatch[2];
-          const eh = endParts[1].padStart(2, "0");
-          const em = endParts[2];
-          const start_time = `${sh}:${sm}`;
-          const end_time = `${eh}:${em}`;
-          const break_duration = parseBreakDuration(cellValue, start_time, end_time);
+          const start_time = `${startMatch[1].padStart(2, "0")}:${startMatch[2]}`;
+          const end_time = `${endParts[1].padStart(2, "0")}:${endParts[2]}`;
+          // Break from parentheses
+          const breakPattern = /\(\s*(\d+)\s*(h|m|min|hr)\s*\)/i;
+          const bm = cellValue.match(breakPattern);
+          let break_duration: number;
+          if (bm) {
+            const bv = parseInt(bm[1], 10);
+            break_duration = bm[2].toLowerCase().startsWith("h") ? bv * 60 : bv;
+          } else {
+            const sMin = parseInt(startMatch[1]) * 60 + parseInt(startMatch[2]);
+            let eMin = parseInt(endParts[1]) * 60 + parseInt(endParts[2]);
+            if (eMin <= sMin) eMin += 1440;
+            break_duration = eMin - sMin > 360 ? 60 : 0;
+          }
           return { start_time, end_time, break_duration };
         }
       }
     }
   }
-
   return null;
 }
 
-/**
- * Parse a schedule Excel file.
- * @param file        The .xlsx file
- * @param targetMonday  Optional ISO date (YYYY-MM-DD) of the Monday to use.
- *                      When provided, the dates from the file are IGNORED and
- *                      columns are mapped positionally starting from this date.
- */
+// ─── Main Parse Entry Point ───
+
 export function parseScheduleFile(
   file: File,
-  targetMonday?: string | null
+  targetMonday?: string | null,
+  allEmployees?: ScheduleEmployee[]
 ): Promise<ScheduleParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -302,164 +637,49 @@ export function parseScheduleFile(
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: "array" });
 
-        // Read metadata sheet
+        // Read meta sheet if present
         const metaSheet = wb.Sheets["__meta__"];
-        if (!metaSheet) {
-          reject(new Error("Arquivo inválido. Use o modelo gerado pelo sistema (aba __meta__ ausente)."));
-          return;
+        let metaData: { employee_id: string; employee_name: string; worker_type: string }[] = [];
+        let metaEmployeeMap: Map<string, { id: string; name: string }> | null = null;
+
+        if (metaSheet) {
+          const raw = XLSX.utils.sheet_to_json<any>(metaSheet);
+          metaData = raw.filter((r: any) => r.employee_id && r.employee_id !== METADATA_ROW_KEY);
+          if (metaData.length > 0) {
+            metaEmployeeMap = new Map();
+            for (const m of metaData) {
+              metaEmployeeMap.set(normalizeString(m.employee_name), { id: m.employee_id, name: m.employee_name });
+            }
+          }
         }
 
-        const metaData = XLSX.utils.sheet_to_json<{
-          employee_id: string;
-          employee_name: string;
-          worker_type: string;
-        }>(metaSheet);
+        // Find the main data sheet
+        const scheduleSheet = wb.Sheets["ESCALA"] || wb.Sheets["Escala"] || wb.Sheets[wb.SheetNames.find((n) => n !== "__meta__" && n !== "Instruções") || wb.SheetNames[0]];
 
-        if (metaData.length === 0) {
-          reject(new Error("Nenhum funcionário encontrado no modelo."));
-          return;
-        }
-
-        // Read schedule sheet
-        const scheduleSheet = wb.Sheets["Escala"];
         if (!scheduleSheet) {
-          reject(new Error("Aba 'Escala' não encontrada."));
+          reject(new Error("Nenhuma aba de escala encontrada."));
           return;
         }
 
-        const rawData = XLSX.utils.sheet_to_json<any>(scheduleSheet, {
-          header: 1,
-          defval: "",
-          raw: true,
-        }) as any[][];
+        const rawData = XLSX.utils.sheet_to_json<any>(scheduleSheet, { header: 1, defval: "", raw: true }) as any[][];
 
-        if (rawData.length < 4) {
+        if (rawData.length < 3) {
           reject(new Error("Planilha vazia ou com formato inválido."));
           return;
         }
 
-        // Row 0 = metadata (marker + ISO dates or Excel serial dates)
-        const metaRow = rawData[0];
-        const metaMarker = cellToString(metaRow[0]);
-        if (metaMarker !== METADATA_ROW_KEY) {
-          reject(new Error("Formato de planilha não reconhecido. Use o modelo gerado pelo sistema."));
-          return;
-        }
-
-        // Extract original dates from file for reference
-        const fileDates: string[] = [];
-        for (let c = 1; c < metaRow.length; c++) {
-          const dateStr = parseDateCell(metaRow[c]);
-          if (dateStr) fileDates.push(dateStr);
-        }
-
-        const originalMonday = fileDates.length > 0 ? fileDates[0] : null;
-
-        // Determine which dates to actually use
-        let dates: string[];
-        if (targetMonday) {
-          // Generate 7 days positionally from the target monday
-          const numCols = Math.max(fileDates.length, 7);
-          dates = [];
-          for (let i = 0; i < numCols; i++) {
-            dates.push(format(addDays(new Date(targetMonday + "T12:00:00"), i), "yyyy-MM-dd"));
+        // Detect format
+        if (detect3ColFormat(rawData)) {
+          resolve(parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees));
+        } else if (detectLegacyFormat(rawData)) {
+          if (metaData.length === 0) {
+            reject(new Error("Formato legado detectado mas aba __meta__ sem dados."));
+            return;
           }
+          resolve(parseLegacySheet(rawData, metaData, targetMonday || null));
         } else {
-          dates = fileDates;
+          reject(new Error("Formato de planilha não reconhecido. Use o modelo gerado pelo sistema ou o formato padrão com ENTRADA/INTERV./SAÍDA."));
         }
-
-        if (dates.length === 0) {
-          reject(new Error("Datas não encontradas no cabeçalho da planilha."));
-          return;
-        }
-
-        // Build name->meta map
-        const nameToMeta = new Map<string, typeof metaData[0]>();
-        for (const m of metaData) {
-          nameToMeta.set(m.employee_name.trim().toUpperCase(), m);
-        }
-
-        const entries: ParsedScheduleEntry[] = [];
-        const errors: ScheduleParseError[] = [];
-        let workingCount = 0;
-        let offCount = 0;
-
-        for (let r = 3; r < rawData.length; r++) {
-          const row = rawData[r];
-          const employeeName = cellToString(row[0]);
-          if (!employeeName) continue;
-
-          const empMeta = nameToMeta.get(employeeName.toUpperCase());
-
-          if (!empMeta) {
-            errors.push({
-              row: r + 1,
-              employeeName,
-              dateLabel: "",
-              message: "Funcionário não encontrado na aba __meta__. Verifique se o nome não foi alterado.",
-            });
-            continue;
-          }
-
-          for (let c = 0; c < dates.length; c++) {
-            const rawCell = row[c + 1];
-
-            if (typeof rawCell === "number" && rawCell > 0 && rawCell < 1) {
-              errors.push({
-                row: r + 1,
-                employeeName: empMeta.employee_name,
-                dateLabel: format(new Date(dates[c] + "T12:00:00"), "EEE dd/MM", { locale: ptBR }),
-                message: `Célula formatada como horário pelo Excel. Use formato texto: HH:MM - HH:MM.`,
-              });
-              continue;
-            }
-
-            const cellValue = cellToString(rawCell);
-            if (!cellValue) continue;
-
-            const dateStr = dates[c];
-            const dateLabel = format(new Date(dateStr + "T12:00:00"), "EEE dd/MM", { locale: ptBR });
-            const cellLower = cellValue.toLowerCase().trim();
-
-            if (OFF_KEYWORDS.has(cellLower)) {
-              entries.push({
-                employee_id: empMeta.employee_id,
-                employee_name: empMeta.employee_name,
-                date: dateStr,
-                schedule_type: "off",
-                start_time: null,
-                end_time: null,
-                break_duration: 0,
-              });
-              offCount++;
-              continue;
-            }
-
-            const parsed = parseTimeRange(cellValue);
-            if (parsed) {
-              entries.push({
-                employee_id: empMeta.employee_id,
-                employee_name: empMeta.employee_name,
-                date: dateStr,
-                schedule_type: "working",
-                start_time: parsed.start_time,
-                end_time: parsed.end_time,
-                break_duration: parsed.break_duration,
-              });
-              workingCount++;
-              continue;
-            }
-
-            errors.push({
-              row: r + 1,
-              employeeName: empMeta.employee_name,
-              dateLabel,
-              message: `Formato inválido: "${cellValue}". Use HH:MM - HH:MM ou FOLGA.`,
-            });
-          }
-        }
-
-        resolve({ entries, errors, workingCount, offCount, originalMonday });
       } catch (err) {
         reject(new Error("Erro ao processar arquivo. Verifique se é um Excel válido."));
       }

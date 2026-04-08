@@ -1,55 +1,33 @@
 
 
-# Correção: Erro de FK ao substituir setores no importador POP
+# Plano: Edição de nome de setor + garantir salvamento da importação IA
 
-## Problema
+## Problema atual
+1. Não existe botão para editar o nome de um setor existente
+2. A importação via IA pode não estar salvando corretamente porque a reconciliação por nome falha quando os nomes não batem exatamente
 
-Ao aplicar o POP importado, o sistema tenta **deletar** os setores antigos. Porém, existem 4 tabelas com FK referenciando `sectors`:
+## Mudanças
 
-- `staffing_matrix` (sector_id)
-- `schedules` (sector_id)
-- `schedule_attendance` (sector_id, remanejado_de_sector_id, remanejado_para_sector_id)
-- `sector_job_titles` (sector_id)
+### 1. Hook: `useRenameSector` em `src/hooks/useStaffingMatrix.ts`
+- Nova mutation que faz `update` no campo `name` da tabela `sectors` pelo `id`
+- Invalida queries de `sectors` e `staffing_matrix`
 
-O delete falha porque há registros em `schedules` e `schedule_attendance` vinculados aos setores antigos.
+### 2. Botão de edição de nome no `StaffingMatrixConfig.tsx`
+- Adicionar ícone de edição (Pencil) ao lado do nome de cada setor na tabela da matriz
+- Ao clicar, transforma o nome em um `Input` inline editável
+- Ao sair do campo (blur) ou pressionar Enter, salva o novo nome via `useRenameSector`
 
-## Solução
-
-**Não deletar setores antigos.** Em vez disso, adotar uma abordagem de **reconciliação**:
-
-1. **Setores que existem na IA e no banco** → manter, apenas atualizar a staffing_matrix
-2. **Setores que existem na IA mas não no banco** → criar novos
-3. **Setores que existem no banco mas não na IA** → **manter** (não deletar, pois têm escalas vinculadas)
-4. **Limpar apenas `staffing_matrix`** dos setores da unidade antes de importar os novos valores
-
-### Mudanças em `StaffingMatrixImporter.tsx`
-
-Reescrever `handleApply`:
-
-1. Buscar setores existentes da unidade
-2. Para cada setor extraído pela IA:
-   - Se já existe (match por nome normalizado) → usar o ID existente
-   - Se não existe → criar via `onAddSector`
-3. Deletar todos os registros de `staffing_matrix` dos setores da unidade (isso não tem FK cascade problem)
-4. Inserir os novos registros de staffing_matrix via `onUpsert`
-
-Isso elimina a necessidade de deletar setores e preserva o histórico de escalas.
-
-### Mudanças em `StaffingMatrixConfig.tsx`
-
-- Remover `onDeleteSector` do importer (não será mais necessário para importação)
-- Adicionar uma nova prop `onClearMatrix` que deleta apenas registros da `staffing_matrix` para os setores da unidade
-
-### Novo: hook ou função para limpar staffing_matrix
-
-Adicionar mutation em `useStaffingMatrix.ts`:
-- `useClearStaffingMatrix()` — deleta registros de `staffing_matrix` por lista de `sector_id`s
+### 3. Garantir salvamento na importação (`StaffingMatrixImporter.tsx`)
+- Na tela de revisão, permitir editar o nome do setor antes de aplicar (para corrigir nomes que a IA leu de forma diferente)
+- No `handleApply`, melhorar o fuzzy match: normalizar removendo acentos, espaços extras e caracteres especiais
+- Adicionar logs e contadores visuais para confirmar quantos registros foram efetivamente salvos
+- Após a criação de setores, usar `await` com re-fetch explícito em vez de `setTimeout` para garantir que os IDs estejam disponíveis
 
 ## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/StaffingMatrixImporter.tsx` | Reescrever handleApply (reconciliação sem delete de setores) |
-| `src/hooks/useStaffingMatrix.ts` | Adicionar mutation para limpar matrix |
-| `src/components/escalas/StaffingMatrixConfig.tsx` | Ajustar props do importer |
+| `src/hooks/useStaffingMatrix.ts` | Adicionar `useRenameSector` |
+| `src/components/escalas/StaffingMatrixConfig.tsx` | Adicionar botão de edição inline no nome do setor |
+| `src/components/escalas/StaffingMatrixImporter.tsx` | Permitir edição de nome na revisão + melhorar reconciliação |
 

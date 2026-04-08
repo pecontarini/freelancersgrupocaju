@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,8 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { useJobTitles } from "@/hooks/useJobTitles";
+import { useCpfLookup } from "@/hooks/useCpfLookup";
+import { formatCPF } from "@/lib/formatters";
 import { toast } from "sonner";
 
 interface FreelancerAddModalProps {
@@ -43,20 +45,18 @@ export function FreelancerAddModal({
   const { data: sectorJobTitles = [] } = useSectorJobTitles([sectorId]);
   const { data: allJobTitles = [] } = useJobTitles(unitId);
   const upsertSchedule = useUpsertSchedule();
+  const { lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
 
-  // Allowed job title IDs for this sector
   const allowedJobTitleIds = useMemo(
     () => new Set(sectorJobTitles.map((sjt) => sjt.job_title_id)),
     [sectorJobTitles]
   );
 
-  // Job titles allowed in this sector
   const allowedJobTitles = useMemo(
     () => allJobTitles.filter((jt) => allowedJobTitleIds.has(jt.id)),
     [allJobTitles, allowedJobTitleIds]
   );
 
-  // Filter freelancers by sector-linked job titles
   const freelancers = useMemo(
     () =>
       employees.filter(
@@ -71,12 +71,30 @@ export function FreelancerAddModal({
   const [mode, setMode] = useState<"select" | "create">("select");
   const [selectedId, setSelectedId] = useState("");
   const [newName, setNewName] = useState("");
+  const [cpfValue, setCpfValue] = useState("");
   const [selectedJobTitleId, setSelectedJobTitleId] = useState("");
   const [rate, setRate] = useState("200");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:20");
+  const [autoFilled, setAutoFilled] = useState(false);
 
   const isSaving = upsertSchedule.isPending;
+
+  const handleCpfChange = useCallback(async (rawValue: string) => {
+    const formatted = formatCPF(rawValue);
+    setCpfValue(formatted);
+
+    const clean = formatted.replace(/\D/g, "");
+    if (clean.length === 11) {
+      const result = await lookupUnifiedByCpf(formatted);
+      if (result) {
+        setNewName(result.nome_completo);
+        setAutoFilled(true);
+      }
+    } else {
+      setAutoFilled(false);
+    }
+  }, [lookupUnifiedByCpf]);
 
   async function handleSubmit() {
     const rateNum = parseFloat(rate) || 0;
@@ -92,6 +110,7 @@ export function FreelancerAddModal({
         return;
       }
       const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
+      const cleanCpf = cpfValue.replace(/\D/g, "");
       try {
         const { data, error } = await (
           await import("@/integrations/supabase/client")
@@ -105,6 +124,7 @@ export function FreelancerAddModal({
             default_rate: rateNum,
             job_title: chosenJt?.name || "Freelancer",
             job_title_id: selectedJobTitleId,
+            cpf: cleanCpf || null,
           })
           .select("id")
           .single();
@@ -145,11 +165,13 @@ export function FreelancerAddModal({
   function resetForm() {
     setSelectedId("");
     setNewName("");
+    setCpfValue("");
     setSelectedJobTitleId("");
     setRate("200");
     setStartTime("08:00");
     setEndTime("16:20");
     setMode("select");
+    setAutoFilled(false);
   }
 
   return (
@@ -214,12 +236,30 @@ export function FreelancerAddModal({
           ) : (
             <>
               <div className="space-y-1.5">
+                <Label>CPF</Label>
+                <div className="relative">
+                  <Input
+                    value={cpfValue}
+                    onChange={(e) => handleCpfChange(e.target.value)}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                  />
+                  {isLookingUp && (
+                    <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Nome *</Label>
                 <Input
                   value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
+                  onChange={(e) => { setNewName(e.target.value); setAutoFilled(false); }}
                   placeholder="Nome completo"
+                  className={autoFilled ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
                 />
+                {autoFilled && (
+                  <p className="text-xs text-green-600">Preenchido automaticamente via CPF</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Cargo *</Label>

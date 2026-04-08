@@ -52,7 +52,7 @@ export function FreelancerForm() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { createEntry } = useFreelancerEntries();
   const { isAdmin, isOperator, unidades, isGerenteUnidade } = useUserProfile();
-  const { lookupFreelancerByCpf, isLookingUp } = useCpfLookup();
+  const { lookupFreelancerByCpf, lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
   
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
@@ -152,6 +152,38 @@ export function FreelancerForm() {
   };
 
   const handleCpfLookup = useCallback(async (cpf: string) => {
+    // Try unified lookup first (searches profiles, employees, then entries)
+    const unified = await lookupUnifiedByCpf(cpf);
+    if (unified) {
+      form.setValue("nome_completo", unified.nome_completo);
+      const filledFields = new Set<string>(["nome_completo"]);
+
+      if (unified.chave_pix) {
+        form.setValue("chave_pix", unified.chave_pix);
+        filledFields.add("chave_pix");
+      }
+
+      if (unified.funcao) {
+        const funcaoExists = funcoes.some(f => f.nome === unified.funcao);
+        if (funcaoExists) {
+          form.setValue("funcao", unified.funcao);
+          filledFields.add("funcao");
+        }
+      }
+
+      if (unified.gerencia) {
+        const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
+        if (gerenciaExists) {
+          form.setValue("gerencia", unified.gerencia);
+          filledFields.add("gerencia");
+        }
+      }
+
+      setAutoFilledFields(filledFields);
+      return;
+    }
+
+    // Fallback to legacy lookup
     const result = await lookupFreelancerByCpf(cpf);
     if (result) {
       form.setValue("nome_completo", result.nome_completo);
@@ -159,14 +191,12 @@ export function FreelancerForm() {
       
       const filledFields = new Set<string>(["nome_completo", "chave_pix"]);
       
-      // Check if the function exists in options before setting
       const funcaoExists = funcoes.some(f => f.nome === result.funcao);
       if (funcaoExists) {
         form.setValue("funcao", result.funcao);
         filledFields.add("funcao");
       }
       
-      // Check if the gerencia exists in options before setting
       const gerenciaExists = gerencias.some(g => g.nome === result.gerencia);
       if (gerenciaExists) {
         form.setValue("gerencia", result.gerencia);
@@ -175,7 +205,7 @@ export function FreelancerForm() {
       
       setAutoFilledFields(filledFields);
     }
-  }, [lookupFreelancerByCpf, form, funcoes, gerencias]);
+  }, [lookupUnifiedByCpf, lookupFreelancerByCpf, form, funcoes, gerencias]);
 
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCurrencyInput(e.target.value);

@@ -129,6 +129,27 @@ export function useClearStaffingMatrix() {
   });
 }
 
+export function useRenameSector() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from("sectors")
+        .update({ name })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sectors"] });
+      qc.invalidateQueries({ queryKey: ["staffing_matrix"] });
+      toast.success("Nome do setor atualizado!");
+    },
+    onError: (err: Error) => {
+      toast.error("Erro ao renomear setor: " + err.message);
+    },
+  });
+}
+
 export function useDeleteSector() {
   const qc = useQueryClient();
   return useMutation({

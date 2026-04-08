@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Loader2, Check, Plus, CalendarDays, AlertTriangle } from "lucide-react";
+import { Camera, Loader2, Check, Plus, CalendarDays, AlertTriangle, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -151,6 +151,12 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
     reader.readAsDataURL(file);
   };
 
+  const handleSectorNameEdit = (rowIdx: number, newName: string) => {
+    setReviewRows((prev) =>
+      prev.map((row, i) => (i === rowIdx ? { ...row, sectorName: newName } : row))
+    );
+  };
+
   const handleDayEdit = (rowIdx: number, dayIdx: number, field: "efetivos" | "extras", value: string) => {
     setReviewRows((prev) =>
       prev.map((row, i) => {
@@ -171,7 +177,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
       const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
 
       // 1. Reconcile sectors: match existing by normalized name, create missing ones
-      const normalize = (s: string) => s.toUpperCase().trim();
+      const normalize = (s: string) =>
+        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
       const existingSectors = [...sectors];
       const sectorMap = new Map<string, string>(); // normalizedName → sector_id
 
@@ -351,12 +358,20 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
             </div>
 
             {reviewRows.map((row, rowIdx) => {
-              const normalize = (s: string) => s.toUpperCase().trim();
+              const normalize = (s: string) =>
+                s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
               const exists = sectors.some((s) => normalize(s.name) === normalize(row.sectorName));
               return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">{row.sectorName}</span>
+                  <div className="flex items-center gap-1">
+                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                    <Input
+                      className="h-7 w-40 text-sm font-medium"
+                      value={row.sectorName}
+                      onChange={(e) => handleSectorNameEdit(rowIdx, e.target.value)}
+                    />
+                  </div>
                   <Badge variant="secondary" className="text-xs">{row.shiftType}</Badge>
                   {exists ? (
                     <Badge variant="outline" className="text-xs gap-1">

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Loader2, Pencil, Check, X } from "lucide-react";
 import {
   useSectors,
   useShifts,
@@ -8,6 +8,7 @@ import {
   useAddSector,
   useDeleteSector,
   useClearStaffingMatrix,
+  useRenameSector,
 } from "@/hooks/useStaffingMatrix";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
@@ -48,6 +49,63 @@ const DAYS = [
   { value: 5, label: "Sáb" },
   { value: 6, label: "Dom" },
 ];
+
+function InlineSectorName({ sectorId, currentName }: { sectorId: string; currentName: string }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(currentName);
+  const renameSector = useRenameSector();
+
+  const handleSave = () => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === currentName) {
+      setName(currentName);
+      setEditing(false);
+      return;
+    }
+    renameSector.mutate({ id: sectorId, name: trimmed }, {
+      onSuccess: () => setEditing(false),
+      onError: () => setName(currentName),
+    });
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <Input
+          className="h-7 w-28 text-xs"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") { setName(currentName); setEditing(false); }
+          }}
+          onBlur={handleSave}
+          autoFocus
+        />
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSave}>
+          <Check className="h-3 w-3" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setName(currentName); setEditing(false); }}>
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 group">
+      <span className="font-medium">{currentName}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={() => setEditing(true)}
+      >
+        <Pencil className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
 
 export function StaffingMatrixConfig() {
   const { isAdmin } = useUserProfile();
@@ -245,7 +303,9 @@ export function StaffingMatrixConfig() {
                   <TableBody>
                     {sectors.map((sector) => (
                       <TableRow key={sector.id}>
-                        <TableCell className="font-medium">{sector.name}</TableCell>
+                        <TableCell>
+                          <InlineSectorName sectorId={sector.id} currentName={sector.name} />
+                        </TableCell>
                         {DAYS.map((d) => {
                           const count = getCount(sector.id, d.value, shiftType);
                           const extras = getExtras(sector.id, d.value, shiftType);

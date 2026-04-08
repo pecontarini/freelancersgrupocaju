@@ -163,12 +163,94 @@ export function ScheduleExcelFlow({
     ? format(targetMonday, "dd/MM", { locale: ptBR })
     : null;
 
+  const selectedUnmatchedCount = unmatchedRegs.filter((r) => r.selected).length;
+
+  async function registerUnmatchedEmployees(): Promise<ScheduleEmployee[]> {
+    if (!unitId) return [];
+    const toRegister = unmatchedRegs.filter((r) => r.selected && r.editedName.trim());
+    if (toRegister.length === 0) return [];
+
+    const newEmployees: ScheduleEmployee[] = [];
+
+    for (const reg of toRegister) {
+      let jobTitleId: string | null = null;
+
+      if (reg.cargo.trim()) {
+        // Try to find existing job_title for this unit
+        const { data: existing } = await supabase
+          .from("job_titles")
+          .select("id")
+          .eq("unit_id", unitId)
+          .ilike("name", reg.cargo.trim())
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          jobTitleId = existing[0].id;
+        } else {
+          // Create new job_title
+          const { data: newJt } = await supabase
+            .from("job_titles")
+            .insert({ name: reg.cargo.trim(), unit_id: unitId })
+            .select("id")
+            .single();
+          if (newJt) jobTitleId = newJt.id;
+        }
+      }
+
+      const { data: newEmp } = await supabase
+        .from("employees")
+        .insert({
+          name: reg.editedName.trim(),
+          unit_id: unitId,
+          job_title: reg.cargo.trim() || null,
+          job_title_id: jobTitleId,
+          gender: "M",
+          worker_type: "clt" as const,
+        })
+        .select("id, name, job_title, worker_type")
+        .single();
+
+      if (newEmp) {
+        newEmployees.push({
+          id: newEmp.id,
+          name: newEmp.name,
+          job_title: newEmp.job_title,
+          worker_type: newEmp.worker_type,
+        });
+      }
+    }
+
+    return newEmployees;
+  }
+
   async function handleConfirmImport() {
-    if (!parseResult || parseResult.entries.length === 0) return;
+    if (!parseResult) return;
 
     setIsSaving(true);
 
     try {
+      // Step 1: Register selected unmatched employees
+      let finalParseResult = parseResult;
+      if (selectedUnmatchedCount > 0 && pendingFile && targetMonday) {
+        const newEmps = await registerUnmatchedEmployees();
+        if (newEmps.length > 0) {
+          toast.success(`${newEmps.length} funcionário(s) cadastrado(s)!`);
+          // Re-parse with updated employee list
+          const allEmps = [...(allUnitEmployees || employees), ...newEmps];
+          const mondayISO = format(targetMonday, "yyyy-MM-dd");
+          const reParsed = await parseScheduleFile(pendingFile, mondayISO, allEmps);
+          finalParseResult = reParsed;
+          // Invalidate employees cache
+          qc.invalidateQueries({ queryKey: ["employees"] });
+        }
+      }
+
+      if (finalParseResult.entries.length === 0) {
+        toast.info("Nenhum lançamento válido após o cadastro.");
+        setIsSaving(false);
+        return;
+      }
+
       const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
       if (!shifts || shifts.length === 0) {
         toast.error("Nenhum turno cadastrado. Cadastre ao menos um turno.");
@@ -177,7 +259,7 @@ export function ScheduleExcelFlow({
       }
       const shiftId = shifts[0].id;
 
-      const employeeIds = [...new Set(parseResult.entries.map((e) => e.employee_id))];
+      const employeeIds = [...new Set(finalParseResult.entries.map((e) => e.employee_id))];
       const { data: empData } = await supabase
         .from("employees")
         .select("id, job_title_id")
@@ -201,7 +283,7 @@ export function ScheduleExcelFlow({
         }
       }
 
-      const rows = parseResult.entries.map((entry) => {
+      const rows = finalParseResult.entries.map((entry) => {
         const jtId = empJobTitleMap.get(entry.employee_id);
         const resolvedSectorId = jtId ? jobTitleToSector.get(jtId) || sectorId : sectorId;
 
@@ -243,6 +325,7 @@ export function ScheduleExcelFlow({
   }
 
   const hasUnmatched = (parseResult?.unmatchedEmployees?.length ?? 0) > 0;
+  const canConfirm = parseResult && (parseResult.entries.length > 0 || selectedUnmatchedCount > 0);
 
   return (
     <>

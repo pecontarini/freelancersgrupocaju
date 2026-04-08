@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -26,6 +28,7 @@ import {
   CalendarIcon,
   Info,
   UserX,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, addDays } from "date-fns";
@@ -41,12 +44,19 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
+interface UnmatchedRegistration {
+  selected: boolean;
+  editedName: string;
+  cargo: string;
+}
+
 interface ScheduleExcelFlowProps {
   employees: ScheduleEmployee[];
   weekDays: Date[];
   sectorName: string;
   sectorId: string;
   unitName?: string;
+  unitId?: string;
   /** All employees in the unit, used for fuzzy-matching external spreadsheets */
   allUnitEmployees?: ScheduleEmployee[];
 }
@@ -57,6 +67,7 @@ export function ScheduleExcelFlow({
   sectorName,
   sectorId,
   unitName,
+  unitId,
   allUnitEmployees,
 }: ScheduleExcelFlowProps) {
   const [importModal, setImportModal] = useState(false);
@@ -66,6 +77,7 @@ export function ScheduleExcelFlow({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [targetMonday, setTargetMonday] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [unmatchedRegs, setUnmatchedRegs] = useState<UnmatchedRegistration[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -98,11 +110,19 @@ export function ScheduleExcelFlow({
   async function runParse(file: File, mondayISO: string) {
     setIsParsing(true);
     setParseResult(null);
+    setUnmatchedRegs([]);
     try {
-      // Merge sector employees + all unit employees for fuzzy matching
       const allEmps = allUnitEmployees || employees;
       const result = await parseScheduleFile(file, mondayISO, allEmps);
       setParseResult(result);
+      // Initialize registration state for unmatched employees
+      setUnmatchedRegs(
+        (result.unmatchedEmployees || []).map((u) => ({
+          selected: true,
+          editedName: u.name,
+          cargo: u.cargo || "",
+        }))
+      );
     } catch (err: any) {
       toast.error(err.message);
       setImportModal(false);
@@ -128,6 +148,7 @@ export function ScheduleExcelFlow({
     setParseResult(null);
     setPendingFile(null);
     setTargetMonday(undefined);
+    setUnmatchedRegs([]);
   }
 
   const showDateWarning =
@@ -142,12 +163,94 @@ export function ScheduleExcelFlow({
     ? format(targetMonday, "dd/MM", { locale: ptBR })
     : null;
 
+  const selectedUnmatchedCount = unmatchedRegs.filter((r) => r.selected).length;
+
+  async function registerUnmatchedEmployees(): Promise<ScheduleEmployee[]> {
+    if (!unitId) return [];
+    const toRegister = unmatchedRegs.filter((r) => r.selected && r.editedName.trim());
+    if (toRegister.length === 0) return [];
+
+    const newEmployees: ScheduleEmployee[] = [];
+
+    for (const reg of toRegister) {
+      let jobTitleId: string | null = null;
+
+      if (reg.cargo.trim()) {
+        // Try to find existing job_title for this unit
+        const { data: existing } = await supabase
+          .from("job_titles")
+          .select("id")
+          .eq("unit_id", unitId)
+          .ilike("name", reg.cargo.trim())
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          jobTitleId = existing[0].id;
+        } else {
+          // Create new job_title
+          const { data: newJt } = await supabase
+            .from("job_titles")
+            .insert({ name: reg.cargo.trim(), unit_id: unitId })
+            .select("id")
+            .single();
+          if (newJt) jobTitleId = newJt.id;
+        }
+      }
+
+      const { data: newEmp } = await supabase
+        .from("employees")
+        .insert({
+          name: reg.editedName.trim(),
+          unit_id: unitId,
+          job_title: reg.cargo.trim() || null,
+          job_title_id: jobTitleId,
+          gender: "M",
+          worker_type: "clt" as const,
+        })
+        .select("id, name, job_title, worker_type")
+        .single();
+
+      if (newEmp) {
+        newEmployees.push({
+          id: newEmp.id,
+          name: newEmp.name,
+          job_title: newEmp.job_title,
+          worker_type: newEmp.worker_type,
+        });
+      }
+    }
+
+    return newEmployees;
+  }
+
   async function handleConfirmImport() {
-    if (!parseResult || parseResult.entries.length === 0) return;
+    if (!parseResult) return;
 
     setIsSaving(true);
 
     try {
+      // Step 1: Register selected unmatched employees
+      let finalParseResult = parseResult;
+      if (selectedUnmatchedCount > 0 && pendingFile && targetMonday) {
+        const newEmps = await registerUnmatchedEmployees();
+        if (newEmps.length > 0) {
+          toast.success(`${newEmps.length} funcionário(s) cadastrado(s)!`);
+          // Re-parse with updated employee list
+          const allEmps = [...(allUnitEmployees || employees), ...newEmps];
+          const mondayISO = format(targetMonday, "yyyy-MM-dd");
+          const reParsed = await parseScheduleFile(pendingFile, mondayISO, allEmps);
+          finalParseResult = reParsed;
+          // Invalidate employees cache
+          qc.invalidateQueries({ queryKey: ["employees"] });
+        }
+      }
+
+      if (finalParseResult.entries.length === 0) {
+        toast.info("Nenhum lançamento válido após o cadastro.");
+        setIsSaving(false);
+        return;
+      }
+
       const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
       if (!shifts || shifts.length === 0) {
         toast.error("Nenhum turno cadastrado. Cadastre ao menos um turno.");
@@ -156,7 +259,7 @@ export function ScheduleExcelFlow({
       }
       const shiftId = shifts[0].id;
 
-      const employeeIds = [...new Set(parseResult.entries.map((e) => e.employee_id))];
+      const employeeIds = [...new Set(finalParseResult.entries.map((e) => e.employee_id))];
       const { data: empData } = await supabase
         .from("employees")
         .select("id, job_title_id")
@@ -180,7 +283,7 @@ export function ScheduleExcelFlow({
         }
       }
 
-      const rows = parseResult.entries.map((entry) => {
+      const rows = finalParseResult.entries.map((entry) => {
         const jtId = empJobTitleMap.get(entry.employee_id);
         const resolvedSectorId = jtId ? jobTitleToSector.get(jtId) || sectorId : sectorId;
 
@@ -222,6 +325,7 @@ export function ScheduleExcelFlow({
   }
 
   const hasUnmatched = (parseResult?.unmatchedEmployees?.length ?? 0) > 0;
+  const canConfirm = parseResult && (parseResult.entries.length > 0 || selectedUnmatchedCount > 0);
 
   return (
     <>
@@ -355,29 +459,75 @@ export function ScheduleExcelFlow({
                 </div>
               </div>
 
-              {/* Unmatched employees warning */}
+              {/* Unmatched employees — interactive registration */}
               {hasUnmatched && (
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                    <UserX className="h-4 w-4" />
-                    Funcionários não encontrados ({parseResult.unmatchedEmployees.length}):
-                  </p>
-                  <ScrollArea className="max-h-[100px]">
-                    <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <UserPlus className="h-4 w-4" />
+                      Funcionários não encontrados ({parseResult.unmatchedEmployees.length})
+                    </p>
+                    {unitId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-6 px-2"
+                        onClick={() => {
+                          const allSelected = unmatchedRegs.every((r) => r.selected);
+                          setUnmatchedRegs((prev) =>
+                            prev.map((r) => ({ ...r, selected: !allSelected }))
+                          );
+                        }}
+                      >
+                        {unmatchedRegs.every((r) => r.selected) ? "Desmarcar todos" : "Marcar todos"}
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-[160px]">
+                    <div className="space-y-1.5">
                       {parseResult.unmatchedEmployees.map((u, i) => (
                         <div
                           key={i}
                           className="flex items-center gap-2 rounded-md border border-amber-300/30 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-xs"
                         >
-                          <UserX className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="font-medium">{u.name}</span>
-                          {u.cargo && <span className="text-muted-foreground">({u.cargo})</span>}
+                          {unitId && (
+                            <Checkbox
+                              checked={unmatchedRegs[i]?.selected ?? false}
+                              onCheckedChange={(checked) => {
+                                setUnmatchedRegs((prev) =>
+                                  prev.map((r, idx) =>
+                                    idx === i ? { ...r, selected: !!checked } : r
+                                  )
+                                );
+                              }}
+                              disabled={isSaving}
+                            />
+                          )}
+                          <Input
+                            value={unmatchedRegs[i]?.editedName ?? u.name}
+                            onChange={(e) => {
+                              setUnmatchedRegs((prev) =>
+                                prev.map((r, idx) =>
+                                  idx === i ? { ...r, editedName: e.target.value } : r
+                                )
+                              );
+                            }}
+                            className="h-6 text-xs flex-1 min-w-0"
+                            disabled={isSaving || !(unmatchedRegs[i]?.selected)}
+                          />
+                          {u.cargo && (
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {u.cargo}
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
                   <p className="text-[11px] text-muted-foreground">
-                    Esses funcionários serão ignorados. Cadastre-os no sistema e tente novamente.
+                    {unitId
+                      ? `Marque para cadastrar automaticamente. ${selectedUnmatchedCount} selecionado(s).`
+                      : "Selecione uma unidade para poder cadastrar automaticamente."}
                   </p>
                 </div>
               )}
@@ -410,7 +560,7 @@ export function ScheduleExcelFlow({
                 </div>
               )}
 
-              {parseResult.entries.length === 0 && (
+              {parseResult.entries.length === 0 && !hasUnmatched && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhum lançamento válido encontrado na planilha.
                 </p>
@@ -422,10 +572,12 @@ export function ScheduleExcelFlow({
             <Button variant="outline" onClick={closeModal} disabled={isSaving}>
               Cancelar
             </Button>
-            {parseResult && parseResult.entries.length > 0 && (
+            {canConfirm && (
               <Button onClick={handleConfirmImport} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Confirmar Importação ({parseResult.entries.length})
+                {selectedUnmatchedCount > 0
+                  ? `Cadastrar (${selectedUnmatchedCount}) e Importar`
+                  : `Confirmar Importação (${parseResult?.entries.length || 0})`}
               </Button>
             )}
           </DialogFooter>

@@ -362,7 +362,14 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
               return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">{row.sectorName}</span>
+                  <div className="flex items-center gap-1">
+                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                    <Input
+                      className="h-7 w-40 text-sm font-medium"
+                      value={row.sectorName}
+                      onChange={(e) => handleSectorNameEdit(rowIdx, e.target.value)}
+                    />
+                  </div>
                   <Badge variant="secondary" className="text-xs">{row.shiftType}</Badge>
                   {exists ? (
                     <Badge variant="outline" className="text-xs gap-1">

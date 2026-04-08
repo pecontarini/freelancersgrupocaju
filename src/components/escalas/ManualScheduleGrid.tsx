@@ -154,8 +154,13 @@ export function ManualScheduleGrid() {
     if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) {
       return active;
     }
-    return active.filter((emp) => emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id));
-  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds]);
+    return active.filter((emp) => {
+      if (emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
+      return schedules.some(
+        (s) => s.employee_id === emp.id && s.sector_id === activeSectorId && s.status !== "cancelled"
+      );
+    });
+  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, schedules]);
 
   // Sort: CLT first, then freelancers — exclude hidden employees
   const sortedEmployees = useMemo(() => {

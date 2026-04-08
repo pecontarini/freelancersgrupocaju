@@ -1,6 +1,7 @@
 import XLSX from "xlsx-js-style";
 import { format, addDays, startOfWeek } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
+import { jsDayToPopDay } from "@/lib/popConventions";
 
 const DAY_LABELS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -331,7 +332,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
       const shiftLabel = shifts.find((s: any) => s.type === shiftType)?.name || shiftType;
       ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: `POP ${shiftLabel}`, s: STYLE.popLabel };
       for (let d = 0; d < 7; d++) {
-        const dow = weekDays[d].getDay();
+        const dow = jsDayToPopDay(weekDays[d].getDay());
         const entry = matrix.find(
           (m: any) => m.sector_id === sector.id && m.day_of_week === dow && m.shift_type === shiftType
         );

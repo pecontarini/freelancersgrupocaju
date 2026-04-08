@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
+import { jsDayToPopDay } from "@/lib/popConventions";
 import { fetchScheduleData, type ScheduleDataResult } from "@/lib/scheduleMasterExport";
 
 const DAY_LABELS_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -275,7 +276,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
       const shiftLabel = shifts.find((s: any) => s.type === shiftType)?.name || shiftType;
       const popRow: any[] = [`POP ${shiftLabel}`];
       for (const day of weekDays) {
-        const dow = day.getDay();
+        const dow = jsDayToPopDay(day.getDay());
         const entry = matrix.find(
           (m: any) => m.sector_id === sector.id && m.day_of_week === dow && m.shift_type === shiftType
         );

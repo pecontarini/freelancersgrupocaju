@@ -109,7 +109,43 @@ export function useAddSector() {
   });
 }
 
+export function useClearStaffingMatrix() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sectorIds: string[]) => {
+      if (sectorIds.length === 0) return;
+      const { error } = await supabase
+        .from("staffing_matrix")
+        .delete()
+        .in("sector_id", sectorIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["staffing_matrix"] });
+    },
+    onError: (err: Error) => {
+      toast.error("Erro ao limpar matriz: " + err.message);
+    },
+  });
+}
+
 export function useDeleteSector() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("sectors").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sectors"] });
+      qc.invalidateQueries({ queryKey: ["staffing_matrix"] });
+      toast.success("Setor removido!");
+    },
+    onError: (err: Error) => {
+      toast.error("Erro ao remover setor: " + err.message);
+    },
+  });
+}
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {

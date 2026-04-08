@@ -71,7 +71,7 @@ interface Props {
     extras_count: number;
   }) => Promise<void>;
   onAddSector: (params: { unit_id: string; name: string }) => Promise<void>;
-  onDeleteSector: (id: string) => Promise<void>;
+  onClearMatrix: (sectorIds: string[]) => Promise<void>;
 }
 
 function generateMonthOptions() {

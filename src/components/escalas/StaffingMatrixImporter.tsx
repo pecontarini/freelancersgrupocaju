@@ -151,6 +151,12 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
     reader.readAsDataURL(file);
   };
 
+  const handleSectorNameEdit = (rowIdx: number, newName: string) => {
+    setReviewRows((prev) =>
+      prev.map((row, i) => (i === rowIdx ? { ...row, sectorName: newName } : row))
+    );
+  };
+
   const handleDayEdit = (rowIdx: number, dayIdx: number, field: "efetivos" | "extras", value: string) => {
     setReviewRows((prev) =>
       prev.map((row, i) => {

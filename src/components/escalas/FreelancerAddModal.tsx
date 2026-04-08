@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { useEmployees, useAddEmployee, type Employee } from "@/hooks/useEmployees";
+import { useEmployees } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
+import { useJobTitles } from "@/hooks/useJobTitles";
 import { toast } from "sonner";
 
 interface FreelancerAddModalProps {
@@ -38,24 +40,46 @@ export function FreelancerAddModal({
   onAdded,
 }: FreelancerAddModalProps) {
   const { data: employees = [] } = useEmployees(unitId);
-  const freelancers = employees.filter((e: any) => e.worker_type === "freelancer");
-
-  const addEmployee = useAddEmployee();
+  const { data: sectorJobTitles = [] } = useSectorJobTitles([sectorId]);
+  const { data: allJobTitles = [] } = useJobTitles(unitId);
   const upsertSchedule = useUpsertSchedule();
+
+  // Allowed job title IDs for this sector
+  const allowedJobTitleIds = useMemo(
+    () => new Set(sectorJobTitles.map((sjt) => sjt.job_title_id)),
+    [sectorJobTitles]
+  );
+
+  // Job titles allowed in this sector
+  const allowedJobTitles = useMemo(
+    () => allJobTitles.filter((jt) => allowedJobTitleIds.has(jt.id)),
+    [allJobTitles, allowedJobTitleIds]
+  );
+
+  // Filter freelancers by sector-linked job titles
+  const freelancers = useMemo(
+    () =>
+      employees.filter(
+        (e: any) =>
+          e.worker_type === "freelancer" &&
+          e.job_title_id &&
+          allowedJobTitleIds.has(e.job_title_id)
+      ),
+    [employees, allowedJobTitleIds]
+  );
 
   const [mode, setMode] = useState<"select" | "create">("select");
   const [selectedId, setSelectedId] = useState("");
   const [newName, setNewName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
+  const [selectedJobTitleId, setSelectedJobTitleId] = useState("");
   const [rate, setRate] = useState("200");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:20");
 
-  const isSaving = addEmployee.isPending || upsertSchedule.isPending;
+  const isSaving = upsertSchedule.isPending;
 
   async function handleSubmit() {
     const rateNum = parseFloat(rate) || 0;
-
     let empId = selectedId;
 
     if (mode === "create") {
@@ -63,18 +87,24 @@ export function FreelancerAddModal({
         toast.error("Nome é obrigatório.");
         return;
       }
+      if (!selectedJobTitleId) {
+        toast.error("Selecione um cargo.");
+        return;
+      }
+      const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
       try {
-        // We need to create the employee with worker_type = freelancer
-        // useAddEmployee doesn't support worker_type yet, so do it directly
-        const { data, error } = await (await import("@/integrations/supabase/client")).supabase
+        const { data, error } = await (
+          await import("@/integrations/supabase/client")
+        ).supabase
           .from("employees")
           .insert({
             unit_id: unitId,
             name: newName.trim(),
             gender: "M",
-            worker_type: "freelancer",
+            worker_type: "freelancer" as const,
             default_rate: rateNum,
-            job_title: jobTitle || "Freelancer",
+            job_title: chosenJt?.name || "Freelancer",
+            job_title_id: selectedJobTitleId,
           })
           .select("id")
           .single();
@@ -115,7 +145,7 @@ export function FreelancerAddModal({
   function resetForm() {
     setSelectedId("");
     setNewName("");
-    setJobTitle("");
+    setSelectedJobTitleId("");
     setRate("200");
     setStartTime("08:00");
     setEndTime("16:20");
@@ -137,7 +167,6 @@ export function FreelancerAddModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Mode toggle */}
           <div className="flex gap-2">
             <Button
               variant={mode === "select" ? "default" : "outline"}
@@ -162,7 +191,7 @@ export function FreelancerAddModal({
               <Label>Freelancer</Label>
               {freelancers.length === 0 ? (
                 <div className="text-sm text-muted-foreground py-2">
-                  Nenhum freelancer cadastrado.{" "}
+                  Nenhum freelancer com cargo compatível.{" "}
                   <button className="text-primary underline" onClick={() => setMode("create")}>
                     Criar novo
                   </button>
@@ -193,12 +222,23 @@ export function FreelancerAddModal({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Cargo</Label>
-                <Input
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                  placeholder="Ex: Garçom"
-                />
+                <Label>Cargo *</Label>
+                {allowedJobTitles.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhum cargo vinculado a este setor.</p>
+                ) : (
+                  <Select value={selectedJobTitleId} onValueChange={setSelectedJobTitleId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o cargo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allowedJobTitles.map((jt) => (
+                        <SelectItem key={jt.id} value={jt.id}>
+                          {jt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </>
           )}

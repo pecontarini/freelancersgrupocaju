@@ -1,89 +1,55 @@
 
 
-# Plano: Importação Inteligente da Matriz POP via Imagem
+# Correção: Erro de FK ao substituir setores no importador POP
 
-## Resumo
+## Problema
 
-Criar um botão "Importar via IA" na tela da Matriz de Efetivo Mínimo (StaffingMatrixConfig) que aceita uma foto/imagem da tabela de efetivos. A IA (Gemini 2.5 Flash, com visão) interpreta a imagem e extrai setores, dias da semana, turnos, efetivos e extras. O resultado é exibido numa tela de revisão antes de ser aplicado à matriz.
+Ao aplicar o POP importado, o sistema tenta **deletar** os setores antigos. Porém, existem 4 tabelas com FK referenciando `sectors`:
 
----
+- `staffing_matrix` (sector_id)
+- `schedules` (sector_id)
+- `schedule_attendance` (sector_id, remanejado_de_sector_id, remanejado_para_sector_id)
+- `sector_job_titles` (sector_id)
 
-## Edge Function: `supabase/functions/extract-staffing-matrix/index.ts`
+O delete falha porque há registros em `schedules` e `schedule_attendance` vinculados aos setores antigos.
 
-- Recebe imagem (base64 + mimeType) via POST
-- Prompt de sistema instruindo a IA a:
-  - Identificar o nome da unidade (cabeçalho)
-  - Separar por setor (GARÇOM + CHEFIAS, CUMINS, HOSTESS, etc.)
-  - Para cada setor, extrair por turno (ALMOÇO/JANTAR) e dia (Seg-Dom)
-  - Interpretar "5+2" como `{ efetivos: 5, extras: 2 }` e "5" como `{ efetivos: 5, extras: 0 }`
-  - Ignorar colunas "Nº PESSOAS NECESSÁRIAS" e "Nº DOBRAS"
-- Retorna JSON:
-  ```json
-  {
-    "unit_name": "CAMINITO PARRILLA ASA SUL",
-    "sectors": [
-      {
-        "name": "GARÇOM + CHEFIAS",
-        "shifts": [
-          {
-            "type": "ALMOÇO",
-            "days": [
-              { "day": 0, "efetivos": 6, "extras": 0 },
-              { "day": 1, "efetivos": 7, "extras": 0 },
-              ...
-            ]
-          }
-        ]
-      }
-    ]
-  }
-  ```
-- Usa `google/gemini-2.5-flash` (visão multimodal) via `ai.gateway.lovable.dev`
-- Segue o mesmo padrão de `extract-team-data` (CORS, error handling, JSON extraction)
+## Solução
 
----
+**Não deletar setores antigos.** Em vez disso, adotar uma abordagem de **reconciliação**:
 
-## Componente: `src/components/escalas/StaffingMatrixImporter.tsx`
+1. **Setores que existem na IA e no banco** → manter, apenas atualizar a staffing_matrix
+2. **Setores que existem na IA mas não no banco** → criar novos
+3. **Setores que existem no banco mas não na IA** → **manter** (não deletar, pois têm escalas vinculadas)
+4. **Limpar apenas `staffing_matrix`** dos setores da unidade antes de importar os novos valores
 
-Dialog/modal com 3 etapas:
+### Mudanças em `StaffingMatrixImporter.tsx`
 
-**Etapa 1 — Upload:** Input de imagem (câmera ou galeria). Mostra preview da imagem.
+Reescrever `handleApply`:
 
-**Etapa 2 — Processamento:** Spinner enquanto a IA processa. Chamada à edge function via `supabase.functions.invoke("extract-staffing-matrix", ...)`.
+1. Buscar setores existentes da unidade
+2. Para cada setor extraído pela IA:
+   - Se já existe (match por nome normalizado) → usar o ID existente
+   - Se não existe → criar via `onAddSector`
+3. Deletar todos os registros de `staffing_matrix` dos setores da unidade (isso não tem FK cascade problem)
+4. Inserir os novos registros de staffing_matrix via `onUpsert`
 
-**Etapa 3 — Revisão:** Tabela editável mostrando o resultado da IA:
-- Coluna de setor com match automático contra setores existentes (fuzzy match)
-- Se o setor não existir, opção de criar automaticamente
-- Campos de efetivos e extras editáveis antes de confirmar
-- Botão "Aplicar" que faz upsert em massa via `useUpsertStaffingMatrix`
+Isso elimina a necessidade de deletar setores e preserva o histórico de escalas.
 
----
+### Mudanças em `StaffingMatrixConfig.tsx`
 
-## Modificação: `src/components/escalas/StaffingMatrixConfig.tsx`
+- Remover `onDeleteSector` do importer (não será mais necessário para importação)
+- Adicionar uma nova prop `onClearMatrix` que deleta apenas registros da `staffing_matrix` para os setores da unidade
 
-- Adicionar botão "Importar via IA" (ícone Camera/Upload) ao lado do botão "Novo Setor"
-- Renderizar `<StaffingMatrixImporter>` quando aberto
-- Passa `selectedUnit`, `sectors` e `upsertMatrix` como props
-- Após importação, os dados preenchem a matriz existente (campos continuam editáveis)
+### Novo: hook ou função para limpar staffing_matrix
 
----
-
-## Fluxo completo
-
-```text
-[Foto da tabela] → [Upload no modal] → [Edge Function + IA]
-    → [Tela de revisão com setores/dias/efetivos/extras]
-    → [Criar setores faltantes] → [Upsert em massa na staffing_matrix]
-    → [Matriz preenchida e editável]
-```
+Adicionar mutation em `useStaffingMatrix.ts`:
+- `useClearStaffingMatrix()` — deleta registros de `staffing_matrix` por lista de `sector_id`s
 
 ## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/functions/extract-staffing-matrix/index.ts` | Criar |
-| `src/components/escalas/StaffingMatrixImporter.tsx` | Criar |
-| `src/components/escalas/StaffingMatrixConfig.tsx` | Modificar (adicionar botão de importação) |
-
-Nenhuma alteração no banco de dados necessária.
+| `src/components/escalas/StaffingMatrixImporter.tsx` | Reescrever handleApply (reconciliação sem delete de setores) |
+| `src/hooks/useStaffingMatrix.ts` | Adicionar mutation para limpar matrix |
+| `src/components/escalas/StaffingMatrixConfig.tsx` | Ajustar props do importer |
 

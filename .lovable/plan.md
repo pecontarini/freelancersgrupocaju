@@ -1,33 +1,44 @@
 
+Objetivo
+- Fazer o POP lido pela IA salvar de forma confiável e aparecer corretamente em todas as telas.
 
-# Plano: Edição de nome de setor + garantir salvamento da importação IA
+Diagnóstico confirmado
+- A gravação não está simplesmente “falhando”: os dados chegam ao backend, mas parte deles está sendo salva com o turno vindo cru da IA (`ALMOÇO`, `JANTAR`), enquanto o restante do sistema lê apenas os valores internos (`almoco`, `jantar`).
+- Também existe inconsistência no `day_of_week`: uma parte do app usa 0=segunda…6=domingo e outra usa `Date.getDay()` (0=domingo).
+- O mês selecionado no importador hoje não é persistido; ele só aparece na interface.
 
-## Problema atual
-1. Não existe botão para editar o nome de um setor existente
-2. A importação via IA pode não estar salvando corretamente porque a reconciliação por nome falha quando os nomes não batem exatamente
+Plano
+1. Canonizar o payload da IA antes de salvar
+   - Converter qualquer turno lido pela IA para um valor interno único.
+   - Normalizar nomes de setores para reconciliação confiável.
+   - Se houver turno ambíguo, permitir correção na etapa de revisão.
 
-## Mudanças
+2. Trocar o fluxo atual por um “aplicar POP” único no backend
+   - Em vez de vários `upsert`s no client, usar uma única operação transacional.
+   - Essa operação vai: reconciliar/criar setores, preservar setores com histórico, limpar apenas a matriz da unidade e gravar toda a nova matriz em lote.
+   - Remover dependência de `setTimeout` e passar a usar retorno real da operação.
 
-### 1. Hook: `useRenameSector` em `src/hooks/useStaffingMatrix.ts`
-- Nova mutation que faz `update` no campo `name` da tabela `sectors` pelo `id`
-- Invalida queries de `sectors` e `staffing_matrix`
+3. Confirmar o salvamento antes de fechar o modal
+   - Rebuscar a matriz após aplicar.
+   - Comparar “linhas esperadas” x “linhas gravadas”.
+   - Só concluir com sucesso se o total salvo bater com o total interpretado.
 
-### 2. Botão de edição de nome no `StaffingMatrixConfig.tsx`
-- Adicionar ícone de edição (Pencil) ao lado do nome de cada setor na tabela da matriz
-- Ao clicar, transforma o nome em um `Input` inline editável
-- Ao sair do campo (blur) ou pressionar Enter, salva o novo nome via `useRenameSector`
+4. Padronizar todos os leitores do POP
+   - Ajustar matriz, editor de escalas, mobile, dashboard operacional, compliance e exportações para usar a mesma convenção de turno e dia.
+   - Isso elimina o efeito “salvou no banco, mas não aparece na tela”.
 
-### 3. Garantir salvamento na importação (`StaffingMatrixImporter.tsx`)
-- Na tela de revisão, permitir editar o nome do setor antes de aplicar (para corrigir nomes que a IA leu de forma diferente)
-- No `handleApply`, melhorar o fuzzy match: normalizar removendo acentos, espaços extras e caracteres especiais
-- Adicionar logs e contadores visuais para confirmar quantos registros foram efetivamente salvos
-- Após a criação de setores, usar `await` com re-fetch explícito em vez de `setTimeout` para garantir que os IDs estejam disponíveis
+5. Persistir o mês de referência
+   - O mês escolhido no importador passará a ser salvo junto da importação.
+   - Se você quiser manter histórico mensal real do POP, essa mesma refatoração já pode deixar a base pronta para isso.
 
-## Arquivos impactados
+Detalhes técnicos
+- Importação e revisão: `src/components/escalas/StaffingMatrixImporter.tsx`
+- Configuração e integração: `src/components/escalas/StaffingMatrixConfig.tsx`
+- Hooks de gravação/leitura: `src/hooks/useStaffingMatrix.ts`
+- Leituras que precisam ser padronizadas: `ManualScheduleGrid.tsx`, `MobileScheduler.tsx`, `WeeklyScheduler.tsx`, `OperationalDashboard.tsx`, `usePopCompliance.ts`, `scheduleMasterExport.ts`, `scheduleMasterPdf.ts`
+- Backend: criar uma operação transacional para aplicar o POP completo com validação e retorno resumido
 
-| Arquivo | Ação |
-|---------|------|
-| `src/hooks/useStaffingMatrix.ts` | Adicionar `useRenameSector` |
-| `src/components/escalas/StaffingMatrixConfig.tsx` | Adicionar botão de edição inline no nome do setor |
-| `src/components/escalas/StaffingMatrixImporter.tsx` | Permitir edição de nome na revisão + melhorar reconciliação |
-
+Resultado esperado
+- O que a IA interpretar será exatamente o que ficará salvo.
+- Os mesmos números aparecerão na matriz, no editor de escalas, no dashboard e nas exportações.
+- O processo deixa de ser frágil e passa a ser previsível, verificável e auditável.

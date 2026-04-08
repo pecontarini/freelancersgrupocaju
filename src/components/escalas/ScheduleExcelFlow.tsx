@@ -25,6 +25,7 @@ import {
   XCircle,
   CalendarIcon,
   Info,
+  UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, addDays } from "date-fns";
@@ -34,8 +35,8 @@ import {
   generateScheduleTemplate,
   parseScheduleFile,
   type ScheduleEmployee,
-  type ParsedScheduleEntry,
-  type ScheduleParseError,
+  type ScheduleParseResult,
+  type UnmatchedEmployee,
 } from "@/lib/scheduleExcel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,6 +46,9 @@ interface ScheduleExcelFlowProps {
   weekDays: Date[];
   sectorName: string;
   sectorId: string;
+  unitName?: string;
+  /** All employees in the unit, used for fuzzy-matching external spreadsheets */
+  allUnitEmployees?: ScheduleEmployee[];
 }
 
 export function ScheduleExcelFlow({
@@ -52,15 +56,11 @@ export function ScheduleExcelFlow({
   weekDays,
   sectorName,
   sectorId,
+  unitName,
+  allUnitEmployees,
 }: ScheduleExcelFlowProps) {
   const [importModal, setImportModal] = useState(false);
-  const [parseResult, setParseResult] = useState<{
-    entries: ParsedScheduleEntry[];
-    errors: ScheduleParseError[];
-    workingCount: number;
-    offCount: number;
-    originalMonday: string | null;
-  } | null>(null);
+  const [parseResult, setParseResult] = useState<ScheduleParseResult | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -74,7 +74,7 @@ export function ScheduleExcelFlow({
       toast.error("Nenhum funcionário no setor para gerar modelo.");
       return;
     }
-    generateScheduleTemplate(employees, weekDays, sectorName);
+    generateScheduleTemplate(employees, weekDays, sectorName, unitName);
     toast.success("Modelo baixado!");
   }
 
@@ -83,17 +83,15 @@ export function ScheduleExcelFlow({
     if (!file) return;
     e.target.value = "";
 
-    // Store file and open modal — user will pick the target week before parsing
     setPendingFile(file);
     setImportModal(true);
 
-    // Default target to current week's monday from the weekDays prop
-    const defaultMonday = weekDays.length > 0
-      ? startOfWeek(weekDays[0], { weekStartsOn: 1 })
-      : startOfWeek(new Date(), { weekStartsOn: 1 });
+    const defaultMonday =
+      weekDays.length > 0
+        ? startOfWeek(weekDays[0], { weekStartsOn: 1 })
+        : startOfWeek(new Date(), { weekStartsOn: 1 });
     setTargetMonday(defaultMonday);
 
-    // Auto-parse with default target
     await runParse(file, format(defaultMonday, "yyyy-MM-dd"));
   }
 
@@ -101,7 +99,9 @@ export function ScheduleExcelFlow({
     setIsParsing(true);
     setParseResult(null);
     try {
-      const result = await parseScheduleFile(file, mondayISO);
+      // Merge sector employees + all unit employees for fuzzy matching
+      const allEmps = allUnitEmployees || employees;
+      const result = await parseScheduleFile(file, mondayISO, allEmps);
       setParseResult(result);
     } catch (err: any) {
       toast.error(err.message);
@@ -148,7 +148,6 @@ export function ScheduleExcelFlow({
     setIsSaving(true);
 
     try {
-      // 1. Find a default shift_id for the inserts
       const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
       if (!shifts || shifts.length === 0) {
         toast.error("Nenhum turno cadastrado. Cadastre ao menos um turno.");
@@ -157,7 +156,6 @@ export function ScheduleExcelFlow({
       }
       const shiftId = shifts[0].id;
 
-      // 2. Build employee -> correct sector mapping via sector_job_titles
       const employeeIds = [...new Set(parseResult.entries.map((e) => e.employee_id))];
       const { data: empData } = await supabase
         .from("employees")
@@ -169,7 +167,6 @@ export function ScheduleExcelFlow({
         if (emp.job_title_id) empJobTitleMap.set(emp.id, emp.job_title_id);
       }
 
-      // Fetch sector_job_titles to resolve job_title_id -> sector_id
       const jobTitleIds = [...new Set(Array.from(empJobTitleMap.values()))];
       const { data: sjtData } = await supabase
         .from("sector_job_titles")
@@ -178,22 +175,15 @@ export function ScheduleExcelFlow({
 
       const jobTitleToSector = new Map<string, string>();
       for (const sjt of sjtData || []) {
-        // First match wins (an employee's primary sector)
         if (!jobTitleToSector.has(sjt.job_title_id)) {
           jobTitleToSector.set(sjt.job_title_id, sjt.sector_id);
         }
       }
 
-      // 3. Build bulk payload — auto-resolve sector per employee
       const rows = parseResult.entries.map((entry) => {
         const jtId = empJobTitleMap.get(entry.employee_id);
-        const resolvedSectorId = jtId ? (jobTitleToSector.get(jtId) || sectorId) : sectorId;
+        const resolvedSectorId = jtId ? jobTitleToSector.get(jtId) || sectorId : sectorId;
 
-        console.log(
-          `[Excel Import] Salvando ${entry.employee_name} para data ${entry.date}` +
-          ` | setor: ${resolvedSectorId === sectorId ? "padrão" : "auto-resolvido"}` +
-          (showDateWarning ? " (Override Ativo)" : "")
-        );
         return {
           employee_id: entry.employee_id,
           user_id: entry.employee_id,
@@ -209,7 +199,6 @@ export function ScheduleExcelFlow({
         };
       });
 
-      // 3. Batch insert
       const { error, data } = await supabase.from("schedules").insert(rows).select("id");
 
       if (error) {
@@ -220,7 +209,6 @@ export function ScheduleExcelFlow({
       }
 
       const savedCount = data?.length ?? rows.length;
-      console.log(`[Excel Import] ${savedCount} escalas salvas com sucesso.`);
 
       setIsSaving(false);
       closeModal();
@@ -232,6 +220,8 @@ export function ScheduleExcelFlow({
       setIsSaving(false);
     }
   }
+
+  const hasUnmatched = (parseResult?.unmatchedEmployees?.length ?? 0) > 0;
 
   return (
     <>
@@ -265,7 +255,6 @@ export function ScheduleExcelFlow({
         />
       </div>
 
-      {/* Import Confirmation Modal */}
       <Dialog open={importModal} onOpenChange={(o) => { if (!o) closeModal(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -365,6 +354,33 @@ export function ScheduleExcelFlow({
                   </div>
                 </div>
               </div>
+
+              {/* Unmatched employees warning */}
+              {hasUnmatched && (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                    <UserX className="h-4 w-4" />
+                    Funcionários não encontrados ({parseResult.unmatchedEmployees.length}):
+                  </p>
+                  <ScrollArea className="max-h-[100px]">
+                    <div className="space-y-1">
+                      {parseResult.unmatchedEmployees.map((u, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 rounded-md border border-amber-300/30 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-xs"
+                        >
+                          <UserX className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                          <span className="font-medium">{u.name}</span>
+                          {u.cargo && <span className="text-muted-foreground">({u.cargo})</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-[11px] text-muted-foreground">
+                    Esses funcionários serão ignorados. Cadastre-os no sistema e tente novamente.
+                  </p>
+                </div>
+              )}
 
               {/* Errors list */}
               {parseResult.errors.length > 0 && (

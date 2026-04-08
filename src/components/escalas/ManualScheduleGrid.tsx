@@ -48,6 +48,7 @@ import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/h
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
 import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
+import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
 import { formatCurrency } from "@/lib/formatters";
@@ -160,7 +161,7 @@ export function ManualScheduleGrid() {
     if (!activeSectorId) return 0;
     let maxExtras = 0;
     for (const day of weekDays) {
-      const dow = day.getDay();
+      const dow = jsDayToPopDay(day.getDay());
       const entries = staffingMatrix.filter(
         (m) => m.sector_id === activeSectorId && m.day_of_week === dow
       );

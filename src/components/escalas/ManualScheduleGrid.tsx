@@ -400,7 +400,7 @@ export function ManualScheduleGrid() {
                         {weekDays.map((day, i) => {
                           const dateStr = format(day, "yyyy-MM-dd");
                           const budget = getBudgetForDay(dateStr);
-                          const jsDow = day.getDay();
+                          const jsDow = jsDayToPopDay(day.getDay());
                           const popLunch = getPopTarget(jsDow, "almoco");
                           const popDinner = getPopTarget(jsDow, "jantar");
                           const metrics = getDayMetrics(dateStr);

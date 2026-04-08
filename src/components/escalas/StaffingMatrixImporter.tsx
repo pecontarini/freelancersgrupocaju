@@ -294,8 +294,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
             <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
               <p className="text-xs text-orange-700 dark:text-orange-300">
-                <strong>Atenção:</strong> Ao importar um novo POP, todos os setores e dados 
-                da matriz atual desta unidade serão substituídos pelos dados da imagem.
+                <strong>Atenção:</strong> Ao importar um novo POP, os dados da matriz de efetivo 
+                serão substituídos. Setores existentes serão mantidos, novos serão criados conforme a imagem.
               </p>
             </div>
 

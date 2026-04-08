@@ -132,7 +132,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
           for (const shift of sector.shifts) {
             rows.push({
               sectorName: sector.name,
-              shiftType: shift.type,
+              shiftType: normalizeShiftType(shift.type),
               days: shift.days,
             });
           }
@@ -178,24 +178,20 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
       const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
 
       // 1. Reconcile sectors: match existing by normalized name, create missing ones
-      const normalize = (s: string) =>
-        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
       const existingSectors = [...sectors];
       const sectorMap = new Map<string, string>(); // normalizedName → sector_id
 
       for (const s of existingSectors) {
-        sectorMap.set(normalize(s.name), s.id);
+        sectorMap.set(normalizeSectorName(s.name), s.id);
       }
 
-      const sectorsToCreate = uniqueSectorNames.filter((n) => !sectorMap.has(normalize(n)));
+      const sectorsToCreate = uniqueSectorNames.filter((n) => !sectorMap.has(normalizeSectorName(n)));
 
       if (sectorsToCreate.length > 0) {
         toast.info(`Criando ${sectorsToCreate.length} novos setores...`);
         for (const name of sectorsToCreate) {
           await onAddSector({ unit_id: selectedUnit, name });
         }
-        // Wait for creation to propagate
-        await new Promise((r) => setTimeout(r, 1000));
       }
 
       // 2. Re-fetch sectors to get all IDs (existing + newly created)
@@ -205,53 +201,106 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
         .eq("unit_id", selectedUnit);
 
       if (!freshSectors || freshSectors.length === 0) {
-        throw new Error("Setores não encontrados");
+        throw new Error("Setores não encontrados após criação");
       }
 
       // Rebuild map with fresh data
       sectorMap.clear();
       for (const s of freshSectors) {
-        sectorMap.set(normalize(s.name), s.id);
+        sectorMap.set(normalizeSectorName(s.name), s.id);
       }
 
       // 3. Clear ALL staffing_matrix entries for this unit's sectors
       const allSectorIds = freshSectors.map((s) => s.id);
       if (allSectorIds.length > 0) {
         toast.info("Limpando matriz anterior...");
-        await onClearMatrix(allSectorIds);
-        await new Promise((r) => setTimeout(r, 500));
+        const { error: clearError } = await supabase
+          .from("staffing_matrix")
+          .delete()
+          .in("sector_id", allSectorIds);
+        if (clearError) throw clearError;
       }
 
-      // 4. Insert new matrix entries
-      let savedCount = 0;
+      // 4. Build bulk payload with canonical shift_type
+      const bulkRows: {
+        sector_id: string;
+        day_of_week: number;
+        shift_type: string;
+        required_count: number;
+        extras_count: number;
+        updated_at: string;
+      }[] = [];
+
+      let unmatchedSectors: string[] = [];
+
       for (const row of reviewRows) {
-        const sectorId = sectorMap.get(normalize(row.sectorName))
+        const canonicalShift = normalizeShiftType(row.shiftType);
+        const normalizedName = normalizeSectorName(row.sectorName);
+        
+        const sectorId = sectorMap.get(normalizedName)
           || freshSectors.find((s) =>
-            normalize(s.name).includes(normalize(row.sectorName)) ||
-            normalize(row.sectorName).includes(normalize(s.name))
+            normalizeSectorName(s.name).includes(normalizedName) ||
+            normalizedName.includes(normalizeSectorName(s.name))
           )?.id;
 
         if (!sectorId) {
-          console.warn("Setor não encontrado:", row.sectorName);
+          unmatchedSectors.push(row.sectorName);
+          console.warn("Setor não encontrado após reconciliação:", row.sectorName);
           continue;
         }
 
         for (const d of row.days) {
-          await onUpsert({
+          bulkRows.push({
             sector_id: sectorId,
             day_of_week: d.day,
-            shift_type: row.shiftType,
+            shift_type: canonicalShift,
             required_count: d.efetivos,
             extras_count: d.extras,
+            updated_at: new Date().toISOString(),
           });
-          savedCount++;
         }
       }
 
-      toast.success(`POP importado: ${uniqueSectorNames.length} setores, ${savedCount} registros salvos (ref. ${selectedMonth})`);
+      // 5. Bulk insert all rows at once
+      if (bulkRows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("staffing_matrix")
+          .insert(bulkRows);
+        if (insertError) throw insertError;
+      }
+
+      // 6. Verify: re-fetch and compare counts
+      const { data: savedRows, error: verifyError } = await supabase
+        .from("staffing_matrix")
+        .select("id")
+        .in("sector_id", allSectorIds);
+      
+      if (verifyError) throw verifyError;
+      
+      const savedCount = savedRows?.length ?? 0;
+      const expectedCount = bulkRows.length;
+
+      if (savedCount !== expectedCount) {
+        toast.warning(
+          `Atenção: ${savedCount} de ${expectedCount} registros salvos. Verifique a matriz.`
+        );
+      } else {
+        toast.success(
+          `POP importado com sucesso: ${uniqueSectorNames.length} setores, ${savedCount} registros (ref. ${selectedMonth})`
+        );
+      }
+
+      if (unmatchedSectors.length > 0) {
+        toast.warning(`Setores não reconciliados: ${unmatchedSectors.join(", ")}`);
+      }
+
+      // Invalidate queries so the UI refreshes
+      onClearMatrix([]); // triggers queryKey invalidation
+
       setOpen(false);
       reset();
     } catch (err: any) {
+      console.error("Erro ao aplicar POP:", err);
       toast.error("Erro ao aplicar: " + (err.message || "Tente novamente"));
     } finally {
       setApplying(false);

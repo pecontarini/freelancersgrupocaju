@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Loader2, Check, Plus, CalendarDays, AlertTriangle } from "lucide-react";
+import { Camera, Loader2, Check, Plus, CalendarDays, AlertTriangle, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";

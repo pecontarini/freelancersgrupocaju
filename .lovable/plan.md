@@ -1,44 +1,73 @@
 
-Objetivo
-- Fazer o POP lido pela IA salvar de forma confiável e aparecer corretamente em todas as telas.
 
-Diagnóstico confirmado
-- A gravação não está simplesmente “falhando”: os dados chegam ao backend, mas parte deles está sendo salva com o turno vindo cru da IA (`ALMOÇO`, `JANTAR`), enquanto o restante do sistema lê apenas os valores internos (`almoco`, `jantar`).
-- Também existe inconsistência no `day_of_week`: uma parte do app usa 0=segunda…6=domingo e outra usa `Date.getDay()` (0=domingo).
-- O mês selecionado no importador hoje não é persistido; ele só aparece na interface.
+# Plano: Novo formato de planilha de escala (3 colunas por dia + cargo)
 
-Plano
-1. Canonizar o payload da IA antes de salvar
-   - Converter qualquer turno lido pela IA para um valor interno único.
-   - Normalizar nomes de setores para reconciliação confiável.
-   - Se houver turno ambíguo, permitir correção na etapa de revisão.
+## Contexto
 
-2. Trocar o fluxo atual por um “aplicar POP” único no backend
-   - Em vez de vários `upsert`s no client, usar uma única operação transacional.
-   - Essa operação vai: reconciliar/criar setores, preservar setores com histórico, limpar apenas a matriz da unidade e gravar toda a nova matriz em lote.
-   - Remover dependência de `setTimeout` e passar a usar retorno real da operação.
+As planilhas que a operação já usa seguem este formato:
 
-3. Confirmar o salvamento antes de fechar o modal
-   - Rebuscar a matriz após aplicar.
-   - Comparar “linhas esperadas” x “linhas gravadas”.
-   - Só concluir com sucesso se o total salvo bater com o total interpretado.
+```text
+| NOME       | CARGO        | SEGUNDA       |         |       | TERÇA         |         |       | ...
+|            |              | ENTRADA       | INTERV. | SAÍDA | ENTRADA       | INTERV. | SAÍDA | ...
+| Fulano     | Barman       | 12:00         | 3h      | 0:00  | FOLGA         |         |       | ...
+```
 
-4. Padronizar todos os leitores do POP
-   - Ajustar matriz, editor de escalas, mobile, dashboard operacional, compliance e exportações para usar a mesma convenção de turno e dia.
-   - Isso elimina o efeito “salvou no banco, mas não aparece na tela”.
+O sistema atual gera um modelo diferente (1 coluna por dia, formato "HH:MM - HH:MM", aba `__meta__` obrigatória). Isso força a operação a usar dois formatos distintos.
 
-5. Persistir o mês de referência
-   - O mês escolhido no importador passará a ser salvo junto da importação.
-   - Se você quiser manter histórico mensal real do POP, essa mesma refatoração já pode deixar a base pronta para isso.
+## Objetivo
 
-Detalhes técnicos
-- Importação e revisão: `src/components/escalas/StaffingMatrixImporter.tsx`
-- Configuração e integração: `src/components/escalas/StaffingMatrixConfig.tsx`
-- Hooks de gravação/leitura: `src/hooks/useStaffingMatrix.ts`
-- Leituras que precisam ser padronizadas: `ManualScheduleGrid.tsx`, `MobileScheduler.tsx`, `WeeklyScheduler.tsx`, `OperationalDashboard.tsx`, `usePopCompliance.ts`, `scheduleMasterExport.ts`, `scheduleMasterPdf.ts`
-- Backend: criar uma operação transacional para aplicar o POP completo com validação e retorno resumido
+Fazer o sistema gerar e importar no formato real da operação, eliminando a necessidade de retrabalho.
 
-Resultado esperado
-- O que a IA interpretar será exatamente o que ficará salvo.
-- Os mesmos números aparecerão na matriz, no editor de escalas, no dashboard e nas exportações.
-- O processo deixa de ser frágil e passa a ser previsível, verificável e auditável.
+## Mudanças
+
+### 1. Reescrever `generateScheduleTemplate()` em `src/lib/scheduleExcel.ts`
+
+**Novo formato do template gerado:**
+- Aba "Instruções": instruções de preenchimento (já existe, atualizar texto)
+- Aba "ESCALA": tabela com estrutura:
+  - Linha 1: `{SETOR} — {UNIDADE} — SEMANA {dd/MM} a {dd/MM}`
+  - Linha 2: `NOME | CARGO | SEGUNDA | (vazio) | (vazio) | TERÇA | ...`
+  - Linha 3: `(vazio) | (vazio) | ENTRADA | INTERV. | SAÍDA | ENTRADA | INTERV. | SAÍDA | ...`
+  - Linhas de dados: nome do funcionário + cargo pré-preenchidos, células de horário vazias
+- Aba `__meta__` (oculta): mantida para vincular employee_id ao nome (compatibilidade com importação)
+- 3 colunas por dia (ENTRADA, INTERV., SAÍDA) em vez de 1
+
+### 2. Reescrever `parseScheduleFile()` em `src/lib/scheduleExcel.ts`
+
+**Dois modos de parsing:**
+- **Modo legacy**: se detectar aba `__meta__` + marcador `__CAJU_SCHEDULE_META__`, usar parser atual
+- **Modo novo (padrão)**: se detectar cabeçalho com ENTRADA/INTERV./SAÍDA:
+  - Ler linha de título para extrair setor + unidade + semana
+  - Mapear dias por posição (cada dia = 3 colunas)
+  - Para cada funcionário: ler NOME, CARGO, e para cada dia ler ENTRADA/INTERV./SAÍDA
+  - Aceitar: FOLGA, FÉRIAS, FDS MÊS, BANCO DE HORAS como tipos de folga
+  - Usar ENTRADA e SAÍDA como horários, INTERV. como duração do intervalo
+  - Vincular funcionário por nome (fuzzy match contra employees do banco) quando não houver `__meta__`
+
+### 3. Ajustar `ScheduleExcelFlow.tsx`
+
+- Adicionar parâmetros `unitName` nas props para o template
+- Quando não houver `__meta__`, mostrar uma etapa extra de reconciliação de nomes (semelhante ao que já existe no StaffingMatrixImporter)
+- Aceitar arquivos no novo formato sem rejeitar
+
+### 4. Aceitar formato externo (sem `__meta__`)
+
+Para quando a planilha foi criada fora do sistema (formato idêntico mas sem aba `__meta__`):
+- Buscar employees do banco pela unidade selecionada
+- Fazer match por nome normalizado
+- Mostrar avisos para nomes não encontrados
+
+## Arquivos impactados
+
+| Arquivo | Ação |
+|---------|------|
+| `src/lib/scheduleExcel.ts` | Reescrever template e parser |
+| `src/components/escalas/ScheduleExcelFlow.tsx` | Aceitar novo formato, adicionar unitName prop |
+| `src/components/escalas/ManualScheduleGrid.tsx` | Passar unitName para ScheduleExcelFlow |
+
+## Resultado
+
+- O modelo baixado será visualmente idêntico às planilhas que a operação já usa
+- O sistema aceita tanto planilhas geradas por ele quanto planilhas externas no mesmo formato
+- Compatibilidade com formato antigo mantida
+

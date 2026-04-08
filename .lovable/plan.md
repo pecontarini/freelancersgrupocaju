@@ -1,37 +1,28 @@
 
 
-# Plano: Exibir funcionários escalados mesmo com cargo divergente
+# Plano: Filtrar freelancers por cargos vinculados ao setor
 
 ## Problema
 
-O filtro do grid de escalas (`ManualScheduleGrid`) filtra funcionários pelo `job_title_id` vinculado ao setor ativo. Se a Letícia tem cargo "cross barman" mas foi escalada no setor que aceita "auxiliar de bar", ela não aparece na lista visual — mas como o POP conta direto dos `schedules`, o contador funciona normalmente.
+Atualmente o modal de adicionar freelancer lista **todos** os freelancers da unidade, sem filtrar pelo cargo. Isso permite escalar um cumim no bar ou um barman nos cumins.
 
 ## Solução
 
-Alterar o filtro `filteredEmployees` para incluir também funcionários que **já possuem escala ativa na semana** para o setor selecionado, independente do cargo. Isso garante que qualquer funcionário já escalado sempre aparece no grid.
+Usar o mapeamento `sector_job_titles` para filtrar a lista de freelancers disponíveis, mostrando apenas aqueles cujo `job_title_id` está vinculado ao setor ativo. No modo "Criar Novo", restringir o campo de cargo a um dropdown com apenas os cargos permitidos.
 
-## Mudança
+## Mudanças
 
-### `ManualScheduleGrid.tsx` — Filtro de funcionários (linhas 152-158)
+### `FreelancerAddModal.tsx`
 
-Adicionar ao filtro: se o funcionário tem pelo menos um schedule no `activeSectorId` durante a semana atual, incluí-lo na lista mesmo que seu `job_title_id` não bata com os cargos do setor.
-
-```
-// Lógica atual:
-active.filter(emp => emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id))
-
-// Nova lógica:
-active.filter(emp => {
-  // Cargo vinculado ao setor
-  if (emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
-  // Já tem escala no setor esta semana
-  return schedules.some(s => s.employee_id === emp.id && s.sector_id === activeSectorId);
-})
-```
-
-## Arquivo impactado
+1. Importar `useSectorJobTitles` e `useJobTitles`
+2. Buscar os `job_title_id`s vinculados ao `sectorId` via `useSectorJobTitles([sectorId])`
+3. **Modo "Existente"**: filtrar `freelancers` para exibir apenas os que têm `job_title_id` presente nos cargos do setor
+4. **Modo "Criar Novo"**: substituir o campo de texto livre "Cargo" por um `Select` dropdown populado apenas com os job titles vinculados ao setor. Ao selecionar, guardar o `job_title_id` para usar no insert
+5. No insert de novo freelancer, incluir `job_title_id` além do `job_title` (nome) para garantir consistência futura
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/ManualScheduleGrid.tsx` | Ajustar filtro para incluir funcionários já escalados |
+| `src/components/escalas/FreelancerAddModal.tsx` | Filtrar lista + dropdown de cargos do setor |
+
+Nenhuma mudança de banco ou hooks adicionais necessária — os hooks `useSectorJobTitles` e `useJobTitles` já existem.
 

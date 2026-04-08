@@ -52,7 +52,7 @@ export function FreelancerForm() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { createEntry } = useFreelancerEntries();
   const { isAdmin, isOperator, unidades, isGerenteUnidade } = useUserProfile();
-  const { lookupFreelancerByCpf, isLookingUp } = useCpfLookup();
+  const { lookupFreelancerByCpf, lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
   
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();

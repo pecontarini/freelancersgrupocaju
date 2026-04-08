@@ -685,6 +685,37 @@ export function ManualScheduleGrid() {
           date={freelancerModal.date}
         />
       )}
+
+      {/* Delete employee from week confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover funcionário da semana</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as escalas de <strong>{deleteConfirm?.employeeName}</strong> nesta semana serão removidas. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirm && selectedUnit) {
+                  cancelEmployeeWeek.mutate({
+                    employee_id: deleteConfirm.employeeId,
+                    sector_ids: sectorIds,
+                    week_start: weekStart,
+                    week_end: weekEnd,
+                  });
+                }
+                setDeleteConfirm(null);
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

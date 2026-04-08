@@ -302,7 +302,39 @@ export function ScheduleExcelFlow({
         };
       });
 
-      const { error, data } = await supabase.from("schedules").insert(rows).select("id");
+      // Dedup: check which (employee_id, schedule_date, sector_id) already exist
+      const uniqueDates = [...new Set(rows.map((r) => r.schedule_date))];
+      const uniqueEmpIds = [...new Set(rows.map((r) => r.employee_id))];
+      const { data: existingSchedules } = await supabase
+        .from("schedules")
+        .select("employee_id, schedule_date, sector_id")
+        .in("employee_id", uniqueEmpIds)
+        .gte("schedule_date", uniqueDates[0])
+        .lte("schedule_date", uniqueDates[uniqueDates.length - 1])
+        .neq("status", "cancelled");
+
+      const existingKeys = new Set(
+        (existingSchedules || []).map(
+          (s) => `${s.employee_id}|${s.schedule_date}|${s.sector_id}`
+        )
+      );
+
+      const newRows = rows.filter(
+        (r) => !existingKeys.has(`${r.employee_id}|${r.schedule_date}|${r.sector_id}`)
+      );
+
+      const ignoredCount = rows.length - newRows.length;
+      if (ignoredCount > 0) {
+        toast.info(`${ignoredCount} lançamento(s) ignorado(s) por já existirem.`);
+      }
+
+      if (newRows.length === 0) {
+        toast.warning("Todas as escalas já existem. Nenhuma nova inserida.");
+        setIsSaving(false);
+        return;
+      }
+
+      const { error, data } = await supabase.from("schedules").insert(newRows).select("id");
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);

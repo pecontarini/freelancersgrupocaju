@@ -358,7 +358,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
             </div>
 
             {reviewRows.map((row, rowIdx) => {
-              const normalize = (s: string) => s.toUpperCase().trim();
+              const normalize = (s: string) =>
+                s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
               const exists = sectors.some((s) => normalize(s.name) === normalize(row.sectorName));
               return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">

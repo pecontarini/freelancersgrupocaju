@@ -177,7 +177,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
       const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
 
       // 1. Reconcile sectors: match existing by normalized name, create missing ones
-      const normalize = (s: string) => s.toUpperCase().trim();
+      const normalize = (s: string) =>
+        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").replace(/\s+/g, " ").trim();
       const existingSectors = [...sectors];
       const sectorMap = new Map<string, string>(); // normalizedName → sector_id
 

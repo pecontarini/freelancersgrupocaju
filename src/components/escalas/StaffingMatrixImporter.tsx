@@ -410,7 +410,6 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
             {reviewRows.map((row, rowIdx) => {
               const exists = sectors.some((s) => normalizeSectorName(s.name) === normalizeSectorName(row.sectorName));
               return (
-              return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">

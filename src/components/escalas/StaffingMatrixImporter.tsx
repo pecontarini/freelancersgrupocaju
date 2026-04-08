@@ -417,7 +417,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
                   </Table>
                 </div>
               </div>
-            ))}
+            );
+            })}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setOpen(false); reset(); }}>

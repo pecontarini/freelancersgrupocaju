@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Sector } from "@/hooks/useStaffingMatrix";
+import { normalizeShiftType, normalizeSectorName } from "@/lib/popConventions";
 
 const DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 

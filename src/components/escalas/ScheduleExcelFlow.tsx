@@ -343,7 +343,7 @@ export function ScheduleExcelFlow({
         return;
       }
 
-      const savedCount = data?.length ?? rows.length;
+      const savedCount = data?.length ?? newRows.length;
 
       setIsSaving(false);
       closeModal();

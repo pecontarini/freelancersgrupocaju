@@ -118,6 +118,7 @@ export function ManualScheduleGrid() {
     employeeId: string;
     employeeName: string;
   } | null>(null);
+  const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<Set<string>>(new Set());
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;

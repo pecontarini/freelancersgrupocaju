@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   DollarSign,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +45,17 @@ import {
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/hooks/useManualSchedules";
+import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
 import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";

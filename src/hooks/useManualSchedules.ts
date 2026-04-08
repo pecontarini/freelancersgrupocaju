@@ -141,6 +141,98 @@ export function useCancelSchedule() {
   });
 }
 
+export function useBulkVacation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      employee_id: string;
+      sector_id: string;
+      start_date: string;
+      end_date: string;
+      shift_type?: string;
+    }) => {
+      // Generate date strings
+      const dates: string[] = [];
+      const start = new Date(params.start_date + "T12:00:00");
+      const end = new Date(params.end_date + "T12:00:00");
+      if (end < start) throw new Error("Data final deve ser após a data inicial.");
+      const diffDays = Math.round((end.getTime() - start.getTime()) / (86400000)) + 1;
+      if (diffDays > 45) throw new Error("Período máximo de 45 dias.");
+
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        dates.push(`${yyyy}-${mm}-${dd}`);
+      }
+
+      // Find a shift_id
+      let shiftId: string;
+      if (params.shift_type) {
+        const { data: matched } = await supabase
+          .from("shifts")
+          .select("id")
+          .eq("type", params.shift_type)
+          .limit(1);
+        shiftId = matched?.[0]?.id || "";
+      }
+      if (!shiftId!) {
+        const { data: any } = await supabase.from("shifts").select("id").limit(1);
+        if (!any || any.length === 0) throw new Error("Nenhum turno cadastrado.");
+        shiftId = any[0].id;
+      }
+
+      // Cancel existing working schedules in the range
+      const { data: existing } = await supabase
+        .from("schedules")
+        .select("id, schedule_date")
+        .eq("employee_id", params.employee_id)
+        .eq("sector_id", params.sector_id)
+        .gte("schedule_date", params.start_date)
+        .lte("schedule_date", params.end_date)
+        .neq("status", "cancelled");
+
+      const existingDates = new Set((existing || []).map((e) => e.schedule_date));
+
+      // Cancel working ones
+      const toCancel = (existing || []).filter((e) => true);
+      if (toCancel.length > 0) {
+        const cancelIds = toCancel.map((e) => e.id);
+        await supabase
+          .from("schedules")
+          .update({ status: "cancelled" })
+          .in("id", cancelIds);
+      }
+
+      // Insert vacation for all dates
+      const toInsert = dates.map((date) => ({
+        employee_id: params.employee_id,
+        user_id: params.employee_id,
+        schedule_date: date,
+        sector_id: params.sector_id,
+        shift_id: shiftId,
+        status: "scheduled",
+        schedule_type: "vacation" as const,
+        start_time: null,
+        end_time: null,
+        break_duration: 0,
+        agreed_rate: 0,
+      }));
+
+      const { error } = await supabase.from("schedules").insert(toInsert);
+      if (error) throw error;
+
+      return dates.length;
+    },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+      toast.success(`Férias lançadas: ${count} dia(s)!`);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 export function useCopyPreviousDay() {
   const qc = useQueryClient();
   return useMutation({

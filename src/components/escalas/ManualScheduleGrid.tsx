@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   DollarSign,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -44,7 +45,17 @@ import {
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useManualSchedules, useCopyPreviousDay, type ManualSchedule } from "@/hooks/useManualSchedules";
+import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
 import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
@@ -100,8 +111,13 @@ export function ManualScheduleGrid() {
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();
   const copyDay = useCopyPreviousDay();
+  const cancelEmployeeWeek = useCancelEmployeeWeek();
 
-  // Edit modal state
+  // Delete employee from week state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    employeeId: string;
+    employeeName: string;
+  } | null>(null);
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;
@@ -533,11 +549,23 @@ export function ManualScheduleGrid() {
                           <TableRow key={emp.id}>
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                               <div className="flex items-center gap-1.5">
-                                <span className="truncate max-w-[120px]">{emp.name}</span>
+                                <span className="truncate max-w-[110px]">{emp.name}</span>
                                 {isFreelancer && (
                                   <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
                                     FL
                                   </Badge>
+                                )}
+                                {canManage && (
+                                  <button
+                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    title="Remover da semana"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
                                 )}
                               </div>
                               {emp.job_title && (
@@ -657,6 +685,37 @@ export function ManualScheduleGrid() {
           date={freelancerModal.date}
         />
       )}
+
+      {/* Delete employee from week confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover funcionário da semana</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as escalas de <strong>{deleteConfirm?.employeeName}</strong> nesta semana serão removidas. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirm && selectedUnit) {
+                  cancelEmployeeWeek.mutate({
+                    employee_id: deleteConfirm.employeeId,
+                    sector_ids: sectorIds,
+                    week_start: weekStart,
+                    week_end: weekEnd,
+                  });
+                }
+                setDeleteConfirm(null);
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

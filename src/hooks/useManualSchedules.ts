@@ -233,6 +233,47 @@ export function useBulkVacation() {
   });
 }
 
+export function useCancelEmployeeWeek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      employee_id: string;
+      sector_ids: string[];
+      week_start: string;
+      week_end: string;
+    }) => {
+      const { data: existing, error: fetchErr } = await supabase
+        .from("schedules")
+        .select("id")
+        .eq("employee_id", params.employee_id)
+        .in("sector_id", params.sector_ids)
+        .gte("schedule_date", params.week_start)
+        .lte("schedule_date", params.week_end)
+        .neq("status", "cancelled");
+
+      if (fetchErr) throw fetchErr;
+      if (!existing || existing.length === 0) {
+        throw new Error("Nenhuma escala encontrada para este funcionário na semana.");
+      }
+
+      const ids = existing.map((e) => e.id);
+      const { error } = await supabase
+        .from("schedules")
+        .update({ status: "cancelled" })
+        .in("id", ids);
+      if (error) throw error;
+
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+      toast.success(`${count} escala(s) removida(s)!`);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 export function useCopyPreviousDay() {
   const qc = useQueryClient();
   return useMutation({

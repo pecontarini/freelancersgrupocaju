@@ -111,8 +111,13 @@ export function ManualScheduleGrid() {
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();
   const copyDay = useCopyPreviousDay();
+  const cancelEmployeeWeek = useCancelEmployeeWeek();
 
-  // Edit modal state
+  // Delete employee from week state
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    employeeId: string;
+    employeeName: string;
+  } | null>(null);
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;
@@ -544,11 +549,23 @@ export function ManualScheduleGrid() {
                           <TableRow key={emp.id}>
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                               <div className="flex items-center gap-1.5">
-                                <span className="truncate max-w-[120px]">{emp.name}</span>
+                                <span className="truncate max-w-[110px]">{emp.name}</span>
                                 {isFreelancer && (
                                   <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
                                     FL
                                   </Badge>
+                                )}
+                                {canManage && (
+                                  <button
+                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    title="Remover da semana"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                    }}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
                                 )}
                               </div>
                               {emp.job_title && (

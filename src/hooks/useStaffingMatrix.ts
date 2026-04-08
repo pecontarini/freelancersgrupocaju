@@ -146,19 +146,3 @@ export function useDeleteSector() {
     },
   });
 }
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("sectors").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["sectors"] });
-      qc.invalidateQueries({ queryKey: ["staffing_matrix"] });
-      toast.success("Setor removido!");
-    },
-    onError: (err: Error) => {
-      toast.error("Erro ao remover setor: " + err.message);
-    },
-  });
-}

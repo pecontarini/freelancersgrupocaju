@@ -86,7 +86,7 @@ function generateMonthOptions() {
   return options;
 }
 
-export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector, onDeleteSector }: Props) {
+export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector, onClearMatrix }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "processing" | "review">("upload");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -168,56 +168,69 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
   const handleApply = async () => {
     setApplying(true);
     try {
-      // 1. Delete ALL existing sectors for this unit (cascade deletes staffing_matrix rows)
-      if (sectors.length > 0) {
-        toast.info("Removendo setores anteriores...");
-        for (const sector of sectors) {
-          await onDeleteSector(sector.id);
+      const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
+
+      // 1. Reconcile sectors: match existing by normalized name, create missing ones
+      const normalize = (s: string) => s.toUpperCase().trim();
+      const existingSectors = [...sectors];
+      const sectorMap = new Map<string, string>(); // normalizedName → sector_id
+
+      for (const s of existingSectors) {
+        sectorMap.set(normalize(s.name), s.id);
+      }
+
+      const sectorsToCreate = uniqueSectorNames.filter((n) => !sectorMap.has(normalize(n)));
+
+      if (sectorsToCreate.length > 0) {
+        toast.info(`Criando ${sectorsToCreate.length} novos setores...`);
+        for (const name of sectorsToCreate) {
+          await onAddSector({ unit_id: selectedUnit, name });
         }
-        // Wait for deletion to propagate
+        // Wait for creation to propagate
         await new Promise((r) => setTimeout(r, 1000));
       }
 
-      // 2. Create all sectors from the AI extraction (unique names)
-      const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
-      toast.info(`Criando ${uniqueSectorNames.length} setores...`);
-      
-      for (const name of uniqueSectorNames) {
-        await onAddSector({ unit_id: selectedUnit, name });
-      }
-
-      // Wait for sectors to be created
-      await new Promise((r) => setTimeout(r, 1500));
-
-      // 3. Re-fetch sectors to get newly created IDs
+      // 2. Re-fetch sectors to get all IDs (existing + newly created)
       const { data: freshSectors } = await supabase
         .from("sectors")
         .select("*")
         .eq("unit_id", selectedUnit);
 
       if (!freshSectors || freshSectors.length === 0) {
-        throw new Error("Setores não foram criados corretamente");
+        throw new Error("Setores não encontrados");
       }
 
-      // 4. Upsert all matrix entries
+      // Rebuild map with fresh data
+      sectorMap.clear();
+      for (const s of freshSectors) {
+        sectorMap.set(normalize(s.name), s.id);
+      }
+
+      // 3. Clear ALL staffing_matrix entries for this unit's sectors
+      const allSectorIds = freshSectors.map((s) => s.id);
+      if (allSectorIds.length > 0) {
+        toast.info("Limpando matriz anterior...");
+        await onClearMatrix(allSectorIds);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      // 4. Insert new matrix entries
       let savedCount = 0;
       for (const row of reviewRows) {
-        // Find the sector by exact or fuzzy match
-        const sector = freshSectors.find(
-          (s) => s.name.toUpperCase().trim() === row.sectorName.toUpperCase().trim()
-        ) || freshSectors.find(
-          (s) => s.name.toUpperCase().includes(row.sectorName.toUpperCase()) ||
-                 row.sectorName.toUpperCase().includes(s.name.toUpperCase())
-        );
+        const sectorId = sectorMap.get(normalize(row.sectorName))
+          || freshSectors.find((s) =>
+            normalize(s.name).includes(normalize(row.sectorName)) ||
+            normalize(row.sectorName).includes(normalize(s.name))
+          )?.id;
 
-        if (!sector) {
-          console.warn("Setor não encontrado após criação:", row.sectorName);
+        if (!sectorId) {
+          console.warn("Setor não encontrado:", row.sectorName);
           continue;
         }
 
         for (const d of row.days) {
           await onUpsert({
-            sector_id: sector.id,
+            sector_id: sectorId,
             day_of_week: d.day,
             shift_type: row.shiftType,
             required_count: d.efetivos,

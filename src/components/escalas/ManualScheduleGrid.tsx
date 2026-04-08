@@ -58,6 +58,7 @@ import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
+import { ClearSchedulesModal } from "./ClearSchedulesModal";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -262,6 +263,15 @@ export function ManualScheduleGrid() {
           </p>
         </div>
         <div className="flex gap-1.5 flex-wrap">
+          {canManage && selectedUnit && sectors.length > 0 && (
+            <ClearSchedulesModal
+              unitId={selectedUnit}
+              sectors={sectors}
+              weekStart={weekStart}
+              weekEnd={weekEnd}
+              weekLabel={`${format(weekDays[0], "dd/MM")} — ${format(weekDays[6], "dd/MM/yyyy")}`}
+            />
+          )}
           {canManage && selectedUnit && (
             <MasterExportButton
               unitId={selectedUnit}

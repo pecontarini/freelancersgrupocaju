@@ -705,6 +705,7 @@ export function ManualScheduleGrid() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteConfirm && selectedUnit) {
+                  setHiddenEmployeeIds((prev) => new Set(prev).add(deleteConfirm.employeeId));
                   cancelEmployeeWeek.mutate({
                     employee_id: deleteConfirm.employeeId,
                     sector_ids: sectorIds,

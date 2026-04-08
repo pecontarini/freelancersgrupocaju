@@ -342,7 +342,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Revise os dados extraídos. Todos os setores serão criados automaticamente.
+                Revise os dados extraídos. Setores existentes serão reutilizados, novos serão criados.
               </p>
               <Badge variant="secondary" className="gap-1">
                 <CalendarDays className="h-3 w-3" />
@@ -350,14 +350,23 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
               </Badge>
             </div>
 
-            {reviewRows.map((row, rowIdx) => (
+            {reviewRows.map((row, rowIdx) => {
+              const normalize = (s: string) => s.toUpperCase().trim();
+              const exists = sectors.some((s) => normalize(s.name) === normalize(row.sectorName));
+              return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{row.sectorName}</span>
                   <Badge variant="secondary" className="text-xs">{row.shiftType}</Badge>
-                  <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-600">
-                    <Plus className="h-3 w-3" /> Será criado
-                  </Badge>
+                  {exists ? (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Check className="h-3 w-3" /> Já existe
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-600">
+                      <Plus className="h-3 w-3" /> Será criado
+                    </Badge>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <Table>

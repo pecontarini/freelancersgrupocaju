@@ -7,6 +7,7 @@ import {
   useUpsertStaffingMatrix,
   useAddSector,
   useDeleteSector,
+  useClearStaffingMatrix,
 } from "@/hooks/useStaffingMatrix";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
@@ -62,6 +63,7 @@ export function StaffingMatrixConfig() {
   const upsertMatrix = useUpsertStaffingMatrix();
   const addSector = useAddSector();
   const deleteSector = useDeleteSector();
+  const clearMatrix = useClearStaffingMatrix();
 
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
 
@@ -183,7 +185,7 @@ export function StaffingMatrixConfig() {
                 sectors={sectors}
                 onUpsert={async (row) => { await upsertMatrix.mutateAsync(row); }}
                 onAddSector={async (params) => { await addSector.mutateAsync(params); }}
-                onDeleteSector={async (id) => { await deleteSector.mutateAsync(id); }}
+                onClearMatrix={async (ids) => { await clearMatrix.mutateAsync(ids); }}
               />
             </>
           )}

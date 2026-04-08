@@ -71,7 +71,7 @@ interface Props {
     extras_count: number;
   }) => Promise<void>;
   onAddSector: (params: { unit_id: string; name: string }) => Promise<void>;
-  onDeleteSector: (id: string) => Promise<void>;
+  onClearMatrix: (sectorIds: string[]) => Promise<void>;
 }
 
 function generateMonthOptions() {
@@ -86,7 +86,7 @@ function generateMonthOptions() {
   return options;
 }
 
-export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector, onDeleteSector }: Props) {
+export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector, onClearMatrix }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "processing" | "review">("upload");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -168,56 +168,69 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
   const handleApply = async () => {
     setApplying(true);
     try {
-      // 1. Delete ALL existing sectors for this unit (cascade deletes staffing_matrix rows)
-      if (sectors.length > 0) {
-        toast.info("Removendo setores anteriores...");
-        for (const sector of sectors) {
-          await onDeleteSector(sector.id);
+      const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
+
+      // 1. Reconcile sectors: match existing by normalized name, create missing ones
+      const normalize = (s: string) => s.toUpperCase().trim();
+      const existingSectors = [...sectors];
+      const sectorMap = new Map<string, string>(); // normalizedName → sector_id
+
+      for (const s of existingSectors) {
+        sectorMap.set(normalize(s.name), s.id);
+      }
+
+      const sectorsToCreate = uniqueSectorNames.filter((n) => !sectorMap.has(normalize(n)));
+
+      if (sectorsToCreate.length > 0) {
+        toast.info(`Criando ${sectorsToCreate.length} novos setores...`);
+        for (const name of sectorsToCreate) {
+          await onAddSector({ unit_id: selectedUnit, name });
         }
-        // Wait for deletion to propagate
+        // Wait for creation to propagate
         await new Promise((r) => setTimeout(r, 1000));
       }
 
-      // 2. Create all sectors from the AI extraction (unique names)
-      const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
-      toast.info(`Criando ${uniqueSectorNames.length} setores...`);
-      
-      for (const name of uniqueSectorNames) {
-        await onAddSector({ unit_id: selectedUnit, name });
-      }
-
-      // Wait for sectors to be created
-      await new Promise((r) => setTimeout(r, 1500));
-
-      // 3. Re-fetch sectors to get newly created IDs
+      // 2. Re-fetch sectors to get all IDs (existing + newly created)
       const { data: freshSectors } = await supabase
         .from("sectors")
         .select("*")
         .eq("unit_id", selectedUnit);
 
       if (!freshSectors || freshSectors.length === 0) {
-        throw new Error("Setores não foram criados corretamente");
+        throw new Error("Setores não encontrados");
       }
 
-      // 4. Upsert all matrix entries
+      // Rebuild map with fresh data
+      sectorMap.clear();
+      for (const s of freshSectors) {
+        sectorMap.set(normalize(s.name), s.id);
+      }
+
+      // 3. Clear ALL staffing_matrix entries for this unit's sectors
+      const allSectorIds = freshSectors.map((s) => s.id);
+      if (allSectorIds.length > 0) {
+        toast.info("Limpando matriz anterior...");
+        await onClearMatrix(allSectorIds);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      // 4. Insert new matrix entries
       let savedCount = 0;
       for (const row of reviewRows) {
-        // Find the sector by exact or fuzzy match
-        const sector = freshSectors.find(
-          (s) => s.name.toUpperCase().trim() === row.sectorName.toUpperCase().trim()
-        ) || freshSectors.find(
-          (s) => s.name.toUpperCase().includes(row.sectorName.toUpperCase()) ||
-                 row.sectorName.toUpperCase().includes(s.name.toUpperCase())
-        );
+        const sectorId = sectorMap.get(normalize(row.sectorName))
+          || freshSectors.find((s) =>
+            normalize(s.name).includes(normalize(row.sectorName)) ||
+            normalize(row.sectorName).includes(normalize(s.name))
+          )?.id;
 
-        if (!sector) {
-          console.warn("Setor não encontrado após criação:", row.sectorName);
+        if (!sectorId) {
+          console.warn("Setor não encontrado:", row.sectorName);
           continue;
         }
 
         for (const d of row.days) {
           await onUpsert({
-            sector_id: sector.id,
+            sector_id: sectorId,
             day_of_week: d.day,
             shift_type: row.shiftType,
             required_count: d.efetivos,
@@ -281,8 +294,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
             <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
               <p className="text-xs text-orange-700 dark:text-orange-300">
-                <strong>Atenção:</strong> Ao importar um novo POP, todos os setores e dados 
-                da matriz atual desta unidade serão substituídos pelos dados da imagem.
+                <strong>Atenção:</strong> Ao importar um novo POP, os dados da matriz de efetivo 
+                serão substituídos. Setores existentes serão mantidos, novos serão criados conforme a imagem.
               </p>
             </div>
 
@@ -329,7 +342,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Revise os dados extraídos. Todos os setores serão criados automaticamente.
+                Revise os dados extraídos. Setores existentes serão reutilizados, novos serão criados.
               </p>
               <Badge variant="secondary" className="gap-1">
                 <CalendarDays className="h-3 w-3" />
@@ -337,14 +350,23 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
               </Badge>
             </div>
 
-            {reviewRows.map((row, rowIdx) => (
+            {reviewRows.map((row, rowIdx) => {
+              const normalize = (s: string) => s.toUpperCase().trim();
+              const exists = sectors.some((s) => normalize(s.name) === normalize(row.sectorName));
+              return (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{row.sectorName}</span>
                   <Badge variant="secondary" className="text-xs">{row.shiftType}</Badge>
-                  <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-600">
-                    <Plus className="h-3 w-3" /> Será criado
-                  </Badge>
+                  {exists ? (
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Check className="h-3 w-3" /> Já existe
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-600">
+                      <Plus className="h-3 w-3" /> Será criado
+                    </Badge>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
@@ -395,7 +417,8 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
                   </Table>
                 </div>
               </div>
-            ))}
+            );
+            })}
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setOpen(false); reset(); }}>

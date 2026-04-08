@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -26,6 +28,7 @@ import {
   CalendarIcon,
   Info,
   UserX,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, addDays } from "date-fns";
@@ -41,12 +44,19 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
+interface UnmatchedRegistration {
+  selected: boolean;
+  editedName: string;
+  cargo: string;
+}
+
 interface ScheduleExcelFlowProps {
   employees: ScheduleEmployee[];
   weekDays: Date[];
   sectorName: string;
   sectorId: string;
   unitName?: string;
+  unitId?: string;
   /** All employees in the unit, used for fuzzy-matching external spreadsheets */
   allUnitEmployees?: ScheduleEmployee[];
 }
@@ -57,6 +67,7 @@ export function ScheduleExcelFlow({
   sectorName,
   sectorId,
   unitName,
+  unitId,
   allUnitEmployees,
 }: ScheduleExcelFlowProps) {
   const [importModal, setImportModal] = useState(false);
@@ -66,6 +77,7 @@ export function ScheduleExcelFlow({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [targetMonday, setTargetMonday] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [unmatchedRegs, setUnmatchedRegs] = useState<UnmatchedRegistration[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 

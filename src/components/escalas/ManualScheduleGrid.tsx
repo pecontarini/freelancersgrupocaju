@@ -118,6 +118,7 @@ export function ManualScheduleGrid() {
     employeeId: string;
     employeeName: string;
   } | null>(null);
+  const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<Set<string>>(new Set());
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;
@@ -156,15 +157,17 @@ export function ManualScheduleGrid() {
     return active.filter((emp) => emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id));
   }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds]);
 
-  // Sort: CLT first, then freelancers
+  // Sort: CLT first, then freelancers — exclude hidden employees
   const sortedEmployees = useMemo(() => {
-    return [...filteredEmployees].sort((a, b) => {
-      const aType = a.worker_type || "clt";
-      const bType = b.worker_type || "clt";
-      if (aType === bType) return a.name.localeCompare(b.name);
-      return aType === "clt" ? -1 : 1;
-    });
-  }, [filteredEmployees]);
+    return [...filteredEmployees]
+      .filter((e) => !hiddenEmployeeIds.has(e.id))
+      .sort((a, b) => {
+        const aType = a.worker_type || "clt";
+        const bType = b.worker_type || "clt";
+        if (aType === bType) return a.name.localeCompare(b.name);
+        return aType === "clt" ? -1 : 1;
+      });
+  }, [filteredEmployees, hiddenEmployeeIds]);
 
   // Build employee map for worker_type lookup
   const employeeMap = useMemo(() => {
@@ -263,6 +266,7 @@ export function ManualScheduleGrid() {
 
   const navigateWeek = (dir: number) => {
     setCurrentWeekBase((prev) => addDays(prev, dir * 7));
+    setHiddenEmployeeIds(new Set());
   };
 
   const isLoading = loadingEmp || loadingSch || loadingSectors;
@@ -701,6 +705,7 @@ export function ManualScheduleGrid() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteConfirm && selectedUnit) {
+                  setHiddenEmployeeIds((prev) => new Set(prev).add(deleteConfirm.employeeId));
                   cancelEmployeeWeek.mutate({
                     employee_id: deleteConfirm.employeeId,
                     sector_ids: sectorIds,

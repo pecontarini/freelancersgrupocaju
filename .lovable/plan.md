@@ -1,51 +1,38 @@
 
 
-# Plano: Férias com intervalo de datas (lançamento automático em lote)
+# Plano: Prevenir duplicatas na importação + Botão de remover funcionário da escala
 
-## Problema
-Hoje, ao clicar em "MARCAR FÉRIAS", o sistema registra férias apenas para o dia selecionado. O usuário precisa repetir o processo dia a dia, o que é impraticável para períodos de 15-30 dias.
+## Duas mudanças complementares
 
-## Solução
-Ao clicar em "MARCAR FÉRIAS", abrir um sub-formulário pedindo **data de início** e **data de fim**. Ao confirmar, o sistema gera automaticamente um registro de `schedule_type: "vacation"` para cada dia do intervalo, ignorando dias que já tenham escala ativa.
+### 1. Prevenir duplicatas na importação (`ScheduleExcelFlow.tsx`)
 
-## Mudanças
+Antes de inserir as escalas no banco, verificar quais combinações `(employee_id, schedule_date, sector_id)` já existem com status ativo. Filtrar essas entradas e só inserir as que são realmente novas.
 
-### 1. `ScheduleEditModal.tsx` — Sub-formulário de férias
+- Após montar o array `rows`, buscar schedules existentes no período para os mesmos employees/sectors
+- Remover do array as linhas que já existem
+- Exibir toast informativo se houve linhas ignoradas: "X lançamento(s) ignorado(s) por já existirem"
+- Se nenhuma linha nova restar, mostrar aviso e não inserir nada
 
-- Ao clicar no botão "MARCAR FÉRIAS", em vez de chamar `handleSetAbsence("vacation")` diretamente, exibir dois campos de data (início e fim) dentro da aba Ausências
-- Pré-preencher a data de início com o dia atualmente selecionado
-- Mostrar um resumo: "X dias de férias serão lançados"
-- Botão "Confirmar Férias" dispara o lançamento em lote
+### 2. Botão de remover funcionário da semana (`ManualScheduleGrid.tsx` + `useManualSchedules.ts`)
 
-### 2. `useManualSchedules.ts` — Novo hook `useBulkVacation`
+Adicionar ícone de lixeira ao lado do nome de cada funcionário no grid. Ao clicar:
 
-- Recebe: `employee_id`, `sector_id`, `start_date`, `end_date`, `shift_type`
-- Gera array de datas do intervalo (usando loop simples de Date)
-- Busca escalas existentes do funcionário no período para evitar duplicatas
-- Cancela escalas `working` existentes no período (substituir por férias)
-- Insere em lote registros com `schedule_type: "vacation"`, `start_time: null`, `end_time: null`
-- Invalida queries de `manual-schedules` e `schedules`
-
-### 3. Fluxo do usuário
-
-1. Clica na célula de um funcionário na grade
-2. Modal abre → aba "Ausências"
-3. Clica "MARCAR FÉRIAS"
-4. Aparecem campos de data início/fim + contagem de dias
-5. Confirma → sistema lança férias em todos os dias do intervalo
-6. Toast de sucesso: "Férias lançadas: X dias"
+- Exibir `AlertDialog` de confirmação: "Remover todas as escalas de **[nome]** nesta semana?"
+- Ao confirmar, cancelar todos os schedules daquele employee na semana ativa (todos os setores da unidade)
+- Novo hook `useCancelEmployeeWeek` em `useManualSchedules.ts`:
+  - Recebe `employee_id`, `sector_ids[]`, `week_start`, `week_end`
+  - Atualiza status para `cancelled` nos schedules ativos do período
+  - Invalida queries e exibe toast com quantidade removida
 
 ## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/ScheduleEditModal.tsx` | Adicionar sub-formulário de datas para férias |
-| `src/hooks/useManualSchedules.ts` | Adicionar hook `useBulkVacation` |
+| `src/components/escalas/ScheduleExcelFlow.tsx` | Dedup antes do insert |
+| `src/components/escalas/ManualScheduleGrid.tsx` | Ícone Trash2 + AlertDialog na linha do funcionário |
+| `src/hooks/useManualSchedules.ts` | Novo hook `useCancelEmployeeWeek` |
 
-## Detalhes técnicos
-
-- Gerar datas com loop simples incrementando dia a dia (string `YYYY-MM-DD` para evitar problemas de timezone)
-- Antes de inserir, buscar `schedules` existentes do employee no intervalo e cancelar as que forem `working`
-- Inserir em batch único via `supabase.from("schedules").insert([...])`
-- Limite de segurança: máximo 45 dias para evitar erros acidentais
+## Resultado
+- Importações repetidas não criam duplicatas
+- Funcionários duplicados existentes podem ser removidos da semana com um clique
 

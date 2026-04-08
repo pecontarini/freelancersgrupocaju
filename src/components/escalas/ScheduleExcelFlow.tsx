@@ -459,29 +459,75 @@ export function ScheduleExcelFlow({
                 </div>
               </div>
 
-              {/* Unmatched employees warning */}
+              {/* Unmatched employees — interactive registration */}
               {hasUnmatched && (
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                    <UserX className="h-4 w-4" />
-                    Funcionários não encontrados ({parseResult.unmatchedEmployees.length}):
-                  </p>
-                  <ScrollArea className="max-h-[100px]">
-                    <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <UserPlus className="h-4 w-4" />
+                      Funcionários não encontrados ({parseResult.unmatchedEmployees.length})
+                    </p>
+                    {unitId && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-6 px-2"
+                        onClick={() => {
+                          const allSelected = unmatchedRegs.every((r) => r.selected);
+                          setUnmatchedRegs((prev) =>
+                            prev.map((r) => ({ ...r, selected: !allSelected }))
+                          );
+                        }}
+                      >
+                        {unmatchedRegs.every((r) => r.selected) ? "Desmarcar todos" : "Marcar todos"}
+                      </Button>
+                    )}
+                  </div>
+                  <ScrollArea className="max-h-[160px]">
+                    <div className="space-y-1.5">
                       {parseResult.unmatchedEmployees.map((u, i) => (
                         <div
                           key={i}
                           className="flex items-center gap-2 rounded-md border border-amber-300/30 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-xs"
                         >
-                          <UserX className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="font-medium">{u.name}</span>
-                          {u.cargo && <span className="text-muted-foreground">({u.cargo})</span>}
+                          {unitId && (
+                            <Checkbox
+                              checked={unmatchedRegs[i]?.selected ?? false}
+                              onCheckedChange={(checked) => {
+                                setUnmatchedRegs((prev) =>
+                                  prev.map((r, idx) =>
+                                    idx === i ? { ...r, selected: !!checked } : r
+                                  )
+                                );
+                              }}
+                              disabled={isSaving}
+                            />
+                          )}
+                          <Input
+                            value={unmatchedRegs[i]?.editedName ?? u.name}
+                            onChange={(e) => {
+                              setUnmatchedRegs((prev) =>
+                                prev.map((r, idx) =>
+                                  idx === i ? { ...r, editedName: e.target.value } : r
+                                )
+                              );
+                            }}
+                            className="h-6 text-xs flex-1 min-w-0"
+                            disabled={isSaving || !(unmatchedRegs[i]?.selected)}
+                          />
+                          {u.cargo && (
+                            <Badge variant="secondary" className="text-[10px] shrink-0">
+                              {u.cargo}
+                            </Badge>
+                          )}
                         </div>
                       ))}
                     </div>
                   </ScrollArea>
                   <p className="text-[11px] text-muted-foreground">
-                    Esses funcionários serão ignorados. Cadastre-os no sistema e tente novamente.
+                    {unitId
+                      ? `Marque para cadastrar automaticamente. ${selectedUnmatchedCount} selecionado(s).`
+                      : "Selecione uma unidade para poder cadastrar automaticamente."}
                   </p>
                 </div>
               )}
@@ -514,7 +560,7 @@ export function ScheduleExcelFlow({
                 </div>
               )}
 
-              {parseResult.entries.length === 0 && (
+              {parseResult.entries.length === 0 && !hasUnmatched && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   Nenhum lançamento válido encontrado na planilha.
                 </p>
@@ -526,10 +572,12 @@ export function ScheduleExcelFlow({
             <Button variant="outline" onClick={closeModal} disabled={isSaving}>
               Cancelar
             </Button>
-            {parseResult && parseResult.entries.length > 0 && (
+            {canConfirm && (
               <Button onClick={handleConfirmImport} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Confirmar Importação ({parseResult.entries.length})
+                {selectedUnmatchedCount > 0
+                  ? `Cadastrar (${selectedUnmatchedCount}) e Importar`
+                  : `Confirmar Importação (${parseResult?.entries.length || 0})`}
               </Button>
             )}
           </DialogFooter>

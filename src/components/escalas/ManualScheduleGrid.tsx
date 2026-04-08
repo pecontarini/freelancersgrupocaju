@@ -266,6 +266,7 @@ export function ManualScheduleGrid() {
 
   const navigateWeek = (dir: number) => {
     setCurrentWeekBase((prev) => addDays(prev, dir * 7));
+    setHiddenEmployeeIds(new Set());
   };
 
   const isLoading = loadingEmp || loadingSch || loadingSectors;

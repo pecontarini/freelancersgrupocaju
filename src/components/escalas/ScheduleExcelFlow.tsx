@@ -148,6 +148,7 @@ export function ScheduleExcelFlow({
     setParseResult(null);
     setPendingFile(null);
     setTargetMonday(undefined);
+    setUnmatchedRegs([]);
   }
 
   const showDateWarning =

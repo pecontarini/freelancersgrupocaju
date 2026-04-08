@@ -58,6 +58,7 @@ import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
+import { ClearSchedulesModal } from "./ClearSchedulesModal";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 

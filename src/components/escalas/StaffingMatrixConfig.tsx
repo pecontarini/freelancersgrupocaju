@@ -182,7 +182,8 @@ export function StaffingMatrixConfig() {
                 selectedUnit={selectedUnit}
                 sectors={sectors}
                 onUpsert={async (row) => { await upsertMatrix.mutateAsync(row); }}
-                onAddSector={async (params) => { addSector.mutateAsync(params); }}
+                onAddSector={async (params) => { await addSector.mutateAsync(params); }}
+                onDeleteSector={async (id) => { await deleteSector.mutateAsync(id); }}
               />
             </>
           )}

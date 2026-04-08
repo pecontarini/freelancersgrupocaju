@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
-import { Camera, Loader2, Check, AlertTriangle, Plus } from "lucide-react";
+import { Camera, Loader2, Check, Plus, CalendarDays, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { pt } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,13 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Sector } from "@/hooks/useStaffingMatrix";
 
 const DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -47,8 +56,6 @@ interface ExtractedData {
 
 interface ReviewRow {
   sectorName: string;
-  matchedSectorId: string | null;
-  createNew: boolean;
   shiftType: string;
   days: ExtractedDay[];
 }
@@ -64,30 +71,31 @@ interface Props {
     extras_count: number;
   }) => Promise<void>;
   onAddSector: (params: { unit_id: string; name: string }) => Promise<void>;
+  onDeleteSector: (id: string) => Promise<void>;
 }
 
-function fuzzyMatch(a: string, b: string): boolean {
-  const na = a.toUpperCase().trim().replace(/\s+/g, " ");
-  const nb = b.toUpperCase().trim().replace(/\s+/g, " ");
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  return false;
-}
-
-function findSectorMatch(name: string, sectors: Sector[]): string | null {
-  for (const s of sectors) {
-    if (fuzzyMatch(name, s.name)) return s.id;
+function generateMonthOptions() {
+  const options: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = -1; i <= 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const value = format(d, "yyyy-MM");
+    const label = format(d, "MMMM yyyy", { locale: pt });
+    options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
   }
-  return null;
+  return options;
 }
 
-export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector }: Props) {
+export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddSector, onDeleteSector }: Props) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<"upload" | "processing" | "review">("upload");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
   const [applying, setApplying] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"));
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const monthOptions = generateMonthOptions();
 
   const reset = () => {
     setStep("upload");
@@ -123,18 +131,11 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
           for (const shift of sector.shifts) {
             rows.push({
               sectorName: sector.name,
-              matchedSectorId: findSectorMatch(sector.name, sectors),
-              createNew: false,
               shiftType: shift.type,
               days: shift.days,
             });
           }
         }
-
-        // Mark rows without matches for auto-creation
-        rows.forEach((r) => {
-          if (!r.matchedSectorId) r.createNew = true;
-        });
 
         setReviewRows(rows);
         setStep("review");
@@ -167,46 +168,66 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
   const handleApply = async () => {
     setApplying(true);
     try {
-      // First create any new sectors
-      const newSectorNames = [...new Set(
-        reviewRows.filter((r) => r.createNew && !r.matchedSectorId).map((r) => r.sectorName)
-      )];
+      // 1. Delete ALL existing sectors for this unit (cascade deletes staffing_matrix rows)
+      if (sectors.length > 0) {
+        toast.info("Removendo setores anteriores...");
+        for (const sector of sectors) {
+          await onDeleteSector(sector.id);
+        }
+        // Wait for deletion to propagate
+        await new Promise((r) => setTimeout(r, 1000));
+      }
 
-      for (const name of newSectorNames) {
+      // 2. Create all sectors from the AI extraction (unique names)
+      const uniqueSectorNames = [...new Set(reviewRows.map((r) => r.sectorName))];
+      toast.info(`Criando ${uniqueSectorNames.length} setores...`);
+      
+      for (const name of uniqueSectorNames) {
         await onAddSector({ unit_id: selectedUnit, name });
       }
 
-      // Wait a bit for sectors to be created and refetched
-      if (newSectorNames.length > 0) {
-        await new Promise((r) => setTimeout(r, 1500));
-      }
+      // Wait for sectors to be created
+      await new Promise((r) => setTimeout(r, 1500));
 
-      // Re-fetch sectors to get newly created IDs
+      // 3. Re-fetch sectors to get newly created IDs
       const { data: freshSectors } = await supabase
         .from("sectors")
         .select("*")
         .eq("unit_id", selectedUnit);
 
-      // Now upsert all matrix entries
+      if (!freshSectors || freshSectors.length === 0) {
+        throw new Error("Setores não foram criados corretamente");
+      }
+
+      // 4. Upsert all matrix entries
+      let savedCount = 0;
       for (const row of reviewRows) {
-        const sectorId = row.matchedSectorId || findSectorMatch(row.sectorName, freshSectors || []);
-        if (!sectorId) {
-          console.warn("Setor não encontrado:", row.sectorName);
+        // Find the sector by exact or fuzzy match
+        const sector = freshSectors.find(
+          (s) => s.name.toUpperCase().trim() === row.sectorName.toUpperCase().trim()
+        ) || freshSectors.find(
+          (s) => s.name.toUpperCase().includes(row.sectorName.toUpperCase()) ||
+                 row.sectorName.toUpperCase().includes(s.name.toUpperCase())
+        );
+
+        if (!sector) {
+          console.warn("Setor não encontrado após criação:", row.sectorName);
           continue;
         }
 
         for (const d of row.days) {
           await onUpsert({
-            sector_id: sectorId,
+            sector_id: sector.id,
             day_of_week: d.day,
             shift_type: row.shiftType,
             required_count: d.efetivos,
             extras_count: d.extras,
           });
+          savedCount++;
         }
       }
 
-      toast.success("Matriz importada com sucesso!");
+      toast.success(`POP importado: ${uniqueSectorNames.length} setores, ${savedCount} registros salvos (ref. ${selectedMonth})`);
       setOpen(false);
       reset();
     } catch (err: any) {
@@ -226,7 +247,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {step === "upload" && "Importar Matriz via IA"}
+            {step === "upload" && "Importar Matriz POP via IA"}
             {step === "processing" && "Processando imagem..."}
             {step === "review" && "Revisão dos dados extraídos"}
           </DialogTitle>
@@ -236,9 +257,35 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
         {step === "upload" && (
           <div className="space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Envie uma foto ou imagem da tabela de efetivo mínimo (POP). A IA irá interpretar 
+              Envie uma foto da tabela de efetivo mínimo (POP). A IA irá interpretar 
               setores, turnos, dias e quantidades automaticamente.
             </p>
+
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Mês de referência:</span>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-orange-700 dark:text-orange-300">
+                <strong>Atenção:</strong> Ao importar um novo POP, todos os setores e dados 
+                da matriz atual desta unidade serão substituídos pelos dados da imagem.
+              </p>
+            </div>
+
             <div
               className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
               onClick={() => fileRef.current?.click()}
@@ -280,24 +327,24 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
         {/* REVIEW STEP */}
         {step === "review" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Revise os dados extraídos abaixo. Você pode editar valores antes de aplicar.
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Revise os dados extraídos. Todos os setores serão criados automaticamente.
+              </p>
+              <Badge variant="secondary" className="gap-1">
+                <CalendarDays className="h-3 w-3" />
+                {monthOptions.find((m) => m.value === selectedMonth)?.label || selectedMonth}
+              </Badge>
+            </div>
 
             {reviewRows.map((row, rowIdx) => (
               <div key={rowIdx} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{row.sectorName}</span>
                   <Badge variant="secondary" className="text-xs">{row.shiftType}</Badge>
-                  {row.matchedSectorId ? (
-                    <Badge variant="default" className="text-xs gap-1">
-                      <Check className="h-3 w-3" /> Setor encontrado
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs gap-1 border-orange-300 text-orange-600">
-                      <Plus className="h-3 w-3" /> Será criado
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className="text-xs gap-1 border-green-300 text-green-600">
+                    <Plus className="h-3 w-3" /> Será criado
+                  </Badge>
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
@@ -360,7 +407,7 @@ export function StaffingMatrixImporter({ selectedUnit, sectors, onUpsert, onAddS
                     <Loader2 className="h-4 w-4 animate-spin mr-1" /> Aplicando...
                   </>
                 ) : (
-                  "Aplicar na Matriz"
+                  "Substituir e Aplicar POP"
                 )}
               </Button>
             </div>

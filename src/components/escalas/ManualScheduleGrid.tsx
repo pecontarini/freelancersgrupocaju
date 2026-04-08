@@ -281,6 +281,7 @@ export function ManualScheduleGrid() {
               sectorName={sectors.find((s) => s.id === activeSectorId)?.name || "Setor"}
               sectorId={activeSectorId}
               unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || ""}
+              unitId={selectedUnit || undefined}
               allUnitEmployees={(employees || []).map((e) => ({
                 id: e.id,
                 name: e.name,

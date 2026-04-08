@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek } from "date-fns";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { jsDayToPopDay } from "@/lib/popConventions";
 
 export interface SectorCompliance {
   sectorId: string;
@@ -152,7 +153,7 @@ export function usePopCompliance(
         const storeSectors = sectorsByUnit.get(store.id) || [];
         for (const day of weekDays) {
           const dateStr = format(day, "yyyy-MM-dd");
-          const dow = day.getDay();
+          const dow = jsDayToPopDay(day.getDay());
           const key = `${store.id}-${dateStr}`;
 
           const daySectors: SectorCompliance[] = [];

@@ -289,7 +289,6 @@ export function ManualScheduleGrid() {
 
   const navigateWeek = (dir: number) => {
     setCurrentWeekBase((prev) => addDays(prev, dir * 7));
-    setHiddenEmployeeIds(new Set());
   };
 
   const isLoading = loadingEmp || loadingSch || loadingSectors;
@@ -322,9 +321,9 @@ export function ManualScheduleGrid() {
               weekStart={currentWeekBase}
             />
           )}
-          {activeSectorId && sortedEmployees.length > 0 && (
+          {activeSectorId && sortedScheduled.length > 0 && (
             <ScheduleExcelFlow
-              employees={sortedEmployees.map((e) => ({
+              employees={sortedScheduled.map((e) => ({
                 id: e.id,
                 name: e.name,
                 job_title: e.job_title,
@@ -433,7 +432,7 @@ export function ManualScheduleGrid() {
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ) : sortedEmployees.length === 0 ? (
+              ) : sortedScheduled.length === 0 && sortedBase.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   {hasSectorMappings && !showAllEmployees ? (
                     <>
@@ -570,7 +569,7 @@ export function ManualScheduleGrid() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedEmployees.map((emp) => {
+                      {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
                         return (
                           <TableRow key={emp.id}>
@@ -714,7 +713,7 @@ export function ManualScheduleGrid() {
       )}
 
       {/* Delete employee from week confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null); }}>
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o && !isDeletingWeek) setDeleteConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover funcionário da semana</AlertDialogTitle>
@@ -723,22 +722,29 @@ export function ManualScheduleGrid() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingWeek}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
+              disabled={isDeletingWeek}
+              onClick={async (e) => {
+                e.preventDefault();
                 if (deleteConfirm && selectedUnit) {
-                  setHiddenEmployeeIds((prev) => new Set(prev).add(deleteConfirm.employeeId));
-                  cancelEmployeeWeek.mutate({
-                    employee_id: deleteConfirm.employeeId,
-                    sector_ids: sectorIds,
-                    week_start: weekStart,
-                    week_end: weekEnd,
-                  });
+                  setIsDeletingWeek(true);
+                  try {
+                    await cancelEmployeeWeek.mutateAsync({
+                      employee_id: deleteConfirm.employeeId,
+                      sector_ids: sectorIds,
+                      week_start: weekStart,
+                      week_end: weekEnd,
+                    });
+                  } finally {
+                    setIsDeletingWeek(false);
+                    setDeleteConfirm(null);
+                  }
                 }
-                setDeleteConfirm(null);
               }}
             >
+              {isDeletingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Remover
             </AlertDialogAction>
           </AlertDialogFooter>

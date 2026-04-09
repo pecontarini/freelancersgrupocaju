@@ -669,6 +669,55 @@ export function ManualScheduleGrid() {
                           })}
                         </TableRow>
                       ))}
+
+                      {/* Collapsible base section for CLTs not scheduled */}
+                      {sortedBase.length > 0 && !showAllEmployees && (
+                        <>
+                          <TableRow>
+                            <TableCell
+                              colSpan={8}
+                              className="py-1 px-2 cursor-pointer hover:bg-muted/50"
+                              onClick={() => setShowSectorBase((v) => !v)}
+                            >
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showSectorBase ? "rotate-0" : "-rotate-90"}`} />
+                                <Users className="h-3.5 w-3.5" />
+                                <span className="font-medium">Quadro base do setor</span>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {sortedBase.length}
+                                </Badge>
+                                <span className="text-[10px]">— sem escala nesta semana</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {showSectorBase && sortedBase.map((emp) => (
+                            <TableRow key={emp.id} className="opacity-60">
+                              <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate max-w-[110px]">{emp.name}</span>
+                                </div>
+                                {emp.job_title && (
+                                  <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
+                                )}
+                              </TableCell>
+                              {weekDays.map((day, i) => {
+                                const dateStr = format(day, "yyyy-MM-dd");
+                                return (
+                                  <TableCell
+                                    key={i}
+                                    className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
+                                    onClick={() => handleCellClick(emp, dateStr)}
+                                  >
+                                    <div className="h-10 flex items-center justify-center">
+                                      <span className="text-muted-foreground/40 text-xs">—</span>
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
                     </TableBody>
                   </Table>
                 </div>

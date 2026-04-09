@@ -112,25 +112,45 @@ export function FreelancerAddModal({
       const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
       const cleanCpf = cpfValue.replace(/\D/g, "");
       try {
-        const { data, error } = await (
-          await import("@/integrations/supabase/client")
-        ).supabase
-          .from("employees")
-          .insert({
-            unit_id: unitId,
-            name: newName.trim(),
-            gender: "M",
-            worker_type: "freelancer" as const,
-            default_rate: rateNum,
-            job_title: chosenJt?.name || "Freelancer",
-            job_title_id: selectedJobTitleId,
-            cpf: cleanCpf || null,
-          })
-          .select("id")
-          .single();
+        const { supabase } = await import("@/integrations/supabase/client");
 
-        if (error) throw error;
-        empId = data.id;
+        // Check for existing freelancer with same CPF in this unit
+        if (cleanCpf) {
+          const { data: existingEmp } = await supabase
+            .from("employees")
+            .select("id, name")
+            .eq("unit_id", unitId)
+            .eq("cpf", cleanCpf)
+            .eq("worker_type", "freelancer")
+            .eq("active", true)
+            .maybeSingle();
+
+          if (existingEmp) {
+            empId = existingEmp.id;
+            toast.info(`Freelancer "${existingEmp.name}" já cadastrado — reutilizando.`);
+          }
+        }
+
+        // Only create if not found
+        if (!empId) {
+          const { data, error } = await supabase
+            .from("employees")
+            .insert({
+              unit_id: unitId,
+              name: newName.trim(),
+              gender: "M",
+              worker_type: "freelancer" as const,
+              default_rate: rateNum,
+              job_title: chosenJt?.name || "Freelancer",
+              job_title_id: selectedJobTitleId,
+              cpf: cleanCpf || null,
+            })
+            .select("id")
+            .single();
+
+          if (error) throw error;
+          empId = data.id;
+        }
       } catch (err: any) {
         toast.error("Erro ao criar freelancer: " + err.message);
         return;

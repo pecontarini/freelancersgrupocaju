@@ -25,7 +25,6 @@ export function useManualSchedules(unitId: string | null, weekStart: string, wee
     queryFn: async () => {
       if (!unitId) return [];
 
-      // Get all sectors for this unit
       const { data: sectors } = await supabase
         .from("sectors")
         .select("id")
@@ -50,6 +49,20 @@ export function useManualSchedules(unitId: string | null, weekStart: string, wee
   });
 }
 
+async function resolveShiftId(shiftType?: string): Promise<string> {
+  if (shiftType) {
+    const { data: matched } = await supabase
+      .from("shifts")
+      .select("id")
+      .eq("type", shiftType)
+      .limit(1);
+    if (matched && matched.length > 0) return matched[0].id;
+  }
+  const { data: any } = await supabase.from("shifts").select("id").limit(1);
+  if (!any || any.length === 0) throw new Error("Nenhum turno cadastrado.");
+  return any[0].id;
+}
+
 export function useUpsertSchedule() {
   const qc = useQueryClient();
   return useMutation({
@@ -65,26 +78,7 @@ export function useUpsertSchedule() {
       agreed_rate?: number;
       shift_type?: string;
     }) => {
-      // Find shift_id by shift_type if provided, otherwise default
-      let shiftId: string;
-      if (params.shift_type) {
-        const { data: matchedShifts } = await supabase
-          .from("shifts")
-          .select("id")
-          .eq("type", params.shift_type)
-          .limit(1);
-        if (matchedShifts && matchedShifts.length > 0) {
-          shiftId = matchedShifts[0].id;
-        } else {
-          const { data: anyShift } = await supabase.from("shifts").select("id").limit(1);
-          if (!anyShift || anyShift.length === 0) throw new Error("Nenhum turno cadastrado.");
-          shiftId = anyShift[0].id;
-        }
-      } else {
-        const { data: shifts } = await supabase.from("shifts").select("id").limit(1);
-        if (!shifts || shifts.length === 0) throw new Error("Nenhum turno cadastrado.");
-        shiftId = shifts[0].id;
-      }
+      const shiftId = await resolveShiftId(params.shift_type);
 
       const payload: any = {
         employee_id: params.employee_id,
@@ -100,13 +94,35 @@ export function useUpsertSchedule() {
         shift_id: shiftId,
       };
 
+      // If we already have an id, just update
       if (params.id) {
         const { error } = await supabase
           .from("schedules")
           .update(payload)
           .eq("id", params.id);
         if (error) throw error;
+        return;
+      }
+
+      // Check for existing schedule (active or cancelled) for this cell
+      const { data: existing } = await supabase
+        .from("schedules")
+        .select("id, status")
+        .eq("employee_id", params.employee_id)
+        .eq("schedule_date", params.schedule_date)
+        .eq("sector_id", params.sector_id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        // Reactivate/update the existing record
+        const { error } = await supabase
+          .from("schedules")
+          .update(payload)
+          .eq("id", existing[0].id);
+        if (error) throw error;
       } else {
+        // No existing record — insert new
         const { error } = await supabase
           .from("schedules")
           .insert(payload);
@@ -151,7 +167,6 @@ export function useBulkVacation() {
       end_date: string;
       shift_type?: string;
     }) => {
-      // Generate date strings
       const dates: string[] = [];
       const start = new Date(params.start_date + "T12:00:00");
       const end = new Date(params.end_date + "T12:00:00");
@@ -166,21 +181,7 @@ export function useBulkVacation() {
         dates.push(`${yyyy}-${mm}-${dd}`);
       }
 
-      // Find a shift_id
-      let shiftId: string;
-      if (params.shift_type) {
-        const { data: matched } = await supabase
-          .from("shifts")
-          .select("id")
-          .eq("type", params.shift_type)
-          .limit(1);
-        shiftId = matched?.[0]?.id || "";
-      }
-      if (!shiftId!) {
-        const { data: any } = await supabase.from("shifts").select("id").limit(1);
-        if (!any || any.length === 0) throw new Error("Nenhum turno cadastrado.");
-        shiftId = any[0].id;
-      }
+      const shiftId = await resolveShiftId(params.shift_type);
 
       // Cancel existing working schedules in the range
       const { data: existing } = await supabase
@@ -192,12 +193,8 @@ export function useBulkVacation() {
         .lte("schedule_date", params.end_date)
         .neq("status", "cancelled");
 
-      const existingDates = new Set((existing || []).map((e) => e.schedule_date));
-
-      // Cancel working ones
-      const toCancel = (existing || []).filter((e) => true);
-      if (toCancel.length > 0) {
-        const cancelIds = toCancel.map((e) => e.id);
+      if (existing && existing.length > 0) {
+        const cancelIds = existing.map((e) => e.id);
         await supabase
           .from("schedules")
           .update({ status: "cancelled" })
@@ -253,7 +250,8 @@ export function useCancelEmployeeWeek() {
 
       if (fetchErr) throw fetchErr;
       if (!existing || existing.length === 0) {
-        throw new Error("Nenhuma escala encontrada para este funcionário na semana.");
+        // No schedules to cancel — still counts as success for CLT base removal
+        return 0;
       }
 
       const ids = existing.map((e) => e.id);
@@ -268,7 +266,7 @@ export function useCancelEmployeeWeek() {
     onSuccess: (count) => {
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
       qc.invalidateQueries({ queryKey: ["schedules"] });
-      toast.success(`${count} escala(s) removida(s)!`);
+      toast.success(count > 0 ? `${count} escala(s) removida(s)!` : "Funcionário removido da semana.");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -282,7 +280,6 @@ export function useCopyPreviousDay() {
       targetDate: string;
       unitId: string;
     }) => {
-      // Get sectors for unit
       const { data: sectors } = await supabase
         .from("sectors")
         .select("id")
@@ -292,7 +289,6 @@ export function useCopyPreviousDay() {
 
       const sectorIds = sectors.map((s) => s.id);
 
-      // Get schedules from source day
       const { data: sourceSchedules, error: fetchErr } = await supabase
         .from("schedules")
         .select("*")
@@ -308,18 +304,20 @@ export function useCopyPreviousDay() {
       // Check for existing entries on target date
       const { data: existing } = await supabase
         .from("schedules")
-        .select("employee_id")
+        .select("employee_id, sector_id")
         .in("sector_id", sectorIds)
         .eq("schedule_date", params.targetDate)
         .neq("status", "cancelled");
 
-      const existingIds = new Set((existing || []).map((e) => e.employee_id));
+      const existingKeys = new Set(
+        (existing || []).map((e) => `${e.employee_id}_${e.sector_id}`)
+      );
 
       const toInsert = sourceSchedules
-        .filter((s) => !existingIds.has(s.employee_id))
+        .filter((s) => !existingKeys.has(`${s.employee_id}_${s.sector_id}`))
         .map((s) => ({
           employee_id: s.employee_id!,
-          user_id: s.employee_id!, // legacy
+          user_id: s.employee_id!,
           schedule_date: params.targetDate,
           shift_id: s.shift_id,
           sector_id: s.sector_id,

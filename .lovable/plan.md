@@ -1,55 +1,46 @@
 
 
-# Plano: Visão Geral do Quadro Operacional (todos os setores)
+# Correção: Funcionário reaparece após exclusão da semana
 
-## Objetivo
+## Problema
 
-Adicionar uma opção "Visão Geral" ao Quadro Operacional que mostra, numa única tela, o status de **todos os setores** da unidade para o turno selecionado — sem precisar navegar setor a setor.
+Quando você exclui um funcionário da semana, o sistema usa um estado local (`hiddenEmployeeIds`) para escondê-lo visualmente. Mas ao sair e voltar na tela, esse estado é resetado e o funcionário reaparece — mesmo sem escalas ativas — porque o filtro atual mostra **todos** os funcionários cujo cargo está vinculado ao setor, independentemente de terem escalas na semana.
 
-## O que muda
+## Solução
 
-### `OperationalDashboard.tsx`
+Alterar a lógica de filtragem em `ManualScheduleGrid.tsx` para distinguir CLTs de freelancers:
 
-1. **Filtro de Setor**: Adicionar opção "Todos os setores" como valor padrão no seletor. Quando selecionada, exibe a visão geral; ao escolher um setor específico, mantém o comportamento atual (lista de conferência individual).
+- **CLT**: Continua aparecendo se o cargo está vinculado ao setor (precisam estar visíveis para receber lançamentos)
+- **Freelancer**: Só aparece se **já tiver pelo menos uma escala ativa** (não-cancelada) no setor/semana atual. Freelancers sem escalas não aparecem na grade — eles são adicionados sob demanda pelo botão "VAGA EXTRA"
 
-2. **Busca de dados na visão geral**: Quando "Todos os setores" estiver ativo, buscar schedules de **todos os sectorIds** da unidade (já suportado pelo hook `useSchedulesBySector`).
+Isso elimina a dependência do `hiddenEmployeeIds` para freelancers e resolve o bug de "fantasma" que volta ao recarregar.
 
-3. **Visão Geral — Cards por setor**: Renderizar um grid de cards, um por setor, cada um mostrando:
-   - Nome do setor
-   - Meta POP (da staffing matrix)
-   - Escalados (schedules do dia/turno)
-   - Presentes (attendance com status "presente")
-   - Badge de status visual (verde = completo, amarelo = parcial, vermelho = crítico)
-   - Barra de progresso
+## Mudança
 
-4. **KPIs consolidados no topo**: Mostrar totais da unidade (Meta total, Escalados total, Presentes total) nos cards de KPI existentes.
+### `src/components/escalas/ManualScheduleGrid.tsx`
 
-5. **Botão "Gerar Resumo"**: Na visão geral, gera o resumo consolidado de todos os setores para copiar no WhatsApp.
+Ajustar o `filteredEmployees` useMemo:
 
-## Fluxo visual
-
-```text
-┌─────────────────────────────────────────────┐
-│  Unidade: [Caju X]   Setor: [Todos ▼]      │
-│  Turno: [Almoço]                            │
-├─────────────────────────────────────────────┤
-│  [Meta: 42]   [Escalados: 38]  [Presentes: 35] │
-├─────────────────────────────────────────────┤
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐    │
-│  │ Salão    │ │ Bar      │ │ Cozinha  │    │
-│  │ 12/15 ⚠️ │ │ 8/8  ✅  │ │ 15/19 🔴 │    │
-│  │ ████░░░  │ │ ████████ │ │ █████░░░ │    │
-│  └──────────┘ └──────────┘ └──────────┘    │
-│                                             │
-│  Clique num setor para ver detalhes →       │
-└─────────────────────────────────────────────┘
+```typescript
+return active.filter((emp) => {
+  const hasActiveSchedule = schedules.some(
+    (s) => s.employee_id === emp.id && s.sector_id === activeSectorId && s.status !== "cancelled"
+  );
+  
+  // Freelancers: só mostrar se tiver escala ativa na semana
+  if (emp.worker_type === "freelancer") {
+    return hasActiveSchedule;
+  }
+  
+  // CLT: mostrar se cargo vinculado ao setor OU se tiver escala ativa
+  if (emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
+  return hasActiveSchedule;
+});
 ```
 
-## Arquivo impactado
+O `hiddenEmployeeIds` permanece como otimismo visual (evita piscar), mas não é mais necessário para a correção fundamental.
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/OperationalDashboard.tsx` | Adicionar visão geral consolidada |
-
-Nenhuma mudança de banco necessária — usa os mesmos hooks existentes.
+| `src/components/escalas/ManualScheduleGrid.tsx` | Ajustar filtro de employees |
 

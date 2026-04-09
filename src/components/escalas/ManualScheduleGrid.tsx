@@ -151,14 +151,22 @@ export function ManualScheduleGrid() {
 
   const filteredEmployees = useMemo(() => {
     const active = employees.filter(Boolean);
-    if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) {
+    if (showAllEmployees || !activeSectorId) {
       return active;
     }
     return active.filter((emp) => {
-      if (emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
-      return schedules.some(
+      const hasActiveSchedule = schedules.some(
         (s) => s.employee_id === emp.id && s.sector_id === activeSectorId && s.status !== "cancelled"
       );
+
+      // Freelancers: only show if they have an active schedule this week
+      if (emp.worker_type === "freelancer") {
+        return hasActiveSchedule;
+      }
+
+      // CLT: show if job title is linked to sector OR has an active schedule
+      if (sectorLinkedJobTitleIds.size > 0 && emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
+      return hasActiveSchedule;
     });
   }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, schedules]);
 

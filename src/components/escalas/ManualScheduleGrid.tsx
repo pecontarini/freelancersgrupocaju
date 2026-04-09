@@ -119,7 +119,8 @@ export function ManualScheduleGrid() {
     employeeId: string;
     employeeName: string;
   } | null>(null);
-  const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<Set<string>>(new Set());
+  const [isDeletingWeek, setIsDeletingWeek] = useState(false);
+  const [showSectorBase, setShowSectorBase] = useState(false);
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;
@@ -150,38 +151,46 @@ export function ManualScheduleGrid() {
     );
   }, [sectorJobTitles, activeSectorId]);
 
-  const filteredEmployees = useMemo(() => {
+  // Employees with active schedules in this sector+week
+  const scheduledEmployeeIds = useMemo(() => {
+    if (!activeSectorId) return new Set<string>();
+    return new Set(
+      schedules
+        .filter((s) => s.sector_id === activeSectorId && s.status !== "cancelled" && s.employee_id)
+        .map((s) => s.employee_id!)
+    );
+  }, [schedules, activeSectorId]);
+
+  // Primary: employees actually scheduled this week
+  const scheduledEmployees = useMemo(() => {
     const active = employees.filter(Boolean);
-    if (showAllEmployees || !activeSectorId) {
-      return active;
-    }
-    return active.filter((emp) => {
-      const hasActiveSchedule = schedules.some(
-        (s) => s.employee_id === emp.id && s.sector_id === activeSectorId && s.status !== "cancelled"
-      );
+    if (showAllEmployees || !activeSectorId) return active;
+    return active.filter((emp) => scheduledEmployeeIds.has(emp.id));
+  }, [employees, showAllEmployees, activeSectorId, scheduledEmployeeIds]);
 
-      // Freelancers: only show if they have an active schedule this week
-      if (emp.worker_type === "freelancer") {
-        return hasActiveSchedule;
-      }
-
-      // CLT: show if job title is linked to sector OR has an active schedule
-      if (sectorLinkedJobTitleIds.size > 0 && emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
-      return hasActiveSchedule;
+  // Secondary: CLT employees linked to sector but NOT scheduled (base do setor)
+  const sectorBaseEmployees = useMemo(() => {
+    if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) return [];
+    return employees.filter((emp) => {
+      if (emp.worker_type === "freelancer") return false;
+      if (scheduledEmployeeIds.has(emp.id)) return false;
+      return emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id);
     });
-  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, schedules]);
+  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
-  // Sort: CLT first, then freelancers — exclude hidden employees
-  const sortedEmployees = useMemo(() => {
-    return [...filteredEmployees]
-      .filter((e) => !hiddenEmployeeIds.has(e.id))
-      .sort((a, b) => {
-        const aType = a.worker_type || "clt";
-        const bType = b.worker_type || "clt";
-        if (aType === bType) return a.name.localeCompare(b.name);
-        return aType === "clt" ? -1 : 1;
-      });
-  }, [filteredEmployees, hiddenEmployeeIds]);
+  // Sort: CLT first, then freelancers
+  const sortedScheduled = useMemo(() => {
+    return [...scheduledEmployees].sort((a, b) => {
+      const aType = a.worker_type || "clt";
+      const bType = b.worker_type || "clt";
+      if (aType === bType) return a.name.localeCompare(b.name);
+      return aType === "clt" ? -1 : 1;
+    });
+  }, [scheduledEmployees]);
+
+  const sortedBase = useMemo(() => {
+    return [...sectorBaseEmployees].sort((a, b) => a.name.localeCompare(b.name));
+  }, [sectorBaseEmployees]);
 
   // Build employee map for worker_type lookup
   const employeeMap = useMemo(() => {

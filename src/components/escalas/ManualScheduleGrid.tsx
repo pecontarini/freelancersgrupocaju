@@ -15,6 +15,7 @@ import {
   Moon,
   DollarSign,
   Trash2,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -118,7 +119,8 @@ export function ManualScheduleGrid() {
     employeeId: string;
     employeeName: string;
   } | null>(null);
-  const [hiddenEmployeeIds, setHiddenEmployeeIds] = useState<Set<string>>(new Set());
+  const [isDeletingWeek, setIsDeletingWeek] = useState(false);
+  const [showSectorBase, setShowSectorBase] = useState(false);
   const [editModal, setEditModal] = useState<{
     open: boolean;
     employeeId: string;
@@ -149,38 +151,46 @@ export function ManualScheduleGrid() {
     );
   }, [sectorJobTitles, activeSectorId]);
 
-  const filteredEmployees = useMemo(() => {
+  // Employees with active schedules in this sector+week
+  const scheduledEmployeeIds = useMemo(() => {
+    if (!activeSectorId) return new Set<string>();
+    return new Set(
+      schedules
+        .filter((s) => s.sector_id === activeSectorId && s.status !== "cancelled" && s.employee_id)
+        .map((s) => s.employee_id!)
+    );
+  }, [schedules, activeSectorId]);
+
+  // Primary: employees actually scheduled this week
+  const scheduledEmployees = useMemo(() => {
     const active = employees.filter(Boolean);
-    if (showAllEmployees || !activeSectorId) {
-      return active;
-    }
-    return active.filter((emp) => {
-      const hasActiveSchedule = schedules.some(
-        (s) => s.employee_id === emp.id && s.sector_id === activeSectorId && s.status !== "cancelled"
-      );
+    if (showAllEmployees || !activeSectorId) return active;
+    return active.filter((emp) => scheduledEmployeeIds.has(emp.id));
+  }, [employees, showAllEmployees, activeSectorId, scheduledEmployeeIds]);
 
-      // Freelancers: only show if they have an active schedule this week
-      if (emp.worker_type === "freelancer") {
-        return hasActiveSchedule;
-      }
-
-      // CLT: show if job title is linked to sector OR has an active schedule
-      if (sectorLinkedJobTitleIds.size > 0 && emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id)) return true;
-      return hasActiveSchedule;
+  // Secondary: CLT employees linked to sector but NOT scheduled (base do setor)
+  const sectorBaseEmployees = useMemo(() => {
+    if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) return [];
+    return employees.filter((emp) => {
+      if (emp.worker_type === "freelancer") return false;
+      if (scheduledEmployeeIds.has(emp.id)) return false;
+      return emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id);
     });
-  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, schedules]);
+  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
-  // Sort: CLT first, then freelancers — exclude hidden employees
-  const sortedEmployees = useMemo(() => {
-    return [...filteredEmployees]
-      .filter((e) => !hiddenEmployeeIds.has(e.id))
-      .sort((a, b) => {
-        const aType = a.worker_type || "clt";
-        const bType = b.worker_type || "clt";
-        if (aType === bType) return a.name.localeCompare(b.name);
-        return aType === "clt" ? -1 : 1;
-      });
-  }, [filteredEmployees, hiddenEmployeeIds]);
+  // Sort: CLT first, then freelancers
+  const sortedScheduled = useMemo(() => {
+    return [...scheduledEmployees].sort((a, b) => {
+      const aType = a.worker_type || "clt";
+      const bType = b.worker_type || "clt";
+      if (aType === bType) return a.name.localeCompare(b.name);
+      return aType === "clt" ? -1 : 1;
+    });
+  }, [scheduledEmployees]);
+
+  const sortedBase = useMemo(() => {
+    return [...sectorBaseEmployees].sort((a, b) => a.name.localeCompare(b.name));
+  }, [sectorBaseEmployees]);
 
   // Build employee map for worker_type lookup
   const employeeMap = useMemo(() => {
@@ -279,7 +289,6 @@ export function ManualScheduleGrid() {
 
   const navigateWeek = (dir: number) => {
     setCurrentWeekBase((prev) => addDays(prev, dir * 7));
-    setHiddenEmployeeIds(new Set());
   };
 
   const isLoading = loadingEmp || loadingSch || loadingSectors;
@@ -312,9 +321,9 @@ export function ManualScheduleGrid() {
               weekStart={currentWeekBase}
             />
           )}
-          {activeSectorId && sortedEmployees.length > 0 && (
+          {activeSectorId && sortedScheduled.length > 0 && (
             <ScheduleExcelFlow
-              employees={sortedEmployees.map((e) => ({
+              employees={sortedScheduled.map((e) => ({
                 id: e.id,
                 name: e.name,
                 job_title: e.job_title,
@@ -423,7 +432,7 @@ export function ManualScheduleGrid() {
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ) : sortedEmployees.length === 0 ? (
+              ) : sortedScheduled.length === 0 && sortedBase.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   {hasSectorMappings && !showAllEmployees ? (
                     <>
@@ -560,7 +569,7 @@ export function ManualScheduleGrid() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedEmployees.map((emp) => {
+                      {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
                         return (
                           <TableRow key={emp.id}>
@@ -660,6 +669,55 @@ export function ManualScheduleGrid() {
                           })}
                         </TableRow>
                       ))}
+
+                      {/* Collapsible base section for CLTs not scheduled */}
+                      {sortedBase.length > 0 && !showAllEmployees && (
+                        <>
+                          <TableRow>
+                            <TableCell
+                              colSpan={8}
+                              className="py-1 px-2 cursor-pointer hover:bg-muted/50"
+                              onClick={() => setShowSectorBase((v) => !v)}
+                            >
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showSectorBase ? "rotate-0" : "-rotate-90"}`} />
+                                <Users className="h-3.5 w-3.5" />
+                                <span className="font-medium">Quadro base do setor</span>
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {sortedBase.length}
+                                </Badge>
+                                <span className="text-[10px]">— sem escala nesta semana</span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {showSectorBase && sortedBase.map((emp) => (
+                            <TableRow key={emp.id} className="opacity-60">
+                              <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="truncate max-w-[110px]">{emp.name}</span>
+                                </div>
+                                {emp.job_title && (
+                                  <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
+                                )}
+                              </TableCell>
+                              {weekDays.map((day, i) => {
+                                const dateStr = format(day, "yyyy-MM-dd");
+                                return (
+                                  <TableCell
+                                    key={i}
+                                    className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
+                                    onClick={() => handleCellClick(emp, dateStr)}
+                                  >
+                                    <div className="h-10 flex items-center justify-center">
+                                      <span className="text-muted-foreground/40 text-xs">—</span>
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -704,7 +762,7 @@ export function ManualScheduleGrid() {
       )}
 
       {/* Delete employee from week confirmation */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(null); }}>
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o && !isDeletingWeek) setDeleteConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remover funcionário da semana</AlertDialogTitle>
@@ -713,22 +771,29 @@ export function ManualScheduleGrid() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingWeek}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
+              disabled={isDeletingWeek}
+              onClick={async (e) => {
+                e.preventDefault();
                 if (deleteConfirm && selectedUnit) {
-                  setHiddenEmployeeIds((prev) => new Set(prev).add(deleteConfirm.employeeId));
-                  cancelEmployeeWeek.mutate({
-                    employee_id: deleteConfirm.employeeId,
-                    sector_ids: sectorIds,
-                    week_start: weekStart,
-                    week_end: weekEnd,
-                  });
+                  setIsDeletingWeek(true);
+                  try {
+                    await cancelEmployeeWeek.mutateAsync({
+                      employee_id: deleteConfirm.employeeId,
+                      sector_ids: sectorIds,
+                      week_start: weekStart,
+                      week_end: weekEnd,
+                    });
+                  } finally {
+                    setIsDeletingWeek(false);
+                    setDeleteConfirm(null);
+                  }
                 }
-                setDeleteConfirm(null);
               }}
             >
+              {isDeletingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Remover
             </AlertDialogAction>
           </AlertDialogFooter>

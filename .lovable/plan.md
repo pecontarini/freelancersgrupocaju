@@ -1,63 +1,55 @@
 
 
-# Plano: Unificar freelancers via CPF — Budget + Escalas + Check-in
+# Plano: Visão Geral do Quadro Operacional (todos os setores)
 
-## Problema atual
+## Objetivo
 
-Existem 3 sistemas desconectados de freelancers:
-1. **Budget** (`freelancer_entries`) — tem CPF, nome, função, chave PIX
-2. **Escalas** (`employees` com `worker_type=freelancer`) — tem nome, cargo, mas **não tem CPF**
-3. **Check-in** (`freelancer_profiles`) — tem CPF, nome, telefone, chave PIX
+Adicionar uma opção "Visão Geral" ao Quadro Operacional que mostra, numa única tela, o status de **todos os setores** da unidade para o turno selecionado — sem precisar navegar setor a setor.
 
-Não há vínculo entre eles. O mesmo freelancer pode existir em 3 tabelas sem conexão.
+## O que muda
 
-## Solução: Adicionar CPF à tabela `employees` e usar como chave de vínculo
+### `OperationalDashboard.tsx`
 
-### 1. Migração: adicionar coluna `cpf` à tabela `employees`
+1. **Filtro de Setor**: Adicionar opção "Todos os setores" como valor padrão no seletor. Quando selecionada, exibe a visão geral; ao escolher um setor específico, mantém o comportamento atual (lista de conferência individual).
 
-```sql
-ALTER TABLE public.employees ADD COLUMN cpf text;
-CREATE INDEX idx_employees_cpf ON public.employees(cpf);
+2. **Busca de dados na visão geral**: Quando "Todos os setores" estiver ativo, buscar schedules de **todos os sectorIds** da unidade (já suportado pelo hook `useSchedulesBySector`).
+
+3. **Visão Geral — Cards por setor**: Renderizar um grid de cards, um por setor, cada um mostrando:
+   - Nome do setor
+   - Meta POP (da staffing matrix)
+   - Escalados (schedules do dia/turno)
+   - Presentes (attendance com status "presente")
+   - Badge de status visual (verde = completo, amarelo = parcial, vermelho = crítico)
+   - Barra de progresso
+
+4. **KPIs consolidados no topo**: Mostrar totais da unidade (Meta total, Escalados total, Presentes total) nos cards de KPI existentes.
+
+5. **Botão "Gerar Resumo"**: Na visão geral, gera o resumo consolidado de todos os setores para copiar no WhatsApp.
+
+## Fluxo visual
+
+```text
+┌─────────────────────────────────────────────┐
+│  Unidade: [Caju X]   Setor: [Todos ▼]      │
+│  Turno: [Almoço]                            │
+├─────────────────────────────────────────────┤
+│  [Meta: 42]   [Escalados: 38]  [Presentes: 35] │
+├─────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│  │ Salão    │ │ Bar      │ │ Cozinha  │    │
+│  │ 12/15 ⚠️ │ │ 8/8  ✅  │ │ 15/19 🔴 │    │
+│  │ ████░░░  │ │ ████████ │ │ █████░░░ │    │
+│  └──────────┘ └──────────┘ └──────────┘    │
+│                                             │
+│  Clique num setor para ver detalhes →       │
+└─────────────────────────────────────────────┘
 ```
 
-Coluna nullable para não quebrar CLTs e registros existentes.
-
-### 2. `FreelancerAddModal.tsx` — Campo CPF com auto-preenchimento
-
-No modo "Criar Novo":
-- Adicionar campo CPF com formatação automática
-- Ao digitar CPF completo (11 dígitos), buscar em `freelancer_profiles` E em `freelancer_entries` (usando a mesma lógica do `useCpfLookup`)
-- Se encontrar, preencher automaticamente: nome, chave PIX
-- Salvar o CPF no registro `employees` ao criar
-
-No modo "Existente":
-- Exibir o CPF ao lado do nome (se disponível) para facilitar identificação
-
-### 3. `FreelancerForm.tsx` (Budget) — Buscar também em `employees`
-
-Expandir o `handleCpfLookup` para buscar também na tabela `employees` (freelancers da escala) além de `freelancer_entries` e `freelancer_profiles`. Isso garante que dados cadastrados na escala alimentem o budget.
-
-### 4. `useCpfLookup.ts` — Adicionar busca unificada
-
-Criar função `lookupUnifiedByCpf` que busca em ordem de prioridade:
-1. `freelancer_profiles` (dados mais completos — tem foto, telefone, PIX)
-2. `employees` onde `worker_type = 'freelancer'` e `cpf` bate
-3. `freelancer_entries` (fallback histórico)
-
-Retorna os dados mais recentes/completos encontrados.
-
-## Arquivos impactados
+## Arquivo impactado
 
 | Arquivo | Ação |
 |---------|------|
-| Migração SQL | Adicionar coluna `cpf` em `employees` |
-| `src/hooks/useCpfLookup.ts` | Busca unificada em 3 tabelas |
-| `src/components/escalas/FreelancerAddModal.tsx` | Campo CPF + auto-fill ao criar freelancer |
-| `src/components/FreelancerForm.tsx` | Usar busca unificada |
+| `src/components/escalas/OperationalDashboard.tsx` | Adicionar visão geral consolidada |
 
-## Resultado
-
-- Digitar CPF em qualquer formulário puxa dados de todas as fontes
-- Freelancers criados na escala ficam vinculados por CPF ao budget e check-in
-- Sistema integrado: mesmo freelancer é reconhecido em todas as abas
+Nenhuma mudança de banco necessária — usa os mesmos hooks existentes.
 

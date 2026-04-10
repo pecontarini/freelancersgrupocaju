@@ -44,6 +44,11 @@ import { toast } from "sonner";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useUnidade } from "@/contexts/UnidadeContext";
+import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
+import { useEmployees } from "@/hooks/useEmployees";
+import { useSchedulesBySector } from "@/hooks/useSchedules";
+import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
+import { AdminGlobalView } from "./AdminGlobalView";
 
 function getCurrentShiftType(): string {
   const hour = new Date().getHours();

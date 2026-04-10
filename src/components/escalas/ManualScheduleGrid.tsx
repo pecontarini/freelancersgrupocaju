@@ -84,10 +84,17 @@ export function ManualScheduleGrid() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
   const canManage = isAdmin || isOperator || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
   const selectedUnit = canManage ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
+
+  // Reset local state when global context changes
+  useEffect(() => {
+    setLocalUnitId(null);
+    setSelectedSectorId(null);
+  }, [effectiveUnidadeId]);
 
   const [currentWeekBase, setCurrentWeekBase] = useState(new Date());
   const weekDays = useMemo(() => getWeekDays(currentWeekBase), [currentWeekBase]);

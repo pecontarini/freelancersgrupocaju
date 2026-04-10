@@ -1,42 +1,72 @@
 
 
-# Plano: Corrigir seleção de unidade no Quadro Operacional + Visão Global Admin
+# Plano: Corrigir Importação em Massa de Escalas para Todos os Setores e Unidades
 
-## Problema
+## Diagnóstico
 
-1. **Seletor de unidade não funciona**: O componente `OperationalDashboard` usa `useConfigLojas()` para listar lojas, mas não faz filtragem por perfil. Gerentes e operadores veem o dropdown vazio ou com lojas que não são deles, e não há auto-seleção.
+Identifiquei 3 problemas concretos no código:
 
-2. **Admin sem visão global**: Hoje o admin precisa selecionar uma unidade por vez. Falta uma visão consolidada mostrando o quadro operacional de todas as unidades simultaneamente.
+### Problema 1: Botões de Download/Importação não aparecem
+Em `ManualScheduleGrid.tsx` linha 324, os botões de Excel só renderizam quando `sortedScheduled.length > 0` — ou seja, somente se já houver funcionários escalados naquele setor na semana. Em setores ou unidades sem escala prévia, os botões simplesmente não existem.
+
+### Problema 2: Template gera apenas com funcionários já escalados
+O template Excel é gerado com `sortedScheduled` (pessoas já lançadas) em vez dos funcionários do **quadro base do setor** (`sectorBaseEmployees`). Isso significa que o modelo baixado para um setor novo vem vazio.
+
+### Problema 3: Importação só salva no setor ativo
+Na função `handleConfirmImport` (`ScheduleExcelFlow.tsx` linhas 286-303), o `resolvedSectorId` tenta usar `sector_job_titles` para mapear o cargo ao setor correto, mas se o cargo não estiver vinculado, tudo cai no `sectorId` ativo. Não há suporte real para importar para múltiplos setores de uma vez.
 
 ## Solução
 
-### 1. Corrigir seletor de unidade com lógica de perfil
+### 1. Mostrar botões sempre que houver setor ativo
 
-No `OperationalDashboard.tsx`:
+**Arquivo:** `ManualScheduleGrid.tsx`
 
-- Importar `useUserProfile` para obter `isAdmin`, `isOperator`, `unidades`
-- **Admin**: mostrar todas as lojas via `useConfigLojas()` + opção "Todas as unidades"
-- **Operador/Gerente**: mostrar apenas `unidades` do perfil
-- **Auto-seleção**: se o usuário tem apenas 1 unidade, selecionar automaticamente
-- Padrão já usado em `ManualScheduleGrid`, `UnidadeSelector`, etc.
+Mudar a condição de renderização do `ScheduleExcelFlow` de:
+```
+activeSectorId && sortedScheduled.length > 0
+```
+Para:
+```
+activeSectorId
+```
 
-### 2. Criar visão global para admin (opção "Todas as unidades")
+### 2. Usar funcionários do quadro base no template
 
-Quando admin seleciona "Todas as unidades":
-- Iterar sobre todas as lojas e renderizar um card resumo por unidade
-- Cada card mostra: nome da unidade, meta total, escalados, presentes, % de preenchimento
-- Clicar num card filtra para aquela unidade (drill-down)
-- Layout em grid responsivo, similar ao `UnitSummaryGrid` já existente
+**Arquivo:** `ManualScheduleGrid.tsx`
 
-### Arquivo impactado
+Mudar a prop `employees` do `ScheduleExcelFlow` para usar **todos os funcionários vinculados ao setor** (base + escalados), em vez de apenas os escalados:
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/escalas/OperationalDashboard.tsx` | Refatorar seletor + adicionar visão global |
+```text
+Antes: employees={sortedScheduled.map(...)}
+Depois: employees={sectorEmployeesForTemplate} 
+        (= funcionários com job_title vinculado ao setor via sector_job_titles)
+```
 
-### Resultado
+Isso garante que ao clicar "Baixar Modelo", o Excel vem com todos os CLTs do setor, mesmo que nenhum esteja escalado ainda.
 
-- Gerentes/operadores veem e selecionam apenas suas lojas, com auto-seleção quando têm uma só
-- Admin tem dropdown com todas as lojas + "Todas as unidades"
-- Na visão global, admin vê um painel consolidado com cards por unidade e drill-down
+### 3. Melhorar resolução de setor na importação
+
+**Arquivo:** `ScheduleExcelFlow.tsx`
+
+Aprimorar a lógica de `handleConfirmImport` para que, quando o cargo do funcionário está vinculado a um setor específico da unidade (via `sector_job_titles`), o lançamento vá para o setor correto em vez de cair sempre no setor ativo como fallback.
+
+### 4. Proteger o download contra lista vazia
+
+**Arquivo:** `ScheduleExcelFlow.tsx`
+
+Remover o bloqueio `if (employees.length === 0)` no `handleDownloadTemplate`. Se não houver funcionários, gerar o modelo com cabeçalhos vazios (o gestor preencherá manualmente e o sistema registrará via fluxo de "funcionários não encontrados").
+
+## Arquivos impactados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/escalas/ManualScheduleGrid.tsx` | Mudar condição de renderização + prop employees |
+| `src/components/escalas/ScheduleExcelFlow.tsx` | Remover bloqueio de download vazio |
+
+## Resultado esperado
+
+- Botões "Baixar Modelo" e "Importar Planilha" visíveis em todos os setores, mesmo sem escalas prévias
+- Template baixado com todos os funcionários do quadro base do setor
+- Importação funcional para qualquer setor e unidade
+- Download garantido mesmo sem funcionários cadastrados (modelo em branco com cabeçalhos)
 

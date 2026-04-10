@@ -202,7 +202,7 @@ export function TeamManagement() {
             <SelectValue placeholder="Selecione a unidade" />
           </SelectTrigger>
           <SelectContent>
-            {lojas.options.map((u) => (
+            {accessibleStores.map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {u.nome}
               </SelectItem>

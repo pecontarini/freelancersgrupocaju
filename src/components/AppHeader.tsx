@@ -13,15 +13,15 @@ export function AppHeader() {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
+    <header className="glass-header sticky top-0 z-50 border-b-0">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-primary">
-            <DollarSign className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+            <DollarSign className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">FreelancerPay</h1>
-            <p className="text-xs text-muted-foreground">Gestão de Pagamentos</p>
+            <h1 className="text-lg font-semibold tracking-tight">FreelancerPay</h1>
+            <p className="text-xs text-muted-foreground/70">Gestão de Pagamentos</p>
           </div>
         </div>
 

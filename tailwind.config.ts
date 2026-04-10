@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        display: ["Space Grotesk", "system-ui", "sans-serif"],
+        sans: ["Inter", "system-ui", "-apple-system", "BlinkMacSystemFont", "sans-serif"],
+        display: ["Space Grotesk", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["ui-monospace", "SF Mono", "Monaco", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -68,8 +69,11 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        soft: "var(--shadow-soft)",
-        card: "var(--shadow-card)",
+        xs:      "var(--shadow-xs)",
+        soft:    "var(--shadow-sm)",
+        card:    "var(--shadow-card)",
+        md:      "var(--shadow-md)",
+        lg:      "var(--shadow-lg)",
         primary: "var(--shadow-primary)",
       },
       keyframes: {

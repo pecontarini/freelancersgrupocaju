@@ -268,10 +268,10 @@ export function WinsAlertsFeed({ lojaId, showAllStores = false }: WinsAlertsFeed
                           })}
                         </Badge>
                         {event.type === "win" && (
-                          <span className="text-xs">🎉</span>
+                          <span className="text-xs text-green-500">●</span>
                         )}
                         {event.type === "alert" && (
-                          <span className="text-xs">⚠️</span>
+                          <span className="text-xs text-amber-500">●</span>
                         )}
                       </div>
                     </div>

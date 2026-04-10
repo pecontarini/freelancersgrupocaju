@@ -373,7 +373,7 @@ export function CMVNFeProcessor() {
 
       const savedCount = newMappingsToSave.length;
       toast.success(
-        `✅ Estoque atualizado para o dia ${formatDateBR(entryDate)}! ${validMappings.length} itens registrados.${savedCount > 0 ? ` ${savedCount} vínculo(s) salvo(s).` : ""}`
+        `Estoque atualizado para o dia ${formatDateBR(entryDate)}. ${validMappings.length} itens registrados.${savedCount > 0 ? ` ${savedCount} vínculo(s) salvo(s).` : ""}`
       );
       setConfirmModalOpen(false);
       clearExtractedData();

@@ -941,7 +941,7 @@ export function RemuneracaoVariavelTab({
             {isRedFlag ? <div className="flex flex-col items-center gap-4">
                 <AlertTriangle className="h-12 w-12 text-red-500" />
                 <div className="text-center">
-                  <p className="text-xl font-bold text-red-500">🚨 STATUS: RED FLAG</p>
+                  <p className="text-xl font-bold text-red-500">STATUS: RED FLAG</p>
                   <p className="text-sm text-muted-foreground mt-2">
                     {simulatedSupervisao[0] < 80 ? "Supervisão abaixo de 80%." : "NPS de algum canal abaixo do mínimo."}
                     {" "}Bônus TOTAL bloqueado.

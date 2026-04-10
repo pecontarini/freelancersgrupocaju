@@ -87,7 +87,7 @@ const PERFORMANCE_SEALS: Record<PerformanceTier, PerformanceSeal> = {
   ouro: {
     tier: "ouro",
     label: "OURO",
-    emoji: "🥇",
+    emoji: "",
     color: "text-yellow-700",
     bgColor: "bg-gradient-to-br from-yellow-100 to-amber-200",
     borderColor: "border-yellow-400",
@@ -97,7 +97,7 @@ const PERFORMANCE_SEALS: Record<PerformanceTier, PerformanceSeal> = {
   prata: {
     tier: "prata",
     label: "PRATA",
-    emoji: "🥈",
+    emoji: "",
     color: "text-slate-600",
     bgColor: "bg-gradient-to-br from-slate-100 to-slate-200",
     borderColor: "border-slate-400",
@@ -107,7 +107,7 @@ const PERFORMANCE_SEALS: Record<PerformanceTier, PerformanceSeal> = {
   bronze: {
     tier: "bronze",
     label: "BRONZE",
-    emoji: "🥉",
+    emoji: "",
     color: "text-orange-700",
     bgColor: "bg-gradient-to-br from-orange-100 to-orange-200",
     borderColor: "border-orange-400",
@@ -117,7 +117,7 @@ const PERFORMANCE_SEALS: Record<PerformanceTier, PerformanceSeal> = {
   critico: {
     tier: "critico",
     label: "CRÍTICO",
-    emoji: "🚨",
+    emoji: "",
     color: "text-red-700",
     bgColor: "bg-gradient-to-br from-red-100 to-red-200",
     borderColor: "border-red-500",

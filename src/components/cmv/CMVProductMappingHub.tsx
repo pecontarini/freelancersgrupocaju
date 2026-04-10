@@ -265,10 +265,10 @@ export function CMVProductMappingHub() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pending">⏳ Pendentes</SelectItem>
-                  <SelectItem value="linked">✅ Vinculados</SelectItem>
-                  <SelectItem value="ignored">🚫 Ignorados</SelectItem>
-                  <SelectItem value="all">📋 TODOS (Raw)</SelectItem>
+                  <SelectItem value="pending">Pendentes</SelectItem>
+                  <SelectItem value="linked">Vinculados</SelectItem>
+                  <SelectItem value="ignored">Ignorados</SelectItem>
+                  <SelectItem value="all">Todos (Raw)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

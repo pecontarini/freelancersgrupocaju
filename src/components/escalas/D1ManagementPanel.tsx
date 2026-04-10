@@ -156,7 +156,7 @@ export function D1ManagementPanel() {
           className="gap-2"
         >
           <ClipboardCopy className="h-4 w-4" />
-          📋 Partilhar Resumo D-1
+          Partilhar Resumo D-1
         </Button>
       </div>
 

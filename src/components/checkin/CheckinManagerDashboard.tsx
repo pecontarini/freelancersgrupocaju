@@ -49,8 +49,14 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "approved" && c.valor_status === "approved"
   );
 
-  // Match scheduled freelancers with checkins by name
+  // Match scheduled freelancers with checkins by schedule_id first, then by name
   const scheduledWithStatus = scheduledFreelancers.map((sf) => {
+    // Try schedule_id match first (new system)
+    const matchedBySchedule = checkins.find((c) => (c as any).schedule_id === sf.scheduleId);
+    if (matchedBySchedule) {
+      return { ...sf, checkedIn: matchedBySchedule.status !== "pending_schedule", checkinStatus: matchedBySchedule.status };
+    }
+    // Fallback: name normalization (legacy)
     const normalizedScheduleName = normalizeName(sf.employeeName);
     const matchedCheckin = checkins.find((c) => {
       const checkinName = c.freelancer_profiles?.nome_completo;

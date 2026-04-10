@@ -90,7 +90,7 @@ export function ScheduleEditModal({
       setStartTime(existing.start_time?.slice(0, 5) || "08:00");
       setEndTime(existing.end_time?.slice(0, 5) || "16:20");
       setBreakDuration(existing.break_duration ?? 60);
-      setAgreedRate(existing.agreed_rate ? String(existing.agreed_rate) : "");
+      setAgreedRate(existing.agreed_rate ? String(existing.agreed_rate) : (isFreelancer ? "120" : ""));
       if (existing.schedule_type !== "working") {
         setActiveTab("ausencias");
       } else {
@@ -100,7 +100,7 @@ export function ScheduleEditModal({
       setStartTime("08:00");
       setEndTime("16:20");
       setBreakDuration(60);
-      setAgreedRate("");
+      setAgreedRate(isFreelancer ? "120" : "");
       setActiveTab("turno");
     }
     setShowVacationForm(false);

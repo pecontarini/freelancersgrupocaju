@@ -42,6 +42,7 @@ export default function FreelancerCheckin() {
   const [profile, setProfile] = useState<FreelancerProfile | null>(null);
   const [isCheckout, setIsCheckout] = useState(false);
   const [openCheckinId, setOpenCheckinId] = useState<string | null>(null);
+  const [pendingScheduleCheckinId, setPendingScheduleCheckinId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [unitName, setUnitName] = useState("");
 
@@ -64,7 +65,7 @@ export default function FreelancerCheckin() {
   const [valor, setValor] = useState("");
 
   const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
-  const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
+  const { findOpenCheckin, findPendingScheduleCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
   const { lookupFreelancerByCpf } = useCpfLookup();
 
   // Load unit name
@@ -144,6 +145,7 @@ export default function FreelancerCheckin() {
     setProfile(null);
     setIsCheckout(false);
     setOpenCheckinId(null);
+    setPendingScheduleCheckinId(null);
 
     setIsLoading(true);
     try {
@@ -163,6 +165,15 @@ export default function FreelancerCheckin() {
           setOpenCheckinId(open.id);
         } else {
           setIsCheckout(false);
+          // Check for pending schedule checkin to reuse
+          const pending = await findPendingScheduleCheckin(existing.id, unidadeId, today);
+          if (pending) {
+            setPendingScheduleCheckinId(pending.id);
+            // Pre-fill valor from scheduled rate
+            if (pending.valor_informado) {
+              setValor(String(pending.valor_informado));
+            }
+          }
         }
         setStep("confirm");
       } else {
@@ -267,14 +278,32 @@ export default function FreelancerCheckin() {
     setIsLoading(true);
     try {
       const selfieUrl = await uploadPhoto(selfieBase64, "checkins");
-      await createCheckin.mutateAsync({
-        freelancer_id: profile.id,
-        loja_id: unidadeId,
-        checkin_selfie_url: selfieUrl,
-        checkin_lat: geo?.lat,
-        checkin_lng: geo?.lng,
-        valor_informado: numericValor,
-      });
+
+      if (pendingScheduleCheckinId) {
+        // Update existing pending_schedule record instead of creating a new one
+        const { error } = await supabase
+          .from("freelancer_checkins")
+          .update({
+            checkin_selfie_url: selfieUrl,
+            checkin_at: new Date().toISOString(),
+            checkin_lat: geo?.lat,
+            checkin_lng: geo?.lng,
+            valor_informado: numericValor,
+            status: "open",
+          })
+          .eq("id", pendingScheduleCheckinId);
+        if (error) throw error;
+      } else {
+        // Create new checkin (no pending schedule existed)
+        await createCheckin.mutateAsync({
+          freelancer_id: profile.id,
+          loja_id: unidadeId,
+          checkin_selfie_url: selfieUrl,
+          checkin_lat: geo?.lat,
+          checkin_lng: geo?.lng,
+          valor_informado: numericValor,
+        });
+      }
       setStep("done");
       toast.success("Check-in registrado com sucesso!");
     } catch (err: any) {

@@ -73,7 +73,7 @@ export function FreelancerAddModal({
   const [newName, setNewName] = useState("");
   const [cpfValue, setCpfValue] = useState("");
   const [selectedJobTitleId, setSelectedJobTitleId] = useState("");
-  const [rate, setRate] = useState("200");
+  const [rate, setRate] = useState("120");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:20");
   const [autoFilled, setAutoFilled] = useState(false);
@@ -187,7 +187,7 @@ export function FreelancerAddModal({
     setNewName("");
     setCpfValue("");
     setSelectedJobTitleId("");
-    setRate("200");
+    setRate("120");
     setStartTime("08:00");
     setEndTime("16:20");
     setMode("select");

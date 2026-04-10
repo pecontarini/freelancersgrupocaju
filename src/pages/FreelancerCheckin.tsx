@@ -145,6 +145,7 @@ export default function FreelancerCheckin() {
     setProfile(null);
     setIsCheckout(false);
     setOpenCheckinId(null);
+    setPendingScheduleCheckinId(null);
 
     setIsLoading(true);
     try {
@@ -164,6 +165,11 @@ export default function FreelancerCheckin() {
           setOpenCheckinId(open.id);
         } else {
           setIsCheckout(false);
+          // Check for pending schedule checkin to reuse
+          const pending = await findPendingScheduleCheckin(existing.id, unidadeId, today);
+          if (pending) {
+            setPendingScheduleCheckinId(pending.id);
+          }
         }
         setStep("confirm");
       } else {

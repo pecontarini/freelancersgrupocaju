@@ -274,14 +274,32 @@ export default function FreelancerCheckin() {
     setIsLoading(true);
     try {
       const selfieUrl = await uploadPhoto(selfieBase64, "checkins");
-      await createCheckin.mutateAsync({
-        freelancer_id: profile.id,
-        loja_id: unidadeId,
-        checkin_selfie_url: selfieUrl,
-        checkin_lat: geo?.lat,
-        checkin_lng: geo?.lng,
-        valor_informado: numericValor,
-      });
+
+      if (pendingScheduleCheckinId) {
+        // Update existing pending_schedule record instead of creating a new one
+        const { error } = await supabase
+          .from("freelancer_checkins")
+          .update({
+            checkin_selfie_url: selfieUrl,
+            checkin_at: new Date().toISOString(),
+            checkin_lat: geo?.lat,
+            checkin_lng: geo?.lng,
+            valor_informado: numericValor,
+            status: "open",
+          })
+          .eq("id", pendingScheduleCheckinId);
+        if (error) throw error;
+      } else {
+        // Create new checkin (no pending schedule existed)
+        await createCheckin.mutateAsync({
+          freelancer_id: profile.id,
+          loja_id: unidadeId,
+          checkin_selfie_url: selfieUrl,
+          checkin_lat: geo?.lat,
+          checkin_lng: geo?.lng,
+          valor_informado: numericValor,
+        });
+      }
       setStep("done");
       toast.success("Check-in registrado com sucesso!");
     } catch (err: any) {

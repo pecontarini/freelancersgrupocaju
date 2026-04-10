@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useD1Schedules, type D1Schedule } from "@/hooks/useD1Schedules";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -40,6 +41,7 @@ export function D1ManagementPanel() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
   const canManage = isAdmin || isOperator || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
@@ -171,7 +173,7 @@ export function D1ManagementPanel() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lojas.options.map((l) => (
+                  {accessibleStores.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
                   ))}
                 </SelectContent>

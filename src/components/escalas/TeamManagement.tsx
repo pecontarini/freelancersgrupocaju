@@ -47,6 +47,7 @@ import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { toast } from "sonner";
 
 const DEFAULT_JOB_TITLES = [

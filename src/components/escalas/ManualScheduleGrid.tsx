@@ -374,7 +374,7 @@ export function ManualScheduleGrid() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lojas.options.map((l) => (
+                  {accessibleStores.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
                   ))}
                 </SelectContent>

@@ -63,6 +63,75 @@ async function resolveShiftId(shiftType?: string): Promise<string> {
   return any[0].id;
 }
 
+async function autoCreatePendingCheckin(
+  employeeId: string,
+  scheduleDate: string,
+  lojaId: string,
+  agreedRate: number,
+  scheduleId: string
+) {
+  try {
+    // 1. Get employee CPF and unit_id
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("cpf, unit_id, worker_type")
+      .eq("id", employeeId)
+      .single();
+
+    if (!employee || employee.worker_type !== "freelancer" || !employee.cpf) return;
+
+    // 2. Get the unit_id (loja_id) from the sector
+    const lojaIdToUse = employee.unit_id;
+
+    // 3. Find freelancer_profile by CPF
+    const cleanCpf = employee.cpf.replace(/\D/g, "");
+    const { data: profile } = await supabase
+      .from("freelancer_profiles")
+      .select("id, foto_url")
+      .or(`cpf.eq.${cleanCpf},cpf.eq.${employee.cpf}`)
+      .maybeSingle();
+
+    if (!profile) return; // No profile found — freelancer will register via QR Code
+
+    // 4. Check if a pending checkin already exists for this schedule
+    const { data: existingCheckin } = await supabase
+      .from("freelancer_checkins")
+      .select("id")
+      .eq("schedule_id", scheduleId)
+      .maybeSingle();
+
+    if (existingCheckin) return; // Already has a checkin linked
+
+    // 5. Also check if there's already a checkin for this freelancer/loja/date
+    const { data: existingByDate } = await supabase
+      .from("freelancer_checkins")
+      .select("id")
+      .eq("freelancer_id", profile.id)
+      .eq("loja_id", lojaIdToUse)
+      .eq("checkin_date", scheduleDate)
+      .maybeSingle();
+
+    if (existingByDate) return; // Already has a checkin for this date
+
+    // 6. Create pending checkin record
+    await supabase
+      .from("freelancer_checkins")
+      .insert({
+        freelancer_id: profile.id,
+        loja_id: lojaIdToUse,
+        checkin_date: scheduleDate,
+        checkin_selfie_url: profile.foto_url || "pending",
+        status: "pending_schedule",
+        valor_informado: agreedRate,
+        schedule_id: scheduleId,
+        checkin_at: new Date().toISOString(),
+      } as any);
+  } catch (err) {
+    // Don't block the schedule save if checkin creation fails
+    console.warn("Auto-create pending checkin failed:", err);
+  }
+}
+
 export function useUpsertSchedule() {
   const qc = useQueryClient();
   return useMutation({
@@ -94,6 +163,8 @@ export function useUpsertSchedule() {
         shift_id: shiftId,
       };
 
+      let scheduleId: string | null = null;
+
       // If we already have an id, just update
       if (params.id) {
         const { error } = await supabase
@@ -101,36 +172,61 @@ export function useUpsertSchedule() {
           .update(payload)
           .eq("id", params.id);
         if (error) throw error;
-        return;
+        scheduleId = params.id;
+      } else {
+        // Check for existing schedule (active or cancelled) for this cell
+        const { data: existing } = await supabase
+          .from("schedules")
+          .select("id, status")
+          .eq("employee_id", params.employee_id)
+          .eq("schedule_date", params.schedule_date)
+          .eq("sector_id", params.sector_id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          // Reactivate/update the existing record
+          const { error } = await supabase
+            .from("schedules")
+            .update(payload)
+            .eq("id", existing[0].id);
+          if (error) throw error;
+          scheduleId = existing[0].id;
+        } else {
+          // No existing record — insert new
+          const { data: inserted, error } = await supabase
+            .from("schedules")
+            .insert(payload)
+            .select("id")
+            .single();
+          if (error) throw error;
+          scheduleId = inserted.id;
+        }
       }
 
-      // Check for existing schedule (active or cancelled) for this cell
-      const { data: existing } = await supabase
-        .from("schedules")
-        .select("id, status")
-        .eq("employee_id", params.employee_id)
-        .eq("schedule_date", params.schedule_date)
-        .eq("sector_id", params.sector_id)
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Auto-create pending checkin for freelancers
+      if (scheduleId && params.schedule_type === "working") {
+        // Get unit_id from sector
+        const { data: sector } = await supabase
+          .from("sectors")
+          .select("unit_id")
+          .eq("id", params.sector_id)
+          .single();
 
-      if (existing && existing.length > 0) {
-        // Reactivate/update the existing record
-        const { error } = await supabase
-          .from("schedules")
-          .update(payload)
-          .eq("id", existing[0].id);
-        if (error) throw error;
-      } else {
-        // No existing record — insert new
-        const { error } = await supabase
-          .from("schedules")
-          .insert(payload);
-        if (error) throw error;
+        if (sector) {
+          await autoCreatePendingCheckin(
+            params.employee_id,
+            params.schedule_date,
+            sector.unit_id,
+            params.agreed_rate ?? 0,
+            scheduleId
+          );
+        }
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["freelancer-checkins"] });
       toast.success("Escala salva!");
     },
     onError: (err: Error) => {

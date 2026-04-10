@@ -227,7 +227,7 @@ export function OperationalDashboard() {
 
   // WhatsApp export — works for both single and all sectors
   const handleCopyResume = () => {
-    const unitName = lojas.options.find((l) => l.id === selectedUnit)?.nome || "—";
+    const unitName = availableUnits.find((l) => l.id === selectedUnit)?.nome || "—";
     const shiftName = currentShift?.name || shiftType;
 
     if (isAllSectors) {
@@ -301,17 +301,25 @@ export function OperationalDashboard() {
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Unidade</label>
             <Select
-              value={selectedUnit || ""}
+              value={selectedUnit || (isAdmin ? ALL_UNITS_VALUE : "")}
               onValueChange={(v) => {
-                setSelectedUnit(v);
+                setSelectedUnit(v === ALL_UNITS_VALUE ? null : v);
                 setSelectedSector(ALL_SECTORS_VALUE);
               }}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
               <SelectContent>
-                {lojas.options.map((l) => (
+                {isAdmin && (
+                  <SelectItem value={ALL_UNITS_VALUE}>
+                    <span className="flex items-center gap-2">
+                      <Store className="h-4 w-4" />
+                      Todas as unidades
+                    </span>
+                  </SelectItem>
+                )}
+                {availableUnits.map((l) => (
                   <SelectItem key={l.id} value={l.id}>
                     {l.nome}
                   </SelectItem>

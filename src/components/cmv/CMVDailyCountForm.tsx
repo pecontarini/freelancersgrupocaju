@@ -12,6 +12,7 @@ import { CMVChecklistFacilImporter } from "./CMVChecklistFacilImporter";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { downloadWorkbook } from "@/lib/excelUtils";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -165,7 +166,7 @@ export function CMVDailyCountForm() {
     XLSX.utils.book_append_sheet(wb, ws, "Contagem");
     
     const fileName = `Contagem_CMV_${format(selectedDate, "yyyy-MM-dd")}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+    downloadWorkbook(wb, fileName);
     toast.success("Excel exportado com sucesso!");
   };
 

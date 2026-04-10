@@ -321,14 +321,24 @@ export function ManualScheduleGrid() {
               weekStart={currentWeekBase}
             />
           )}
-          {activeSectorId && sortedScheduled.length > 0 && (
+          {activeSectorId && (
             <ScheduleExcelFlow
-              employees={sortedScheduled.map((e) => ({
-                id: e.id,
-                name: e.name,
-                job_title: e.job_title,
-                worker_type: e.worker_type || "clt",
-              }))}
+              employees={[
+                ...sortedScheduled.map((e) => ({
+                  id: e.id,
+                  name: e.name,
+                  job_title: e.job_title,
+                  worker_type: e.worker_type || "clt",
+                })),
+                ...sortedBase
+                  .filter((e) => !sortedScheduled.some((s) => s.id === e.id))
+                  .map((e) => ({
+                    id: e.id,
+                    name: e.name,
+                    job_title: e.job_title,
+                    worker_type: e.worker_type || "clt",
+                  })),
+              ]}
               weekDays={weekDays}
               sectorName={sectors.find((s) => s.id === activeSectorId)?.name || "Setor"}
               sectorId={activeSectorId}

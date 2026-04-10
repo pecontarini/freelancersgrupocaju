@@ -82,10 +82,6 @@ export function ScheduleExcelFlow({
   const qc = useQueryClient();
 
   function handleDownloadTemplate() {
-    if (employees.length === 0) {
-      toast.error("Nenhum funcionário no setor para gerar modelo.");
-      return;
-    }
     generateScheduleTemplate(employees, weekDays, sectorName, unitName);
     toast.success("Modelo baixado!");
   }

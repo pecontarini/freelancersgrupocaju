@@ -1639,6 +1639,7 @@ export type Database = {
           id: string
           loja_id: string
           rejection_reason: string | null
+          schedule_id: string | null
           status: string
           valor_approved_at: string | null
           valor_approved_by: string | null
@@ -1663,6 +1664,7 @@ export type Database = {
           id?: string
           loja_id: string
           rejection_reason?: string | null
+          schedule_id?: string | null
           status?: string
           valor_approved_at?: string | null
           valor_approved_by?: string | null
@@ -1687,6 +1689,7 @@ export type Database = {
           id?: string
           loja_id?: string
           rejection_reason?: string | null
+          schedule_id?: string | null
           status?: string
           valor_approved_at?: string | null
           valor_approved_by?: string | null
@@ -1707,6 +1710,13 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freelancer_checkins_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
             referencedColumns: ["id"]
           },
         ]

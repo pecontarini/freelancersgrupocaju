@@ -1,120 +1,81 @@
 
-## Plano: acabar de vez com reaparecimento, duplicidade e poluição visual no Editor de Escalas
 
-### Diagnóstico do problema atual
+# Plano: Diária fixa R$120 + Integração Escala → Presença de Freelancer
 
-Hoje a grade mistura 3 coisas diferentes na mesma lista:
-1. pessoas realmente lançadas na semana
-2. CLTs do quadro base do setor
-3. ocultação temporária via `hiddenEmployeeIds`
+## Resumo
 
-Isso gera a sensação de que o botão “excluir” não salvou, porque:
-- a linha some só localmente e depois volta
-- CLTs vinculados ao setor continuam reaparecendo mesmo sem escala ativa
-- o cadastro de freelancer e o insert de escala ainda permitem duplicações futuras
-- não existem travas no banco para impedir duplicidade de escala ativa ou freelancer por CPF
+Duas mudanças: (1) pré-fixar o valor da diária em R$120,00 ao lançar extras, e (2) ao salvar um freelancer na escala, criar automaticamente um registro pendente no sistema de presença (checkin), amarrando ponta a ponta.
 
-Além disso, a remoção atual “parece” funcionar visualmente antes de confirmar sucesso no backend, o que mascara erro e faz o problema voltar depois.
+## Problema atual
 
-## Solução definitiva
+- O valor padrão da diária está em R$200 — precisa ser R$120
+- Ao escalar um freelancer, o gestor precisa esperar que ele faça o check-in manualmente via QR Code. Não há registro pendente automático no painel de presença
+- A ponte entre `employees` (escalas) e `freelancer_profiles` (checkins) é feita por normalização de nome — frágil e sem vínculo direto
 
-### 1. Separar visualmente “Escala da semana” de “Base do setor”
-No `ManualScheduleGrid.tsx`, trocar a lista única por duas camadas:
+## Solução
 
-- **Escala da semana**: mostra apenas quem tem lançamento ativo na semana/setor atual
-- **Base do setor**: seção secundária/colapsada com CLTs vinculados ao setor, mas sem lançamento na semana
+### 1. Pré-fixar valor da diária em R$120,00
 
-Resultado:
-- ao excluir alguém da semana, ele sai da área principal e não volta “fantasma”
-- o usuário entende claramente quem está escalado versus quem só pertence ao setor
-- a visualização fica muito mais limpa
+**Arquivos**: `FreelancerAddModal.tsx`, `ScheduleEditModal.tsx`
 
-### 2. Remover dependência do `hiddenEmployeeIds` como fonte da verdade
-O `hiddenEmployeeIds` deve deixar de ser a base da remoção visual.
+- Alterar o estado inicial de `rate` de `"200"` para `"120"`
+- Alterar o valor default de `agreedRate` no ScheduleEditModal para `"120"` quando for freelancer sem valor existente
 
-Novo comportamento:
-- a grade principal passa a ser derivada dos lançamentos reais da semana
-- o estado local vira apenas otimização temporária, com rollback se houver erro
-- ao trocar semana/setor/unidade, a tela continua consistente porque depende do dado real, não de memória local
+### 2. Adicionar coluna `schedule_id` na tabela `freelancer_checkins`
 
-### 3. Corrigir o fluxo do botão “Remover da semana”
-No fluxo de exclusão:
+**Migração SQL**
 
-- só fechar o modal depois do sucesso real da mutação
-- mostrar loading no botão
-- aplicar otimização visual com rollback em erro
-- deixar explícito o escopo da ação:
-  - **remover deste setor na semana**
-  - e só usar remoção ampla se isso for intencional
+- Adicionar coluna opcional `schedule_id uuid REFERENCES schedules(id)` à tabela `freelancer_checkins`
+- Isso permite vincular diretamente um checkin a uma escala específica
 
-Isso elimina a falsa percepção de “apagou mas voltou”.
+### 3. Auto-criar registro de presença pendente ao escalar freelancer
 
-### 4. Tornar a gravação de escala idempotente
-Em `useUpsertSchedule`, parar de fazer insert cego.
+**Arquivo**: `src/hooks/useManualSchedules.ts` (dentro do `useUpsertSchedule`)
 
-Novo comportamento:
-- se já existir escala ativa para `employee + date + sector`, atualizar
-- se existir uma cancelada equivalente, reativar/atualizar
-- só inserir nova linha quando realmente não houver registro para aquela célula
+Após gravar a escala com sucesso para um freelancer:
 
-Isso evita duplicidade de lançamentos no mesmo dia/setor.
+1. Buscar o `employee` para pegar o CPF
+2. Com o CPF, buscar o `freelancer_profile` correspondente
+3. Se encontrar o perfil, criar automaticamente um registro em `freelancer_checkins` com:
+   - `freelancer_id` = id do perfil encontrado
+   - `loja_id` = unit_id da escala
+   - `checkin_date` = data da escala
+   - `status` = "pending_schedule" (novo status para distinguir de check-ins manuais)
+   - `checkin_selfie_url` = placeholder (ex: foto do perfil existente)
+   - `valor_informado` = agreed_rate (R$120)
+   - `schedule_id` = id da escala recém-criada
+4. Se NÃO encontrar perfil por CPF, não criar (o freelancer fará o cadastro via QR Code)
 
-### 5. Impedir duplicidade na origem (banco)
-Adicionar migração com travas definitivas:
+### 4. Melhorar a ponte no Dashboard de Presença
 
-- **índice único parcial em `schedules`**
-  - uma única escala ativa por `employee_id + schedule_date + sector_id`
-- **índice único parcial em `employees` para freelancer por CPF na unidade**
-  - evita criar o mesmo freelancer várias vezes
+**Arquivo**: `src/components/checkin/CheckinManagerDashboard.tsx`
 
-Como verifiquei a estrutura atual, `employees` e `schedules` não têm essas proteções hoje. As políticas de acesso já existem, então não deve exigir mudança de permissão.
+- Usar `schedule_id` para vincular checkins a escalas em vez de normalização de nome
+- Manter fallback por nome para registros antigos sem `schedule_id`
 
-### 6. Blindar o cadastro de freelancer no modal
-No `FreelancerAddModal.tsx`:
+### 5. Ajustar o fluxo de check-in do freelancer (QR Code)
 
-- antes de criar novo freelancer, buscar por CPF na unidade
-- se já existir, reutilizar o cadastro existente em vez de criar outro
-- se o freelancer já estiver lançado naquele dia/setor, abrir edição em vez de inserir de novo
+**Arquivo**: `src/pages/FreelancerCheckin.tsx`
 
-Isso corta o problema de nomes duplicados na raiz.
-
-### 7. Acabamento visual para eliminar “poluição”
-No grid:
-
-- seção principal com badge de contagem: “Escalados nesta semana”
-- seção secundária colapsável: “Quadro base do setor”
-- badge para casos detectados de identidade repetida: “cadastro duplicado”
-- mensagem clara quando a pessoa não está mais escalada, em vez de simplesmente reaparecer vazia
-
-```text
-Editor de Escalas
-├─ Escalados nesta semana
-│  ├─ linhas reais da semana
-│  └─ excluir remove daqui de forma definitiva
-└─ Base do setor
-   ├─ CLTs do setor sem lançamento
-   └─ seção secundária, recolhida por padrão
-```
+- Ao fazer check-in, verificar se já existe um registro pendente (criado pela escala) para aquele CPF/loja/data
+- Se existir, atualizar esse registro (adicionar selfie, horário real) em vez de criar um novo
+- Isso evita duplicidade e mantém o vínculo com a escala
 
 ## Arquivos impactados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/escalas/ManualScheduleGrid.tsx` | reconstruir a lógica visual da grade |
-| `src/hooks/useManualSchedules.ts` | tornar gravação e exclusão determinísticas |
-| `src/components/escalas/FreelancerAddModal.tsx` | impedir criação duplicada de freelancer |
-| Migração SQL | adicionar unicidade parcial para schedules e freelancers |
+| `src/components/escalas/FreelancerAddModal.tsx` | Mudar valor default de R$200 → R$120 |
+| `src/components/escalas/ScheduleEditModal.tsx` | Mudar valor default para R$120 em freelancers |
+| Migração SQL | Adicionar `schedule_id` em `freelancer_checkins` |
+| `src/hooks/useManualSchedules.ts` | Auto-criar checkin pendente ao escalar freelancer |
+| `src/components/checkin/CheckinManagerDashboard.tsx` | Vincular por `schedule_id` |
+| `src/pages/FreelancerCheckin.tsx` | Reutilizar registro pendente da escala |
 
-## Resultado esperado
+## Resultado
 
-Depois dessa mudança:
-- excluir da semana passa a refletir no dado real
-- a pessoa não volta como “fantasma”
-- nomes duplicados deixam de surgir
-- o grid fica limpo, com foco em quem está realmente escalado
-- o quadro base continua disponível, mas sem poluir a visualização principal
+- Valor da diária sempre começa em R$120
+- Ao lançar um extra na escala, ele já aparece como "Pendente" no painel de presença
+- O freelancer, ao fazer check-in via QR Code, atualiza o registro existente (com selfie e horário real)
+- O gestor vê tudo amarrado: escala → presença → aprovação → pagamento
 
-## Detalhes técnicos
-- Não preciso mudar autenticação nem políticas para isso; o backend já tem regras de acesso em `employees` e `schedules`.
-- A correção definitiva depende de **UI + lógica de gravação + trava no banco**. Fazer só front-end não basta.
-- Na leitura atual, não encontrei índices de unicidade nessas tabelas, então hoje o sistema ainda permite duplicação por desenho.

@@ -45,7 +45,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
 import {
   AlertDialog,

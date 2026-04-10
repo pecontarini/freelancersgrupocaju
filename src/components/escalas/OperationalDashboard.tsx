@@ -712,12 +712,25 @@ export function OperationalDashboard() {
         </>
       )}
 
-      {!selectedUnit && (
+      {!selectedUnit && !isAdmin && (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             Selecione uma unidade para iniciar a conferência.
           </CardContent>
         </Card>
+      )}
+
+      {/* ═══ VISÃO GLOBAL ADMIN (todas as unidades) ═══ */}
+      {!selectedUnit && isAdmin && (
+        <AdminGlobalView
+          allLojas={allLojas}
+          shiftType={shiftType}
+          today={today}
+          onSelectUnit={(unitId) => {
+            setSelectedUnit(unitId);
+            setSelectedSector(ALL_SECTORS_VALUE);
+          }}
+        />
       )}
 
       {/* Justification Dialog */}

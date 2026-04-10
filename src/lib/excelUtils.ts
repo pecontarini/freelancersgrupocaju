@@ -294,13 +294,33 @@ export function generateTemplate(officialFuncoes: string[] = [], officialGerenci
   XLSX.utils.book_append_sheet(workbook, worksheet, "Modelo");
   XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instruções");
   
-  XLSX.writeFile(workbook, "modelo_importacao.xlsx");
+  downloadWorkbook(workbook, "modelo_importacao.xlsx");
 }
 
 /**
  * Normalize a value for database storage
  * Converts to uppercase and trims whitespace
  */
+/**
+ * Force-download an XLSX workbook as a file (works in sandboxed iframes)
+ */
+export function downloadWorkbook(wb: XLSX.WorkBook, filename: string): void {
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
 export function normalizeForDatabase(value: string): string {
   return value.trim().toUpperCase();
 }
@@ -389,5 +409,5 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
   
-  XLSX.writeFile(workbook, `${filename}.xlsx`);
+  downloadWorkbook(workbook, `${filename}.xlsx`);
 }

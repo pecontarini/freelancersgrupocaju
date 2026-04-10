@@ -1,5 +1,6 @@
 import XLSX from "xlsx-js-style";
 import { format, addDays, startOfWeek } from "date-fns";
+import { downloadWorkbook } from "@/lib/excelUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { jsDayToPopDay } from "@/lib/popConventions";
 
@@ -415,5 +416,5 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   }
 
   const fileName = `Escala_Geral_${unitName.replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  downloadWorkbook(wb as any, fileName);
 }

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { format, addDays } from "date-fns";
+import { downloadWorkbook } from "@/lib/excelUtils";
 import { ptBR } from "date-fns/locale";
 import { normalizeString, stringSimilarity } from "@/lib/fuzzyMatch";
 
@@ -159,7 +160,7 @@ export function generateScheduleTemplate(
   XLSX.utils.book_append_sheet(wb, instrWs, "Instruções");
 
   const filename = `ESCALA_${sectorName.toUpperCase().replace(/\s+/g, "_")}_${format(days[0], "ddMM")}_${format(days[days.length - 1], "ddMM")}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  downloadWorkbook(wb, filename);
 }
 
 // ─── Helpers ───

@@ -47,6 +47,7 @@ import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMat
 import { useEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
 import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
+import { AdminGlobalView } from "./AdminGlobalView";
 
 function getCurrentShiftType(): string {
   const hour = new Date().getHours();

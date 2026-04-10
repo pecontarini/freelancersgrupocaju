@@ -41,8 +41,9 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
-import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
+import { useUnidade } from "@/contexts/UnidadeContext";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
@@ -70,29 +71,21 @@ export function OperationalDashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
   const autoShiftType = getCurrentShiftType();
 
-  const { options: allLojas, isLoading: loadingLojas } = useConfigLojas();
+  const { stores: availableUnits, isLoading: loadingLojas } = useAccessibleStores();
   const { isAdmin, isOperator, isGerenteUnidade, unidades } = useUserProfile();
-  
-  // Determine available units based on role
-  const availableUnits = useMemo(() => {
-    if (isAdmin) return allLojas;
-    if ((isOperator || isGerenteUnidade) && unidades.length > 0) {
-      return unidades;
-    }
-    return [];
-  }, [isAdmin, isOperator, isGerenteUnidade, unidades, allLojas]);
+  const { effectiveUnidadeId, setSelectedUnidadeId: setGlobalUnit } = useUnidade();
 
-  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  // Local unit override within this dashboard
+  const [localUnit, setLocalUnit] = useState<string | null>(null);
+  const selectedUnit = localUnit !== null ? localUnit : effectiveUnidadeId;
   const [selectedSector, setSelectedSector] = useState<string>(ALL_SECTORS_VALUE);
   const [shiftType, setShiftType] = useState(autoShiftType);
 
-  // Auto-select unit for users with a single store
+  // Sync local override when global changes
   useEffect(() => {
-    if (selectedUnit) return;
-    if (!isAdmin && availableUnits.length === 1) {
-      setSelectedUnit(availableUnits[0].id);
-    }
-  }, [availableUnits, isAdmin, selectedUnit]);
+    setLocalUnit(null);
+    setSelectedSector(ALL_SECTORS_VALUE);
+  }, [effectiveUnidadeId]);
 
   // Justification dialog state
   const [justifyDialog, setJustifyDialog] = useState<{
@@ -304,7 +297,7 @@ export function OperationalDashboard() {
             <Select
               value={selectedUnit || (isAdmin ? ALL_UNITS_VALUE : "")}
               onValueChange={(v) => {
-                setSelectedUnit(v === ALL_UNITS_VALUE ? null : v);
+                setLocalUnit(v === ALL_UNITS_VALUE ? null : v);
                 setSelectedSector(ALL_SECTORS_VALUE);
               }}
             >
@@ -724,11 +717,11 @@ export function OperationalDashboard() {
       {/* ═══ VISÃO GLOBAL ADMIN (todas as unidades) ═══ */}
       {!selectedUnit && isAdmin && (
         <AdminGlobalView
-          allLojas={allLojas}
+          allLojas={availableUnits}
           shiftType={shiftType}
           today={today}
           onSelectUnit={(unitId) => {
-            setSelectedUnit(unitId);
+            setLocalUnit(unitId);
             setSelectedSector(ALL_SECTORS_VALUE);
           }}
         />

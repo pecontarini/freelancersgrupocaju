@@ -25,6 +25,7 @@ import {
 import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useSectors } from "@/hooks/useStaffingMatrix";
 import { useJobTitles } from "@/hooks/useJobTitles";
 import {
@@ -34,6 +35,7 @@ import {
 
 export function SectorJobTitleMapping() {
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
   const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
   const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(selectedUnit);
@@ -87,7 +89,7 @@ export function SectorJobTitleMapping() {
                 <SelectValue placeholder="Escolha a unidade" />
               </SelectTrigger>
               <SelectContent>
-                {lojas.options.map((l) => (
+                {accessibleStores.map((l) => (
                   <SelectItem key={l.id} value={l.id}>
                     {l.nome}
                   </SelectItem>
@@ -132,7 +134,7 @@ export function SectorJobTitleMapping() {
             <SelectValue placeholder="Trocar unidade" />
           </SelectTrigger>
           <SelectContent>
-            {lojas.options.map((l) => (
+            {accessibleStores.map((l) => (
               <SelectItem key={l.id} value={l.id}>
                 {l.nome}
               </SelectItem>

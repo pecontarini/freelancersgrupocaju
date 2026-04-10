@@ -47,6 +47,7 @@ import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { toast } from "sonner";
 
 const DEFAULT_JOB_TITLES = [
@@ -66,6 +67,7 @@ export function TeamManagement() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
 
   // Local override for unit — used when admin/operator/gerente needs to pick a unit inside the dialog
   const [dialogUnitId, setDialogUnitId] = useState<string | null>(null);
@@ -200,7 +202,7 @@ export function TeamManagement() {
             <SelectValue placeholder="Selecione a unidade" />
           </SelectTrigger>
           <SelectContent>
-            {lojas.options.map((u) => (
+            {accessibleStores.map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {u.nome}
               </SelectItem>

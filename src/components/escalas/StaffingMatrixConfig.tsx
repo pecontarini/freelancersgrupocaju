@@ -12,6 +12,7 @@ import {
 } from "@/hooks/useStaffingMatrix";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import {
   Select,
   SelectContent,
@@ -110,6 +111,7 @@ function InlineSectorName({ sectorId, currentName }: { sectorId: string; current
 export function StaffingMatrixConfig() {
   const { isAdmin } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
   const [newSectorName, setNewSectorName] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -205,7 +207,7 @@ export function StaffingMatrixConfig() {
               <SelectValue placeholder="Escolha a unidade" />
             </SelectTrigger>
             <SelectContent>
-              {lojas.options.map((l) => (
+              {accessibleStores.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.nome}
                 </SelectItem>

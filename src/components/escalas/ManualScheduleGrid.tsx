@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format, addDays, startOfWeek, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -45,6 +45,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
 import {
@@ -83,10 +84,17 @@ export function ManualScheduleGrid() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
   const canManage = isAdmin || isOperator || isGerenteUnidade;
 
   const [localUnitId, setLocalUnitId] = useState<string | null>(null);
   const selectedUnit = canManage ? (localUnitId || effectiveUnidadeId) : effectiveUnidadeId;
+
+  // Reset local state when global context changes
+  useEffect(() => {
+    setLocalUnitId(null);
+    setSelectedSectorId(null);
+  }, [effectiveUnidadeId]);
 
   const [currentWeekBase, setCurrentWeekBase] = useState(new Date());
   const weekDays = useMemo(() => getWeekDays(currentWeekBase), [currentWeekBase]);
@@ -366,7 +374,7 @@ export function ManualScheduleGrid() {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {lojas.options.map((l) => (
+                  {accessibleStores.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
                   ))}
                 </SelectContent>

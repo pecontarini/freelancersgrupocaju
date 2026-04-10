@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -11,6 +11,8 @@ import {
   XCircle,
   Loader2,
   LayoutGrid,
+  Store,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +42,7 @@ import {
 import { toast } from "sonner";
 
 import { useConfigLojas } from "@/hooks/useConfigOptions";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
@@ -60,13 +63,34 @@ const JUSTIFICATIVA_OPTIONS = [
 ];
 
 const ALL_SECTORS_VALUE = "__all__";
+const ALL_UNITS_VALUE = "__all_units__";
 
 export function OperationalDashboard() {
   const today = format(new Date(), "yyyy-MM-dd");
   const autoShiftType = getCurrentShiftType();
 
-  const lojas = useConfigLojas();
+  const { options: allLojas, isLoading: loadingLojas } = useConfigLojas();
+  const { isAdmin, isOperator, isGerenteUnidade, unidades } = useUserProfile();
+  
+  // Determine available units based on role
+  const availableUnits = useMemo(() => {
+    if (isAdmin) return allLojas;
+    if ((isOperator || isGerenteUnidade) && unidades.length > 0) {
+      return unidades;
+    }
+    return [];
+  }, [isAdmin, isOperator, isGerenteUnidade, unidades, allLojas]);
+
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const [shiftType, setShiftType] = useState(autoShiftType);
+
+  // Auto-select unit for users with a single store
+  useEffect(() => {
+    if (selectedUnit) return;
+    if (!isAdmin && availableUnits.length === 1) {
+      setSelectedUnit(availableUnits[0].id);
+    }
+  }, [availableUnits, isAdmin, selectedUnit]);
   const [selectedSector, setSelectedSector] = useState<string>(ALL_SECTORS_VALUE);
   const [shiftType, setShiftType] = useState(autoShiftType);
 

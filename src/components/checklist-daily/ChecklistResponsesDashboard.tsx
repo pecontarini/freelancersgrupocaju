@@ -427,7 +427,7 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                           {format(new Date(r.response_date), "dd/MM/yyyy", { locale: ptBR })} •{" "}
                           {r.responded_by_name || "Anônimo"} •{" "}
                           {r.conforming_items}/{r.total_items} conformes
-                          {tplName && ` • 📄 ${tplName}`}
+                          {tplName && ` • ${tplName}`}
                         </div>
                       </div>
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -502,7 +502,7 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
                                       </div>
                                     )}
                                     {!item.is_conforming && !corr && (
-                                      <span className="text-xs text-red-500 mt-1 block">⏳ Correção pendente</span>
+                                      <span className="text-xs text-red-500 mt-1 block">Correção pendente</span>
                                     )}
                                   </div>
                                 </div>

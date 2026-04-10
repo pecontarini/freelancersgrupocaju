@@ -177,7 +177,7 @@ export function ForecastingCard({
             </p>
             {forecastData.hasRealData && (
               <p className="text-xs text-emerald-600">
-                📊 Base: {forecastData.daysWithEntries} lançamentos reais
+                Base: {forecastData.daysWithEntries} lançamentos reais
               </p>
             )}
           </div>

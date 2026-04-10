@@ -220,7 +220,7 @@ export function PerformanceEntryForm({ selectedUnidadeId }: PerformanceEntryForm
 
         {/* Info Text */}
         <p className="text-xs text-muted-foreground text-center">
-          💡 Você pode lançar dados várias vezes por semana. O sistema soma automaticamente para gerar o ranking mensal atualizado.
+          Você pode lançar dados várias vezes por semana. O sistema soma automaticamente para gerar o ranking mensal atualizado.
         </p>
       </CardContent>
     </Card>

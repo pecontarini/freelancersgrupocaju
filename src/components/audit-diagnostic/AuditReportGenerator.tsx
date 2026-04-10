@@ -167,10 +167,10 @@ export function AuditReportGenerator({
           </div>
 
           {/* Recurrences */}
-          <h2>🔥 Foco de Melhoria (Recorrências)</h2>
+          <h2>Foco de Melhoria (Recorrências)</h2>
           {recurrences.length === 0 ? (
             <p style={{ fontSize: "12px", color: "#666", padding: "12px 0" }}>
-              Nenhuma recorrência detectada no período. ✅
+              Nenhuma recorrência detectada no período.
             </p>
           ) : (
             <table>
@@ -194,7 +194,7 @@ export function AuditReportGenerator({
           )}
 
           {/* Sector Summary */}
-          <h2>📊 Resumo Setorial</h2>
+          <h2>Resumo Setorial</h2>
           <table>
             <thead>
               <tr>
@@ -214,7 +214,7 @@ export function AuditReportGenerator({
 
           {/* Action Plan space */}
           <div className="signature">
-            <h2>📝 Plano de Ação do Chefe / Gerente</h2>
+            <h2>Plano de Ação do Chefe / Gerente</h2>
             <div className="action-box">
               <p>Escreva aqui as ações corretivas prioritárias para o período:</p>
             </div>

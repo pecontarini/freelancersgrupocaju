@@ -141,7 +141,7 @@ function DeviationBadge({ value, pct, hasData }: { value: number; pct: number; h
         {value >= 0 ? "+" : ""}{value.toFixed(1)}
       </span>
       <Badge variant={absMeta ? "destructive" : "default"} className="text-[10px] px-1 py-0">
-        {pct.toFixed(1)}% {absMeta ? "🔴" : "🟢"}
+        {pct.toFixed(1)}%
       </Badge>
     </div>
   );

@@ -511,7 +511,7 @@ export function CMVSmartSalesImporter() {
                 <div className="space-y-1">
                   <Label htmlFor="transactional-mode" className="cursor-pointer font-semibold flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    📄 Arquivo Transacional (1 linha = 1 item vendido)
+                    Arquivo Transacional (1 linha = 1 item vendido)
                   </Label>
                   <p className="text-xs text-muted-foreground">
                     Marque se seu arquivo não possui coluna de quantidade. O sistema contará automaticamente as linhas por produto.
@@ -677,8 +677,8 @@ export function CMVSmartSalesImporter() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatMini label="Linhas no Arquivo" value={fileData.totalRows} />
                 <StatMini label="Produtos Distintos" value={aggregatedPreview.uniqueProducts} />
-                <StatMini label="✅ Reconhecidos" value={filteredPreview.matched.length} accent />
-                <StatMini label="🗑️ Descartados" value={filteredPreview.unmatched.length} />
+                <StatMini label="Reconhecidos" value={filteredPreview.matched.length} accent />
+                <StatMini label="Descartados" value={filteredPreview.unmatched.length} />
               </div>
 
               {aggregatedPreview.failures.length > 0 && (

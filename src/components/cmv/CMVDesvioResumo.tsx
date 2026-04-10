@@ -129,7 +129,7 @@ function DesvioBlock({ label, stats }: { label: string; stats: { globalDesvio: n
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
         <Badge variant={Math.abs(stats.globalDesvio) > META ? "destructive" : "default"}>
-          {stats.globalDesvio.toFixed(2)}% {Math.abs(stats.globalDesvio) > META ? "🔴" : "🟢"}
+          {stats.globalDesvio.toFixed(2)}%
         </Badge>
       </div>
       <p className="text-xs text-muted-foreground">Meta: ≤ {META}%</p>

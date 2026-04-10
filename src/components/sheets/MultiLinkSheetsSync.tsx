@@ -354,7 +354,7 @@ export function MultiLinkSheetsSync() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  ⚠️ Use apenas URLs no formato: /export?format=csv&gid=0
+                  Use apenas URLs no formato: /export?format=csv&gid=0
                 </p>
               </div>
               <Button

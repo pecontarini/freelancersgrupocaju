@@ -439,7 +439,7 @@ export default function DailyChecklist() {
           {sectorDisplayName} — {submitResult.loja_name}
         </p>
         {templateName && (
-          <p className="text-sm text-muted-foreground">📄 {templateName}</p>
+          <p className="text-sm text-muted-foreground">{templateName}</p>
         )}
         <p className="text-muted-foreground">{format(new Date(), "dd/MM/yyyy")}</p>
         <div className="flex gap-6 text-sm flex-wrap justify-center">
@@ -508,7 +508,7 @@ export default function DailyChecklist() {
             <h1 className="text-lg font-bold uppercase">Checklist Diário — {sectorDisplayName}</h1>
             <p className="text-xs text-muted-foreground">
               {lojaName} • {today}
-              {templateName && ` • 📄 ${templateName}`}
+              {templateName && ` • ${templateName}`}
             </p>
           </div>
         </div>

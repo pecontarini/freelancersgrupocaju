@@ -342,10 +342,10 @@ export default function ConfirmShift() {
                 <SelectValue placeholder="Selecione o motivo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="doenca">🏥 Doença</SelectItem>
-                <SelectItem value="transporte">🚌 Transporte</SelectItem>
-                <SelectItem value="pessoal">👤 Pessoal</SelectItem>
-                <SelectItem value="outro">📝 Outro</SelectItem>
+                <SelectItem value="doenca">Doença</SelectItem>
+                <SelectItem value="transporte">Transporte</SelectItem>
+                <SelectItem value="pessoal">Pessoal</SelectItem>
+                <SelectItem value="outro">Outro</SelectItem>
               </SelectContent>
             </Select>
             <Button

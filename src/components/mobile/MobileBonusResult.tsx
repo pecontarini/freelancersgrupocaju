@@ -32,7 +32,7 @@ export function MobileBonusResult({
             <div className="flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-red-500" />
               <div>
-                <p className="text-sm font-bold text-red-500">🚨 RED FLAG</p>
+                <p className="text-sm font-bold text-red-500">RED FLAG</p>
                 <p className="text-xs text-muted-foreground">
                   {redFlagReason || "Bônus bloqueado"}
                 </p>

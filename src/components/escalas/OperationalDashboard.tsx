@@ -297,7 +297,7 @@ export function OperationalDashboard() {
             <Select
               value={selectedUnit || (isAdmin ? ALL_UNITS_VALUE : "")}
               onValueChange={(v) => {
-                setSelectedUnit(v === ALL_UNITS_VALUE ? null : v);
+                setLocalUnit(v === ALL_UNITS_VALUE ? null : v);
                 setSelectedSector(ALL_SECTORS_VALUE);
               }}
             >
@@ -717,11 +717,11 @@ export function OperationalDashboard() {
       {/* ═══ VISÃO GLOBAL ADMIN (todas as unidades) ═══ */}
       {!selectedUnit && isAdmin && (
         <AdminGlobalView
-          allLojas={allLojas}
+          allLojas={availableUnits}
           shiftType={shiftType}
           today={today}
           onSelectUnit={(unitId) => {
-            setSelectedUnit(unitId);
+            setLocalUnit(unitId);
             setSelectedSector(ALL_SECTORS_VALUE);
           }}
         />

@@ -42,6 +42,7 @@ export default function FreelancerCheckin() {
   const [profile, setProfile] = useState<FreelancerProfile | null>(null);
   const [isCheckout, setIsCheckout] = useState(false);
   const [openCheckinId, setOpenCheckinId] = useState<string | null>(null);
+  const [pendingScheduleCheckinId, setPendingScheduleCheckinId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [unitName, setUnitName] = useState("");
 
@@ -64,7 +65,7 @@ export default function FreelancerCheckin() {
   const [valor, setValor] = useState("");
 
   const { lookupByCpf, createProfile, updateProfile } = useFreelancerProfiles();
-  const { findOpenCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
+  const { findOpenCheckin, findPendingScheduleCheckin, createCheckin, doCheckout } = useFreelancerCheckins();
   const { lookupFreelancerByCpf } = useCpfLookup();
 
   // Load unit name

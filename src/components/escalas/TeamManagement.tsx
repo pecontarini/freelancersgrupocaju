@@ -67,6 +67,7 @@ export function TeamManagement() {
   const { effectiveUnidadeId } = useUnidade();
   const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const lojas = useConfigLojas();
+  const { stores: accessibleStores } = useAccessibleStores();
 
   // Local override for unit — used when admin/operator/gerente needs to pick a unit inside the dialog
   const [dialogUnitId, setDialogUnitId] = useState<string | null>(null);

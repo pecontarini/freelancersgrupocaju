@@ -55,13 +55,28 @@ export function useFreelancerCheckins(lojaId?: string, date?: string) {
   });
 
   const findOpenCheckin = async (freelancerId: string, lojaId: string, today: string) => {
-    const { data, error } = await supabase
+    // First check for open checkins (active session)
+    const { data: openData, error: openErr } = await supabase
       .from("freelancer_checkins")
       .select("*")
       .eq("freelancer_id", freelancerId)
       .eq("loja_id", lojaId)
       .eq("checkin_date", today)
       .eq("status", "open")
+      .maybeSingle();
+    if (openErr) throw openErr;
+    if (openData) return openData;
+    return null;
+  };
+
+  const findPendingScheduleCheckin = async (freelancerId: string, lojaId: string, today: string) => {
+    const { data, error } = await supabase
+      .from("freelancer_checkins")
+      .select("*")
+      .eq("freelancer_id", freelancerId)
+      .eq("loja_id", lojaId)
+      .eq("checkin_date", today)
+      .eq("status", "pending_schedule")
       .maybeSingle();
     if (error) throw error;
     return data;
@@ -163,6 +178,7 @@ export function useFreelancerCheckins(lojaId?: string, date?: string) {
     checkins: checkinsQuery.data ?? [],
     isLoading: checkinsQuery.isLoading,
     findOpenCheckin,
+    findPendingScheduleCheckin,
     createCheckin,
     doCheckout,
     approvePresence,

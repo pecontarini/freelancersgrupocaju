@@ -80,19 +80,7 @@ export function OperationalDashboard() {
     }
     return [];
   }, [isAdmin, isOperator, isGerenteUnidade, unidades, allLojas]);
-
-  const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
-  const [shiftType, setShiftType] = useState(autoShiftType);
-
-  // Auto-select unit for users with a single store
-  useEffect(() => {
-    if (selectedUnit) return;
-    if (!isAdmin && availableUnits.length === 1) {
-      setSelectedUnit(availableUnits[0].id);
-    }
-  }, [availableUnits, isAdmin, selectedUnit]);
   const [selectedSector, setSelectedSector] = useState<string>(ALL_SECTORS_VALUE);
-  const [shiftType, setShiftType] = useState(autoShiftType);
 
   // Justification dialog state
   const [justifyDialog, setJustifyDialog] = useState<{

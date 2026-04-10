@@ -169,6 +169,10 @@ export default function FreelancerCheckin() {
           const pending = await findPendingScheduleCheckin(existing.id, unidadeId, today);
           if (pending) {
             setPendingScheduleCheckinId(pending.id);
+            // Pre-fill valor from scheduled rate
+            if (pending.valor_informado) {
+              setValor(String(pending.valor_informado));
+            }
           }
         }
         setStep("confirm");

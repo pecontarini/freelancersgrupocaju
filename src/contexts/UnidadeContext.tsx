@@ -1,27 +1,45 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useMemo } from "react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface UnidadeContextType {
   selectedUnidadeId: string | null;
   setSelectedUnidadeId: (id: string | null) => void;
   effectiveUnidadeId: string | null;
+  /** Stores the user can access based on role */
+  availableUnidades: { id: string; nome: string }[];
 }
 
 const UnidadeContext = createContext<UnidadeContextType | undefined>(undefined);
 
 export function UnidadeProvider({ children }: { children: ReactNode }) {
-  const { isAdmin, isOperator, unidade, unidades, isLoading } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade, unidade, unidades, isLoading } = useUserProfile();
   const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
-  // For gerente_unidade and operator, auto-select their assigned store
-  // For admin, allow selecting any store or null (all)
+  // Auto-select ONLY for single-store users; multi-store users start at null ("todas")
   useEffect(() => {
-    if (!isLoading && !isAdmin && (unidade || unidades.length > 0)) {
-      if (unidade) setSelectedUnidadeId(unidade.id);
+    if (isLoading || initialized) return;
+    if (!isAdmin && unidades.length === 1) {
+      setSelectedUnidadeId(unidades[0].id);
+    } else if (!isAdmin && unidade) {
+      setSelectedUnidadeId(unidade.id);
     }
-  }, [isAdmin, unidade, unidades, isLoading]);
+    setInitialized(true);
+  }, [isAdmin, unidade, unidades, isLoading, initialized]);
 
-  const effectiveUnidadeId = isAdmin ? selectedUnidadeId : (selectedUnidadeId || unidade?.id || null);
+  // For non-admin: effectiveUnidadeId falls back to first store when selection is null
+  // For admin: null means "all stores"
+  const effectiveUnidadeId = isAdmin
+    ? selectedUnidadeId
+    : selectedUnidadeId || unidade?.id || (unidades.length > 0 ? unidades[0].id : null);
+
+  const availableUnidades = useMemo(() => {
+    // Non-admin users only see their linked stores
+    if (!isAdmin) return unidades;
+    // Admin sees all — but that list comes from useConfigLojas, not here
+    // We return unidades (empty for admin) so consumers know to use useConfigLojas
+    return unidades;
+  }, [isAdmin, unidades]);
 
   return (
     <UnidadeContext.Provider
@@ -29,6 +47,7 @@ export function UnidadeProvider({ children }: { children: ReactNode }) {
         selectedUnidadeId,
         setSelectedUnidadeId,
         effectiveUnidadeId,
+        availableUnidades,
       }}
     >
       {children}

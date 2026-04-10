@@ -28,6 +28,7 @@ import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import { useMaintenanceEntries } from "@/hooks/useMaintenanceEntries";
 import { useOperationalExpenses } from "@/hooks/useOperationalExpenses";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
 
 const tabConfig: Record<string, { title: string; subtitle: string }> = {
   budgets: {
@@ -95,24 +96,22 @@ const Index = () => {
     hasNoRole,
   } = useUserProfile();
   const isMobile = useIsMobile();
-  const [selectedUnidadeId, setSelectedUnidadeId] = useState<string | null>(
-    null
-  );
+
+  // Use global context as single source of truth
+  const { selectedUnidadeId, setSelectedUnidadeId, effectiveUnidadeId } = useUnidade();
+
   const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "escalas" : "budgets");
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Auto-select first store for gerentes when they have stores assigned
+  // Set default tab for chefe_setor
   useEffect(() => {
     if (!isLoadingProfile && !isInitialized) {
       if (isChefeSetor) {
         setActiveTab("escalas");
-        if (unidades.length > 0) setSelectedUnidadeId(unidades[0].id);
-      } else if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
-        setSelectedUnidadeId(unidades[0].id);
       }
       setIsInitialized(true);
     }
-  }, [isLoadingProfile, isInitialized, isGerenteUnidade, isOperator, isAdmin, isChefeSetor, unidades]);
+  }, [isLoadingProfile, isInitialized, isChefeSetor]);
 
   // Filter entries based on selected unidade
   const filteredEntries = useMemo(() => {
@@ -204,7 +203,7 @@ const Index = () => {
               freelancerEntries={filteredEntries}
               operationalExpenses={filteredOperationalExpenses}
               maintenanceEntries={filteredMaintenanceEntries}
-              selectedUnidadeId={selectedUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
+              selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
             />
           </div>
         );
@@ -244,7 +243,7 @@ const Index = () => {
             freelancerEntries={filteredEntries}
             operationalExpenses={filteredOperationalExpenses}
             maintenanceEntries={filteredMaintenanceEntries}
-            selectedUnidadeId={selectedUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
+            selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
           />
         );
     }

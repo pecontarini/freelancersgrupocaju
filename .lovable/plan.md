@@ -1,72 +1,62 @@
 
 
-# Plano: Corrigir Importação em Massa de Escalas para Todos os Setores e Unidades
+# Plano: Garantir download do modelo Excel funcione no preview
 
 ## Diagnóstico
 
-Identifiquei 3 problemas concretos no código:
+O código executa corretamente — a função `generateScheduleTemplate` roda sem erros e o toast "Modelo baixado!" aparece. Porém, `XLSX.writeFile(wb, filename)` internamente cria um `<a href="blob:...">` e clica nele, o que pode ser bloqueado pelo ambiente de preview (iframe sandboxado).
 
-### Problema 1: Botões de Download/Importação não aparecem
-Em `ManualScheduleGrid.tsx` linha 324, os botões de Excel só renderizam quando `sortedScheduled.length > 0` — ou seja, somente se já houver funcionários escalados naquele setor na semana. Em setores ou unidades sem escala prévia, os botões simplesmente não existem.
-
-### Problema 2: Template gera apenas com funcionários já escalados
-O template Excel é gerado com `sortedScheduled` (pessoas já lançadas) em vez dos funcionários do **quadro base do setor** (`sectorBaseEmployees`). Isso significa que o modelo baixado para um setor novo vem vazio.
-
-### Problema 3: Importação só salva no setor ativo
-Na função `handleConfirmImport` (`ScheduleExcelFlow.tsx` linhas 286-303), o `resolvedSectorId` tenta usar `sector_job_titles` para mapear o cargo ao setor correto, mas se o cargo não estiver vinculado, tudo cai no `sectorId` ativo. Não há suporte real para importar para múltiplos setores de uma vez.
+A solução é substituir `XLSX.writeFile` por uma abordagem que use `XLSX.write` para gerar o blob manualmente e forçar o download via `window.open` ou criando o link com `target="_blank"`, garantindo compatibilidade com iframes.
 
 ## Solução
 
-### 1. Mostrar botões sempre que houver setor ativo
+### Arquivo: `src/lib/scheduleExcel.ts`
 
-**Arquivo:** `ManualScheduleGrid.tsx`
+Substituir a linha `XLSX.writeFile(wb, filename)` por uma função auxiliar `forceDownload` que:
 
-Mudar a condição de renderização do `ScheduleExcelFlow` de:
+1. Gera o buffer com `XLSX.write(wb, { bookType: 'xlsx', type: 'array' })`
+2. Cria um `Blob` com o tipo MIME correto
+3. Cria um `<a>` com `download` attribute, `href = URL.createObjectURL(blob)` 
+4. Faz `document.body.appendChild(link)`, `link.click()`, `link.remove()`, `URL.revokeObjectURL()`
+
+Aplicar essa mesma função auxiliar em todos os outros arquivos que usam `XLSX.writeFile`:
+- `src/lib/scheduleMasterExport.ts` (linha 418)
+- `src/lib/excelUtils.ts` (linhas 297, 392)
+- `src/components/cmv/CMVDailyCountForm.tsx` (linha 168)
+
+### Implementação
+
+Criar uma função reutilizável em `src/lib/excelUtils.ts`:
+
+```typescript
+export function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
+  const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
 ```
-activeSectorId && sortedScheduled.length > 0
-```
-Para:
-```
-activeSectorId
-```
 
-### 2. Usar funcionários do quadro base no template
-
-**Arquivo:** `ManualScheduleGrid.tsx`
-
-Mudar a prop `employees` do `ScheduleExcelFlow` para usar **todos os funcionários vinculados ao setor** (base + escalados), em vez de apenas os escalados:
-
-```text
-Antes: employees={sortedScheduled.map(...)}
-Depois: employees={sectorEmployeesForTemplate} 
-        (= funcionários com job_title vinculado ao setor via sector_job_titles)
-```
-
-Isso garante que ao clicar "Baixar Modelo", o Excel vem com todos os CLTs do setor, mesmo que nenhum esteja escalado ainda.
-
-### 3. Melhorar resolução de setor na importação
-
-**Arquivo:** `ScheduleExcelFlow.tsx`
-
-Aprimorar a lógica de `handleConfirmImport` para que, quando o cargo do funcionário está vinculado a um setor específico da unidade (via `sector_job_titles`), o lançamento vá para o setor correto em vez de cair sempre no setor ativo como fallback.
-
-### 4. Proteger o download contra lista vazia
-
-**Arquivo:** `ScheduleExcelFlow.tsx`
-
-Remover o bloqueio `if (employees.length === 0)` no `handleDownloadTemplate`. Se não houver funcionários, gerar o modelo com cabeçalhos vazios (o gestor preencherá manualmente e o sistema registrará via fluxo de "funcionários não encontrados").
+Depois substituir todas as chamadas `XLSX.writeFile(wb, filename)` por `downloadWorkbook(wb, filename)`.
 
 ## Arquivos impactados
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/escalas/ManualScheduleGrid.tsx` | Mudar condição de renderização + prop employees |
-| `src/components/escalas/ScheduleExcelFlow.tsx` | Remover bloqueio de download vazio |
+| `src/lib/excelUtils.ts` | Adicionar função `downloadWorkbook` |
+| `src/lib/scheduleExcel.ts` | Substituir `XLSX.writeFile` por `downloadWorkbook` |
+| `src/lib/scheduleMasterExport.ts` | Substituir `XLSX.writeFile` por `downloadWorkbook` |
+| `src/components/cmv/CMVDailyCountForm.tsx` | Substituir `XLSX.writeFile` por `downloadWorkbook` |
 
-## Resultado esperado
+## Resultado
 
-- Botões "Baixar Modelo" e "Importar Planilha" visíveis em todos os setores, mesmo sem escalas prévias
-- Template baixado com todos os funcionários do quadro base do setor
-- Importação funcional para qualquer setor e unidade
-- Download garantido mesmo sem funcionários cadastrados (modelo em branco com cabeçalhos)
+Download do arquivo Excel funciona de forma confiável em qualquer ambiente, incluindo o preview do Lovable.
 

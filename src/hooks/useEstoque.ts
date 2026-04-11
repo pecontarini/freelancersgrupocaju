@@ -232,3 +232,63 @@ export function useUpdateSetorItem() {
     onError: (e: any) => toast.error(e.message),
   });
 }
+
+export function useUpdateCatalogItemCost() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, preco_custo }: { id: string; preco_custo: number }) => {
+      const { error } = await supabase
+        .from("items_catalog")
+        .update({ preco_custo })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["items_catalog"] });
+      toast.success("Custo atualizado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useLatestInventarioItems(lojaId: string | null) {
+  return useQuery({
+    queryKey: ["latest_inventario_items", lojaId],
+    enabled: !!lojaId,
+    queryFn: async () => {
+      // Get the latest CONCLUIDO inventario per setor_item
+      const { data: inventarios, error: invErr } = await supabase
+        .from("inventarios")
+        .select("id, setor_id, status, data_inventario")
+        .eq("loja_id", lojaId!)
+        .eq("status", "CONCLUIDO")
+        .order("data_inventario", { ascending: false });
+      if (invErr) throw invErr;
+      if (!inventarios?.length) return [];
+
+      const invIds = inventarios.map((i: any) => i.id);
+      const { data: items, error: itemsErr } = await supabase
+        .from("inventario_items")
+        .select("*, setor_items(catalog_item_id)")
+        .in("inventario_id", invIds);
+      if (itemsErr) throw itemsErr;
+      return items || [];
+    },
+  });
+}
+
+export function useMovimentacoesAfterDate(lojaId: string | null) {
+  return useQuery({
+    queryKey: ["movimentacoes_after", lojaId],
+    enabled: !!lojaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("movimentacoes_estoque")
+        .select("*, setor_items(catalog_item_id)")
+        .eq("loja_id", lojaId!)
+        .order("data_movimentacao", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+}

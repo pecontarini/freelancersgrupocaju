@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useItemsCatalog, useSetores, useSetorItems, useCreateSetorItem, useUpdateSetorItem } from "@/hooks/useEstoque";
+import { useItemsCatalog, useSetores, useSetorItems, useCreateSetorItem, useUpdateSetorItem, useUpdateCatalogItemCost } from "@/hooks/useEstoque";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { Search, Link2, Upload, Edit2 } from "lucide-react";
+import { Search, Link2, Upload, Edit2, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CatalogoItens() {
@@ -20,6 +20,7 @@ export function CatalogoItens() {
   const { data: setorItems } = useSetorItems(effectiveUnidadeId);
   const createLink = useCreateSetorItem();
   const updateLink = useUpdateSetorItem();
+  const updateCost = useUpdateCatalogItemCost();
 
   const [search, setSearch] = useState("");
   const [filterGrandeGrupo, setFilterGrandeGrupo] = useState("all");
@@ -38,6 +39,10 @@ export function CatalogoItens() {
   const [linkPonto, setLinkPonto] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editSetorItemId, setEditSetorItemId] = useState("");
+  
+  // Cost edit state
+  const [costEditId, setCostEditId] = useState<string | null>(null);
+  const [costEditValue, setCostEditValue] = useState("");
 
   const grandeGrupos = useMemo(() => {
     const s = new Set<string>();
@@ -214,8 +219,11 @@ export function CatalogoItens() {
                   <TableHead>Código</TableHead>
                   <TableHead>Item</TableHead>
                   <TableHead>UM</TableHead>
+                  <TableHead className="text-right">Custo Unit.</TableHead>
                   <TableHead>Grande Grupo</TableHead>
                   <TableHead>Grupo</TableHead>
+                  <TableHead>Setores Vinculados</TableHead>
+                  <TableHead></TableHead>
                   <TableHead>Setores Vinculados</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -231,6 +239,36 @@ export function CatalogoItens() {
                         {item.is_utensilio && <Badge variant="outline" className="ml-2 text-xs">Utensílio</Badge>}
                       </TableCell>
                       <TableCell className="text-xs">{item.unit || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {costEditId === item.id ? (
+                          <div className="flex items-center gap-1 justify-end">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-24 text-right h-8"
+                              value={costEditValue}
+                              onChange={(e) => setCostEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  updateCost.mutate({ id: item.id, preco_custo: parseFloat(costEditValue) || 0 });
+                                  setCostEditId(null);
+                                } else if (e.key === "Escape") {
+                                  setCostEditId(null);
+                                }
+                              }}
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <span
+                            className="cursor-pointer hover:text-primary font-mono text-xs"
+                            onClick={() => { setCostEditId(item.id); setCostEditValue(String(item.preco_custo || 0)); }}
+                          >
+                            R$ {(item.preco_custo || 0).toFixed(2)}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">{item.grande_grupo || "—"}</TableCell>
                       <TableCell className="text-xs">{item.grupo || "—"}</TableCell>
                       <TableCell>

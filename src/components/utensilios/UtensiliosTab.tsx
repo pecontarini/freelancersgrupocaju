@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import { ContagemSemanal } from "./ContagemSemanal";
+import { ControleBudget } from "./ControleBudget";
+import { HistoricoContagens } from "./HistoricoContagens";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("contagem");
@@ -15,25 +17,13 @@ export function UtensiliosTab() {
         </TabsList>
 
         <TabsContent value="contagem">
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              Módulo de contagem semanal de utensílios — em construção.
-            </CardContent>
-          </Card>
+          <ContagemSemanal />
         </TabsContent>
         <TabsContent value="budget">
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              Controle de budget de utensílios — em construção.
-            </CardContent>
-          </Card>
+          <ControleBudget />
         </TabsContent>
         <TabsContent value="historico">
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              Histórico de contagens — em construção.
-            </CardContent>
-          </Card>
+          <HistoricoContagens />
         </TabsContent>
       </Tabs>
     </div>

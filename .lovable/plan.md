@@ -1,79 +1,61 @@
 
+# Plano: Custo unitário nos módulos + validação de dados + funcionalidade
 
-# Plano: Módulo Estoque Geral (Parte 2)
+## Diagnóstico
 
-## 1. Schema Supabase — 5 novas tabelas via migração
+1. **Dados no banco**: 1.288 itens no `items_catalog` (229 com prefixo UT). A planilha pode ter 1.289 — preciso verificar qual está faltando e inserir se necessário.
+2. **Campo `preco_custo` ausente**: A tabela `items_catalog` não tem coluna de custo unitário. Sem ela, não há como controlar valor financeiro no estoque geral.
+3. **`setor_items` sem custo**: Também não tem campo de custo — o custo deve vir do catálogo (centralizado).
+4. **`utensilios_items` já tem `valor_unitario`** — OK para utensílios.
+5. **UtensiliosTab é stub** — as 3 abas estão vazias ("em construção").
+6. **VisaoConsolidada tem `saldo = 0` hardcoded** — nunca calcula saldo real.
+7. **CatalogoItens não mostra/edita custo** — precisa de coluna e campo de edição.
 
-Tabelas existentes confirmadas: `items_catalog`, `utensilios_*` (5 tabelas da Parte 1) + `sectors` (escalas, não será tocada).
+## Mudanças
 
-Novas tabelas a criar:
+### 1. Migração: adicionar `preco_custo` ao `items_catalog`
+- Adicionar coluna `preco_custo numeric default 0` à tabela `items_catalog`
+- Isso centraliza o custo unitário para todos os itens (utensílios e estoque geral)
 
-| Tabela | Campos principais | Notas |
-|--------|-------------------|-------|
-| `setores` | id, nome, descricao, loja_id, is_active | Seed: Estoque, Cozinha, Parrilla, Bar, Salão |
-| `setor_items` | id, catalog_item_id (FK), setor_id (FK), loja_id, estoque_minimo, estoque_maximo, ponto_pedido, is_active | unique(catalog_item_id, setor_id, loja_id) |
-| `inventarios` | id, setor_id (FK), loja_id, tipo, turno, data_inventario, semana_referencia, responsavel, status | |
-| `inventario_items` | id, inventario_id (FK), setor_item_id (FK), quantidade_anterior, quantidade_contada, variacao (GENERATED), observacao | variacao = quantidade_contada - quantidade_anterior |
-| `movimentacoes_estoque` | id, setor_item_id (FK), loja_id, tipo_movimentacao, quantidade, setor_destino_id (FK nullable), data_movimentacao, responsavel, observacao | |
+### 2. Verificar e corrigir item faltante
+- Comparar a planilha com o banco para identificar o item #1289 que pode estar ausente
+- Inserir via insert tool se confirmado
 
-Detalhes:
-- `loja_id` adicionado a `setores`, `setor_items`, `inventarios` e `movimentacoes_estoque` para RLS multi-loja
-- RLS: admin full access, gestores read/write nas suas unidades via `user_has_access_to_loja`
-- `inventario_items.variacao` usa `GENERATED ALWAYS AS (quantidade_contada - quantidade_anterior) STORED`
-- Seed dos 5 setores inserido na mesma migração (sem loja_id, servem como template global)
+### 3. UI: Edição de custo no Catálogo de Itens
+- Adicionar coluna "Custo Unit." na tabela do `CatalogoItens.tsx`
+- No dialog de vincular/editar, adicionar campo "Custo Unitário (R$)"
+- Criar mutation `useUpdateCatalogItem` no hook `useEstoque.ts` para atualizar `preco_custo` diretamente no `items_catalog`
+- Permitir edição inline ou via botão de editar no catálogo
 
-## 2. Navegação — adicionar tab "ESTOQUE"
+### 4. UI: Valor financeiro na Visão Consolidada
+- Mostrar coluna "Custo Unit." e "Valor Total" (saldo × custo) na tabela consolidada
+- Cards de resumo passam a mostrar valor total do estoque por setor
+
+### 5. Funcionalizar o módulo de Utensílios (UtensiliosTab)
+- Implementar as 3 sub-abas completas usando os hooks `useUtensilios.ts` (que já existe ou será criado):
+  - **Contagem Semanal**: lista de itens UT agrupados por categoria, input de contagem, indicador verde/vermelho vs mínimo, salvar por turno
+  - **Controle de Budget**: cards de resumo + tabela de alocação por prioridade + geração de pedido
+  - **Histórico**: filtro por semana, tabela comparativa abertura/fechamento
+- Os itens de utensílios virão de `items_catalog WHERE is_utensilio = true`, cruzando com `utensilios_items` para os que já têm config operacional
+
+### 6. Conectar saldo real na Visão Consolidada
+- Substituir `saldo = 0` por cálculo real: última contagem + entradas - saídas (via `inventario_items` + `movimentacoes_estoque`)
+
+## Arquivos impactados
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/layout/AppSidebar.tsx` | Adicionar "ESTOQUE GERAL" no `menuItems` com ícone `Warehouse` |
-| `src/components/layout/BottomNavigation.tsx` | Adicionar item na nav mobile |
-| `src/pages/Index.tsx` | Adicionar `estoque` no `tabConfig` + case no switch para `EstoqueTab` |
+| Migração SQL | `ALTER TABLE items_catalog ADD COLUMN preco_custo numeric DEFAULT 0` |
+| `src/hooks/useEstoque.ts` | Adicionar `useUpdateCatalogItem` mutation |
+| `src/hooks/useUtensilios.ts` | Criar hook completo para CRUD de contagens, config e pedidos |
+| `src/components/estoque/CatalogoItens.tsx` | Coluna custo + campo edição + botão editar item |
+| `src/components/estoque/VisaoConsolidada.tsx` | Colunas de custo/valor + saldo real |
+| `src/components/utensilios/UtensiliosTab.tsx` | Implementação completa das 3 abas |
+| `src/components/utensilios/ContagemSemanal.tsx` | Criar componente |
+| `src/components/utensilios/ControleBudget.tsx` | Criar componente |
+| `src/components/utensilios/HistoricoContagens.tsx` | Criar componente |
 
-## 3. Componentes do módulo
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `src/components/estoque/EstoqueTab.tsx` | Container com 4 sub-abas |
-| `src/components/estoque/VisaoConsolidada.tsx` | Cards por setor + tabela com filtros e badges de status |
-| `src/components/estoque/Movimentacao.tsx` | Form de nova movimentação + histórico filtrado |
-| `src/components/estoque/Inventarios.tsx` | Novo inventário + contagem + comparativo semanal |
-| `src/components/estoque/CatalogoItens.tsx` | Lista de items_catalog com filtros, vínculo a setores, badge utensílio |
-| `src/components/estoque/index.ts` | Barrel export |
-| `src/hooks/useEstoque.ts` | Hook para CRUD de setor_items, inventários, movimentações e saldo calculado |
-
-## 4. Lógica de saldo em tempo real
-
-O saldo atual de cada `setor_item` será calculado no frontend:
-1. Pega a última contagem do item (via `inventario_items`)
-2. Soma movimentações posteriores (entradas +, saídas -)
-3. Resultado = quantidade_contada + sum(entradas) - sum(saídas)
-
-Status: OK (saldo >= mínimo), Alerta (saldo < mínimo), Crítico (saldo < ponto_pedido).
-
-## 5. O que NÃO será alterado
-
-- Nenhuma tabela existente (items_catalog, utensilios_*, CMV, escalas, sectors)
-- Nenhum hook existente
-- Nenhum arquivo em `src/lib/`, `src/contexts/`, `src/integrations/`
+## O que NÃO será alterado
+- Nenhuma tabela existente além de `items_catalog` (apenas ADD COLUMN)
+- Nenhum módulo existente (CMV, escalas, budgets)
 - Rotas do `App.tsx`
-- Módulo de Utensílios (componentes e hook)
-
-## Arquivos impactados (existentes)
-
-| Arquivo | Tipo |
-|---------|------|
-| `src/pages/Index.tsx` | Adicionar tab + case |
-| `src/components/layout/AppSidebar.tsx` | Menu item |
-| `src/components/layout/BottomNavigation.tsx` | Nav mobile |
-
-## Arquivos criados (novos)
-
-- `src/components/estoque/EstoqueTab.tsx`
-- `src/components/estoque/VisaoConsolidada.tsx`
-- `src/components/estoque/Movimentacao.tsx`
-- `src/components/estoque/Inventarios.tsx`
-- `src/components/estoque/CatalogoItens.tsx`
-- `src/components/estoque/index.ts`
-- `src/hooks/useEstoque.ts`
-

@@ -1975,6 +1975,7 @@ export type Database = {
           is_utensilio: boolean
           item_type: string | null
           name: string
+          preco_custo: number
           subgrupo: string | null
           unit: string | null
         }
@@ -1989,6 +1990,7 @@ export type Database = {
           is_utensilio?: boolean
           item_type?: string | null
           name: string
+          preco_custo?: number
           subgrupo?: string | null
           unit?: string | null
         }
@@ -2003,6 +2005,7 @@ export type Database = {
           is_utensilio?: boolean
           item_type?: string | null
           name?: string
+          preco_custo?: number
           subgrupo?: string | null
           unit?: string | null
         }

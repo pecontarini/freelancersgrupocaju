@@ -68,6 +68,7 @@ export function CatalogoItens() {
 
   const filtered = useMemo(() => {
     if (!catalog) return [];
+    setCurrentPage(1);
     return catalog.filter((c: any) => {
       if (search && !c.name?.toLowerCase().includes(search.toLowerCase()) && !c.code?.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterGrandeGrupo !== "all" && c.grande_grupo !== filterGrandeGrupo) return false;
@@ -78,6 +79,26 @@ export function CatalogoItens() {
       return true;
     });
   }, [catalog, search, filterGrandeGrupo, filterGrupo, filterTipo, filterUtensilio]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | "ellipsis")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("ellipsis");
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push("ellipsis");
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [totalPages, currentPage]);
 
   const openLinkDialog = (item: any) => {
     setLinkItem(item);

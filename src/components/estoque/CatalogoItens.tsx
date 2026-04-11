@@ -26,6 +26,8 @@ export function CatalogoItens() {
   const [filterGrupo, setFilterGrupo] = useState("all");
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterUtensilio, setFilterUtensilio] = useState("all");
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Link dialog state
   const [linkOpen, setLinkOpen] = useState(false);

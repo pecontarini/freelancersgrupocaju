@@ -1861,6 +1861,51 @@ export type Database = {
           },
         ]
       }
+      items_catalog: {
+        Row: {
+          code: string | null
+          created_at: string
+          family: string | null
+          grande_grupo: string | null
+          grupo: string | null
+          id: string
+          is_active: boolean
+          is_utensilio: boolean
+          item_type: string | null
+          name: string
+          subgrupo: string | null
+          unit: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          family?: string | null
+          grande_grupo?: string | null
+          grupo?: string | null
+          id?: string
+          is_active?: boolean
+          is_utensilio?: boolean
+          item_type?: string | null
+          name: string
+          subgrupo?: string | null
+          unit?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          family?: string | null
+          grande_grupo?: string | null
+          grupo?: string | null
+          id?: string
+          is_active?: boolean
+          is_utensilio?: boolean
+          item_type?: string | null
+          name?: string
+          subgrupo?: string | null
+          unit?: string | null
+        }
+        Relationships: []
+      }
       job_titles: {
         Row: {
           created_at: string
@@ -3243,6 +3288,216 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utensilios_config: {
+        Row: {
+          budget_mensal: number | null
+          created_at: string
+          faturamento_mensal: number
+          id: string
+          loja_id: string
+          mes_referencia: string
+          percentual_budget: number
+        }
+        Insert: {
+          budget_mensal?: number | null
+          created_at?: string
+          faturamento_mensal?: number
+          id?: string
+          loja_id: string
+          mes_referencia: string
+          percentual_budget?: number
+        }
+        Update: {
+          budget_mensal?: number | null
+          created_at?: string
+          faturamento_mensal?: number
+          id?: string
+          loja_id?: string
+          mes_referencia?: string
+          percentual_budget?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utensilios_config_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utensilios_contagens: {
+        Row: {
+          created_at: string
+          data_contagem: string
+          id: string
+          loja_id: string
+          observacao: string | null
+          quantidade_contada: number
+          responsavel: string | null
+          semana_referencia: string
+          turno: string
+          utensilio_item_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_contagem: string
+          id?: string
+          loja_id: string
+          observacao?: string | null
+          quantidade_contada?: number
+          responsavel?: string | null
+          semana_referencia: string
+          turno: string
+          utensilio_item_id: string
+        }
+        Update: {
+          created_at?: string
+          data_contagem?: string
+          id?: string
+          loja_id?: string
+          observacao?: string | null
+          quantidade_contada?: number
+          responsavel?: string | null
+          semana_referencia?: string
+          turno?: string
+          utensilio_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utensilios_contagens_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_contagens_utensilio_item_id_fkey"
+            columns: ["utensilio_item_id"]
+            isOneToOne: false
+            referencedRelation: "utensilios_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utensilios_items: {
+        Row: {
+          area_responsavel: string
+          catalog_item_id: string
+          categoria: string | null
+          created_at: string
+          estoque_minimo: number
+          id: string
+          is_active: boolean
+          loja_id: string
+          ordem_prioridade: number
+          valor_unitario: number
+        }
+        Insert: {
+          area_responsavel?: string
+          catalog_item_id: string
+          categoria?: string | null
+          created_at?: string
+          estoque_minimo?: number
+          id?: string
+          is_active?: boolean
+          loja_id: string
+          ordem_prioridade?: number
+          valor_unitario?: number
+        }
+        Update: {
+          area_responsavel?: string
+          catalog_item_id?: string
+          categoria?: string | null
+          created_at?: string
+          estoque_minimo?: number
+          id?: string
+          is_active?: boolean
+          loja_id?: string
+          ordem_prioridade?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utensilios_items_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "items_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utensilios_pedidos: {
+        Row: {
+          ajuste_final: number | null
+          config_id: string
+          created_at: string
+          custo_pedido: number | null
+          id: string
+          loja_id: string
+          qtd_aprovada: number
+          qtd_deficit: number
+          status: string
+          utensilio_item_id: string
+          valor_unitario: number
+        }
+        Insert: {
+          ajuste_final?: number | null
+          config_id: string
+          created_at?: string
+          custo_pedido?: number | null
+          id?: string
+          loja_id: string
+          qtd_aprovada?: number
+          qtd_deficit?: number
+          status?: string
+          utensilio_item_id: string
+          valor_unitario?: number
+        }
+        Update: {
+          ajuste_final?: number | null
+          config_id?: string
+          created_at?: string
+          custo_pedido?: number | null
+          id?: string
+          loja_id?: string
+          qtd_aprovada?: number
+          qtd_deficit?: number
+          status?: string
+          utensilio_item_id?: string
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utensilios_pedidos_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "utensilios_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_pedidos_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_pedidos_utensilio_item_id_fkey"
+            columns: ["utensilio_item_id"]
+            isOneToOne: false
+            referencedRelation: "utensilios_items"
             referencedColumns: ["id"]
           },
         ]

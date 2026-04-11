@@ -219,8 +219,11 @@ export function CatalogoItens() {
                   <TableHead>Código</TableHead>
                   <TableHead>Item</TableHead>
                   <TableHead>UM</TableHead>
+                  <TableHead className="text-right">Custo Unit.</TableHead>
                   <TableHead>Grande Grupo</TableHead>
                   <TableHead>Grupo</TableHead>
+                  <TableHead>Setores Vinculados</TableHead>
+                  <TableHead></TableHead>
                   <TableHead>Setores Vinculados</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -236,6 +239,36 @@ export function CatalogoItens() {
                         {item.is_utensilio && <Badge variant="outline" className="ml-2 text-xs">Utensílio</Badge>}
                       </TableCell>
                       <TableCell className="text-xs">{item.unit || "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {costEditId === item.id ? (
+                          <div className="flex items-center gap-1 justify-end">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              className="w-24 text-right h-8"
+                              value={costEditValue}
+                              onChange={(e) => setCostEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  updateCost.mutate({ id: item.id, preco_custo: parseFloat(costEditValue) || 0 });
+                                  setCostEditId(null);
+                                } else if (e.key === "Escape") {
+                                  setCostEditId(null);
+                                }
+                              }}
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <span
+                            className="cursor-pointer hover:text-primary font-mono text-xs"
+                            onClick={() => { setCostEditId(item.id); setCostEditValue(String(item.preco_custo || 0)); }}
+                          >
+                            R$ {(item.preco_custo || 0).toFixed(2)}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">{item.grande_grupo || "—"}</TableCell>
                       <TableCell className="text-xs">{item.grupo || "—"}</TableCell>
                       <TableCell>

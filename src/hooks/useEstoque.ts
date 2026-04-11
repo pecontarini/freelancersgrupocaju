@@ -89,7 +89,7 @@ export function useItemsCatalog() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items_catalog")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("is_active", true)
         .order("name")
         .range(0, 1999);

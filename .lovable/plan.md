@@ -1,61 +1,104 @@
 
-# Plano: Custo unitário nos módulos + validação de dados + funcionalidade
 
-## Diagnóstico
+# Plano: Otimizar Estoque Geral e Utensílios para Mobile
 
-1. **Dados no banco**: 1.288 itens no `items_catalog` (229 com prefixo UT). A planilha pode ter 1.289 — preciso verificar qual está faltando e inserir se necessário.
-2. **Campo `preco_custo` ausente**: A tabela `items_catalog` não tem coluna de custo unitário. Sem ela, não há como controlar valor financeiro no estoque geral.
-3. **`setor_items` sem custo**: Também não tem campo de custo — o custo deve vir do catálogo (centralizado).
-4. **`utensilios_items` já tem `valor_unitario`** — OK para utensílios.
-5. **UtensiliosTab é stub** — as 3 abas estão vazias ("em construção").
-6. **VisaoConsolidada tem `saldo = 0` hardcoded** — nunca calcula saldo real.
-7. **CatalogoItens não mostra/edita custo** — precisa de coluna e campo de edição.
+## Problema
+Todos os componentes de Estoque e Utensílios usam `<Table>` com 7-9 colunas, ilegíveis em telas de 440px. Além disso, "Utensílios" não está acessível na navegação mobile.
 
 ## Mudanças
 
-### 1. Migração: adicionar `preco_custo` ao `items_catalog`
-- Adicionar coluna `preco_custo numeric default 0` à tabela `items_catalog`
-- Isso centraliza o custo unitário para todos os itens (utensílios e estoque geral)
-
-### 2. Verificar e corrigir item faltante
-- Comparar a planilha com o banco para identificar o item #1289 que pode estar ausente
-- Inserir via insert tool se confirmado
-
-### 3. UI: Edição de custo no Catálogo de Itens
-- Adicionar coluna "Custo Unit." na tabela do `CatalogoItens.tsx`
-- No dialog de vincular/editar, adicionar campo "Custo Unitário (R$)"
-- Criar mutation `useUpdateCatalogItem` no hook `useEstoque.ts` para atualizar `preco_custo` diretamente no `items_catalog`
-- Permitir edição inline ou via botão de editar no catálogo
-
-### 4. UI: Valor financeiro na Visão Consolidada
-- Mostrar coluna "Custo Unit." e "Valor Total" (saldo × custo) na tabela consolidada
-- Cards de resumo passam a mostrar valor total do estoque por setor
-
-### 5. Funcionalizar o módulo de Utensílios (UtensiliosTab)
-- Implementar as 3 sub-abas completas usando os hooks `useUtensilios.ts` (que já existe ou será criado):
-  - **Contagem Semanal**: lista de itens UT agrupados por categoria, input de contagem, indicador verde/vermelho vs mínimo, salvar por turno
-  - **Controle de Budget**: cards de resumo + tabela de alocação por prioridade + geração de pedido
-  - **Histórico**: filtro por semana, tabela comparativa abertura/fechamento
-- Os itens de utensílios virão de `items_catalog WHERE is_utensilio = true`, cruzando com `utensilios_items` para os que já têm config operacional
-
-### 6. Conectar saldo real na Visão Consolidada
-- Substituir `saldo = 0` por cálculo real: última contagem + entradas - saídas (via `inventario_items` + `movimentacoes_estoque`)
-
-## Arquivos impactados
+### 1. Navegação mobile — adicionar Utensílios
+O bottom nav já tem 5 itens + Perfil (limite ergonômico). Adicionar "Utensílios" no menu hamburger (Sheet lateral direita) junto com as outras opções admin, acessível para todos os perfis.
 
 | Arquivo | Mudança |
 |---------|---------|
-| Migração SQL | `ALTER TABLE items_catalog ADD COLUMN preco_custo numeric DEFAULT 0` |
-| `src/hooks/useEstoque.ts` | Adicionar `useUpdateCatalogItem` mutation |
-| `src/hooks/useUtensilios.ts` | Criar hook completo para CRUD de contagens, config e pedidos |
-| `src/components/estoque/CatalogoItens.tsx` | Coluna custo + campo edição + botão editar item |
-| `src/components/estoque/VisaoConsolidada.tsx` | Colunas de custo/valor + saldo real |
-| `src/components/utensilios/UtensiliosTab.tsx` | Implementação completa das 3 abas |
-| `src/components/utensilios/ContagemSemanal.tsx` | Criar componente |
-| `src/components/utensilios/ControleBudget.tsx` | Criar componente |
-| `src/components/utensilios/HistoricoContagens.tsx` | Criar componente |
+| `src/components/layout/BottomNavigation.tsx` | Adicionar botão "Utensílios" na Sheet do menu lateral |
+
+### 2. Sub-abas responsivas — texto compacto
+As TabsList de 4 colunas (Estoque) e 3 colunas (Utensílios) ficam apertadas em mobile. Usar texto curto e scroll horizontal.
+
+| Arquivo | Mudança |
+|---------|---------|
+| `EstoqueTab.tsx` | TabsList com `overflow-x-auto` e labels curtas em mobile |
+| `UtensiliosTab.tsx` | Idem |
+
+### 3. Estoque — Visão Consolidada mobile
+Substituir a tabela de 9 colunas por cards empilhados quando `isMobile`:
+- Cada card mostra: nome do item, setor (badge), saldo vs mínimo, custo, status badge
+- Filtros empilhados verticalmente em mobile
+- Cards de setor mantêm grid 2 colunas (já funciona)
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/estoque/VisaoConsolidada.tsx` | Renderização condicional: cards no mobile, tabela no desktop |
+
+### 4. Estoque — Movimentação mobile
+- Formulário já usa `grid-cols-1 md:grid-cols-4` (OK)
+- Tabela de histórico: substituir por cards com ícone de tipo, nome do item, quantidade e data
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/estoque/Movimentacao.tsx` | Cards no histórico quando mobile |
+
+### 5. Estoque — Inventários mobile
+- Dialog de novo inventário já funciona
+- Tabela de contagem ativa: converter em cards por item (nome, anterior, input contagem, variação)
+- Tabela de histórico: converter em cards compactos
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/estoque/Inventarios.tsx` | Cards mobile para contagem e histórico |
+
+### 6. Estoque — Catálogo de Itens mobile
+- Tabela com 6+ colunas: converter em cards
+- Cada card: nome, código, grupo, custo, badges de setores vinculados, botões de ação
+- Filtros em layout vertical
+- Paginação mantida
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/estoque/CatalogoItens.tsx` | Cards mobile + filtros verticais |
+
+### 7. Utensílios — Contagem Semanal mobile
+- Tabela de 5 colunas → cards por item: nome, código, mínimo, input de contagem, badge de status
+- Filtros (semana, turno) empilhados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/utensilios/ContagemSemanal.tsx` | Cards mobile |
+
+### 8. Utensílios — Controle de Budget mobile
+- Cards de resumo já usam `grid-cols-2` (OK)
+- Tabela de alocação: converter em cards com item, déficit, custo, qtd aprovada, badge de status
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/utensilios/ControleBudget.tsx` | Cards mobile na tabela de alocação |
+
+### 9. Utensílios — Histórico mobile
+- Tabela comparativa: converter em cards com abertura/fechamento lado a lado e variação destacada
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/utensilios/HistoricoContagens.tsx` | Cards mobile |
+
+## Padrão técnico
+Todos os componentes usarão `useIsMobile()` do hook existente. Quando `isMobile = true`, renderizam cards em vez de tabelas. Nenhum componente novo será criado — apenas adaptação dos existentes com renderização condicional.
+
+## Arquivos impactados (10)
+- `src/components/layout/BottomNavigation.tsx`
+- `src/components/estoque/EstoqueTab.tsx`
+- `src/components/estoque/VisaoConsolidada.tsx`
+- `src/components/estoque/Movimentacao.tsx`
+- `src/components/estoque/Inventarios.tsx`
+- `src/components/estoque/CatalogoItens.tsx`
+- `src/components/utensilios/UtensiliosTab.tsx`
+- `src/components/utensilios/ContagemSemanal.tsx`
+- `src/components/utensilios/ControleBudget.tsx`
+- `src/components/utensilios/HistoricoContagens.tsx`
 
 ## O que NÃO será alterado
-- Nenhuma tabela existente além de `items_catalog` (apenas ADD COLUMN)
-- Nenhum módulo existente (CMV, escalas, budgets)
-- Rotas do `App.tsx`
+- Nenhum hook, schema, migração ou rota
+- Lógica de dados permanece idêntica
+- Layout desktop permanece intacto
+

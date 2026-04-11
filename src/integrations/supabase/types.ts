@@ -1807,6 +1807,108 @@ export type Database = {
         }
         Relationships: []
       }
+      inventario_items: {
+        Row: {
+          created_at: string
+          id: string
+          inventario_id: string
+          observacao: string | null
+          quantidade_anterior: number
+          quantidade_contada: number
+          setor_item_id: string
+          variacao: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inventario_id: string
+          observacao?: string | null
+          quantidade_anterior?: number
+          quantidade_contada?: number
+          setor_item_id: string
+          variacao?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inventario_id?: string
+          observacao?: string | null
+          quantidade_anterior?: number
+          quantidade_contada?: number
+          setor_item_id?: string
+          variacao?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_items_inventario_id_fkey"
+            columns: ["inventario_id"]
+            isOneToOne: false
+            referencedRelation: "inventarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_items_setor_item_id_fkey"
+            columns: ["setor_item_id"]
+            isOneToOne: false
+            referencedRelation: "setor_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventarios: {
+        Row: {
+          created_at: string
+          data_inventario: string
+          id: string
+          loja_id: string
+          responsavel: string | null
+          semana_referencia: string | null
+          setor_id: string
+          status: string
+          tipo: string
+          turno: string | null
+        }
+        Insert: {
+          created_at?: string
+          data_inventario: string
+          id?: string
+          loja_id: string
+          responsavel?: string | null
+          semana_referencia?: string | null
+          setor_id: string
+          status?: string
+          tipo: string
+          turno?: string | null
+        }
+        Update: {
+          created_at?: string
+          data_inventario?: string
+          id?: string
+          loja_id?: string
+          responsavel?: string | null
+          semana_referencia?: string | null
+          setor_id?: string
+          status?: string
+          tipo?: string
+          turno?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventarios_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventarios_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_transactions: {
         Row: {
           created_at: string
@@ -2247,6 +2349,67 @@ export type Database = {
             columns: ["cargo_id"]
             isOneToOne: false
             referencedRelation: "cargos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimentacoes_estoque: {
+        Row: {
+          created_at: string
+          data_movimentacao: string
+          id: string
+          loja_id: string
+          observacao: string | null
+          quantidade: number
+          responsavel: string | null
+          setor_destino_id: string | null
+          setor_item_id: string
+          tipo_movimentacao: string
+        }
+        Insert: {
+          created_at?: string
+          data_movimentacao?: string
+          id?: string
+          loja_id: string
+          observacao?: string | null
+          quantidade: number
+          responsavel?: string | null
+          setor_destino_id?: string | null
+          setor_item_id: string
+          tipo_movimentacao: string
+        }
+        Update: {
+          created_at?: string
+          data_movimentacao?: string
+          id?: string
+          loja_id?: string
+          observacao?: string | null
+          quantidade?: number
+          responsavel?: string | null
+          setor_destino_id?: string | null
+          setor_item_id?: string
+          tipo_movimentacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_estoque_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_setor_destino_id_fkey"
+            columns: ["setor_destino_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_setor_item_id_fkey"
+            columns: ["setor_item_id"]
+            isOneToOne: false
+            referencedRelation: "setor_items"
             referencedColumns: ["id"]
           },
         ]
@@ -2748,6 +2911,99 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "semanas_cmv_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setor_items: {
+        Row: {
+          catalog_item_id: string
+          created_at: string
+          estoque_maximo: number | null
+          estoque_minimo: number
+          id: string
+          is_active: boolean
+          loja_id: string
+          ponto_pedido: number | null
+          setor_id: string
+        }
+        Insert: {
+          catalog_item_id: string
+          created_at?: string
+          estoque_maximo?: number | null
+          estoque_minimo?: number
+          id?: string
+          is_active?: boolean
+          loja_id: string
+          ponto_pedido?: number | null
+          setor_id: string
+        }
+        Update: {
+          catalog_item_id?: string
+          created_at?: string
+          estoque_maximo?: number | null
+          estoque_minimo?: number
+          id?: string
+          is_active?: boolean
+          loja_id?: string
+          ponto_pedido?: number | null
+          setor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setor_items_catalog_item_id_fkey"
+            columns: ["catalog_item_id"]
+            isOneToOne: false
+            referencedRelation: "items_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setor_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setor_items_setor_id_fkey"
+            columns: ["setor_id"]
+            isOneToOne: false
+            referencedRelation: "setores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setores: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          is_active: boolean
+          loja_id: string | null
+          nome: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_active?: boolean
+          loja_id?: string | null
+          nome: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          is_active?: boolean
+          loja_id?: string | null
+          nome?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setores_loja_id_fkey"
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"

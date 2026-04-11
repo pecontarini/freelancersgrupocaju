@@ -20,6 +20,8 @@ import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab
 import { RedeTab } from "@/components/dashboard/RedeTab";
 import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
+import { UtensiliosTab } from "@/components/utensilios";
+import { EstoqueTab } from "@/components/estoque";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 
@@ -70,6 +72,14 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   escalas: {
     title: "Escalas",
     subtitle: "Construtor de escalas com validação CLT e compliance POP",
+  },
+  utensilios: {
+    title: "Utensílios",
+    subtitle: "Controle de utensílios, contagem e budget mensal",
+  },
+  estoque: {
+    title: "Estoque Geral",
+    subtitle: "Gestão de estoque por setor com inventários e movimentações",
   },
 };
 
@@ -233,6 +243,10 @@ const Index = () => {
         return <EscalasTab />;
       case "presenca":
         return <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />;
+      case "utensilios":
+        return <UtensiliosTab />;
+      case "estoque":
+        return <EstoqueTab />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

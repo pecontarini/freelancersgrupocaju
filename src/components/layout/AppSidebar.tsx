@@ -15,6 +15,8 @@ import {
   BarChart3,
   CalendarClock,
   ScanFace,
+  UtensilsCrossed,
+  Warehouse,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -95,6 +97,18 @@ const menuItems = [
     id: "escalas",
     icon: CalendarClock,
     description: "Matriz de efetivo mínimo",
+  },
+  {
+    title: "UTENSÍLIOS",
+    id: "utensilios",
+    icon: UtensilsCrossed,
+    description: "Controle de utensílios e budget",
+  },
+  {
+    title: "ESTOQUE GERAL",
+    id: "estoque",
+    icon: Warehouse,
+    description: "Gestão de estoque por setor",
   },
 ];
 

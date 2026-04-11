@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useUnidade } from "@/contexts/UnidadeContext";
 import { toast } from "sonner";
 
 export function useUtensiliosCatalog() {
@@ -28,42 +27,108 @@ export function useUtensiliosItems(lojaId: string | null) {
         .from("utensilios_items")
         .select("*, items_catalog(*)")
         .eq("loja_id", lojaId!)
-        .eq("ativo", true);
+        .eq("is_active", true)
+        .order("ordem_prioridade");
       if (error) throw error;
       return data;
     },
   });
 }
 
-export function useUtensiliosSemanas(lojaId: string | null) {
+export function useUtensiliosContagens(lojaId: string | null, semanaRef: string | null) {
   return useQuery({
-    queryKey: ["utensilios_semanas", lojaId],
-    enabled: !!lojaId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("utensilios_semanas")
-        .select("*")
-        .eq("loja_id", lojaId!)
-        .order("data_inicio", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useUtensiliosContagens(semanaId: string | null) {
-  return useQuery({
-    queryKey: ["utensilios_contagens", semanaId],
-    enabled: !!semanaId,
+    queryKey: ["utensilios_contagens", lojaId, semanaRef],
+    enabled: !!lojaId && !!semanaRef,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("utensilios_contagens")
         .select("*, utensilios_items(*, items_catalog(*))")
-        .eq("semana_id", semanaId!);
+        .eq("loja_id", lojaId!)
+        .eq("semana_referencia", semanaRef!);
       if (error) throw error;
       return data;
     },
+  });
+}
+
+export function useDistinctSemanas(lojaId: string | null) {
+  return useQuery({
+    queryKey: ["utensilios_semanas_distinct", lojaId],
+    enabled: !!lojaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("utensilios_contagens")
+        .select("semana_referencia")
+        .eq("loja_id", lojaId!)
+        .order("semana_referencia", { ascending: false });
+      if (error) throw error;
+      const unique = [...new Set((data || []).map((d: any) => d.semana_referencia))];
+      return unique;
+    },
+  });
+}
+
+export function useSaveContagem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (contagens: Array<{
+      loja_id: string;
+      utensilio_item_id: string;
+      turno: string;
+      quantidade_contada: number;
+      data_contagem: string;
+      semana_referencia: string;
+      responsavel?: string;
+    }>) => {
+      const { error } = await supabase.from("utensilios_contagens").insert(contagens);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_contagens"] });
+      qc.invalidateQueries({ queryKey: ["utensilios_semanas_distinct"] });
+      toast.success("Contagem salva");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useUtensiliosConfig(lojaId: string | null) {
+  return useQuery({
+    queryKey: ["utensilios_config", lojaId],
+    enabled: !!lojaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("utensilios_config")
+        .select("*")
+        .eq("loja_id", lojaId!)
+        .order("mes_referencia", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0] || null;
+    },
+  });
+}
+
+export function useCreatePedido() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (pedidos: Array<{
+      loja_id: string;
+      utensilio_item_id: string;
+      config_id: string;
+      qtd_deficit: number;
+      qtd_aprovada: number;
+      valor_unitario: number;
+      status: string;
+    }>) => {
+      const { error } = await supabase.from("utensilios_pedidos").insert(pedidos);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_pedidos"] });
+      toast.success("Pedidos gerados");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 }
 
@@ -78,93 +143,6 @@ export function useUtensiliosPedidos(lojaId: string | null) {
         .eq("loja_id", lojaId!)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCreateSemana() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (semana: {
-      loja_id: string;
-      data_inicio: string;
-      data_fim: string;
-      semana_label: string;
-    }) => {
-      const { data, error } = await supabase
-        .from("utensilios_semanas")
-        .insert(semana)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["utensilios_semanas"] });
-      toast.success("Semana criada");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
-
-export function useSaveContagem() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (contagens: Array<{
-      semana_id: string;
-      utensilio_item_id: string;
-      turno: string;
-      quantidade_contada: number;
-      responsavel?: string;
-    }>) => {
-      const { error } = await supabase.from("utensilios_contagens").upsert(contagens, {
-        onConflict: "semana_id,utensilio_item_id,turno",
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["utensilios_contagens"] });
-      toast.success("Contagem salva");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
-
-export function useCreatePedido() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (pedidos: Array<{
-      loja_id: string;
-      utensilio_item_id: string;
-      semana_id: string;
-      qtd_necessaria: number;
-      qtd_aprovada: number;
-      status: string;
-    }>) => {
-      const { error } = await supabase.from("utensilios_pedidos").insert(pedidos);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["utensilios_pedidos"] });
-      toast.success("Pedidos gerados");
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
-}
-
-export function useUtensiliosBudgetConfig(lojaId: string | null) {
-  return useQuery({
-    queryKey: ["utensilios_budget_config", lojaId],
-    enabled: !!lojaId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("utensilios_items")
-        .select("*, items_catalog(name, code, preco_custo)")
-        .eq("loja_id", lojaId!)
-        .eq("ativo", true)
-        .order("prioridade_reposicao", { ascending: true });
       if (error) throw error;
       return data;
     },

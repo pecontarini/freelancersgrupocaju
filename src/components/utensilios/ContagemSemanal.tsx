@@ -1,32 +1,30 @@
 import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { useUtensiliosItems, useUtensiliosSemanas, useUtensiliosContagens, useCreateSemana, useSaveContagem } from "@/hooks/useUtensilios";
-import { Plus, Save, CheckCircle, AlertTriangle } from "lucide-react";
+import { useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useSaveContagem } from "@/hooks/useUtensilios";
+import { Save, CheckCircle, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, startOfWeek, endOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format } from "date-fns";
 
 export function ContagemSemanal() {
   const { effectiveUnidadeId } = useUnidade();
   const { data: items, isLoading: loadingItems } = useUtensiliosItems(effectiveUnidadeId);
-  const { data: semanas, isLoading: loadingSemanas } = useUtensiliosSemanas(effectiveUnidadeId);
-  const createSemana = useCreateSemana();
+  const { data: semanas, isLoading: loadingSemanas } = useDistinctSemanas(effectiveUnidadeId);
   const saveContagem = useSaveContagem();
 
-  const [selectedSemana, setSelectedSemana] = useState<string>("");
+  const [semanaRef, setSemanaRef] = useState<string>("");
+  const [newSemanaRef, setNewSemanaRef] = useState<string>("");
   const [turno, setTurno] = useState<string>("ABERTURA");
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [newWeekOpen, setNewWeekOpen] = useState(false);
 
-  const { data: contagens } = useUtensiliosContagens(selectedSemana || null);
+  const activeSemana = semanaRef || "";
+  const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);
 
   const existingCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -38,36 +36,32 @@ export function ContagemSemanal() {
     return map;
   }, [contagens, turno]);
 
-  const handleCreateWeek = () => {
-    if (!effectiveUnidadeId) return;
-    const now = new Date();
-    const inicio = startOfWeek(now, { weekStartsOn: 1 });
-    const fim = endOfWeek(now, { weekStartsOn: 1 });
-    const label = `Sem ${format(inicio, "dd/MM")} - ${format(fim, "dd/MM/yyyy")}`;
-    createSemana.mutate({
-      loja_id: effectiveUnidadeId,
-      data_inicio: format(inicio, "yyyy-MM-dd"),
-      data_fim: format(fim, "yyyy-MM-dd"),
-      semana_label: label,
-    }, {
-      onSuccess: (data) => {
-        setSelectedSemana(data.id);
-        setNewWeekOpen(false);
-      },
-    });
-  };
-
   const handleSave = () => {
-    if (!selectedSemana || !items) return;
+    if (!effectiveUnidadeId || !items) return;
+    const ref = activeSemana || newSemanaRef;
+    if (!ref) return;
+    const today = format(new Date(), "yyyy-MM-dd");
     const entries = Object.entries(counts)
       .filter(([, v]) => v >= 0)
       .map(([itemId, qty]) => ({
-        semana_id: selectedSemana,
+        loja_id: effectiveUnidadeId,
         utensilio_item_id: itemId,
         turno,
         quantidade_contada: qty,
+        data_contagem: today,
+        semana_referencia: ref,
       }));
-    if (entries.length) saveContagem.mutate(entries);
+    if (entries.length) {
+      saveContagem.mutate(entries, {
+        onSuccess: () => {
+          setCounts({});
+          if (newSemanaRef) {
+            setSemanaRef(newSemanaRef);
+            setNewSemanaRef("");
+          }
+        },
+      });
+    }
   };
 
   if (!effectiveUnidadeId) {
@@ -82,15 +76,21 @@ export function ContagemSemanal() {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[200px]">
-          <Label>Semana</Label>
-          <Select value={selectedSemana} onValueChange={setSelectedSemana}>
-            <SelectTrigger><SelectValue placeholder="Selecionar semana" /></SelectTrigger>
-            <SelectContent>
-              {semanas?.map((s: any) => (
-                <SelectItem key={s.id} value={s.id}>{s.semana_label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>Semana de Referência</Label>
+          {semanas && semanas.length > 0 ? (
+            <Select value={semanaRef} onValueChange={setSemanaRef}>
+              <SelectTrigger><SelectValue placeholder="Selecionar semana" /></SelectTrigger>
+              <SelectContent>
+                {semanas.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+        <div>
+          <Label>Nova Semana (ex: 2026-S15)</Label>
+          <Input value={newSemanaRef} onChange={(e) => setNewSemanaRef(e.target.value)} placeholder="2026-S15" className="w-[160px]" />
         </div>
         <div>
           <Label>Turno</Label>
@@ -102,15 +102,12 @@ export function ContagemSemanal() {
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" onClick={() => setNewWeekOpen(true)}>
-          <Plus className="h-4 w-4 mr-1" />Nova Semana
-        </Button>
-        <Button onClick={handleSave} disabled={!selectedSemana || saveContagem.isPending}>
+        <Button onClick={handleSave} disabled={(!activeSemana && !newSemanaRef) || saveContagem.isPending}>
           <Save className="h-4 w-4 mr-1" />Salvar
         </Button>
       </div>
 
-      {selectedSemana && items && items.length > 0 ? (
+      {items && items.length > 0 ? (
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -163,21 +160,9 @@ export function ContagemSemanal() {
         </Card>
       ) : (
         <Card><CardContent className="py-10 text-center text-muted-foreground">
-          {!selectedSemana ? "Selecione ou crie uma semana para iniciar a contagem." : "Nenhum item de utensílio configurado para esta unidade."}
+          Nenhum item de utensílio configurado para esta unidade.
         </CardContent></Card>
       )}
-
-      <Dialog open={newWeekOpen} onOpenChange={setNewWeekOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Criar Nova Semana</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Será criada a semana atual ({format(startOfWeek(new Date(), { weekStartsOn: 1 }), "dd/MM", { locale: ptBR })} - {format(endOfWeek(new Date(), { weekStartsOn: 1 }), "dd/MM/yyyy", { locale: ptBR })}).
-          </p>
-          <Button onClick={handleCreateWeek} disabled={createSemana.isPending} className="w-full mt-2">
-            Criar Semana
-          </Button>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

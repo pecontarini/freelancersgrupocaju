@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,8 @@ export function CatalogoItens() {
   const [filterGrupo, setFilterGrupo] = useState("all");
   const [filterTipo, setFilterTipo] = useState("all");
   const [filterUtensilio, setFilterUtensilio] = useState("all");
+  const [pageSize, setPageSize] = useState(50);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Link dialog state
   const [linkOpen, setLinkOpen] = useState(false);
@@ -65,6 +68,7 @@ export function CatalogoItens() {
 
   const filtered = useMemo(() => {
     if (!catalog) return [];
+    setCurrentPage(1);
     return catalog.filter((c: any) => {
       if (search && !c.name?.toLowerCase().includes(search.toLowerCase()) && !c.code?.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterGrandeGrupo !== "all" && c.grande_grupo !== filterGrandeGrupo) return false;
@@ -75,6 +79,26 @@ export function CatalogoItens() {
       return true;
     });
   }, [catalog, search, filterGrandeGrupo, filterGrupo, filterTipo, filterUtensilio]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
+  const pageNumbers = useMemo(() => {
+    const pages: (number | "ellipsis")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push("ellipsis");
+      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push("ellipsis");
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [totalPages, currentPage]);
 
   const openLinkDialog = (item: any) => {
     setLinkItem(item);
@@ -160,6 +184,19 @@ export function CatalogoItens() {
             <SelectItem value="no">Não</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-3">
+          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="25">25 por página</SelectItem>
+              <SelectItem value="50">50 por página</SelectItem>
+              <SelectItem value="100">100 por página</SelectItem>
+              <SelectItem value="250">250 por página</SelectItem>
+              <SelectItem value="500">500 por página</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">{filtered.length} itens encontrados</span>
+        </div>
         <Button variant="outline" disabled title="Importação CSV (em breve)">
           <Upload className="h-4 w-4 mr-2" />CSV
         </Button>
@@ -184,7 +221,7 @@ export function CatalogoItens() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.slice(0, 100).map((item: any) => {
+                {paginatedItems.map((item: any) => {
                   const links = linkedMap[item.id] || [];
                   return (
                     <TableRow key={item.id}>
@@ -218,8 +255,31 @@ export function CatalogoItens() {
               </TableBody>
             </Table>
           )}
-          {filtered.length > 100 && (
-            <p className="text-center py-3 text-xs text-muted-foreground">Mostrando 100 de {filtered.length} itens. Use os filtros para refinar.</p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length}
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} />
+                  </PaginationItem>
+                  {pageNumbers.map((pg, i) =>
+                    pg === "ellipsis" ? (
+                      <PaginationItem key={`e${i}`}><PaginationEllipsis /></PaginationItem>
+                    ) : (
+                      <PaginationItem key={pg}>
+                        <PaginationLink isActive={pg === currentPage} onClick={() => setCurrentPage(pg as number)} className="cursor-pointer">{pg}</PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
+                  <PaginationItem>
+                    <PaginationNext onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           )}
         </CardContent>
       </Card>

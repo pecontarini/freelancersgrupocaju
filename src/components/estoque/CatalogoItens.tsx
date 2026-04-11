@@ -184,6 +184,19 @@ export function CatalogoItens() {
             <SelectItem value="no">Não</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-3">
+          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="25">25 por página</SelectItem>
+              <SelectItem value="50">50 por página</SelectItem>
+              <SelectItem value="100">100 por página</SelectItem>
+              <SelectItem value="250">250 por página</SelectItem>
+              <SelectItem value="500">500 por página</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-xs text-muted-foreground">{filtered.length} itens encontrados</span>
+        </div>
         <Button variant="outline" disabled title="Importação CSV (em breve)">
           <Upload className="h-4 w-4 mr-2" />CSV
         </Button>

@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useItemsCatalog, useSetores, useSetorItems, useCreateSetorItem, useUpdateSetorItem } from "@/hooks/useEstoque";
+import { useItemsCatalog, useSetores, useSetorItems, useCreateSetorItem, useUpdateSetorItem, useUpdateCatalogItemCost } from "@/hooks/useEstoque";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { Search, Link2, Upload, Edit2 } from "lucide-react";
+import { Search, Link2, Upload, Edit2, DollarSign } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CatalogoItens() {
@@ -20,6 +20,7 @@ export function CatalogoItens() {
   const { data: setorItems } = useSetorItems(effectiveUnidadeId);
   const createLink = useCreateSetorItem();
   const updateLink = useUpdateSetorItem();
+  const updateCost = useUpdateCatalogItemCost();
 
   const [search, setSearch] = useState("");
   const [filterGrandeGrupo, setFilterGrandeGrupo] = useState("all");
@@ -38,6 +39,10 @@ export function CatalogoItens() {
   const [linkPonto, setLinkPonto] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editSetorItemId, setEditSetorItemId] = useState("");
+  
+  // Cost edit state
+  const [costEditId, setCostEditId] = useState<string | null>(null);
+  const [costEditValue, setCostEditValue] = useState("");
 
   const grandeGrupos = useMemo(() => {
     const s = new Set<string>();

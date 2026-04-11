@@ -1,58 +1,84 @@
+# Plano: Módulo de Controle de Utensílios (Parte 1)
 
-Objetivo: destravar a seleção de lojas e deixar o módulo de Escalas/Quadro Operacional funcional, consistente e rápido.
+## Contexto
 
-Diagnóstico confirmado no código:
-1. Há 3 fontes de verdade para unidade: `Index.tsx` (estado local), `UnidadeContext.tsx` (contexto) e seletores locais dentro de `ManualScheduleGrid`, `D1ManagementPanel`, `OperationalDashboard` e `TeamManagement`. Elas não estão sincronizadas, então a troca de loja parece “travada”.
-2. `UnidadeContext.tsx` faz fallback para a primeira loja quando o usuário multi-loja fica com seleção nula. Isso quebra o significado de “todas as lojas” e gera comportamento inconsistente.
-3. Algumas telas de Escalas usam `useConfigLojas()` sem filtrar por perfil, então gestores podem ver listas erradas ou estados vazios.
-4. A visão global admin do `OperationalDashboard` está pesada: `AdminGlobalView` monta um card por loja com consultas próprias de setores/matriz/escalas, o que explica congelamento ao abrir “todas as unidades”.
+O app usa navegação por tabs dentro de `Index.tsx` — não rotas separadas. O novo módulo será adicionado como uma nova tab "utensilios" no menu lateral e no switch de renderização, seguindo o padrão existente.
 
-Plano de correção definitiva:
-1. Unificar a seleção de unidade no portal
-- Trocar `Index.tsx` para usar `useUnidade()` como fonte única de verdade.
-- Fazer `PortalHeader` e `UnidadeSelector` escreverem no contexto global.
-- Ajustar `UnidadeContext.tsx` para:
-  - auto-selecionar só quando o usuário tem 1 loja;
-  - manter `null` real para multi-loja quando a escolha for “todas”;
-  - diferenciar seleção atual de unidade efetiva.
+## 1. Schema Supabase — 5 tabelas via migração
 
-2. Padronizar todo o módulo Escalas
-- `ManualScheduleGrid.tsx`, `D1ManagementPanel.tsx`, `TeamManagement.tsx` e `OperationalDashboard.tsx` passarão a iniciar pela unidade do contexto e só usar override local quando necessário.
-- Ao trocar de loja, resetar setor e estados dependentes para evitar tela vazia/travada.
-- Nas telas que exigem uma loja concreta, mostrar seletor explícito quando a seleção global estiver em “todas”, em vez de cair silenciosamente na primeira loja.
+Criar as 5 tabelas conforme especificado: `items_catalog`, `utensilios_config`, `utensilios_items`, `utensilios_contagens`, `utensilios_pedidos`.
 
-3. Corrigir visibilidade de lojas por perfil
-- Aplicar uma regra única de lojas disponíveis:
-  - admin: todas as lojas;
-  - operator / gerente_unidade / chefe_setor: apenas lojas vinculadas.
-- Usar essa regra em `OperationalDashboard`, `TeamManagement`, `SectorJobTitleMapping`, `StaffingMatrixConfig` e demais seletores locais.
+Detalhes técnicos:
 
-4. Refatorar a visão global admin para performance
-- Reescrever `AdminGlobalView.tsx` para usar carregamento agregado em lote, não um conjunto de hooks por card.
-- Buscar setores, matriz, escalas do dia e presença uma vez no dashboard e montar os cards por unidade em memória.
-- Manter drill-down: clicar no card continua abrindo a unidade detalhada.
+- `utensilios_config.budget_mensal` e `utensilios_pedidos.custo_pedido` usam `GENERATED ALWAYS AS ... STORED`
+- RLS habilitado em todas as tabelas com políticas: admin full access, gestores read/write nas suas unidades
+- Nota: `utensilios_contagens` e `utensilios_pedidos` não têm campo `loja_id` no spec original — vou adicioná-lo para compatibilidade com RLS multi-loja
 
-5. Validar acesso de dados
-- Revisar leitura de `sectors`, `employees`, `staffing_matrix`, `schedules` e `schedule_attendance` para garantir:
-  - admin vê tudo;
-  - gestores veem apenas suas lojas.
-- Se aparecer bloqueio de permissão, complementar as políticas com migração focada.
+## 2. Navegação — adicionar tab "UTENSÍLIOS"
 
-Arquivos principais impactados:
-- `src/pages/Index.tsx`
-- `src/contexts/UnidadeContext.tsx`
-- `src/components/layout/PortalHeader.tsx`
-- `src/components/UnidadeSelector.tsx`
-- `src/components/escalas/OperationalDashboard.tsx`
-- `src/components/escalas/AdminGlobalView.tsx`
-- `src/components/escalas/ManualScheduleGrid.tsx`
-- `src/components/escalas/D1ManagementPanel.tsx`
-- `src/components/escalas/TeamManagement.tsx`
-- `src/components/escalas/SectorJobTitleMapping.tsx`
-- `src/components/escalas/StaffingMatrixConfig.tsx`
 
-Resultado esperado:
-- Admin consegue abrir qualquer loja e também a visão “todas as unidades” sem congelamento.
-- Operator/gerente só veem lojas permitidas e conseguem alternar corretamente.
-- O seletor do topo realmente controla o módulo.
-- Quadro Operacional, Editor de Escalas, Gestão D-1, Equipe e Configurações passam a responder de forma consistente à loja escolhida.
+| Arquivo                                      | Mudança                                                                           |
+| -------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/components/layout/AppSidebar.tsx`       | Adicionar item "UTENSÍLIOS" no `menuItems` com ícone `UtensilsCrossed`            |
+| `src/components/layout/BottomNavigation.tsx` | Adicionar item na nav mobile                                                      |
+| `src/pages/Index.tsx`                        | Adicionar entrada em `tabConfig`, importar e renderizar `UtensiliosTab` no switch |
+
+
+## 3. Componentes do módulo
+
+Criar os seguintes arquivos:
+
+
+| Arquivo                                            | Descrição                                                                                                         |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `src/components/utensilios/UtensiliosTab.tsx`      | Container principal com 3 sub-abas                                                                                |
+| `src/components/utensilios/ContagemSemanal.tsx`    | Aba 1: contagem por turno, agrupada por categoria, com indicadores verde/vermelho vs mínimo                       |
+| `src/components/utensilios/ControleBudget.tsx`     | Aba 2: 4 cards de resumo + parâmetros editáveis + tabela de alocação com lógica de prioridade + geração de pedido |
+| `src/components/utensilios/HistoricoContagens.tsx` | Aba 3: filtro por semana, tabela comparativa abertura/fechamento/variação                                         |
+| `src/components/utensilios/index.ts`               | Barrel export                                                                                                     |
+| `src/hooks/useUtensilios.ts`                       | Hook para CRUD de items, contagens, config e pedidos                                                              |
+
+
+## 4. Lógica de alocação de budget (Aba 2)
+
+A alocação percorre os itens em ordem de `ordem_prioridade`. Para cada item:
+
+1. Calcula déficit = max(0, estoque_minimo - estoque_atual)
+2. Calcula custo para repor = déficit × valor_unitario
+3. Se budget restante >= custo: qtd_aprovada = déficit, status = "Pedir Total"
+4. Se budget restante > 0 mas < custo: qtd_aprovada = floor(budget/valor_unitario), status = "Parcial"
+5. Se budget = 0: qtd_aprovada = 0, status = "Sem Budget"
+6. Se déficit = 0: status = "OK"
+
+O botão "Gerar Pedido" cria registros em `utensilios_pedidos`.
+
+## 5. Seed data
+
+Sem dados de seed automáticos nesta migração (os 74 itens e 1.289 do catálogo virão em importação posterior ou via insert manual)  
+Importante que os itens estão todos nos 1289 e os 74 iniciais precisam de um depara para cruzamento e não ficar duplicado. Vamos usar só os itens que tiverem na nomeclatura UT na frente e usar apenas o banco de dados dos 1289 ignorando os 74 itens que estão separados. As tabelas ficam prontas para receber dados.
+
+## Arquivos impactados (existentes)
+
+
+| Arquivo                                      | Tipo de mudança                       |
+| -------------------------------------------- | ------------------------------------- |
+| `src/pages/Index.tsx`                        | Adicionar tab config + case no switch |
+| `src/components/layout/AppSidebar.tsx`       | Adicionar menu item                   |
+| `src/components/layout/BottomNavigation.tsx` | Adicionar item mobile                 |
+
+
+## Arquivos criados (novos)
+
+- `src/components/utensilios/UtensiliosTab.tsx`
+- `src/components/utensilios/ContagemSemanal.tsx`
+- `src/components/utensilios/ControleBudget.tsx`
+- `src/components/utensilios/HistoricoContagens.tsx`
+- `src/components/utensilios/index.ts`
+- `src/hooks/useUtensilios.ts`
+
+## O que NÃO será alterado
+
+- Nenhuma tabela existente (CMV, escalas, budgets)
+- Nenhum hook existente
+- Nenhum arquivo em `src/lib/`, `src/contexts/`, `src/integrations/`
+- Rotas do `App.tsx`

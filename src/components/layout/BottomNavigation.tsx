@@ -65,31 +65,41 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente de Unidade"}
               </div>
               
-              {isAdmin && (
-                <div className="space-y-2 border-t pt-4">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => onTabChange("cx")}
-                  >
-                    Dores da Operação
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => onTabChange("configuracoes")}
-                  >
-                    Configurações
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => onTabChange("rede")}
-                  >
-                    Visão Rede
-                  </Button>
-                </div>
-              )}
+              <div className="space-y-2 border-t pt-4">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => onTabChange("utensilios")}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Utensílios
+                </Button>
+                {isAdmin && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onTabChange("cx")}
+                    >
+                      Dores da Operação
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onTabChange("configuracoes")}
+                    >
+                      Configurações
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      onClick={() => onTabChange("rede")}
+                    >
+                      Visão Rede
+                    </Button>
+                  </>
+                )}
+              </div>
               
               <div className="border-t pt-4 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Tema</span>
@@ -180,6 +190,14 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 </SheetTitle>
               </SheetHeader>
               <div className="mt-6 space-y-3 pb-8">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-12"
+                  onClick={() => onTabChange("utensilios")}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  Utensílios
+                </Button>
                 {isAdmin && (
                   <>
                     <Button

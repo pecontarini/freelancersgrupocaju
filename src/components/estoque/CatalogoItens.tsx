@@ -221,7 +221,7 @@ export function CatalogoItens() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.slice(0, 100).map((item: any) => {
+                {paginatedItems.map((item: any) => {
                   const links = linkedMap[item.id] || [];
                   return (
                     <TableRow key={item.id}>
@@ -255,8 +255,31 @@ export function CatalogoItens() {
               </TableBody>
             </Table>
           )}
-          {filtered.length > 100 && (
-            <p className="text-center py-3 text-xs text-muted-foreground">Mostrando 100 de {filtered.length} itens. Use os filtros para refinar.</p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} de {filtered.length}
+              </p>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"} />
+                  </PaginationItem>
+                  {pageNumbers.map((pg, i) =>
+                    pg === "ellipsis" ? (
+                      <PaginationItem key={`e${i}`}><PaginationEllipsis /></PaginationItem>
+                    ) : (
+                      <PaginationItem key={pg}>
+                        <PaginationLink isActive={pg === currentPage} onClick={() => setCurrentPage(pg as number)} className="cursor-pointer">{pg}</PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
+                  <PaginationItem>
+                    <PaginationNext onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           )}
         </CardContent>
       </Card>

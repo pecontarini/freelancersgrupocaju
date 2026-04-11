@@ -91,7 +91,8 @@ export function useItemsCatalog() {
         .from("items_catalog")
         .select("*")
         .eq("is_active", true)
-        .order("name");
+        .order("name")
+        .range(0, 1999);
       if (error) throw error;
       return data;
     },

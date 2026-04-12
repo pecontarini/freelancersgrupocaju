@@ -409,7 +409,7 @@ export function MobileScheduler() {
                               </div>
 
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
+                                <p className="text-sm font-medium truncate uppercase">
                                   {emp.name}
                                 </p>
                                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -562,9 +562,9 @@ export function MobileScheduler() {
                         .toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{emp.name}</p>
+                      <p className="text-sm font-medium truncate uppercase">{emp.name}</p>
                       {emp.job_title && (
-                        <p className="text-xs text-muted-foreground">{emp.job_title}</p>
+                        <p className="text-xs text-muted-foreground uppercase">{emp.job_title}</p>
                       )}
                     </div>
                     <Plus className="h-4 w-4 text-muted-foreground shrink-0" />

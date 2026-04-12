@@ -427,7 +427,7 @@ function DesktopScheduler() {
                         <TableRow key={emp.id}>
                           <TableCell className="font-medium sticky left-0 bg-background z-10">
                             <div className="flex items-center gap-1.5">
-                              <span>{emp.name}</span>
+                              <span className="uppercase">{emp.name}</span>
                               {emp.gender === "F" && (
                                 <Badge variant="outline" className="text-[9px] px-1 py-0">F</Badge>
                               )}

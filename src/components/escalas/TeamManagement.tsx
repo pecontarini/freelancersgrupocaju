@@ -370,10 +370,10 @@ export function TeamManagement() {
             <TableBody>
               {employees.map((emp) => (
                 <TableRow key={emp.id}>
-                  <TableCell className="font-medium">{emp.name}</TableCell>
+                  <TableCell className="font-medium uppercase">{emp.name}</TableCell>
                   <TableCell>
                     {emp.job_title ? (
-                      <Badge variant="secondary">{emp.job_title}</Badge>
+                      <Badge variant="secondary" className="uppercase">{emp.job_title}</Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">—</span>
                     )}

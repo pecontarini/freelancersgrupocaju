@@ -243,7 +243,7 @@ function ScheduleCard({
           {isConfirmed && <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />}
           {isDenied && <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />}
           {isPending && <Clock className="h-3.5 w-3.5 text-yellow-600 shrink-0" />}
-          <span className="font-medium text-sm truncate">{s.employee_name}</span>
+          <span className="font-medium text-sm truncate uppercase">{s.employee_name}</span>
           {s.worker_type === "freelancer" && (
             <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
               FL
@@ -251,7 +251,7 @@ function ScheduleCard({
           )}
         </div>
         <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap ml-5">
-          {s.job_title && <span>{s.job_title}</span>}
+          {s.job_title && <span className="uppercase">{s.job_title}</span>}
           {s.start_time && s.end_time && (
             <>
               <span>•</span>

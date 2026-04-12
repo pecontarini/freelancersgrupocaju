@@ -598,8 +598,8 @@ export function ManualScheduleGrid() {
                           <TableRow key={emp.id}>
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                               <div className="flex items-center gap-1.5">
-                                <span className="truncate max-w-[110px]">{emp.name}</span>
-                                {isFreelancer && (
+                                <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
+                                 {isFreelancer && (
                                   <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
                                     FL
                                   </Badge>
@@ -618,10 +618,10 @@ export function ManualScheduleGrid() {
                                 )}
                               </div>
                               {emp.job_title && (
-                                <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
-                              )}
-                            </TableCell>
-                            {weekDays.map((day, i) => {
+                                <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
+                               )}
+                             </TableCell>
+                             {weekDays.map((day, i) => {
                               const dateStr = format(day, "yyyy-MM-dd");
                               const schedule = getScheduleForCell(emp.id, dateStr);
                               return (
@@ -717,10 +717,10 @@ export function ManualScheduleGrid() {
                             <TableRow key={emp.id} className="opacity-60">
                               <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="truncate max-w-[110px]">{emp.name}</span>
+                                  <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
                                 </div>
                                 {emp.job_title && (
-                                  <div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
+                                  <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
                                 )}
                               </TableCell>
                               {weekDays.map((day, i) => {

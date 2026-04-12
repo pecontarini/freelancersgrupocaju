@@ -181,7 +181,7 @@ export function ScheduleEditModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span>{employeeName}</span>
+            <span className="uppercase">{employeeName}</span>
             {isFreelancer && (
               <Badge variant="outline" className="border-orange-400 text-orange-600 text-[10px]">
                 Freelancer

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useUtensiliosCatalog, useUtensiliosItems, useSaveContagem } from "@/hooks/useUtensilios";
+import { useUtensiliosCatalog, useUtensiliosItems, useSaveContagem, useAutoProvisionItems, useUpdateUtensilioItem } from "@/hooks/useUtensilios";
 import { SectorFilter } from "@/components/utensilios/SectorFilter";
-import { Save, Search, Package, Lock } from "lucide-react";
+import { Save, Search, Package, Lock, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -43,7 +43,6 @@ function PinScreen({ lojaId, onSuccess }: { lojaId: string; onSuccess: () => voi
 
     const storePin = (data as any)?.pin_contagem;
     if (!storePin) {
-      // No PIN set — allow access
       onSuccess();
     } else if (pin === storePin) {
       onSuccess();
@@ -92,7 +91,6 @@ export default function ContagemUtensilios() {
   const [pinAuthenticated, setPinAuthenticated] = useState(false);
   const isPublicAccess = !!paramLojaId;
 
-  // If public access and not yet authenticated with PIN, show PIN screen
   if (isPublicAccess && !pinAuthenticated) {
     return <PinScreen lojaId={paramLojaId!} onSuccess={() => setPinAuthenticated(true)} />;
   }
@@ -110,8 +108,11 @@ export default function ContagemUtensilios() {
 
 function ContagemForm({ lojaId }: { lojaId: string }) {
   const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
-  const { data: storeItems } = useUtensiliosItems(lojaId);
+  const { data: storeItems, isLoading: loadingItems } = useUtensiliosItems(lojaId);
   const saveContagem = useSaveContagem();
+  const autoProvision = useAutoProvisionItems();
+  const updateItem = useUpdateUtensilioItem();
+  const provisionTriggered = useRef(false);
 
   const [semanaRef, setSemanaRef] = useState("");
   const [turno, setTurno] = useState("ABERTURA");
@@ -119,6 +120,22 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
   const [responsavel, setResponsavel] = useState("");
   const [search, setSearch] = useState("");
   const [counts, setCounts] = useState<Record<string, number>>({});
+
+  // Auto-provision: if store has no items and catalog is loaded, create them
+  useEffect(() => {
+    if (
+      !provisionTriggered.current &&
+      !loadingCatalog &&
+      !loadingItems &&
+      catalog &&
+      catalog.length > 0 &&
+      storeItems &&
+      storeItems.length === 0
+    ) {
+      provisionTriggered.current = true;
+      autoProvision.mutate(lojaId);
+    }
+  }, [loadingCatalog, loadingItems, catalog, storeItems, lojaId]);
 
   const storeMap = useMemo(() => {
     const map: Record<string, any> = {};
@@ -145,7 +162,7 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
           name: c.name,
           code: c.code,
           unit: c.unit || "UN",
-          setor: si.area_responsavel || "Salão",
+          setor: si.area_responsavel || "Front",
           estoque_minimo: si.estoque_minimo ?? 0,
           photo_url: c.photo_url || null,
         };
@@ -153,6 +170,11 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
   }, [catalog, storeMap, search, setor]);
 
   const filledCount = Object.values(counts).filter(v => v > 0).length;
+
+  const handleToggleSetor = (storeItemId: string, currentSetor: string) => {
+    const newSetor = currentSetor === "Front" ? "Back" : "Front";
+    updateItem.mutate({ id: storeItemId, area_responsavel: newSetor } as any);
+  };
 
   const handleSave = () => {
     if (!lojaId || !semanaRef) { toast.error("Preencha a semana"); return; }
@@ -180,6 +202,8 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
       onSuccess: () => setCounts({}),
     });
   };
+
+  const isProvisioning = autoProvision.isPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,11 +248,19 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
 
       {/* Items */}
       <div className="max-w-2xl mx-auto p-4 pb-24">
-        {loadingCatalog ? (
-          <div className="space-y-2">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>
+        {(loadingCatalog || loadingItems || isProvisioning) ? (
+          <div className="space-y-2">
+            {isProvisioning && (
+              <div className="flex items-center gap-2 justify-center py-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Preparando itens para contagem...
+              </div>
+            )}
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+          </div>
         ) : displayItems.length === 0 ? (
           <Card><CardContent className="py-10 text-center text-muted-foreground">
-            {storeItems?.length === 0 ? "Nenhum utensílio configurado nesta loja. Defina o estoque mínimo primeiro." : "Nenhum item encontrado."}
+            Nenhum item encontrado.
           </CardContent></Card>
         ) : (
           <div className="space-y-2">
@@ -248,7 +280,14 @@ function ContagemForm({ lojaId }: { lojaId: string }) {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{item.name}</p>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <Badge variant="outline" className="text-[10px]">{item.setor}</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`h-5 px-1.5 text-[10px] font-bold ${item.setor === "Front" ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-red-100 text-red-700 border-red-300"}`}
+                            onClick={() => handleToggleSetor(item.storeItemId, item.setor)}
+                          >
+                            {item.setor === "Front" ? "F" : "B"}
+                          </Button>
                           <span className="text-[10px] text-muted-foreground">Mín: {item.estoque_minimo}</span>
                         </div>
                       </div>

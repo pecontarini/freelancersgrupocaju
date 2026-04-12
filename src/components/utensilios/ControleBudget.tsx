@@ -128,7 +128,7 @@ export function ControleBudget() {
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{a.items_catalog?.name || "—"}</p>
-                    <Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Salão"}</Badge>
+                    <Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Front"}</Badge>
                   </div>
                   {statusBadge(a.status)}
                 </div>
@@ -157,7 +157,7 @@ export function ControleBudget() {
               ) : allocations.map((a: any) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">{a.items_catalog?.name || "—"}</TableCell>
-                  <TableCell><Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Salão"}</Badge></TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Front"}</Badge></TableCell>
                   <TableCell className="text-right font-mono">{a.estoque_minimo}</TableCell>
                   <TableCell className="text-right font-mono">{a.lastCount}</TableCell>
                   <TableCell className="text-right font-mono">{a.deficit}</TableCell>

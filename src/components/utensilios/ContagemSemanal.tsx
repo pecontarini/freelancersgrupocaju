@@ -59,7 +59,7 @@ export function ContagemSemanal() {
           name: c.name,
           code: c.code,
           unit: c.unit || "UN",
-          setor: storeItem?.area_responsavel || "Salão",
+          setor: storeItem?.area_responsavel || "Front",
           estoque_minimo: storeItem?.estoque_minimo ?? null,
           preco_custo: c.preco_custo || 0,
         };

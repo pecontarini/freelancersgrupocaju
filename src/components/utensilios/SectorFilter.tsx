@@ -1,7 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-export const SETORES_UTENSILIOS = ["Todos", "Cozinha", "Bar", "Salão", "Parrilla", "Sushi"] as const;
+export const SETORES_UTENSILIOS = ["Todos", "Front", "Back"] as const;
 export type SetorUtensilio = typeof SETORES_UTENSILIOS[number];
 
 interface SectorFilterProps {

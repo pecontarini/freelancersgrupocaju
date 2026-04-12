@@ -151,7 +151,7 @@ export function BulkImportExport() {
             loja_nome: String(row[colMap.lojaNome] ?? "").trim(),
             catalog_item_id: String(row[colMap.itemId]).trim(),
             item_nome: String(row[colMap.itemNome] ?? "").trim(),
-            area_responsavel: String(row[colMap.setor] ?? "Salão").trim(),
+            area_responsavel: String(row[colMap.setor] ?? "Front").trim(),
             estoque_minimo: min,
             valor_unitario: parseFloat(row[colMap.valor] ?? 0) || 0,
           });

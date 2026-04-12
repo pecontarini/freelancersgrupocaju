@@ -167,7 +167,7 @@ export function useBulkCreateUtensiliosItems() {
         loja_id: i.loja_id,
         estoque_minimo: i.estoque_minimo,
         valor_unitario: i.valor_unitario ?? 0,
-        area_responsavel: i.area_responsavel || "Salão",
+        area_responsavel: i.area_responsavel || "Front",
         is_active: true,
       }));
       const { error } = await supabase
@@ -186,7 +186,7 @@ export function useBulkCreateUtensiliosItems() {
 export function useUpdateUtensilioItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (update: { id: string; estoque_minimo?: number; valor_unitario?: number }) => {
+    mutationFn: async (update: { id: string; estoque_minimo?: number; valor_unitario?: number; area_responsavel?: string }) => {
       const { id, ...fields } = update;
       const { error } = await supabase.from("utensilios_items").update(fields).eq("id", id);
       if (error) throw error;
@@ -194,6 +194,46 @@ export function useUpdateUtensilioItem() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["utensilios_items"] });
       toast.success("Item atualizado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+// ── Auto-provision: create all catalog items for a store if none exist ──
+export function useAutoProvisionItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (lojaId: string) => {
+      // Fetch all active utensilio catalog items
+      const { data: catalog, error: catError } = await supabase
+        .from("items_catalog")
+        .select("id")
+        .eq("is_utensilio", true)
+        .eq("is_active", true);
+      if (catError) throw catError;
+      if (!catalog || catalog.length === 0) return;
+
+      const rows = catalog.map((c: any) => ({
+        catalog_item_id: c.id,
+        loja_id: lojaId,
+        estoque_minimo: 0,
+        valor_unitario: 0,
+        area_responsavel: "Front",
+        is_active: true,
+      }));
+
+      // Upsert in batches of 500 — onConflict won't overwrite existing
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
+        const { error } = await supabase
+          .from("utensilios_items")
+          .upsert(batch, { onConflict: "catalog_item_id,loja_id", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      toast.success("Itens criados automaticamente!");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -230,7 +270,7 @@ export function useBulkImportUtensiliosItems() {
         loja_id: i.loja_id,
         estoque_minimo: i.estoque_minimo,
         valor_unitario: i.valor_unitario ?? 0,
-        area_responsavel: i.area_responsavel || "Salão",
+        area_responsavel: i.area_responsavel || "Front",
         is_active: true,
       }));
       // Upsert in batches of 500

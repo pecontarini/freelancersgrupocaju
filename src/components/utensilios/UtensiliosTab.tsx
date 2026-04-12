@@ -109,7 +109,7 @@ export function UtensiliosTab() {
     const initialSec: Record<string, string> = {};
     storeItems?.forEach((si: any) => {
       initialMin[si.catalog_item_id] = si.estoque_minimo;
-      initialSec[si.catalog_item_id] = si.area_responsavel || "Salão";
+      initialSec[si.catalog_item_id] = si.area_responsavel || "Front";
     });
     setMinimums(initialMin);
     setSectors(initialSec);
@@ -124,7 +124,7 @@ export function UtensiliosTab() {
         catalog_item_id: catalogId,
         loja_id: effectiveUnidadeId,
         estoque_minimo: min,
-        area_responsavel: sectors[catalogId] || "Salão",
+        area_responsavel: sectors[catalogId] || "Front",
       }));
     if (entries.length === 0) return;
     bulkCreate.mutate(entries, {
@@ -239,7 +239,7 @@ export function UtensiliosTab() {
                 {filteredCatalog.map((item: any) => {
                   const existing = storeMap[item.id];
                   const val = minimums[item.id] ?? existing?.estoque_minimo ?? 0;
-                  const sec = sectors[item.id] ?? existing?.area_responsavel ?? "Salão";
+                  const sec = sectors[item.id] ?? existing?.area_responsavel ?? "Front";
                   return (
                     <div key={item.id} className="flex items-center gap-2 p-2 rounded-md border bg-card hover:bg-accent/30 transition-colors">
                       <div className="flex-1 min-w-0">

@@ -336,6 +336,7 @@ export function ManualScheduleGrid() {
                   id: e.id,
                   name: e.name,
                   job_title: e.job_title,
+                  job_title_id: e.job_title_id,
                   worker_type: e.worker_type || "clt",
                 })),
                 ...sortedBase
@@ -344,6 +345,7 @@ export function ManualScheduleGrid() {
                     id: e.id,
                     name: e.name,
                     job_title: e.job_title,
+                    job_title_id: e.job_title_id,
                     worker_type: e.worker_type || "clt",
                   })),
               ]}
@@ -356,8 +358,11 @@ export function ManualScheduleGrid() {
                 id: e.id,
                 name: e.name,
                 job_title: e.job_title,
+                job_title_id: e.job_title_id,
                 worker_type: e.worker_type || "clt",
               }))}
+              sectors={sectors.map((s) => ({ id: s.id, name: s.name }))}
+              sectorJobTitles={sectorJobTitles.map((sjt) => ({ sector_id: sjt.sector_id, job_title_id: sjt.job_title_id }))}
             />
           )}
         </div>

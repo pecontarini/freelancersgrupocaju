@@ -4,6 +4,7 @@ import { ContagemSemanal } from "./ContagemSemanal";
 import { ControleBudget } from "./ControleBudget";
 import { HistoricoContagens } from "./HistoricoContagens";
 import { DashboardUtensilios } from "./DashboardUtensilios";
+import { BulkImportExport } from "./BulkImportExport";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosCatalog, useUtensiliosItems, useBulkCreateUtensiliosItems } from "@/hooks/useUtensilios";
@@ -88,15 +89,18 @@ export function UtensiliosTab() {
             {totalCount} itens no catálogo
           </Badge>
           {hasStoreConfig && (
-            <Badge className="bg-green-600 text-xs">
+            <Badge className="bg-primary text-primary-foreground text-xs">
               {configuredCount} configurados nesta loja
             </Badge>
           )}
         </div>
-        <Button onClick={handleOpenDialog} variant={hasStoreConfig ? "outline" : "default"} className={isMobile ? "w-full" : ""}>
-          <Settings2 className="h-4 w-4 mr-2" />
-          {hasStoreConfig ? "Ajustar Estoques Mínimos" : "Definir Estoque Inicial"}
-        </Button>
+        <div className={isMobile ? "flex flex-col gap-2" : "flex items-center gap-2"}>
+          <BulkImportExport />
+          <Button onClick={handleOpenDialog} variant={hasStoreConfig ? "outline" : "default"} className={isMobile ? "w-full" : ""}>
+            <Settings2 className="h-4 w-4 mr-2" />
+            {hasStoreConfig ? "Ajustar Estoques Mínimos" : "Definir Estoque Inicial"}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

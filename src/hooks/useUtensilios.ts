@@ -199,6 +199,46 @@ export function useUpdateUtensilioItem() {
   });
 }
 
+// ── Auto-provision: create all catalog items for a store if none exist ──
+export function useAutoProvisionItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (lojaId: string) => {
+      // Fetch all active utensilio catalog items
+      const { data: catalog, error: catError } = await supabase
+        .from("items_catalog")
+        .select("id")
+        .eq("is_utensilio", true)
+        .eq("is_active", true);
+      if (catError) throw catError;
+      if (!catalog || catalog.length === 0) return;
+
+      const rows = catalog.map((c: any) => ({
+        catalog_item_id: c.id,
+        loja_id: lojaId,
+        estoque_minimo: 0,
+        valor_unitario: 0,
+        area_responsavel: "Front",
+        is_active: true,
+      }));
+
+      // Upsert in batches of 500 — onConflict won't overwrite existing
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
+        const { error } = await supabase
+          .from("utensilios_items")
+          .upsert(batch, { onConflict: "catalog_item_id,loja_id", ignoreDuplicates: true });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      toast.success("Itens criados automaticamente!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
 // ── Bulk: fetch ALL stores' utensilio items ──
 export function useAllUtensiliosItems() {
   return useQuery({

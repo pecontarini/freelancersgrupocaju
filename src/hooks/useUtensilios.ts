@@ -159,6 +159,7 @@ export function useBulkCreateUtensiliosItems() {
       loja_id: string;
       estoque_minimo: number;
       valor_unitario?: number;
+      area_responsavel?: string;
     }>) => {
       // upsert using the unique constraint (catalog_item_id, loja_id)
       const rows = items.map((i) => ({
@@ -166,6 +167,7 @@ export function useBulkCreateUtensiliosItems() {
         loja_id: i.loja_id,
         estoque_minimo: i.estoque_minimo,
         valor_unitario: i.valor_unitario ?? 0,
+        area_responsavel: i.area_responsavel || "Salão",
         is_active: true,
       }));
       const { error } = await supabase

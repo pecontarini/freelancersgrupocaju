@@ -29,6 +29,7 @@ import {
   Info,
   UserX,
   UserPlus,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, addDays } from "date-fns";
@@ -36,13 +37,22 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
   generateScheduleTemplate,
+  generateMultiSectorTemplate,
   parseScheduleFile,
   type ScheduleEmployee,
-  type ScheduleParseResult,
+  type MultiSectorParseResult,
   type UnmatchedEmployee,
+  type SectorInfo,
+  type SectorJobTitleMapping,
 } from "@/lib/scheduleExcel";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UnmatchedRegistration {
   selected: boolean;
@@ -59,6 +69,10 @@ interface ScheduleExcelFlowProps {
   unitId?: string;
   /** All employees in the unit, used for fuzzy-matching external spreadsheets */
   allUnitEmployees?: ScheduleEmployee[];
+  /** All sectors in the unit — needed for multi-sector template */
+  sectors?: SectorInfo[];
+  /** Sector↔job_title mappings — needed for multi-sector template */
+  sectorJobTitles?: SectorJobTitleMapping[];
 }
 
 export function ScheduleExcelFlow({
@@ -69,9 +83,11 @@ export function ScheduleExcelFlow({
   unitName,
   unitId,
   allUnitEmployees,
+  sectors,
+  sectorJobTitles,
 }: ScheduleExcelFlowProps) {
   const [importModal, setImportModal] = useState(false);
-  const [parseResult, setParseResult] = useState<ScheduleParseResult | null>(null);
+  const [parseResult, setParseResult] = useState<MultiSectorParseResult | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -81,9 +97,18 @@ export function ScheduleExcelFlow({
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
-  function handleDownloadTemplate() {
+  function handleDownloadSingleSector() {
     generateScheduleTemplate(employees, weekDays, sectorName, unitName);
     toast.success("Modelo baixado!");
+  }
+
+  function handleDownloadAllSectors() {
+    if (!sectors?.length || !allUnitEmployees?.length || !sectorJobTitles) {
+      toast.error("Dados de setores não disponíveis.");
+      return;
+    }
+    generateMultiSectorTemplate(sectors, allUnitEmployees, sectorJobTitles, weekDays, unitName);
+    toast.success("Modelo multi-setor baixado!");
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -281,7 +306,8 @@ export function ScheduleExcelFlow({
 
       const rows = finalParseResult.entries.map((entry) => {
         const jtId = empJobTitleMap.get(entry.employee_id);
-        const resolvedSectorId = jtId ? jobTitleToSector.get(jtId) || sectorId : sectorId;
+        // If the entry has a sector_id from multi-sector parse, use it
+        const resolvedSectorId = entry.sector_id || (jtId ? jobTitleToSector.get(jtId) || sectorId : sectorId);
 
         return {
           employee_id: entry.employee_id,
@@ -358,16 +384,37 @@ export function ScheduleExcelFlow({
   return (
     <>
       <div className="flex gap-1.5">
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 text-xs"
-          onClick={handleDownloadTemplate}
-        >
-          <Download className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Baixar Modelo</span>
-          <span className="sm:hidden">Modelo</span>
-        </Button>
+        {sectors && sectors.length > 1 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Baixar Modelo</span>
+                <span className="sm:hidden">Modelo</span>
+                <ChevronDown className="h-3 w-3 ml-0.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={handleDownloadSingleSector}>
+                Só este setor ({sectorName})
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownloadAllSectors}>
+                Todos os setores
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={handleDownloadSingleSector}
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Baixar Modelo</span>
+            <span className="sm:hidden">Modelo</span>
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"

@@ -10,6 +10,7 @@ export interface ScheduleEmployee {
   id: string;
   name: string;
   job_title: string | null;
+  job_title_id?: string | null;
   worker_type: string;
 }
 
@@ -21,6 +22,17 @@ export interface ParsedScheduleEntry {
   start_time: string | null;
   end_time: string | null;
   break_duration: number; // minutes
+  sector_id?: string; // populated when parsing multi-sector files
+}
+
+export interface SectorInfo {
+  id: string;
+  name: string;
+}
+
+export interface SectorJobTitleMapping {
+  sector_id: string;
+  job_title_id: string;
 }
 
 export interface ScheduleParseError {
@@ -160,6 +172,139 @@ export function generateScheduleTemplate(
   XLSX.utils.book_append_sheet(wb, instrWs, "Instruções");
 
   const filename = `ESCALA_${sectorName.toUpperCase().replace(/\s+/g, "_")}_${format(days[0], "ddMM")}_${format(days[days.length - 1], "ddMM")}.xlsx`;
+  downloadWorkbook(wb, filename);
+}
+
+// ─── Multi-Sector Template Generator ───
+
+export function generateMultiSectorTemplate(
+  sectors: SectorInfo[],
+  allEmployees: ScheduleEmployee[],
+  sectorJobTitles: SectorJobTitleMapping[],
+  weekDays: Date[],
+  unitName?: string
+): void {
+  const wb = XLSX.utils.book_new();
+  const days = weekDays.length >= 7 ? weekDays.slice(0, 7) : weekDays;
+  const totalCols = 2 + days.length * 3;
+
+  // Build sector→job_title_ids map
+  const sectorJtMap = new Map<string, Set<string>>();
+  for (const sjt of sectorJobTitles) {
+    if (!sectorJtMap.has(sjt.sector_id)) sectorJtMap.set(sjt.sector_id, new Set());
+    sectorJtMap.get(sjt.sector_id)!.add(sjt.job_title_id);
+  }
+
+  // Track all assigned employee IDs to find unassigned ones
+  const assignedIds = new Set<string>();
+
+  // Meta data for all employees across sectors
+  const metaSectorMap: { sector_name: string; sector_id: string }[] = [];
+  const metaEmployees: { employee_id: string; employee_name: string; worker_type: string; sector_name: string }[] = [];
+
+  for (const sector of sectors) {
+    const jtIds = sectorJtMap.get(sector.id) || new Set();
+    const sectorEmps = allEmployees.filter(
+      (emp) => emp.job_title_id && jtIds.has(emp.job_title_id) && emp.worker_type !== "freelancer"
+    );
+
+    sectorEmps.forEach((e) => assignedIds.add(e.id));
+
+    const sheetName = sector.name.toUpperCase().substring(0, 31); // Excel tab name limit
+    const titleStr = `${sheetName} — ${(unitName || "").toUpperCase()} — SEMANA ${format(days[0], "dd/MM")} a ${format(days[days.length - 1], "dd/MM")}`;
+
+    const row1: string[] = [titleStr];
+    for (let i = 1; i < totalCols; i++) row1.push("");
+
+    const row2: string[] = ["NOME", "CARGO"];
+    const row3: string[] = ["", ""];
+    days.forEach((d, idx) => {
+      const dayLabel = DAY_NAMES[idx] || format(d, "EEEE", { locale: ptBR }).toUpperCase();
+      row2.push(dayLabel, "", "");
+      row3.push(...SUB_HEADERS);
+    });
+
+    // CLT employees first
+    const dataRows: string[][] = [];
+    const sorted = [...sectorEmps].sort((a, b) => a.name.localeCompare(b.name));
+    for (const emp of sorted) {
+      const row: string[] = [emp.name, emp.job_title || ""];
+      days.forEach(() => row.push("", "", ""));
+      dataRows.push(row);
+      metaEmployees.push({ employee_id: emp.id, employee_name: emp.name, worker_type: emp.worker_type, sector_name: sheetName });
+    }
+
+    // Empty rows for extras/freelancers
+    const separatorRow: string[] = ["── EXTRAS / FREELANCERS ──", ""];
+    days.forEach(() => separatorRow.push("", "", ""));
+    dataRows.push(separatorRow);
+    for (let i = 0; i < 5; i++) {
+      const row: string[] = ["", ""];
+      days.forEach(() => row.push("", "", ""));
+      dataRows.push(row);
+    }
+
+    const sheetData = [row1, row2, row3, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } }];
+    for (let d = 0; d < days.length; d++) {
+      const startCol = 2 + d * 3;
+      ws["!merges"].push({ s: { r: 1, c: startCol }, e: { r: 1, c: startCol + 2 } });
+    }
+
+    const cols: XLSX.ColInfo[] = [{ wch: 25 }, { wch: 18 }];
+    for (let d = 0; d < days.length; d++) cols.push({ wch: 10 }, { wch: 8 }, { wch: 8 });
+    ws["!cols"] = cols;
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    metaSectorMap.push({ sector_name: sheetName, sector_id: sector.id });
+  }
+
+  // __meta__ sheet with sector mapping
+  const metaRows: any[][] = [
+    ["employee_id", "employee_name", "worker_type", "sector_name"],
+    ...metaEmployees.map((m) => [m.employee_id, m.employee_name, m.worker_type, m.sector_name]),
+  ];
+  // Sector mapping rows
+  metaRows.push(["__SECTOR_MAP__"]);
+  for (const sm of metaSectorMap) {
+    metaRows.push(["__SECTOR__", sm.sector_name, sm.sector_id]);
+  }
+  // Date row
+  metaRows.push([METADATA_ROW_KEY, ...days.map((d) => format(d, "yyyy-MM-dd"))]);
+  const metaWs = XLSX.utils.aoa_to_sheet(metaRows);
+  XLSX.utils.book_append_sheet(wb, metaWs, "__meta__");
+
+  // Instructions sheet
+  const instrData = [
+    ["📋 ESCALA MULTI-SETOR — " + (unitName || "").toUpperCase()],
+    [`SEMANA: ${format(days[0], "dd/MM")} a ${format(days[days.length - 1], "dd/MM")}`],
+    [""],
+    ["═══════════════════════════════════════════════════════"],
+    ["📌 COMO PREENCHER:"],
+    ["1. Cada aba corresponde a um setor (ex: COZINHA, BAR, SALÃO)"],
+    ["2. Os funcionários do setor já estão listados"],
+    ["3. Para cada dia, preencha 3 campos:"],
+    ["   ENTRADA → horário de início (ex: 11:00)"],
+    ["   INTERV. → duração do intervalo (ex: 1h ou 3h)"],
+    ["   SAÍDA   → horário de saída (ex: 23:00)"],
+    ['4. Para dias de FOLGA → digite "FOLGA" na ENTRADA'],
+    ['   Também aceito: "FDS MÊS", "FÉRIAS", "BANCO DE HORAS"'],
+    [""],
+    ["⚠️ ATENÇÃO:"],
+    ["• NÃO altere cabeçalhos, NÃO adicione colunas"],
+    ["• Extras/Freelancers: preencha nome e cargo nas linhas em branco"],
+    [""],
+    ["📤 APÓS PREENCHER:"],
+    ["• Salve o arquivo (Ctrl+S)"],
+    ["• Importe de volta no sistema pelo botão Importar Planilha"],
+  ];
+  const instrWs = XLSX.utils.aoa_to_sheet(instrData.map((r) => [r[0] || ""]));
+  instrWs["!cols"] = [{ wch: 65 }];
+  XLSX.utils.book_append_sheet(wb, instrWs, "Instruções");
+
+  const filename = `ESCALA_TODOS_SETORES_${format(days[0], "ddMM")}_${format(days[days.length - 1], "ddMM")}.xlsx`;
   downloadWorkbook(wb, filename);
 }
 
@@ -623,13 +768,29 @@ function parseTimeRange(cellValue: string): { start_time: string; end_time: stri
   return null;
 }
 
+// ─── Multi-Sector Parse Result ───
+
+export interface MultiSectorParseResult {
+  /** Combined entries from all sector sheets */
+  entries: ParsedScheduleEntry[];
+  errors: ScheduleParseError[];
+  workingCount: number;
+  offCount: number;
+  originalMonday: string | null;
+  unmatchedEmployees: UnmatchedEmployee[];
+  /** True if the file had multiple sector tabs */
+  isMultiSector: boolean;
+  /** Sector mapping found in meta */
+  sectorMap: Map<string, string>; // sheetName → sectorId
+}
+
 // ─── Main Parse Entry Point ───
 
 export function parseScheduleFile(
   file: File,
   targetMonday?: string | null,
   allEmployees?: ScheduleEmployee[]
-): Promise<ScheduleParseResult> {
+): Promise<MultiSectorParseResult> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -643,9 +804,23 @@ export function parseScheduleFile(
         let metaData: { employee_id: string; employee_name: string; worker_type: string }[] = [];
         let metaEmployeeMap: Map<string, { id: string; name: string }> | null = null;
 
+        // Check for sector mapping in meta
+        const sectorMap = new Map<string, string>(); // sheetName → sectorId
+
         if (metaSheet) {
+          const rawMeta = XLSX.utils.sheet_to_json<any>(metaSheet, { header: 1, defval: "", raw: true }) as any[][];
+          // Parse structured meta
+          for (const row of rawMeta) {
+            const first = cellToString(row[0]);
+            if (first === "__SECTOR__") {
+              const sheetName = cellToString(row[1]);
+              const sectorId = cellToString(row[2]);
+              if (sheetName && sectorId) sectorMap.set(sheetName, sectorId);
+            }
+          }
+
           const raw = XLSX.utils.sheet_to_json<any>(metaSheet);
-          metaData = raw.filter((r: any) => r.employee_id && r.employee_id !== METADATA_ROW_KEY);
+          metaData = raw.filter((r: any) => r.employee_id && r.employee_id !== METADATA_ROW_KEY && r.employee_id !== "__SECTOR_MAP__" && r.employee_id !== "__SECTOR__");
           if (metaData.length > 0) {
             metaEmployeeMap = new Map();
             for (const m of metaData) {
@@ -654,7 +829,58 @@ export function parseScheduleFile(
           }
         }
 
-        // Find the main data sheet
+        // Multi-sector detection: multiple sheets that match sector names in meta
+        const dataSheetNames = wb.SheetNames.filter((n) => n !== "__meta__" && n !== "Instruções");
+        const isMultiSector = sectorMap.size > 0 && dataSheetNames.filter((n) => sectorMap.has(n)).length > 1;
+
+        if (isMultiSector) {
+          // Parse each sector sheet
+          const allEntries: ParsedScheduleEntry[] = [];
+          const allErrors: ScheduleParseError[] = [];
+          const allUnmatched: UnmatchedEmployee[] = [];
+          let totalWorking = 0;
+          let totalOff = 0;
+          let firstMonday: string | null = null;
+
+          for (const sheetName of dataSheetNames) {
+            const sectorId = sectorMap.get(sheetName);
+            if (!sectorId) continue;
+
+            const sheet = wb.Sheets[sheetName];
+            if (!sheet) continue;
+
+            const rawData = XLSX.utils.sheet_to_json<any>(sheet, { header: 1, defval: "", raw: true }) as any[][];
+            if (rawData.length < 3) continue;
+
+            if (detect3ColFormat(rawData)) {
+              const result = parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees);
+              // Tag entries with sector_id
+              for (const entry of result.entries) {
+                entry.sector_id = sectorId;
+              }
+              allEntries.push(...result.entries);
+              allErrors.push(...result.errors);
+              allUnmatched.push(...result.unmatchedEmployees);
+              totalWorking += result.workingCount;
+              totalOff += result.offCount;
+              if (!firstMonday && result.originalMonday) firstMonday = result.originalMonday;
+            }
+          }
+
+          resolve({
+            entries: allEntries,
+            errors: allErrors,
+            workingCount: totalWorking,
+            offCount: totalOff,
+            originalMonday: firstMonday,
+            unmatchedEmployees: allUnmatched,
+            isMultiSector: true,
+            sectorMap,
+          });
+          return;
+        }
+
+        // Single-sheet fallback (original behavior)
         const scheduleSheet = wb.Sheets["ESCALA"] || wb.Sheets["Escala"] || wb.Sheets[wb.SheetNames.find((n) => n !== "__meta__" && n !== "Instruções") || wb.SheetNames[0]];
 
         if (!scheduleSheet) {
@@ -669,18 +895,25 @@ export function parseScheduleFile(
           return;
         }
 
-        // Detect format
+        let result: ScheduleParseResult;
         if (detect3ColFormat(rawData)) {
-          resolve(parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees));
+          result = parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees);
         } else if (detectLegacyFormat(rawData)) {
           if (metaData.length === 0) {
             reject(new Error("Formato legado detectado mas aba __meta__ sem dados."));
             return;
           }
-          resolve(parseLegacySheet(rawData, metaData, targetMonday || null));
+          result = parseLegacySheet(rawData, metaData, targetMonday || null);
         } else {
           reject(new Error("Formato de planilha não reconhecido. Use o modelo gerado pelo sistema ou o formato padrão com ENTRADA/INTERV./SAÍDA."));
+          return;
         }
+
+        resolve({
+          ...result,
+          isMultiSector: false,
+          sectorMap,
+        });
       } catch (err) {
         reject(new Error("Erro ao processar arquivo. Verifique se é um Excel válido."));
       }

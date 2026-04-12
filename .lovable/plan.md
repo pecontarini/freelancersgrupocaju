@@ -1,58 +1,40 @@
 
 
-# Plano: Refatorar Importação em Massa de Estoque Mínimo
+# Plano: Padronizar Nomes e Cargos em CAPS LOCK nas Escalas
 
-## Problemas Atuais
-1. O fallback de setor no export ainda usa `"Salão"` (linha 66) em vez de `"Front"`
-2. O modal de revisão é básico — não agrupa por unidade, não mostra resumo por loja, não permite edição inline
-3. Sem feedback de progresso durante a importação (batches de 500)
-4. Sem validação de IDs contra catálogo/lojas reais antes de confirmar
-5. Os botões ficam pequenos e pouco visíveis na interface
+## Resumo
+Aplicar `uppercase` (CSS ou `.toUpperCase()`) em todos os pontos de exibição de nomes de funcionários e cargos nos componentes do módulo de escalas, garantindo visual padronizado e premium.
 
-## Mudanças
+## Abordagem
+Usar a classe Tailwind `uppercase` nos elementos de texto que exibem nomes e cargos. Isso mantém os dados originais intactos no banco e aplica a transformação apenas visualmente.
 
-### 1. `src/components/utensilios/BulkImportExport.tsx` — REESCREVER
-- **Export melhorado**: corrigir fallback `"Salão"` → `"Front"`, adicionar formatação condicional (highlight colunas editáveis), proteção nas colunas de ID
-- **Import com validação robusta**: validar `loja_id` e `catalog_item_id` contra dados reais do banco; separar linhas válidas de inválidas
-- **Modal de revisão profissional**:
-  - Resumo por unidade (cards com nome da loja, quantidade de itens, badge novo/atualizado)
-  - Tabela agrupada por unidade com accordion/collapse
-  - Indicador visual de registros novos vs. atualizados (comparando com `existingMap`)
-  - Contadores: novos, atualizados, ignorados (min=0), inválidos (ID não encontrado)
-  - Barra de progresso durante o upsert
-- **Aceitar linhas com estoque mínimo = 0** também (para zerar estoques intencionalmente), removendo a restrição atual que ignora min ≤ 0
+## Arquivos e Pontos de Mudança
 
-### 2. `src/hooks/useUtensilios.ts` — EDITAR
-- `useBulkImportUtensiliosItems`: adicionar callback de progresso para reportar batch atual/total ao componente
-- `useAllUtensiliosItems`: sem mudanças necessárias
+| Arquivo | O que muda |
+|---------|-----------|
+| `src/components/escalas/ManualScheduleGrid.tsx` | `emp.name` (linhas ~601, ~720) e `emp.job_title` (linhas ~621, ~723) — adicionar `uppercase` |
+| `src/components/escalas/WeeklyScheduler.tsx` | `emp.name` (linha ~430) — adicionar `uppercase` |
+| `src/components/escalas/MobileScheduler.tsx` | `emp.name` (linhas ~413, ~565) e `emp.job_title` (linha ~567) — adicionar `uppercase` |
+| `src/components/escalas/D1SectorAccordion.tsx` | `s.employee_name` (linha ~246) e `s.job_title` (linha ~254) — adicionar `uppercase` |
+| `src/components/escalas/D1ManagementPanel.tsx` | `s.employee_name` nos textos de exibição — adicionar `uppercase` |
+| `src/components/escalas/TeamManagement.tsx` | `emp.name` (linha ~373) e `emp.job_title` badge (linha ~376) — adicionar `uppercase` |
+| `src/components/escalas/FreelancerAddModal.tsx` | Nome do freelancer no Select (linha ~249) — adicionar `uppercase` |
+| `src/components/escalas/ScheduleEditModal.tsx` | Nome do funcionário no header do modal — adicionar `uppercase` |
 
-### 3. `src/components/utensilios/UtensiliosTab.tsx` — EDITAR
-- Dar mais destaque visual à seção de importação em massa (Card dedicado em vez de botões inline)
-- Mover `BulkImportExport` para dentro de um Card com título "Gestão em Massa" visível apenas para admins
+## Exemplo da mudança
+```tsx
+// Antes
+<span className="truncate max-w-[110px]">{emp.name}</span>
+<div className="text-[10px] text-muted-foreground truncate">{emp.job_title}</div>
 
-## Fluxo Revisado
-
-```text
-Admin clica "Exportar Modelo"
-  → Excel com todas unidades × todos utensílios
-  → Colunas editáveis destacadas em amarelo
-  → IDs ocultos para integridade
-
-Admin preenche e clica "Importar Planilha"
-  → Parser lê o arquivo
-  → Valida IDs contra banco (lojas + catálogo)
-  → Classifica: válidos, inválidos, novos, atualizados
-  → Abre modal de revisão agrupado por unidade
-  → Admin confirma
-  → Progress bar durante upsert em batches
-  → Sucesso com resumo final
+// Depois
+<span className="truncate max-w-[110px] uppercase">{emp.name}</span>
+<div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
 ```
 
-## Arquivos
-
-| Tipo | Arquivo |
-|------|---------|
-| Reescrever | `src/components/utensilios/BulkImportExport.tsx` |
-| Editar | `src/hooks/useUtensilios.ts` — progresso no bulk import |
-| Editar | `src/components/utensilios/UtensiliosTab.tsx` — layout do Card |
+## O que NÃO muda
+- Dados no banco de dados (continuam com capitalização original)
+- Campos de input/formulário (digitação livre)
+- Mensagens de WhatsApp (mantêm formatação natural para comunicação)
+- Relatórios PDF/Excel (mantêm formatação existente)
 

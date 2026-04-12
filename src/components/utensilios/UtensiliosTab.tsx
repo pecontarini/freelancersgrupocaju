@@ -4,6 +4,7 @@ import { ContagemSemanal } from "./ContagemSemanal";
 import { ControleBudget } from "./ControleBudget";
 import { HistoricoContagens } from "./HistoricoContagens";
 import { DashboardUtensilios } from "./DashboardUtensilios";
+import { BulkImportExport } from "./BulkImportExport";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosCatalog, useUtensiliosItems, useBulkCreateUtensiliosItems } from "@/hooks/useUtensilios";

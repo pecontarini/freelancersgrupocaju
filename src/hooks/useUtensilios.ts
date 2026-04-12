@@ -186,7 +186,7 @@ export function useBulkCreateUtensiliosItems() {
 export function useUpdateUtensilioItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (update: { id: string; estoque_minimo?: number; valor_unitario?: number }) => {
+    mutationFn: async (update: { id: string; estoque_minimo?: number; valor_unitario?: number; area_responsavel?: string }) => {
       const { id, ...fields } = update;
       const { error } = await supabase.from("utensilios_items").update(fields).eq("id", id);
       if (error) throw error;

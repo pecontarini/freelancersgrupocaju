@@ -12,11 +12,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const SECTOR_COLORS: Record<string, string> = {
-  Cozinha: "#ef4444",
-  Bar: "#f59e0b",
-  Salão: "#3b82f6",
-  Parrilla: "#8b5cf6",
-  Sushi: "#10b981",
+  Front: "#3b82f6",
+  Back: "#ef4444",
 };
 
 export function DashboardUtensilios() {
@@ -82,7 +79,7 @@ export function DashboardUtensilios() {
         return {
           id: si.id,
           name: catalogMap[si.catalog_item_id]?.name || "—",
-          setor: si.area_responsavel || "Salão",
+          setor: si.area_responsavel || "Front",
           min,
           count,
           deficit,

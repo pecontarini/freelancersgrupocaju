@@ -167,7 +167,7 @@ export function useBulkCreateUtensiliosItems() {
         loja_id: i.loja_id,
         estoque_minimo: i.estoque_minimo,
         valor_unitario: i.valor_unitario ?? 0,
-        area_responsavel: i.area_responsavel || "Salão",
+        area_responsavel: i.area_responsavel || "Front",
         is_active: true,
       }));
       const { error } = await supabase
@@ -230,7 +230,7 @@ export function useBulkImportUtensiliosItems() {
         loja_id: i.loja_id,
         estoque_minimo: i.estoque_minimo,
         valor_unitario: i.valor_unitario ?? 0,
-        area_responsavel: i.area_responsavel || "Salão",
+        area_responsavel: i.area_responsavel || "Front",
         is_active: true,
       }));
       // Upsert in batches of 500

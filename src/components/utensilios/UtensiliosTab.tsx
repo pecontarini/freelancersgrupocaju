@@ -159,6 +159,50 @@ export function UtensiliosTab() {
         </div>
       </div>
 
+      {/* Link de Contagem section */}
+      {canManageLinks && effectiveUnidadeId && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Link2 className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Link de Contagem</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Compartilhe este link para que a equipe faça a contagem de utensílios sem precisar acessar o portal.
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <Input value={countingLink} readOnly className="text-xs font-mono flex-1" />
+              <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleShareWhatsApp}>
+                <Share2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label className="text-xs flex items-center gap-1 mb-1">
+                  <Lock className="h-3 w-3" /> PIN de acesso (4 dígitos)
+                </Label>
+                <Input
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="Ex: 1234"
+                  maxLength={4}
+                  className="w-32 font-mono"
+                />
+              </div>
+              <Button size="sm" onClick={handleSavePin}>
+                <Save className="h-3.5 w-3.5 mr-1" /> Salvar PIN
+              </Button>
+            </div>
+            {!pinValue && (
+              <p className="text-xs text-amber-600 mt-2">⚠️ Sem PIN definido — qualquer pessoa com o link poderá acessar.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={isMobile ? "overflow-x-auto -mx-2 px-2" : ""}>
           <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-4"}>

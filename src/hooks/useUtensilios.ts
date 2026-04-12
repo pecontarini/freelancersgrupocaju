@@ -198,3 +198,55 @@ export function useUpdateUtensilioItem() {
     onError: (e: any) => toast.error(e.message),
   });
 }
+
+// ── Bulk: fetch ALL stores' utensilio items ──
+export function useAllUtensiliosItems() {
+  return useQuery({
+    queryKey: ["utensilios_items_all"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("utensilios_items")
+        .select("catalog_item_id, loja_id, estoque_minimo, valor_unitario, area_responsavel")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+// ── Bulk: upsert items for multiple stores ──
+export function useBulkImportUtensiliosItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: Array<{
+      catalog_item_id: string;
+      loja_id: string;
+      estoque_minimo: number;
+      valor_unitario?: number;
+      area_responsavel?: string;
+    }>) => {
+      const rows = items.map((i) => ({
+        catalog_item_id: i.catalog_item_id,
+        loja_id: i.loja_id,
+        estoque_minimo: i.estoque_minimo,
+        valor_unitario: i.valor_unitario ?? 0,
+        area_responsavel: i.area_responsavel || "Salão",
+        is_active: true,
+      }));
+      // Upsert in batches of 500
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
+        const { error } = await supabase
+          .from("utensilios_items")
+          .upsert(batch, { onConflict: "catalog_item_id,loja_id" });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      qc.invalidateQueries({ queryKey: ["utensilios_items_all"] });
+      toast.success("Importação em massa concluída!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}

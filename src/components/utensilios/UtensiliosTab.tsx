@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContagemSemanal } from "./ContagemSemanal";
 import { ControleBudget } from "./ControleBudget";
 import { HistoricoContagens } from "./HistoricoContagens";
+import { DashboardUtensilios } from "./DashboardUtensilios";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosCatalog, useUtensiliosItems, useBulkCreateUtensiliosItems } from "@/hooks/useUtensilios";
@@ -12,11 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2, Save, Search, Package } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SETORES_UTENSILIOS } from "./SectorFilter";
 
 export function UtensiliosTab() {
-  const [activeTab, setActiveTab] = useState("contagem");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const isMobile = useIsMobile();
   const { effectiveUnidadeId } = useUnidade();
 
@@ -27,43 +30,44 @@ export function UtensiliosTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
+  const [sectors, setSectors] = useState<Record<string, string>>({});
 
-  // Build lookup: catalog_item_id → utensilios_items row
-  const storeMap = useMemo(() => {
-    const map: Record<string, any> = {};
-    storeItems?.forEach((si: any) => { map[si.catalog_item_id] = si; });
-    return map;
-  }, [storeItems]);
+  const storeMap: Record<string, any> = {};
+  storeItems?.forEach((si: any) => { storeMap[si.catalog_item_id] = si; });
 
   const hasStoreConfig = storeItems && storeItems.length > 0;
   const configuredCount = storeItems?.length || 0;
   const totalCount = catalog?.length || 0;
 
-  const filteredCatalog = useMemo(() => {
+  const filteredCatalog = (() => {
     if (!catalog) return [];
     const q = search.toLowerCase();
     return catalog.filter((c: any) =>
-      (c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
+      c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
     );
-  }, [catalog, search]);
+  })();
 
   const handleOpenDialog = () => {
-    // Pre-populate with existing minimums
-    const initial: Record<string, number> = {};
-    storeItems?.forEach((si: any) => { initial[si.catalog_item_id] = si.estoque_minimo; });
-    setMinimums(initial);
+    const initialMin: Record<string, number> = {};
+    const initialSec: Record<string, string> = {};
+    storeItems?.forEach((si: any) => {
+      initialMin[si.catalog_item_id] = si.estoque_minimo;
+      initialSec[si.catalog_item_id] = si.area_responsavel || "Salão";
+    });
+    setMinimums(initialMin);
+    setSectors(initialSec);
     setDialogOpen(true);
   };
 
   const handleSave = () => {
     if (!effectiveUnidadeId || !catalog) return;
-    // Only save items that have a value > 0
     const entries = Object.entries(minimums)
       .filter(([, v]) => v > 0)
       .map(([catalogId, min]) => ({
         catalog_item_id: catalogId,
         loja_id: effectiveUnidadeId,
         estoque_minimo: min,
+        area_responsavel: sectors[catalogId] || "Salão",
       }));
     if (entries.length === 0) return;
     bulkCreate.mutate(entries, {
@@ -72,27 +76,22 @@ export function UtensiliosTab() {
   };
 
   if (!effectiveUnidadeId) {
-    return (
-      <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>
-    );
+    return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>;
   }
 
   return (
     <div className="space-y-4">
-      {/* Header with config button */}
       <div className={isMobile ? "space-y-3" : "flex items-center justify-between"}>
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className="text-xs">
-              <Package className="h-3 w-3 mr-1" />
-              {totalCount} itens no catálogo
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="outline" className="text-xs">
+            <Package className="h-3 w-3 mr-1" />
+            {totalCount} itens no catálogo
+          </Badge>
+          {hasStoreConfig && (
+            <Badge className="bg-green-600 text-xs">
+              {configuredCount} configurados nesta loja
             </Badge>
-            {hasStoreConfig && (
-              <Badge className="bg-green-600 text-xs">
-                {configuredCount} configurados nesta loja
-              </Badge>
-            )}
-          </div>
+          )}
         </div>
         <Button onClick={handleOpenDialog} variant={hasStoreConfig ? "outline" : "default"} className={isMobile ? "w-full" : ""}>
           <Settings2 className="h-4 w-4 mr-2" />
@@ -102,13 +101,15 @@ export function UtensiliosTab() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={isMobile ? "overflow-x-auto -mx-2 px-2" : ""}>
-          <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-3"}>
+          <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-4"}>
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="contagem">{isMobile ? "Contagem" : "Contagem Semanal"}</TabsTrigger>
-            <TabsTrigger value="budget">{isMobile ? "Budget" : "Controle de Budget"}</TabsTrigger>
+            <TabsTrigger value="budget">{isMobile ? "Compras" : "Controle de Compras"}</TabsTrigger>
             <TabsTrigger value="historico">Histórico</TabsTrigger>
           </TabsList>
         </div>
 
+        <TabsContent value="dashboard"><DashboardUtensilios /></TabsContent>
         <TabsContent value="contagem"><ContagemSemanal /></TabsContent>
         <TabsContent value="budget"><ControleBudget /></TabsContent>
         <TabsContent value="historico"><HistoricoContagens /></TabsContent>
@@ -123,12 +124,7 @@ export function UtensiliosTab() {
 
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar utensílio..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+            <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
 
           {loadingCatalog ? (
@@ -139,19 +135,28 @@ export function UtensiliosTab() {
                 {filteredCatalog.map((item: any) => {
                   const existing = storeMap[item.id];
                   const val = minimums[item.id] ?? existing?.estoque_minimo ?? 0;
+                  const sec = sectors[item.id] ?? existing?.area_responsavel ?? "Salão";
                   return (
-                    <div key={item.id} className="flex items-center gap-3 p-2 rounded-md border bg-card hover:bg-accent/30 transition-colors">
+                    <div key={item.id} className="flex items-center gap-2 p-2 rounded-md border bg-card hover:bg-accent/30 transition-colors">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">{item.code} · {item.unit || "UN"}</p>
                       </div>
-                      {existing && (
-                        <Badge variant="outline" className="text-[10px] shrink-0">Configurado</Badge>
-                      )}
+                      {existing && <Badge variant="outline" className="text-[10px] shrink-0">OK</Badge>}
+                      <Select value={sec} onValueChange={(v) => setSectors(prev => ({ ...prev, [item.id]: v }))}>
+                        <SelectTrigger className="w-24 h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SETORES_UTENSILIOS.filter(s => s !== "Todos").map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Input
                         type="number"
                         min={0}
-                        className="w-20 text-right"
+                        className="w-16 text-right h-8"
                         placeholder="Mín"
                         value={val || ""}
                         onChange={(e) => setMinimums(prev => ({ ...prev, [item.id]: parseInt(e.target.value) || 0 }))}

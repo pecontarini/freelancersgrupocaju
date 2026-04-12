@@ -151,7 +151,6 @@ export function UtensiliosTab() {
           )}
         </div>
         <div className={isMobile ? "flex flex-col gap-2" : "flex items-center gap-2"}>
-          <BulkImportExport />
           <Button onClick={handleOpenDialog} variant={hasStoreConfig ? "outline" : "default"} className={isMobile ? "w-full" : ""}>
             <Settings2 className="h-4 w-4 mr-2" />
             {hasStoreConfig ? "Ajustar Estoques Mínimos" : "Definir Estoque Inicial"}
@@ -199,6 +198,21 @@ export function UtensiliosTab() {
             {!pinValue && (
               <p className="text-xs text-amber-600 mt-2">⚠️ Sem PIN definido — qualquer pessoa com o link poderá acessar.</p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Gestão em Massa — admin only */}
+      {isAdmin && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm">Gestão em Massa</h3>
+                <p className="text-xs text-muted-foreground">Exporte o modelo, preencha e importe para configurar todas as unidades de uma vez.</p>
+              </div>
+              <BulkImportExport />
+            </div>
           </CardContent>
         </Card>
       )}

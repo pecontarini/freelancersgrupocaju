@@ -245,7 +245,7 @@ export function FreelancerAddModal({
                   </SelectTrigger>
                   <SelectContent>
                     {freelancers.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
+                      <SelectItem key={f.id} value={f.id} className="uppercase">
                         {f.name} {f.job_title ? `(${f.job_title})` : ""}
                       </SelectItem>
                     ))}

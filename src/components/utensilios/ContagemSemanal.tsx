@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosCatalog, useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useSaveContagem } from "@/hooks/useUtensilios";
+import { SectorFilter } from "./SectorFilter";
 import { Save, CheckCircle, AlertTriangle, MinusCircle, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -21,23 +22,22 @@ export function ContagemSemanal() {
   const saveContagem = useSaveContagem();
   const isMobile = useIsMobile();
 
-  const [semanaRef, setSemanaRef] = useState<string>("");
-  const [newSemanaRef, setNewSemanaRef] = useState<string>("");
-  const [turno, setTurno] = useState<string>("ABERTURA");
+  const [semanaRef, setSemanaRef] = useState("");
+  const [newSemanaRef, setNewSemanaRef] = useState("");
+  const [turno, setTurno] = useState("ABERTURA");
+  const [setor, setSetor] = useState("Todos");
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
 
   const activeSemana = semanaRef || "";
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);
 
-  // Build store items lookup: catalog_item_id → utensilios_items row
   const storeMap = useMemo(() => {
     const map: Record<string, any> = {};
     storeItems?.forEach((si: any) => { map[si.catalog_item_id] = si; });
     return map;
   }, [storeItems]);
 
-  // Build existing contagens lookup: utensilio_item_id → qty
   const existingCounts = useMemo(() => {
     const map: Record<string, number> = {};
     contagens?.forEach((c: any) => {
@@ -46,7 +46,6 @@ export function ContagemSemanal() {
     return map;
   }, [contagens, turno]);
 
-  // Main list: all catalog UT items, enriched with store config
   const displayItems = useMemo(() => {
     if (!catalog) return [];
     const q = search.toLowerCase();
@@ -60,19 +59,19 @@ export function ContagemSemanal() {
           name: c.name,
           code: c.code,
           unit: c.unit || "UN",
+          setor: storeItem?.area_responsavel || "Salão",
           estoque_minimo: storeItem?.estoque_minimo ?? null,
           preco_custo: c.preco_custo || 0,
         };
-      });
-  }, [catalog, storeMap, search]);
+      })
+      .filter((i) => setor === "Todos" || i.setor === setor);
+  }, [catalog, storeMap, search, setor]);
 
   const handleSave = () => {
     if (!effectiveUnidadeId) return;
     const ref = activeSemana || newSemanaRef;
     if (!ref) return;
     const today = format(new Date(), "yyyy-MM-dd");
-
-    // Only save items that have a storeItemId (configured for this store)
     const entries = Object.entries(counts)
       .filter(([, v]) => v >= 0)
       .map(([catalogId, qty]) => {
@@ -88,7 +87,6 @@ export function ContagemSemanal() {
         };
       })
       .filter(Boolean) as any[];
-
     if (entries.length) {
       saveContagem.mutate(entries, {
         onSuccess: () => {
@@ -99,13 +97,8 @@ export function ContagemSemanal() {
     }
   };
 
-  if (!effectiveUnidadeId) {
-    return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>;
-  }
-
-  if (loadingCatalog || loadingSemanas) {
-    return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
-  }
+  if (!effectiveUnidadeId) return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>;
+  if (loadingCatalog || loadingSemanas) return <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full" />)}</div>;
 
   const getStatusBadge = (qty: number | "", min: number | null) => {
     const numQty = typeof qty === "number" ? qty : 0;
@@ -119,7 +112,7 @@ export function ContagemSemanal() {
     <div className="space-y-4">
       {/* Filters */}
       <div className={isMobile ? "space-y-3" : "flex flex-wrap gap-3 items-end"}>
-        <div className={isMobile ? "w-full" : "flex-1 min-w-[200px]"}>
+        <div className={isMobile ? "w-full" : "flex-1 min-w-[180px]"}>
           <Label>Semana de Referência</Label>
           {semanas && semanas.length > 0 ? (
             <Select value={semanaRef} onValueChange={setSemanaRef}>
@@ -128,7 +121,7 @@ export function ContagemSemanal() {
             </Select>
           ) : null}
         </div>
-        <div className={isMobile ? "grid grid-cols-2 gap-2" : "flex gap-3 items-end"}>
+        <div className={isMobile ? "grid grid-cols-3 gap-2" : "flex gap-3 items-end"}>
           <div>
             <Label>Nova Semana</Label>
             <Input value={newSemanaRef} onChange={(e) => setNewSemanaRef(e.target.value)} placeholder="2026-S15" />
@@ -143,13 +136,13 @@ export function ContagemSemanal() {
               </SelectContent>
             </Select>
           </div>
+          <SectorFilter value={setor} onChange={setSetor} />
         </div>
         <Button onClick={handleSave} disabled={(!activeSemana && !newSemanaRef) || saveContagem.isPending} className={isMobile ? "w-full" : ""}>
           <Save className="h-4 w-4 mr-1" />Salvar
         </Button>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
@@ -167,24 +160,19 @@ export function ContagemSemanal() {
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
                         <p className="font-medium text-sm truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.code} · {item.unit}
-                          {item.estoque_minimo !== null && ` · Mín: ${item.estoque_minimo}`}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px]">{item.setor}</Badge>
+                          <span className="text-xs text-muted-foreground">{item.code} · {item.unit}</span>
+                          {item.estoque_minimo !== null && <span className="text-xs text-muted-foreground">Mín: {item.estoque_minimo}</span>}
+                        </div>
                       </div>
                       {getStatusBadge(qty, item.estoque_minimo)}
                     </div>
                     <Input
-                      type="number"
-                      min={0}
-                      placeholder="Qtd contada"
-                      value={qty}
-                      disabled={!item.storeItemId}
+                      type="number" min={0} placeholder="Qtd contada" value={qty} disabled={!item.storeItemId}
                       onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
                     />
-                    {!item.storeItemId && (
-                      <p className="text-[10px] text-muted-foreground">Configure o estoque mínimo primeiro</p>
-                    )}
+                    {!item.storeItemId && <p className="text-[10px] text-muted-foreground">Configure o estoque mínimo primeiro</p>}
                   </CardContent>
                 </Card>
               );
@@ -197,6 +185,7 @@ export function ContagemSemanal() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Item</TableHead>
+                    <TableHead>Setor</TableHead>
                     <TableHead>Código</TableHead>
                     <TableHead className="text-right">Mínimo</TableHead>
                     <TableHead className="text-right">Contagem</TableHead>
@@ -210,17 +199,14 @@ export function ContagemSemanal() {
                     return (
                       <TableRow key={item.catalogId}>
                         <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-[10px]">{item.setor}</Badge></TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.code}</TableCell>
                         <TableCell className="text-right font-mono">
                           {item.estoque_minimo !== null ? item.estoque_minimo : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right">
                           <Input
-                            type="number"
-                            min={0}
-                            className="w-20 ml-auto text-right"
-                            value={qty}
-                            disabled={!item.storeItemId}
+                            type="number" min={0} className="w-20 ml-auto text-right" value={qty} disabled={!item.storeItemId}
                             onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
                           />
                         </TableCell>

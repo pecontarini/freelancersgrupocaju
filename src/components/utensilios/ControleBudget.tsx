@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useUtensiliosConfig, useCreatePedido } from "@/hooks/useUtensilios";
+import { SectorFilter } from "./SectorFilter";
 import { DollarSign, ShoppingCart, TrendingDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,7 +20,8 @@ export function ControleBudget() {
   const createPedido = useCreatePedido();
   const isMobile = useIsMobile();
 
-  const [semanaRef, setSemanaRef] = useState<string>("");
+  const [semanaRef, setSemanaRef] = useState("");
+  const [setor, setSetor] = useState("Todos");
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, semanaRef || null);
 
   const budgetMensal = config?.budget_mensal || 0;
@@ -30,21 +32,23 @@ export function ControleBudget() {
     contagens.forEach((c: any) => { if (c.turno === "FECHAMENTO") countMap[c.utensilio_item_id] = c.quantidade_contada; });
 
     let remainingBudget = budgetMensal;
-    return items.map((item: any) => {
-      const lastCount = countMap[item.id] ?? 0;
-      const min = item.estoque_minimo || 0;
-      const deficit = Math.max(0, min - lastCount);
-      const unitCost = item.valor_unitario || item.items_catalog?.preco_custo || 0;
-      const totalNeeded = deficit * unitCost;
-      let qtdAprovada = 0, status = "ok";
-      if (deficit > 0) {
-        if (remainingBudget >= totalNeeded) { qtdAprovada = deficit; remainingBudget -= totalNeeded; status = "pedir_total"; }
-        else if (remainingBudget > 0 && unitCost > 0) { qtdAprovada = Math.floor(remainingBudget / unitCost); remainingBudget -= qtdAprovada * unitCost; status = qtdAprovada > 0 ? "parcial" : "sem_budget"; }
-        else status = "sem_budget";
-      }
-      return { ...item, lastCount, deficit, unitCost, totalNeeded, qtdAprovada, custoAprovado: qtdAprovada * unitCost, status };
-    });
-  }, [items, contagens, budgetMensal]);
+    return items
+      .filter((item: any) => setor === "Todos" || item.area_responsavel === setor)
+      .map((item: any) => {
+        const lastCount = countMap[item.id] ?? 0;
+        const min = item.estoque_minimo || 0;
+        const deficit = Math.max(0, min - lastCount);
+        const unitCost = item.valor_unitario || item.items_catalog?.preco_custo || 0;
+        const totalNeeded = deficit * unitCost;
+        let qtdAprovada = 0, status = "ok";
+        if (deficit > 0) {
+          if (remainingBudget >= totalNeeded) { qtdAprovada = deficit; remainingBudget -= totalNeeded; status = "pedir_total"; }
+          else if (remainingBudget > 0 && unitCost > 0) { qtdAprovada = Math.floor(remainingBudget / unitCost); remainingBudget -= qtdAprovada * unitCost; status = qtdAprovada > 0 ? "parcial" : "sem_budget"; }
+          else status = "sem_budget";
+        }
+        return { ...item, lastCount, deficit, unitCost, totalNeeded, qtdAprovada, custoAprovado: qtdAprovada * unitCost, status };
+      });
+  }, [items, contagens, budgetMensal, setor]);
 
   const summary = useMemo(() => {
     const totalNeeded = allocations.reduce((s, a) => s + a.totalNeeded, 0);
@@ -73,7 +77,7 @@ export function ControleBudget() {
   };
 
   if (!effectiveUnidadeId) return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>;
-  if (isLoading) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
+  if (isLoading) return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>;
 
   return (
     <div className="space-y-4">
@@ -85,6 +89,7 @@ export function ControleBudget() {
             <SelectContent>{semanas?.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
           </Select>
         </div>
+        <SectorFilter value={setor} onChange={setSetor} className={isMobile ? "w-full" : "min-w-[160px]"} />
         <Button onClick={handleGerarPedido} disabled={!semanaRef || !config || createPedido.isPending} className={isMobile ? "w-full" : ""}>
           <ShoppingCart className="h-4 w-4 mr-1" />Gerar Pedido
         </Button>
@@ -121,7 +126,10 @@ export function ControleBudget() {
             <Card key={a.id}>
               <CardContent className="p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="font-medium text-sm truncate">{a.items_catalog?.name || "—"}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{a.items_catalog?.name || "—"}</p>
+                    <Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Salão"}</Badge>
+                  </div>
                   {statusBadge(a.status)}
                 </div>
                 <div className="grid grid-cols-4 gap-1 text-center bg-muted/30 rounded-md p-2">
@@ -139,16 +147,17 @@ export function ControleBudget() {
         <Card><CardContent className="p-0">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Item</TableHead><TableHead className="text-right">Mínimo</TableHead>
+              <TableHead>Item</TableHead><TableHead>Setor</TableHead><TableHead className="text-right">Mínimo</TableHead>
               <TableHead className="text-right">Contagem</TableHead><TableHead className="text-right">Déficit</TableHead>
               <TableHead className="text-right">Custo Unit.</TableHead><TableHead className="text-right">Qtd Aprov.</TableHead><TableHead>Status</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {allocations.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Selecione uma semana com contagens.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Selecione uma semana com contagens.</TableCell></TableRow>
               ) : allocations.map((a: any) => (
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">{a.items_catalog?.name || "—"}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px]">{a.area_responsavel || "Salão"}</Badge></TableCell>
                   <TableCell className="text-right font-mono">{a.estoque_minimo}</TableCell>
                   <TableCell className="text-right font-mono">{a.lastCount}</TableCell>
                   <TableCell className="text-right font-mono">{a.deficit}</TableCell>

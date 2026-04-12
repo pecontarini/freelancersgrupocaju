@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
+import ContagemUtensilios from "./pages/ContagemUtensilios";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ function App() {
                   element={<ChecklistCorrections />}
                 />
                 <Route path="/checkin" element={<FreelancerCheckin />} />
+                <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

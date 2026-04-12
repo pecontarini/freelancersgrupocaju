@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,18 +7,110 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useUtensiliosCatalog, useUtensiliosItems, useSaveContagem } from "@/hooks/useUtensilios";
-import { SectorFilter, SETORES_UTENSILIOS } from "@/components/utensilios/SectorFilter";
-import { Save, Search, CheckCircle, Package } from "lucide-react";
+import { SectorFilter } from "@/components/utensilios/SectorFilter";
+import { Save, Search, Package, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+
+function PinScreen({ lojaId, onSuccess }: { lojaId: string; onSuccess: () => void }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [storeName, setStoreName] = useState("");
+
+  useEffect(() => {
+    supabase
+      .from("config_lojas")
+      .select("nome")
+      .eq("id", lojaId)
+      .single()
+      .then(({ data }) => {
+        if (data) setStoreName(data.nome);
+      });
+  }, [lojaId]);
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError("");
+    const { data } = await supabase
+      .from("config_lojas")
+      .select("pin_contagem")
+      .eq("id", lojaId)
+      .single();
+
+    const storePin = (data as any)?.pin_contagem;
+    if (!storePin) {
+      // No PIN set — allow access
+      onSuccess();
+    } else if (pin === storePin) {
+      onSuccess();
+    } else {
+      setError("PIN incorreto");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <Card className="w-full max-w-sm">
+        <CardContent className="pt-6 space-y-4">
+          <div className="text-center">
+            <Lock className="h-10 w-10 mx-auto text-primary mb-2" />
+            <h1 className="text-lg font-bold">Contagem de Utensílios</h1>
+            {storeName && <p className="text-sm text-muted-foreground">{storeName}</p>}
+          </div>
+          <div>
+            <Label className="text-sm">Digite o PIN de acesso</Label>
+            <Input
+              type="tel"
+              maxLength={4}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="• • • •"
+              className="text-center text-2xl font-mono tracking-[0.5em] mt-1"
+              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            />
+            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+          </div>
+          <Button onClick={handleSubmit} disabled={loading || pin.length < 4} className="w-full">
+            {loading ? "Verificando..." : "Acessar"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function ContagemUtensilios() {
+  const { lojaId: paramLojaId } = useParams<{ lojaId?: string }>();
   const { effectiveUnidadeId } = useUnidade();
+  const resolvedLojaId = paramLojaId || effectiveUnidadeId;
+
+  const [pinAuthenticated, setPinAuthenticated] = useState(false);
+  const isPublicAccess = !!paramLojaId;
+
+  // If public access and not yet authenticated with PIN, show PIN screen
+  if (isPublicAccess && !pinAuthenticated) {
+    return <PinScreen lojaId={paramLojaId!} onSuccess={() => setPinAuthenticated(true)} />;
+  }
+
+  if (!resolvedLojaId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade no portal.</CardContent></Card>
+      </div>
+    );
+  }
+
+  return <ContagemForm lojaId={resolvedLojaId} />;
+}
+
+function ContagemForm({ lojaId }: { lojaId: string }) {
   const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
-  const { data: storeItems } = useUtensiliosItems(effectiveUnidadeId);
+  const { data: storeItems } = useUtensiliosItems(lojaId);
   const saveContagem = useSaveContagem();
 
   const [semanaRef, setSemanaRef] = useState("");
@@ -40,7 +133,7 @@ export default function ContagemUtensilios() {
       .filter((c: any) => {
         if (!c.name?.toLowerCase().includes(q) && !c.code?.toLowerCase().includes(q)) return false;
         const storeItem = storeMap[c.id];
-        if (!storeItem) return false; // Only show configured items
+        if (!storeItem) return false;
         if (setor !== "Todos" && storeItem.area_responsavel !== setor) return false;
         return true;
       })
@@ -62,7 +155,7 @@ export default function ContagemUtensilios() {
   const filledCount = Object.values(counts).filter(v => v > 0).length;
 
   const handleSave = () => {
-    if (!effectiveUnidadeId || !semanaRef) { toast.error("Preencha a semana"); return; }
+    if (!lojaId || !semanaRef) { toast.error("Preencha a semana"); return; }
     if (!responsavel.trim()) { toast.error("Informe o nome do responsável"); return; }
     const today = format(new Date(), "yyyy-MM-dd");
     const entries = Object.entries(counts)
@@ -71,7 +164,7 @@ export default function ContagemUtensilios() {
         const item = displayItems.find(d => d.catalogId === catalogId);
         if (!item) return null;
         return {
-          loja_id: effectiveUnidadeId,
+          loja_id: lojaId,
           utensilio_item_id: item.storeItemId,
           turno,
           quantidade_contada: qty,
@@ -87,14 +180,6 @@ export default function ContagemUtensilios() {
       onSuccess: () => setCounts({}),
     });
   };
-
-  if (!effectiveUnidadeId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade no portal.</CardContent></Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">

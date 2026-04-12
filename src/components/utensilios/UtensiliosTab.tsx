@@ -8,6 +8,7 @@ import { BulkImportExport } from "./BulkImportExport";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUtensiliosCatalog, useUtensiliosItems, useBulkCreateUtensiliosItems } from "@/hooks/useUtensilios";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -15,14 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Save, Search, Package } from "lucide-react";
+import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SETORES_UTENSILIOS } from "./SectorFilter";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Label } from "@/components/ui/label";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const isMobile = useIsMobile();
   const { effectiveUnidadeId } = useUnidade();
+
+  const { isAdmin, isGerenteUnidade } = useUserProfile();
+  const canManageLinks = isAdmin || isGerenteUnidade;
 
   const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
   const { data: storeItems } = useUtensiliosItems(effectiveUnidadeId);
@@ -32,6 +39,55 @@ export function UtensiliosTab() {
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
   const [sectors, setSectors] = useState<Record<string, string>>({});
+  const [pinValue, setPinValue] = useState("");
+  const [pinLoaded, setPinLoaded] = useState(false);
+
+  // Load current PIN
+  useState(() => {
+    if (effectiveUnidadeId && canManageLinks) {
+      supabase
+        .from("config_lojas")
+        .select("pin_contagem")
+        .eq("id", effectiveUnidadeId)
+        .single()
+        .then(({ data }) => {
+          setPinValue((data as any)?.pin_contagem || "");
+          setPinLoaded(true);
+        });
+    }
+  });
+
+  const PRODUCTION_URL = "https://freelancersgrupocaju.lovable.app";
+  const countingLink = effectiveUnidadeId
+    ? `${PRODUCTION_URL}/contagem-utensilios/${effectiveUnidadeId}`
+    : "";
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(countingLink);
+    toast.success("Link copiado!");
+  };
+
+  const handleShareWhatsApp = () => {
+    const msg = encodeURIComponent(`📋 Link para contagem de utensílios:\n${countingLink}`);
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
+
+  const handleSavePin = async () => {
+    if (!effectiveUnidadeId) return;
+    if (pinValue && !/^\d{4}$/.test(pinValue)) {
+      toast.error("O PIN deve ter exatamente 4 dígitos numéricos");
+      return;
+    }
+    const { error } = await supabase
+      .from("config_lojas")
+      .update({ pin_contagem: pinValue || null } as any)
+      .eq("id", effectiveUnidadeId);
+    if (error) {
+      toast.error("Erro ao salvar PIN");
+    } else {
+      toast.success(pinValue ? "PIN salvo!" : "PIN removido");
+    }
+  };
 
   const storeMap: Record<string, any> = {};
   storeItems?.forEach((si: any) => { storeMap[si.catalog_item_id] = si; });
@@ -102,6 +158,50 @@ export function UtensiliosTab() {
           </Button>
         </div>
       </div>
+
+      {/* Link de Contagem section */}
+      {canManageLinks && effectiveUnidadeId && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Link2 className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Link de Contagem</h3>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Compartilhe este link para que a equipe faça a contagem de utensílios sem precisar acessar o portal.
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <Input value={countingLink} readOnly className="text-xs font-mono flex-1" />
+              <Button size="sm" variant="outline" onClick={handleCopyLink}>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleShareWhatsApp}>
+                <Share2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label className="text-xs flex items-center gap-1 mb-1">
+                  <Lock className="h-3 w-3" /> PIN de acesso (4 dígitos)
+                </Label>
+                <Input
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="Ex: 1234"
+                  maxLength={4}
+                  className="w-32 font-mono"
+                />
+              </div>
+              <Button size="sm" onClick={handleSavePin}>
+                <Save className="h-3.5 w-3.5 mr-1" /> Salvar PIN
+              </Button>
+            </div>
+            {!pinValue && (
+              <p className="text-xs text-amber-600 mt-2">⚠️ Sem PIN definido — qualquer pessoa com o link poderá acessar.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={isMobile ? "overflow-x-auto -mx-2 px-2" : ""}>

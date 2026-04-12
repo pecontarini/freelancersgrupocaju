@@ -7,15 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useSaveContagem } from "@/hooks/useUtensilios";
-import { Save, CheckCircle, AlertTriangle } from "lucide-react";
+import { useUtensiliosCatalog, useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useSaveContagem } from "@/hooks/useUtensilios";
+import { Save, CheckCircle, AlertTriangle, MinusCircle, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function ContagemSemanal() {
   const { effectiveUnidadeId } = useUnidade();
-  const { data: items, isLoading: loadingItems } = useUtensiliosItems(effectiveUnidadeId);
+  const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
+  const { data: storeItems } = useUtensiliosItems(effectiveUnidadeId);
   const { data: semanas, isLoading: loadingSemanas } = useDistinctSemanas(effectiveUnidadeId);
   const saveContagem = useSaveContagem();
   const isMobile = useIsMobile();
@@ -24,10 +25,19 @@ export function ContagemSemanal() {
   const [newSemanaRef, setNewSemanaRef] = useState<string>("");
   const [turno, setTurno] = useState<string>("ABERTURA");
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState("");
 
   const activeSemana = semanaRef || "";
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);
 
+  // Build store items lookup: catalog_item_id → utensilios_items row
+  const storeMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    storeItems?.forEach((si: any) => { map[si.catalog_item_id] = si; });
+    return map;
+  }, [storeItems]);
+
+  // Build existing contagens lookup: utensilio_item_id → qty
   const existingCounts = useMemo(() => {
     const map: Record<string, number> = {};
     contagens?.forEach((c: any) => {
@@ -36,18 +46,55 @@ export function ContagemSemanal() {
     return map;
   }, [contagens, turno]);
 
+  // Main list: all catalog UT items, enriched with store config
+  const displayItems = useMemo(() => {
+    if (!catalog) return [];
+    const q = search.toLowerCase();
+    return catalog
+      .filter((c: any) => c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
+      .map((c: any) => {
+        const storeItem = storeMap[c.id];
+        return {
+          catalogId: c.id,
+          storeItemId: storeItem?.id || null,
+          name: c.name,
+          code: c.code,
+          unit: c.unit || "UN",
+          estoque_minimo: storeItem?.estoque_minimo ?? null,
+          preco_custo: c.preco_custo || 0,
+        };
+      });
+  }, [catalog, storeMap, search]);
+
   const handleSave = () => {
-    if (!effectiveUnidadeId || !items) return;
+    if (!effectiveUnidadeId) return;
     const ref = activeSemana || newSemanaRef;
     if (!ref) return;
     const today = format(new Date(), "yyyy-MM-dd");
-    const entries = Object.entries(counts).filter(([, v]) => v >= 0).map(([itemId, qty]) => ({
-      loja_id: effectiveUnidadeId, utensilio_item_id: itemId, turno,
-      quantidade_contada: qty, data_contagem: today, semana_referencia: ref,
-    }));
+
+    // Only save items that have a storeItemId (configured for this store)
+    const entries = Object.entries(counts)
+      .filter(([, v]) => v >= 0)
+      .map(([catalogId, qty]) => {
+        const item = displayItems.find(d => d.catalogId === catalogId);
+        if (!item?.storeItemId) return null;
+        return {
+          loja_id: effectiveUnidadeId,
+          utensilio_item_id: item.storeItemId,
+          turno,
+          quantidade_contada: qty,
+          data_contagem: today,
+          semana_referencia: ref,
+        };
+      })
+      .filter(Boolean) as any[];
+
     if (entries.length) {
       saveContagem.mutate(entries, {
-        onSuccess: () => { setCounts({}); if (newSemanaRef) { setSemanaRef(newSemanaRef); setNewSemanaRef(""); } },
+        onSuccess: () => {
+          setCounts({});
+          if (newSemanaRef) { setSemanaRef(newSemanaRef); setNewSemanaRef(""); }
+        },
       });
     }
   };
@@ -56,12 +103,21 @@ export function ContagemSemanal() {
     return <Card><CardContent className="py-10 text-center text-muted-foreground">Selecione uma unidade.</CardContent></Card>;
   }
 
-  if (loadingItems || loadingSemanas) {
+  if (loadingCatalog || loadingSemanas) {
     return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
   }
 
+  const getStatusBadge = (qty: number | "", min: number | null) => {
+    const numQty = typeof qty === "number" ? qty : 0;
+    if (min === null) return <Badge variant="outline" className="text-[10px]"><MinusCircle className="h-3 w-3 mr-1" />Sem mínimo</Badge>;
+    if (numQty <= 0) return <span className="text-xs text-muted-foreground">—</span>;
+    if (numQty < min) return <Badge variant="destructive" className="text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Abaixo</Badge>;
+    return <Badge className="bg-green-600 text-xs"><CheckCircle className="h-3 w-3 mr-1" />OK</Badge>;
+  };
+
   return (
     <div className="space-y-4">
+      {/* Filters */}
       <div className={isMobile ? "space-y-3" : "flex flex-wrap gap-3 items-end"}>
         <div className={isMobile ? "w-full" : "flex-1 min-w-[200px]"}>
           <Label>Semana de Referência</Label>
@@ -93,29 +149,42 @@ export function ContagemSemanal() {
         </Button>
       </div>
 
-      {items && items.length > 0 ? (
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      </div>
+
+      {displayItems.length > 0 ? (
         isMobile ? (
           <div className="space-y-2">
-            {items.map((item: any) => {
-              const qty = counts[item.id] ?? existingCounts[item.id] ?? "";
-              const min = item.estoque_minimo || 0;
-              const numQty = typeof qty === "number" ? qty : parseInt(String(qty)) || 0;
-              const isBelow = numQty > 0 && numQty < min;
+            {displayItems.map((item) => {
+              const existingQty = item.storeItemId ? existingCounts[item.storeItemId] : undefined;
+              const qty = counts[item.catalogId] ?? existingQty ?? "";
               return (
-                <Card key={item.id}>
+                <Card key={item.catalogId}>
                   <CardContent className="p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{item.items_catalog?.name || "—"}</p>
-                        <p className="text-xs text-muted-foreground">{item.items_catalog?.code} · Mín: {min}</p>
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.code} · {item.unit}
+                          {item.estoque_minimo !== null && ` · Mín: ${item.estoque_minimo}`}
+                        </p>
                       </div>
-                      {numQty > 0 ? (
-                        isBelow ? <Badge variant="destructive" className="text-xs shrink-0"><AlertTriangle className="h-3 w-3 mr-1" />Abaixo</Badge>
-                          : <Badge className="bg-green-600 text-xs shrink-0"><CheckCircle className="h-3 w-3 mr-1" />OK</Badge>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                      {getStatusBadge(qty, item.estoque_minimo)}
                     </div>
-                    <Input type="number" min={0} placeholder="Qtd contada" value={qty}
-                      onChange={(e) => setCounts((prev) => ({ ...prev, [item.id]: parseInt(e.target.value) || 0 }))} />
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="Qtd contada"
+                      value={qty}
+                      disabled={!item.storeItemId}
+                      onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
+                    />
+                    {!item.storeItemId && (
+                      <p className="text-[10px] text-muted-foreground">Configure o estoque mínimo primeiro</p>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -125,31 +194,37 @@ export function ContagemSemanal() {
           <Card>
             <CardContent className="p-0">
               <Table>
-                <TableHeader><TableRow>
-                  <TableHead>Item</TableHead><TableHead>Código</TableHead>
-                  <TableHead className="text-right">Mínimo</TableHead><TableHead className="text-right">Contagem</TableHead><TableHead>Status</TableHead>
-                </TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead className="text-right">Mínimo</TableHead>
+                    <TableHead className="text-right">Contagem</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {items.map((item: any) => {
-                    const qty = counts[item.id] ?? existingCounts[item.id] ?? "";
-                    const min = item.estoque_minimo || 0;
-                    const numQty = typeof qty === "number" ? qty : parseInt(String(qty)) || 0;
-                    const isBelow = numQty > 0 && numQty < min;
+                  {displayItems.map((item) => {
+                    const existingQty = item.storeItemId ? existingCounts[item.storeItemId] : undefined;
+                    const qty = counts[item.catalogId] ?? existingQty ?? "";
                     return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.items_catalog?.name || "—"}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{item.items_catalog?.code}</TableCell>
-                        <TableCell className="text-right font-mono">{min}</TableCell>
+                      <TableRow key={item.catalogId}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{item.code}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {item.estoque_minimo !== null ? item.estoque_minimo : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
                         <TableCell className="text-right">
-                          <Input type="number" min={0} className="w-20 ml-auto text-right" value={qty}
-                            onChange={(e) => setCounts((prev) => ({ ...prev, [item.id]: parseInt(e.target.value) || 0 }))} />
+                          <Input
+                            type="number"
+                            min={0}
+                            className="w-20 ml-auto text-right"
+                            value={qty}
+                            disabled={!item.storeItemId}
+                            onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
+                          />
                         </TableCell>
-                        <TableCell>
-                          {numQty > 0 ? (
-                            isBelow ? <Badge variant="destructive" className="text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Abaixo</Badge>
-                              : <Badge className="bg-green-600 text-xs"><CheckCircle className="h-3 w-3 mr-1" />OK</Badge>
-                          ) : <span className="text-xs text-muted-foreground">—</span>}
-                        </TableCell>
+                        <TableCell>{getStatusBadge(qty, item.estoque_minimo)}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -159,7 +234,7 @@ export function ContagemSemanal() {
           </Card>
         )
       ) : (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhum item de utensílio configurado para esta unidade.</CardContent></Card>
+        <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhum utensílio encontrado.</CardContent></Card>
       )}
     </div>
   );

@@ -151,7 +151,6 @@ export function UtensiliosTab() {
           )}
         </div>
         <div className={isMobile ? "flex flex-col gap-2" : "flex items-center gap-2"}>
-          <BulkImportExport />
           <Button onClick={handleOpenDialog} variant={hasStoreConfig ? "outline" : "default"} className={isMobile ? "w-full" : ""}>
             <Settings2 className="h-4 w-4 mr-2" />
             {hasStoreConfig ? "Ajustar Estoques Mínimos" : "Definir Estoque Inicial"}

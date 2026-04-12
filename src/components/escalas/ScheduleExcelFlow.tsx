@@ -29,6 +29,7 @@ import {
   Info,
   UserX,
   UserPlus,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfWeek, addDays } from "date-fns";

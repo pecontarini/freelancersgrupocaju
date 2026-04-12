@@ -1,45 +1,39 @@
 
 
-# Plano: Import/Export em Massa de Estoque Mínimo de Utensílios
+# Plano: Permitir Gerentes Gerar Links de Contagem de Utensílios
 
-## Resumo
-Criar dois botões no `UtensiliosTab`: **Exportar Modelo** e **Importar Planilha**. O modelo Excel lista todas as unidades × todos os utensílios com colunas para estoque mínimo e setor. Ao importar, o sistema faz upsert em massa na `utensilios_items`.
+## Contexto
+O plano anterior previa que apenas admins (sem unidade selecionada) veriam o dashboard global com os links de contagem. Porém, gerentes de unidade precisam gerar esses links para suas lojas diretamente da aba de utensílios.
 
-## Estrutura do Excel
-
-```text
-| Unidade (não editar) | ID Unidade (oculto) | Código | Utensílio (não editar) | ID Item (oculto) | Setor | Estoque Mínimo | Valor Unitário |
-|----------------------|---------------------|--------|------------------------|-------------------|-------|----------------|----------------|
-| Caju Asa Norte       | uuid...             | UT001  | Garfo de mesa          | uuid...           | Salão | 50             | 2.50           |
-| Caju Asa Norte       | uuid...             | UT002  | Faca de mesa           | uuid...           | Salão | 50             | 3.00           |
-| Caju Lago Sul        | uuid...             | UT001  | Garfo de mesa          | uuid...           | Salão | 40             | 2.50           |
-```
-
-- Colunas de ID ficam ocultas (para o parser usar na importação)
-- Colunas de nome ficam protegidas/cinza (só para referência)
-- Colunas editáveis: **Setor**, **Estoque Mínimo**, **Valor Unitário**
-- Se já existir configuração, o export preenche os valores atuais
+## Solução
+Adicionar um card/seção "Link de Contagem" dentro do `UtensiliosTab` visível para **admins** e **gerentes** quando uma unidade está selecionada. Esse card mostra o link público da loja ativa e permite copiar/compartilhar.
 
 ## Mudanças
 
-### 1. `src/hooks/useUtensilios.ts`
-- Novo hook `useAllUtensiliosItems()` — busca `utensilios_items` de TODAS as lojas (sem filtro de `loja_id`), para pré-preencher valores existentes no export
-- Novo hook `useBulkImportUtensiliosItems()` — recebe array de `{ catalog_item_id, loja_id, estoque_minimo, valor_unitario, area_responsavel }` e faz upsert em massa
+### 1. `src/components/utensilios/UtensiliosTab.tsx` — EDITAR
+- Importar `useUserProfile` para checar `isAdmin` e `isGerenteUnidade`
+- Adicionar seção "Link de Contagem" acima das tabs quando `effectiveUnidadeId` existe e o usuário é admin ou gerente
+- Botões: **Copiar Link** e **Compartilhar WhatsApp**
+- O link será: `{productionUrl}/contagem-utensilios/{effectiveUnidadeId}`
 
-### 2. Novo componente `src/components/utensilios/BulkImportExport.tsx`
-- Botão **Exportar Modelo**: gera Excel com todas unidades × todos utensílios usando openpyxl-style (SheetJS), com formatação profissional
-- Botão **Importar Planilha**: abre file input, parseia Excel, mostra modal de confirmação com resumo (X unidades, Y itens, Z alterações), e executa upsert
-- Modal de revisão mostra preview dos dados antes de salvar
+### 2. `src/pages/ContagemUtensilios.tsx` — EDITAR
+- Aceitar `lojaId` como URL param (`useParams`) além do contexto global
+- Se vier do param, usar esse ID (rota pública)
 
-### 3. `src/components/utensilios/UtensiliosTab.tsx`
-- Adicionar os botões de import/export ao lado do botão "Definir Estoque Inicial"
-- Visível apenas para admins (gestão multi-unidade)
+### 3. `src/App.tsx` — EDITAR
+- Adicionar rota pública `/contagem-utensilios/:lojaId` (sem ProtectedRoute)
+
+### 4. PIN de segurança (da decisão anterior)
+- Novo campo `pin_contagem` na tabela `lojas` via migration (varchar(4), nullable)
+- Na `ContagemUtensilios`, se acessada via URL param, exibir tela de PIN antes de liberar a contagem
+- No `UtensiliosTab`, campo para o gerente/admin definir o PIN da loja
 
 ## Arquivos
 
 | Tipo | Arquivo |
 |------|---------|
-| Novo | `src/components/utensilios/BulkImportExport.tsx` |
-| Editar | `src/hooks/useUtensilios.ts` — hooks de fetch all + bulk import |
-| Editar | `src/components/utensilios/UtensiliosTab.tsx` — integrar botões |
+| Editar | `src/components/utensilios/UtensiliosTab.tsx` — seção de link + PIN config |
+| Editar | `src/pages/ContagemUtensilios.tsx` — aceitar param + tela de PIN |
+| Editar | `src/App.tsx` — rota pública |
+| Migration | Adicionar coluna `pin_contagem` à tabela `lojas` |
 

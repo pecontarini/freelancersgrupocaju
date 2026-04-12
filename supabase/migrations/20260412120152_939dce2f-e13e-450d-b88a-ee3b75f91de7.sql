@@ -1,0 +1,1 @@
+ALTER TABLE public.utensilios_items ADD CONSTRAINT utensilios_items_catalog_loja_unique UNIQUE (catalog_item_id, loja_id);

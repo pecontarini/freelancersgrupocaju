@@ -28,6 +28,9 @@ export function UtensiliosTab() {
   const isMobile = useIsMobile();
   const { effectiveUnidadeId } = useUnidade();
 
+  const { isAdmin, isGerenteUnidade } = useUserProfile();
+  const canManageLinks = isAdmin || isGerenteUnidade;
+
   const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
   const { data: storeItems } = useUtensiliosItems(effectiveUnidadeId);
   const bulkCreate = useBulkCreateUtensiliosItems();
@@ -36,6 +39,55 @@ export function UtensiliosTab() {
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
   const [sectors, setSectors] = useState<Record<string, string>>({});
+  const [pinValue, setPinValue] = useState("");
+  const [pinLoaded, setPinLoaded] = useState(false);
+
+  // Load current PIN
+  useState(() => {
+    if (effectiveUnidadeId && canManageLinks) {
+      supabase
+        .from("config_lojas")
+        .select("pin_contagem")
+        .eq("id", effectiveUnidadeId)
+        .single()
+        .then(({ data }) => {
+          setPinValue((data as any)?.pin_contagem || "");
+          setPinLoaded(true);
+        });
+    }
+  });
+
+  const PRODUCTION_URL = "https://freelancersgrupocaju.lovable.app";
+  const countingLink = effectiveUnidadeId
+    ? `${PRODUCTION_URL}/contagem-utensilios/${effectiveUnidadeId}`
+    : "";
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(countingLink);
+    toast.success("Link copiado!");
+  };
+
+  const handleShareWhatsApp = () => {
+    const msg = encodeURIComponent(`📋 Link para contagem de utensílios:\n${countingLink}`);
+    window.open(`https://wa.me/?text=${msg}`, "_blank");
+  };
+
+  const handleSavePin = async () => {
+    if (!effectiveUnidadeId) return;
+    if (pinValue && !/^\d{4}$/.test(pinValue)) {
+      toast.error("O PIN deve ter exatamente 4 dígitos numéricos");
+      return;
+    }
+    const { error } = await supabase
+      .from("config_lojas")
+      .update({ pin_contagem: pinValue || null } as any)
+      .eq("id", effectiveUnidadeId);
+    if (error) {
+      toast.error("Erro ao salvar PIN");
+    } else {
+      toast.success(pinValue ? "PIN salvo!" : "PIN removido");
+    }
+  };
 
   const storeMap: Record<string, any> = {};
   storeItems?.forEach((si: any) => { storeMap[si.catalog_item_id] = si; });

@@ -202,6 +202,21 @@ export function UtensiliosTab() {
         </Card>
       )}
 
+      {/* Gestão em Massa — admin only */}
+      {isAdmin && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm">Gestão em Massa</h3>
+                <p className="text-xs text-muted-foreground">Exporte o modelo, preencha e importe para configurar todas as unidades de uma vez.</p>
+              </div>
+              <BulkImportExport />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={isMobile ? "overflow-x-auto -mx-2 px-2" : ""}>
           <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-4"}>

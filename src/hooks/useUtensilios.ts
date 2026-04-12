@@ -148,3 +148,51 @@ export function useUtensiliosPedidos(lojaId: string | null) {
     },
   });
 }
+
+// ── NEW: Bulk upsert utensilios_items for a store ──
+
+export function useBulkCreateUtensiliosItems() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: Array<{
+      catalog_item_id: string;
+      loja_id: string;
+      estoque_minimo: number;
+      valor_unitario?: number;
+    }>) => {
+      // upsert using the unique constraint (catalog_item_id, loja_id)
+      const rows = items.map((i) => ({
+        catalog_item_id: i.catalog_item_id,
+        loja_id: i.loja_id,
+        estoque_minimo: i.estoque_minimo,
+        valor_unitario: i.valor_unitario ?? 0,
+        is_active: true,
+      }));
+      const { error } = await supabase
+        .from("utensilios_items")
+        .upsert(rows, { onConflict: "catalog_item_id,loja_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      toast.success("Estoque mínimo salvo com sucesso!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
+export function useUpdateUtensilioItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (update: { id: string; estoque_minimo?: number; valor_unitario?: number }) => {
+      const { id, ...fields } = update;
+      const { error } = await supabase.from("utensilios_items").update(fields).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      toast.success("Item atualizado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}

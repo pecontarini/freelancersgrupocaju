@@ -62,7 +62,7 @@ export interface ScheduleParseResult {
 const DAY_NAMES = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const DAY_NAMES_NORM = DAY_NAMES.map((d) => normalizeString(d));
 const SUB_HEADERS = ["ENTRADA", "INTERV.", "SAÍDA"];
-const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas"]);
+const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas", "banco horas", "domingo mes", "domingo mês", "domingo mês ", "domingo mes ", "banco horas ", "atestado", "licença", "licenca", "suspensão", "suspensao"]);
 const METADATA_ROW_KEY = "__CAJU_SCHEDULE_META__";
 
 // ─── Template Generator (3 columns per day) ───

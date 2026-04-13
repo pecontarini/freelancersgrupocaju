@@ -521,6 +521,16 @@ function parse3ColSheet(
     const empName = cellToString(row[0]);
     if (!empName) continue;
 
+    // Skip separator rows (e.g. "── EXTRAS / FREELANCERS ──")
+    if (empName.startsWith("──") || empName.startsWith("--")) continue;
+
+    // Skip template rows where ALL day columns are empty (no schedule data at all)
+    const hasAnyDayData = dayColumns.some((colBase) => {
+      const val = cellToString(row[colBase]);
+      return val !== "";
+    });
+    if (!hasAnyDayData) continue;
+
     const cargo = cellToString(row[1]);
     const normName = normalizeString(empName);
 

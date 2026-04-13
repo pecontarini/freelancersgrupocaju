@@ -6,6 +6,7 @@ import { LOGO_BASE64 } from "@/lib/logoBase64";
 import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { fetchScheduleData, type ScheduleDataResult } from "@/lib/scheduleMasterExport";
+import { meetsMinimumOverlap, LUNCH_PEAK, DINNER_PEAK } from "@/lib/peakHours";
 
 const DAY_LABELS_SHORT = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -251,11 +252,13 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
     // Get final Y from autoTable
     tableEndY = (doc as any).lastAutoTable?.finalY || tableEndY + 50;
 
-    // ── Summary block ──
+    // ── Summary block — per shift (POP rule: 2h minimum overlap) ──
     const summaryY = tableEndY + 6;
     const summaryHead = [["", ...weekDays.map((d, i) => `${DAY_LABELS_SHORT[i]}`)]];
     const summaryBody: any[][] = [];
-    const summaryRow: any[] = ["Efet / Ext / Total"];
+
+    // Almoço row
+    const lunchRow: any[] = ["Almoço (12h–15h)"];
     for (const day of weekDays) {
       const dateStr = format(day, "yyyy-MM-dd");
       const daySchedules = sectorSchedules.filter(
@@ -263,13 +266,32 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
       );
       let clt = 0, extra = 0;
       for (const s of daySchedules) {
+        if (!meetsMinimumOverlap(s.start_time, s.end_time, LUNCH_PEAK)) continue;
         const emp = s.employee_id ? empMap.get(s.employee_id) : null;
         if (emp && emp.worker_type !== "clt") extra++;
         else clt++;
       }
-      summaryRow.push(`${clt} / ${extra} / ${clt + extra}`);
+      lunchRow.push(`${clt} / ${extra} / ${clt + extra}`);
     }
-    summaryBody.push(summaryRow);
+    summaryBody.push(lunchRow);
+
+    // Jantar row
+    const dinnerRow: any[] = ["Jantar (19h–22h)"];
+    for (const day of weekDays) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const daySchedules = sectorSchedules.filter(
+        (s: any) => s.schedule_date === dateStr && s.schedule_type === "working"
+      );
+      let clt = 0, extra = 0;
+      for (const s of daySchedules) {
+        if (!meetsMinimumOverlap(s.start_time, s.end_time, DINNER_PEAK)) continue;
+        const emp = s.employee_id ? empMap.get(s.employee_id) : null;
+        if (emp && emp.worker_type !== "clt") extra++;
+        else clt++;
+      }
+      dinnerRow.push(`${clt} / ${extra} / ${clt + extra}`);
+    }
+    summaryBody.push(dinnerRow);
 
     // POP rows
     for (const shiftType of shiftTypes) {
@@ -304,7 +326,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
         columnStyles: { 0: { halign: "left", cellWidth: 50 } },
         didParseCell: (hookData) => {
           if (hookData.section === "body") {
-            if (hookData.row.index === 0) {
+            if (hookData.row.index <= 1) {
               hookData.cell.styles.fillColor = [254, 249, 195];
               hookData.cell.styles.fontStyle = "bold";
             } else {
@@ -325,7 +347,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
         columnStyles: { 0: { halign: "left", cellWidth: 50 } },
         didParseCell: (hookData) => {
           if (hookData.section === "body") {
-            if (hookData.row.index === 0) {
+            if (hookData.row.index <= 1) {
               hookData.cell.styles.fillColor = [254, 249, 195];
               hookData.cell.styles.fontStyle = "bold";
             } else {

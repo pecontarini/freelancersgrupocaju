@@ -106,34 +106,35 @@ export function usePopCompliance(
         sectorsByUnit.get(sec.unit_id)!.push(sec);
       }
 
-      // Helper: count scheduled for a sector/date/shift using time intersection
-      const LUNCH_START = 12 * 60;
-      const LUNCH_END = 14 * 60 + 30;
-      const DINNER_START = 19 * 60 + 30;
-      const DINNER_END = 22 * 60;
+      // Helper: count scheduled for a sector/date/shift using POP 2h minimum overlap rule
+      const LUNCH_PEAK_W = { start: "12:00", end: "15:00" };
+      const DINNER_PEAK_W = { start: "19:00", end: "22:00" };
+      const MIN_OVERLAP = 120; // minutes
 
       function timeToMin(t: string) {
         const [h, m] = t.split(":").map(Number);
         return h * 60 + (m || 0);
       }
 
-      function overlaps(startTime: string, endTime: string, windowStart: number, windowEnd: number) {
+      function hasMinOverlap(startTime: string, endTime: string, windowStart: number, windowEnd: number, minMinutes: number) {
         let s = timeToMin(startTime);
         let e = timeToMin(endTime);
         if (e <= s) e += 24 * 60;
-        return s < windowEnd && e > windowStart;
+        const overlapStart = Math.max(s, windowStart);
+        const overlapEnd = Math.min(e, windowEnd);
+        return (overlapEnd - overlapStart) >= minMinutes;
       }
 
       function countScheduled(sectorId: string, dateStr: string, shiftType: string): number {
         const daySchedules = schedules.filter(
           (s) => s.sector_id === sectorId && s.schedule_date === dateStr
         );
-        let window = shiftType === "almoco"
-          ? { start: LUNCH_START, end: LUNCH_END }
-          : { start: DINNER_START, end: DINNER_END };
+        const peak = shiftType === "almoco" ? LUNCH_PEAK_W : DINNER_PEAK_W;
+        const windowStart = timeToMin(peak.start);
+        const windowEnd = timeToMin(peak.end);
 
         return daySchedules.filter((s) =>
-          s.start_time && s.end_time && overlaps(s.start_time, s.end_time, window.start, window.end)
+          s.start_time && s.end_time && hasMinOverlap(s.start_time, s.end_time, windowStart, windowEnd, MIN_OVERLAP)
         ).length;
       }
 

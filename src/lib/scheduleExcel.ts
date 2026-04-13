@@ -62,7 +62,7 @@ export interface ScheduleParseResult {
 const DAY_NAMES = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const DAY_NAMES_NORM = DAY_NAMES.map((d) => normalizeString(d));
 const SUB_HEADERS = ["ENTRADA", "INTERV.", "SAÍDA"];
-const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas"]);
+const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas", "banco horas", "domingo mes", "domingo mês", "domingo mês ", "domingo mes ", "banco horas ", "atestado", "licença", "licenca", "suspensão", "suspensao"]);
 const METADATA_ROW_KEY = "__CAJU_SCHEDULE_META__";
 
 // ─── Template Generator (3 columns per day) ───
@@ -382,7 +382,11 @@ function parseTimeStr(cell: any): string | null {
 }
 
 function isOffKeyword(val: string): boolean {
-  return OFF_KEYWORDS.has(val.toLowerCase().trim());
+  const cleaned = val.toLowerCase().trim();
+  if (OFF_KEYWORDS.has(cleaned)) return true;
+  // Partial match for common variations like "BANCO HORAS " or "DOMINGO MÊS "
+  const kwArray = Array.from(OFF_KEYWORDS);
+  return kwArray.some((kw) => cleaned.startsWith(kw) || kw.startsWith(cleaned));
 }
 
 // ─── Detect format ───
@@ -514,6 +518,16 @@ function parse3ColSheet(
 
     const empName = cellToString(row[0]);
     if (!empName) continue;
+
+    // Skip separator rows (e.g. "── EXTRAS / FREELANCERS ──")
+    if (empName.startsWith("──") || empName.startsWith("--")) continue;
+
+    // Skip template rows where ALL day columns are empty (no schedule data at all)
+    const hasAnyDayData = dayColumns.some((colBase) => {
+      const val = cellToString(row[colBase]);
+      return val !== "";
+    });
+    if (!hasAnyDayData) continue;
 
     const cargo = cellToString(row[1]);
     const normName = normalizeString(empName);

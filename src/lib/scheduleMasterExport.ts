@@ -217,7 +217,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   const wb = XLSX.utils.book_new();
 
   // Track summary data for "Resumo Geral" tab
-  const summaryData: { sectorName: string; days: { clt: number; extra: number }[] }[] = [];
+  const summaryData: { sectorName: string; days: { lunchClt: number; lunchExtra: number; dinnerClt: number; dinnerExtra: number }[] }[] = [];
 
   for (const sector of sectors) {
     const sectorSchedules = scheduleBySector.get(sector.id) || [];

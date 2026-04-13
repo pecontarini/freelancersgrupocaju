@@ -385,10 +385,8 @@ function isOffKeyword(val: string): boolean {
   const cleaned = val.toLowerCase().trim();
   if (OFF_KEYWORDS.has(cleaned)) return true;
   // Partial match for common variations like "BANCO HORAS " or "DOMINGO MÊS "
-  for (const kw of OFF_KEYWORDS) {
-    if (cleaned.startsWith(kw) || kw.startsWith(cleaned)) return true;
-  }
-  return false;
+  const kwArray = Array.from(OFF_KEYWORDS);
+  return kwArray.some((kw) => cleaned.startsWith(kw) || kw.startsWith(cleaned));
 }
 
 // ─── Detect format ───

@@ -382,7 +382,13 @@ function parseTimeStr(cell: any): string | null {
 }
 
 function isOffKeyword(val: string): boolean {
-  return OFF_KEYWORDS.has(val.toLowerCase().trim());
+  const cleaned = val.toLowerCase().trim();
+  if (OFF_KEYWORDS.has(cleaned)) return true;
+  // Partial match for common variations like "BANCO HORAS " or "DOMINGO MÊS "
+  for (const kw of OFF_KEYWORDS) {
+    if (cleaned.startsWith(kw) || kw.startsWith(cleaned)) return true;
+  }
+  return false;
 }
 
 // ─── Detect format ───

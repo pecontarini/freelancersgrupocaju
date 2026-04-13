@@ -3,6 +3,7 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { downloadWorkbook } from "@/lib/excelUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { jsDayToPopDay } from "@/lib/popConventions";
+import { meetsMinimumOverlap, LUNCH_PEAK, DINNER_PEAK } from "@/lib/peakHours";
 
 const DAY_LABELS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -294,24 +295,51 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     // Empty separator
     row++;
 
-    // Daily summary
-    const sectorDaySummary: { clt: number; extra: number }[] = [];
-    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "RESUMO DO DIA", s: STYLE.resumoLabel };
+    // Daily summary — per shift (POP rule: 2h minimum overlap)
+    const sectorDaySummary: { lunchClt: number; lunchExtra: number; dinnerClt: number; dinnerExtra: number }[] = [];
+
+    // Almoço row
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "ALMOÇO (12h–15h)", s: STYLE.resumoLabel };
     for (let d = 0; d < 7; d++) {
       const dateStr = format(weekDays[d], "yyyy-MM-dd");
       const daySchedules = sectorSchedules.filter(
         (s: any) => s.schedule_date === dateStr && s.schedule_type === "working"
       );
-      let cltCount = 0;
-      let extraCount = 0;
+      let lunchClt = 0, lunchExtra = 0;
       for (const s of daySchedules) {
+        if (!meetsMinimumOverlap(s.start_time, s.end_time, LUNCH_PEAK)) continue;
         const emp = s.employee_id ? empMap.get(s.employee_id) : null;
-        if (emp && emp.worker_type !== "clt") extraCount++;
-        else cltCount++;
+        if (emp && emp.worker_type !== "clt") lunchExtra++;
+        else lunchClt++;
       }
-      sectorDaySummary.push({ clt: cltCount, extra: extraCount });
+      if (!sectorDaySummary[d]) sectorDaySummary[d] = { lunchClt: 0, lunchExtra: 0, dinnerClt: 0, dinnerExtra: 0 };
+      sectorDaySummary[d].lunchClt = lunchClt;
+      sectorDaySummary[d].lunchExtra = lunchExtra;
       ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
-        v: `Efet: ${cltCount} | Ext: ${extraCount} | Total: ${cltCount + extraCount}`,
+        v: `Efet: ${lunchClt} | Ext: ${lunchExtra} | Total: ${lunchClt + lunchExtra}`,
+        s: STYLE.resumo,
+      };
+    }
+    row++;
+
+    // Jantar row
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "JANTAR (19h–22h)", s: STYLE.resumoLabel };
+    for (let d = 0; d < 7; d++) {
+      const dateStr = format(weekDays[d], "yyyy-MM-dd");
+      const daySchedules = sectorSchedules.filter(
+        (s: any) => s.schedule_date === dateStr && s.schedule_type === "working"
+      );
+      let dinnerClt = 0, dinnerExtra = 0;
+      for (const s of daySchedules) {
+        if (!meetsMinimumOverlap(s.start_time, s.end_time, DINNER_PEAK)) continue;
+        const emp = s.employee_id ? empMap.get(s.employee_id) : null;
+        if (emp && emp.worker_type !== "clt") dinnerExtra++;
+        else dinnerClt++;
+      }
+      sectorDaySummary[d].dinnerClt = dinnerClt;
+      sectorDaySummary[d].dinnerExtra = dinnerExtra;
+      ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
+        v: `Efet: ${dinnerClt} | Ext: ${dinnerExtra} | Total: ${dinnerClt + dinnerExtra}`,
         s: STYLE.resumo,
       };
     }
@@ -380,27 +408,54 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     }
     row++;
 
-    // Data rows
-    const totals = Array(7).fill(null).map(() => ({ clt: 0, extra: 0 }));
+    // Data rows — two sub-rows per sector (Almoço + Jantar)
+    const lunchTotals = Array(7).fill(null).map(() => ({ clt: 0, extra: 0 }));
+    const dinnerTotals = Array(7).fill(null).map(() => ({ clt: 0, extra: 0 }));
+
     summaryData.forEach((sd, idx) => {
       const bg = idx % 2 === 0 ? "FFFFFF" : "F3F4F6";
-      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: sd.sectorName, s: { ...STYLE.summaryCell(bg), alignment: { horizontal: "left", vertical: "center" }, font: { sz: 10, bold: true } } };
+      // Almoço row
+      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: `${sd.sectorName} — Almoço`, s: { ...STYLE.summaryCell(bg), alignment: { horizontal: "left", vertical: "center" }, font: { sz: 10, bold: true } } };
       for (let d = 0; d < 7; d++) {
-        const { clt, extra } = sd.days[d];
-        totals[d].clt += clt;
-        totals[d].extra += extra;
+        const { lunchClt, lunchExtra } = sd.days[d];
+        lunchTotals[d].clt += lunchClt;
+        lunchTotals[d].extra += lunchExtra;
         ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
-          v: `${clt} + ${extra} ext = ${clt + extra}`,
+          v: `${lunchClt} + ${lunchExtra} ext = ${lunchClt + lunchExtra}`,
+          s: STYLE.summaryCell(bg),
+        };
+      }
+      row++;
+
+      // Jantar row
+      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: `${sd.sectorName} — Jantar`, s: { ...STYLE.summaryCell(bg), alignment: { horizontal: "left", vertical: "center" }, font: { sz: 10 } } };
+      for (let d = 0; d < 7; d++) {
+        const { dinnerClt, dinnerExtra } = sd.days[d];
+        dinnerTotals[d].clt += dinnerClt;
+        dinnerTotals[d].extra += dinnerExtra;
+        ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
+          v: `${dinnerClt} + ${dinnerExtra} ext = ${dinnerClt + dinnerExtra}`,
           s: STYLE.summaryCell(bg),
         };
       }
       row++;
     });
 
-    // Totals row
-    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "TOTAL GERAL", s: { ...STYLE.summaryTotal, alignment: { horizontal: "left", vertical: "center" } } };
+    // Totals — Almoço
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "TOTAL ALMOÇO", s: { ...STYLE.summaryTotal, alignment: { horizontal: "left", vertical: "center" } } };
     for (let d = 0; d < 7; d++) {
-      const { clt, extra } = totals[d];
+      const { clt, extra } = lunchTotals[d];
+      ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
+        v: `${clt} + ${extra} ext = ${clt + extra}`,
+        s: STYLE.summaryTotal,
+      };
+    }
+    row++;
+
+    // Totals — Jantar
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: "TOTAL JANTAR", s: { ...STYLE.summaryTotal, alignment: { horizontal: "left", vertical: "center" } } };
+    for (let d = 0; d < 7; d++) {
+      const { clt, extra } = dinnerTotals[d];
       ws[XLSX.utils.encode_cell({ r: row, c: d + 1 })] = {
         v: `${clt} + ${extra} ext = ${clt + extra}`,
         s: STYLE.summaryTotal,

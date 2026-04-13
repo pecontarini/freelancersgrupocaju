@@ -347,7 +347,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
         columnStyles: { 0: { halign: "left", cellWidth: 50 } },
         didParseCell: (hookData) => {
           if (hookData.section === "body") {
-            if (hookData.row.index === 0) {
+            if (hookData.row.index <= 1) {
               hookData.cell.styles.fillColor = [254, 249, 195];
               hookData.cell.styles.fontStyle = "bold";
             } else {

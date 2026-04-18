@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StaffingMatrixImporter } from "./StaffingMatrixImporter";
+import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
 
 const DAYS = [
   { value: 0, label: "Seg" },

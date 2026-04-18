@@ -55,29 +55,34 @@ export function mapGoogleStatus(g?: string | null): ParticipanteStatus {
 
 function normalizeParticipantes(raw: unknown): AgendaParticipante[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      if (typeof item === "string") {
-        const email = item.trim().toLowerCase();
-        if (!email) return null;
-        return { email, status: "pendente" as ParticipanteStatus };
-      }
-      if (item && typeof item === "object") {
-        const obj = item as Record<string, unknown>;
-        const email = String(obj.email ?? "").trim().toLowerCase();
-        if (!email) return null;
-        const status = (obj.status as ParticipanteStatus) ?? "pendente";
-        return {
-          email,
-          user_id: (obj.user_id as string | null) ?? null,
-          nome: (obj.nome as string | null) ?? null,
-          avatar_url: (obj.avatar_url as string | null) ?? null,
-          status: ["pendente", "aceito", "recusado", "talvez"].includes(status) ? status : "pendente",
-        };
-      }
-      return null;
-    })
-    .filter((x): x is AgendaParticipante => !!x);
+  const out: AgendaParticipante[] = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      const email = item.trim().toLowerCase();
+      if (!email) continue;
+      out.push({ email, status: "pendente" });
+      continue;
+    }
+    if (item && typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      const email = String(obj.email ?? "").trim().toLowerCase();
+      if (!email) continue;
+      const rawStatus = (obj.status as string) ?? "pendente";
+      const status: ParticipanteStatus = (["pendente", "aceito", "recusado", "talvez"] as const).includes(
+        rawStatus as ParticipanteStatus
+      )
+        ? (rawStatus as ParticipanteStatus)
+        : "pendente";
+      out.push({
+        email,
+        user_id: (obj.user_id as string | null) ?? null,
+        nome: (obj.nome as string | null) ?? null,
+        avatar_url: (obj.avatar_url as string | null) ?? null,
+        status,
+      });
+    }
+  }
+  return out;
 }
 
 export function useAgendaEventos(opts?: { allUsers?: boolean }) {

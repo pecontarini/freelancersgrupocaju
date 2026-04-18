@@ -7,12 +7,13 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
 import { useNavigate } from "react-router-dom";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnidade } from "@/contexts/UnidadeContext";
 import { supabase } from "@/integrations/supabase/client";
 
 import { AgendaMonthView } from "@/components/agenda/AgendaMonthView";
@@ -37,6 +38,7 @@ export default function Agenda() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isAdmin, isOperator } = useUserProfile();
+  const { selectedUnidadeId, setSelectedUnidadeId } = useUnidade();
   const canSeeAll = isAdmin || isOperator;
 
   const [view, setView] = useState<ViewMode>("mensal");
@@ -276,9 +278,12 @@ export default function Agenda() {
       <div className="flex min-h-screen w-full">
         <AppSidebar activeTab="agenda" onTabChange={(tab) => navigate(`/?tab=${tab}`)} />
         <SidebarInset>
-          <PortalHeader title="Agenda Operacional" subtitle="Calendário integrado ao Google Calendar">
-            <SidebarTrigger />
-          </PortalHeader>
+          <PortalHeader
+            title="Agenda Operacional"
+            subtitle="Calendário integrado ao Google Calendar"
+            selectedUnidadeId={selectedUnidadeId}
+            onUnidadeChange={setSelectedUnidadeId}
+          />
 
           <main className="container mx-auto max-w-7xl p-4 md:p-6">
             {hasGoogleToken === null ? (

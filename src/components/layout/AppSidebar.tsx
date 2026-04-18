@@ -17,6 +17,7 @@ import {
   ScanFace,
   UtensilsCrossed,
   Warehouse,
+  Calendar,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -109,6 +110,12 @@ const menuItems = [
     id: "estoque",
     icon: Warehouse,
     description: "Gestão de estoque por setor",
+  },
+  {
+    title: "AGENDA",
+    id: "agenda",
+    icon: Calendar,
+    description: "Agenda integrada ao Google Calendar",
   },
 ];
 

@@ -18,6 +18,7 @@ import ResetPassword from "./pages/ResetPassword";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 import ContagemUtensilios from "./pages/ContagemUtensilios";
+import Agenda from "./pages/Agenda";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/checkin" element={<FreelancerCheckin />} />
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
+                <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

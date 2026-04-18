@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { CATEGORIA_INFO, formatDateTimeBR } from "./agendaUtils";
-import type { AgendaEvento } from "@/hooks/useAgendaEventos";
+import type { AgendaEvento, AgendaParticipante } from "@/hooks/useAgendaEventos";
 import { CheckCircle2, Clock, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { STATUS_DOT_COLOR } from "./ParticipanteStatusBadge";
 
 interface Props {
   eventos: AgendaEvento[];
@@ -11,11 +12,11 @@ interface Props {
   ownerNameById?: Record<string, string>;
 }
 
-function initialsFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? email;
-  const parts = local.split(/[._-]+/).filter(Boolean);
+function initialsFrom(p: AgendaParticipante): string {
+  const src = (p.nome && p.nome.trim()) || p.email.split("@")[0] || p.email;
+  const parts = src.split(/[\s._-]+/).filter(Boolean);
   const letters = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
-  return (letters || local.slice(0, 2)).toUpperCase();
+  return (letters || src.slice(0, 2)).toUpperCase();
 }
 
 export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameById }: Props) {
@@ -83,13 +84,25 @@ export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameByI
               {participantes.length > 0 && (
                 <div className="mt-1.5 flex items-center gap-1">
                   <div className="flex -space-x-1.5">
-                    {visiveis.map((email) => (
+                    {visiveis.map((p) => (
                       <span
-                        key={email}
-                        title={email}
-                        className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-primary/15 text-[9px] font-bold uppercase text-primary"
+                        key={p.email}
+                        title={`${p.nome ?? p.email} (${p.status})`}
+                        className="relative"
                       >
-                        {initialsFromEmail(email)}
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-primary/15 text-[9px] font-bold uppercase text-primary">
+                          {p.avatar_url ? (
+                            <img src={p.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            initialsFrom(p)
+                          )}
+                        </span>
+                        <span
+                          className={cn(
+                            "absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border-[1.5px] border-background",
+                            STATUS_DOT_COLOR[p.status]
+                          )}
+                        />
                       </span>
                     ))}
                   </div>

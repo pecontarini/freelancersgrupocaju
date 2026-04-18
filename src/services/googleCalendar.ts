@@ -4,13 +4,24 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const SCOPES = "https://www.googleapis.com/auth/calendar";
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 
+export interface AgendaParticipanteInput {
+  email: string;
+  nome?: string | null;
+}
+
 export interface AgendaEventoInput {
   titulo: string;
   descricao?: string | null;
   data_inicio: string; // ISO
   data_fim?: string | null;
   categoria: "reuniao" | "operacional" | "pessoal" | "outro";
-  participantes?: string[];
+  participantes?: AgendaParticipanteInput[];
+}
+
+export interface GoogleAttendee {
+  email: string;
+  displayName?: string;
+  responseStatus?: "accepted" | "declined" | "tentative" | "needsAction";
 }
 
 declare global {
@@ -129,7 +140,10 @@ function buildGoogleEvent(evento: AgendaEventoInput) {
     },
   };
   if (evento.participantes && evento.participantes.length > 0) {
-    base.attendees = evento.participantes.map((email) => ({ email }));
+    base.attendees = evento.participantes.map((p) => ({
+      email: p.email,
+      ...(p.nome ? { displayName: p.nome } : {}),
+    }));
     base.guestsCanSeeOtherGuests = true;
   }
   return base;
@@ -192,4 +206,17 @@ export async function deleteCalendarEvent(token: string, googleEventId: string) 
   return googleFetch(token, `/calendars/primary/events/${encodeURIComponent(googleEventId)}`, {
     method: "DELETE",
   });
+}
+
+// Busca detalhes do evento e retorna attendees com responseStatus
+export async function getCalendarEventAttendees(
+  token: string,
+  googleEventId: string
+): Promise<GoogleAttendee[]> {
+  const data = await googleFetch(
+    token,
+    `/calendars/primary/events/${encodeURIComponent(googleEventId)}`
+  );
+  const attendees = (data?.attendees ?? []) as GoogleAttendee[];
+  return attendees;
 }

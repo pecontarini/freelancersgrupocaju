@@ -1,4 +1,4 @@
-import { useEffect, useState, KeyboardEvent } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Check, RotateCcw, Loader2, UserPlus, X } from "lucide-react";
+import { Trash2, Check, RotateCcw, Loader2 } from "lucide-react";
+import { ParticipanteSelector } from "./ParticipanteSelector";
+import { ParticipanteStatusBadge } from "./ParticipanteStatusBadge";
+import type { AgendaParticipante } from "@/hooks/useAgendaEventos";
 
 export type AgendaCategoria = "reuniao" | "operacional" | "pessoal" | "outro";
 
@@ -22,7 +25,7 @@ export interface AgendaEventoForm {
   concluido: boolean;
   google_event_id?: string | null;
   syncGoogle: boolean;
-  participantes: string[];
+  participantes: AgendaParticipante[];
 }
 
 interface Props {
@@ -43,8 +46,6 @@ const CATEGORIAS: { value: AgendaCategoria; label: string }[] = [
   { value: "outro", label: "Outro" },
 ];
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export function AgendaEventModal({
   open,
   onOpenChange,
@@ -56,56 +57,19 @@ export function AgendaEventModal({
   isEdit,
 }: Props) {
   const [form, setForm] = useState<AgendaEventoForm>(() => buildDefault(initial));
-  const [emailDraft, setEmailDraft] = useState("");
-  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setForm(buildDefault(initial));
-      setEmailDraft("");
-      setEmailError(null);
     }
   }, [open, initial]);
 
   const update = <K extends keyof AgendaEventoForm>(k: K, v: AgendaEventoForm[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const tryAddEmail = (raw: string) => {
-    const email = raw.trim().toLowerCase();
-    if (!email) return;
-    if (!EMAIL_RE.test(email)) {
-      setEmailError("E-mail inválido.");
-      return;
-    }
-    if (form.participantes.includes(email)) {
-      setEmailError("E-mail já adicionado.");
-      return;
-    }
-    update("participantes", [...form.participantes, email]);
-    setEmailDraft("");
-    setEmailError(null);
-  };
-
-  const handleEmailKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      tryAddEmail(emailDraft);
-    } else if (e.key === "Backspace" && !emailDraft && form.participantes.length) {
-      update("participantes", form.participantes.slice(0, -1));
-    }
-  };
-
-  const removeEmail = (email: string) =>
-    update(
-      "participantes",
-      form.participantes.filter((e) => e !== email)
-    );
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.titulo.trim() || !form.data_inicio_date || !form.data_inicio_time) return;
-    // Adiciona email pendente se houver
-    if (emailDraft.trim()) tryAddEmail(emailDraft);
     await onSubmit(form);
   };
 
@@ -196,48 +160,31 @@ export function AgendaEventModal({
             </Select>
           </div>
 
-          {/* Participantes */}
-          <div className="space-y-2">
-            <Label htmlFor="participantes" className="flex items-center gap-1.5">
-              <UserPlus className="h-4 w-4 text-primary" />
-              Participantes <span className="text-xs font-normal text-muted-foreground">(opcional)</span>
-            </Label>
-            {form.participantes.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {form.participantes.map((email) => (
-                  <span
-                    key={email}
-                    className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                  >
-                    {email}
-                    <button
-                      type="button"
-                      onClick={() => removeEmail(email)}
-                      className="rounded-full p-0.5 transition-colors hover:bg-primary/20"
-                      aria-label={`Remover ${email}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
+          {/* Participantes (busca inteligente) */}
+          <ParticipanteSelector
+            value={form.participantes}
+            onChange={(next) => update("participantes", next)}
+          />
+
+          {/* Lista de status (apenas em modo edição com participantes) */}
+          {isEdit && form.participantes.length > 0 && (
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Status dos convidados</p>
+              <ul className="space-y-1.5">
+                {form.participantes.map((p) => (
+                  <li key={p.email} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium">{p.nome ?? p.email}</span>
+                      {p.nome && (
+                        <span className="ml-1 truncate text-xs text-muted-foreground">({p.email})</span>
+                      )}
+                    </span>
+                    <ParticipanteStatusBadge status={p.status} />
+                  </li>
                 ))}
-              </div>
-            )}
-            <Input
-              id="participantes"
-              type="email"
-              value={emailDraft}
-              onChange={(e) => {
-                setEmailDraft(e.target.value);
-                if (emailError) setEmailError(null);
-              }}
-              onKeyDown={handleEmailKeyDown}
-              onBlur={() => {
-                if (emailDraft.trim()) tryAddEmail(emailDraft);
-              }}
-              placeholder="Digite um e-mail e pressione Enter"
-            />
-            {emailError && <p className="text-xs text-destructive">{emailError}</p>}
-          </div>
+              </ul>
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>

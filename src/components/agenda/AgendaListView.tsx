@@ -11,6 +11,13 @@ interface Props {
   ownerNameById?: Record<string, string>;
 }
 
+function initialsFromEmail(email: string): string {
+  const local = email.split("@")[0] ?? email;
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  const letters = (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+  return (letters || local.slice(0, 2)).toUpperCase();
+}
+
 export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameById }: Props) {
   const ordered = useMemo(() => {
     const now = Date.now();
@@ -31,6 +38,9 @@ export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameByI
     <div className="space-y-2">
       {ordered.map((e) => {
         const info = CATEGORIA_INFO[e.categoria];
+        const participantes = e.participantes ?? [];
+        const visiveis = participantes.slice(0, 3);
+        const restantes = participantes.length - visiveis.length;
         return (
           <button
             key={e.id}
@@ -69,7 +79,29 @@ export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameByI
               >
                 {e.titulo}
               </div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
+
+              {participantes.length > 0 && (
+                <div className="mt-1.5 flex items-center gap-1">
+                  <div className="flex -space-x-1.5">
+                    {visiveis.map((email) => (
+                      <span
+                        key={email}
+                        title={email}
+                        className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-primary/15 text-[9px] font-bold uppercase text-primary"
+                      >
+                        {initialsFromEmail(email)}
+                      </span>
+                    ))}
+                  </div>
+                  {restantes > 0 && (
+                    <span className="ml-1 text-[10px] font-medium text-muted-foreground">
+                      +{restantes}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-1 text-xs text-muted-foreground">
                 {formatDateTimeBR(e.data_inicio)}
                 {e.data_fim && ` → ${formatDateTimeBR(e.data_fim)}`}
               </div>

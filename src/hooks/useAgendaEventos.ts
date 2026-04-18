@@ -14,6 +14,7 @@ export interface AgendaEvento {
   data_fim: string | null;
   categoria: AgendaCategoria;
   concluido: boolean;
+  participantes: string[];
   created_at: string;
 }
 
@@ -26,6 +27,7 @@ export interface AgendaEventoUpsert {
   categoria: AgendaCategoria;
   concluido?: boolean;
   google_event_id?: string | null;
+  participantes?: string[];
 }
 
 export function useAgendaEventos(opts?: { allUsers?: boolean }) {
@@ -43,7 +45,10 @@ export function useAgendaEventos(opts?: { allUsers?: boolean }) {
       if (!opts?.allUsers) q = q.eq("user_id", user.id);
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as AgendaEvento[];
+      return ((data ?? []) as any[]).map((r) => ({
+        ...r,
+        participantes: Array.isArray(r.participantes) ? r.participantes : [],
+      })) as AgendaEvento[];
     },
     enabled: !!user,
   });
@@ -62,11 +67,12 @@ export function useAgendaEventos(opts?: { allUsers?: boolean }) {
           categoria: input.categoria,
           concluido: input.concluido ?? false,
           google_event_id: input.google_event_id ?? null,
-        })
+          participantes: input.participantes ?? [],
+        } as any)
         .select("*")
         .single();
       if (error) throw error;
-      return data as AgendaEvento;
+      return data as unknown as AgendaEvento;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["agenda-eventos"] }),
   });
@@ -83,7 +89,8 @@ export function useAgendaEventos(opts?: { allUsers?: boolean }) {
           categoria: input.categoria,
           concluido: input.concluido ?? false,
           google_event_id: input.google_event_id ?? null,
-        })
+          participantes: input.participantes ?? [],
+        } as any)
         .eq("id", input.id);
       if (error) throw error;
     },

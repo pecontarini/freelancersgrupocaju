@@ -147,6 +147,7 @@ export default function Agenda() {
       concluido: e.concluido,
       google_event_id: e.google_event_id,
       syncGoogle: !!e.google_event_id,
+      participantes: e.participantes ?? [],
     });
     setModalOpen(true);
   };
@@ -173,6 +174,7 @@ export default function Agenda() {
                 data_inicio,
                 data_fim,
                 categoria: form.categoria,
+                participantes: form.participantes,
               });
             } else {
               const created = await createCalendarEvent(tokenRow.access_token, {
@@ -181,6 +183,7 @@ export default function Agenda() {
                 data_inicio,
                 data_fim,
                 categoria: form.categoria,
+                participantes: form.participantes,
               });
               googleEventId = created?.id ?? null;
             }
@@ -197,6 +200,7 @@ export default function Agenda() {
           categoria: form.categoria,
           concluido: form.concluido,
           google_event_id: googleEventId,
+          participantes: form.participantes,
         });
         toast.success("Evento atualizado.");
       } else {
@@ -208,6 +212,7 @@ export default function Agenda() {
               data_inicio,
               data_fim,
               categoria: form.categoria,
+              participantes: form.participantes,
             });
             googleEventId = created?.id ?? null;
           } catch (err: any) {
@@ -222,6 +227,7 @@ export default function Agenda() {
           categoria: form.categoria,
           concluido: false,
           google_event_id: googleEventId,
+          participantes: form.participantes,
         });
         toast.success("Evento criado.");
       }

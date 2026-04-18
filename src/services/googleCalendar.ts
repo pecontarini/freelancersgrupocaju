@@ -10,6 +10,7 @@ export interface AgendaEventoInput {
   data_inicio: string; // ISO
   data_fim?: string | null;
   categoria: "reuniao" | "operacional" | "pessoal" | "outro";
+  participantes?: string[];
 }
 
 declare global {
@@ -117,7 +118,7 @@ export async function clearTokenFromSupabase(): Promise<void> {
 }
 
 function buildGoogleEvent(evento: AgendaEventoInput) {
-  return {
+  const base: any = {
     summary: evento.titulo,
     description: evento.descricao ?? "",
     start: { dateTime: new Date(evento.data_inicio).toISOString() },
@@ -127,6 +128,18 @@ function buildGoogleEvent(evento: AgendaEventoInput) {
       ).toISOString(),
     },
   };
+  if (evento.participantes && evento.participantes.length > 0) {
+    base.attendees = evento.participantes.map((email) => ({ email }));
+    base.guestsCanSeeOtherGuests = true;
+  }
+  return base;
+}
+
+function withSendUpdates(path: string, evento: AgendaEventoInput): string {
+  const hasGuests = !!evento.participantes && evento.participantes.length > 0;
+  if (!hasGuests) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}sendUpdates=all`;
 }
 
 async function googleFetch(token: string, path: string, init?: RequestInit) {
@@ -147,7 +160,7 @@ async function googleFetch(token: string, path: string, init?: RequestInit) {
 }
 
 export async function createCalendarEvent(token: string, evento: AgendaEventoInput) {
-  return googleFetch(token, `/calendars/primary/events`, {
+  return googleFetch(token, withSendUpdates(`/calendars/primary/events`, evento), {
     method: "POST",
     body: JSON.stringify(buildGoogleEvent(evento)),
   });
@@ -165,10 +178,14 @@ export async function listCalendarEvents(token: string, timeMin: string, timeMax
 }
 
 export async function updateCalendarEvent(token: string, googleEventId: string, evento: AgendaEventoInput) {
-  return googleFetch(token, `/calendars/primary/events/${encodeURIComponent(googleEventId)}`, {
-    method: "PUT",
-    body: JSON.stringify(buildGoogleEvent(evento)),
-  });
+  return googleFetch(
+    token,
+    withSendUpdates(`/calendars/primary/events/${encodeURIComponent(googleEventId)}`, evento),
+    {
+      method: "PUT",
+      body: JSON.stringify(buildGoogleEvent(evento)),
+    }
+  );
 }
 
 export async function deleteCalendarEvent(token: string, googleEventId: string) {

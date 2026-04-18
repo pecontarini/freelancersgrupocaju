@@ -75,6 +75,9 @@ import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";
 import { supabase } from "@/integrations/supabase/client";
+import { PracaBadge } from "./PracaBadge";
+import { PlanoChaoStatus } from "./PlanoChaoStatus";
+import { usePracasByUnit } from "@/hooks/usePracas";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -740,13 +743,16 @@ export function ManualScheduleGrid() {
                              {weekDays.map((day, i) => {
                               const dateStr = format(day, "yyyy-MM-dd");
                               const schedule = getScheduleForCell(emp.id, dateStr);
+                              const pracaName = schedule?.praca_id
+                                ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
+                                : null;
                               return (
                                 <TableCell
                                   key={i}
                                   className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
                                   onClick={() => handleCellClick(emp, dateStr)}
                                 >
-                                  <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} />
+                                  <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
                                 </TableCell>
                               );
                             })}
@@ -886,6 +892,8 @@ export function ManualScheduleGrid() {
           date={editModal.date}
           sectorId={editModal.sectorId}
           existing={editModal.existing}
+          unitId={selectedUnit}
+          sectorName={sectors.find((s) => s.id === editModal.sectorId)?.name || sectors.find((s) => s.id === activeSectorId)?.name || null}
         />
       )}
 
@@ -987,9 +995,11 @@ function MiniPopBadge({
 function ScheduleCell({
   schedule,
   isFreelancer,
+  pracaName,
 }: {
   schedule?: ManualSchedule;
   isFreelancer: boolean;
+  pracaName?: string | null;
 }) {
   if (!schedule) {
     return (
@@ -1031,21 +1041,24 @@ function ScheduleCell({
   const hasBreak = schedule.break_duration > 0;
 
   return (
-    <div
-      className={`h-10 flex items-center justify-center rounded-md text-[11px] font-medium px-1 ${
-        isFreelancer
-          ? "border-2 border-orange-400 bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300"
-          : "bg-primary/10 text-primary"
-      }`}
-    >
-      {startStr && endStr ? (
-        <span className="flex items-center gap-0.5">
-          {startStr} - {endStr}
-          {hasBreak && <Coffee className="h-2.5 w-2.5 opacity-50" />}
-        </span>
-      ) : (
-        <span>✓</span>
-      )}
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        className={`h-10 w-full flex items-center justify-center rounded-md text-[11px] font-medium px-1 ${
+          isFreelancer
+            ? "border-2 border-orange-400 bg-orange-50 dark:bg-orange-950/20 text-orange-700 dark:text-orange-300"
+            : "bg-primary/10 text-primary"
+        }`}
+      >
+        {startStr && endStr ? (
+          <span className="flex items-center gap-0.5">
+            {startStr} - {endStr}
+            {hasBreak && <Coffee className="h-2.5 w-2.5 opacity-50" />}
+          </span>
+        ) : (
+          <span>✓</span>
+        )}
+      </div>
+      <PracaBadge nome={pracaName} />
     </div>
   );
 }

@@ -248,7 +248,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
       didDrawPage: () => {
         // Header on continuation pages
         if (doc.internal.pages.length > 2) {
-          addSectorHeader(doc, sector.name);
+          addSectorHeader(doc, sectorTitle);
         }
       },
     });
@@ -318,7 +318,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
     // Check if we need a new page for summary
     if (summaryY + 30 > pageHeight - 20) {
       doc.addPage();
-      addSectorHeader(doc, sector.name);
+      addSectorHeader(doc, sectorTitle);
       autoTable(doc, {
         head: summaryHead,
         body: summaryBody,

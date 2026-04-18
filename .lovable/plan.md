@@ -1,45 +1,72 @@
 
-Objetivo: fazer a opção de vincular unidades aparecer no lugar certo para o fluxo operacional e corrigir a inconsistência de acesso.
+Objetivo: fazer o vínculo de setores realmente funcionar e fazer os dois lados aparecerem juntos no Editor de Escalas.
 
-Diagnóstico do problema
-- O vínculo de unidades já existe no código, mas foi colocado em `Configurações` do menu administrativo (`ConfigurationsTab`).
-- No uso real, você está em `Escalas > Configurações` (`StaffingMatrixConfig`), então a ação “não aparece” onde a operação espera encontrá-la.
-- Há também uma inconsistência de permissão: `UnitPartnershipsSection` aceita admin/operador, mas o tab `configuracoes` da página principal só renderiza para admin.
+Diagnóstico
+- Pelo print, o bloqueio imediato é este: a loja parceira selecionada não tem setores cadastrados, então o modal fica sem opção de “setor parceiro” e o vínculo não pode ser concluído.
+- No código, mesmo quando existe `sector_partnership`, o Editor de Escalas ainda mistura só uma parte dos dados:
+  - traz funcionários da loja parceira,
+  - mas continua filtrando escalas, métricas, quadro base e edição principalmente pelo `activeSectorId` local.
+- Resultado: o setor pode até ficar “vinculado”, mas não vira de fato uma área única na elaboração da escala.
 
 Plano de correção
-1. Mover o ponto principal de uso para Escalas
-- Inserir a seção `Lojas Casadas` dentro de `src/components/escalas/StaffingMatrixConfig.tsx`, acima do seletor de unidade.
-- Isso coloca o vínculo exatamente no fluxo onde o usuário sobe a matriz POP conjunta.
 
-2. Manter consistência sem quebrar o que já existe
-- Decidir uma das abordagens:
-  - Preferida: exibir `Lojas Casadas` também em `Escalas > Configurações` e manter no menu administrativo.
-  - Alternativa: remover do menu administrativo e deixar apenas em Escalas.
-- Eu seguiria com a primeira, porque evita regressão para quem já procurar em Configurações.
+1. Corrigir o fluxo de vínculo de setor
+- Ajustar `SectorPartnerLinkModal` para não parar em beco sem saída quando a loja parceira estiver sem setores.
+- Quando não existir setor correspondente na loja parceira, mostrar ação para:
+  - criar o setor parceiro automaticamente, usando o nome do setor atual, e
+  - já concluir o vínculo na sequência.
+- Melhorar o texto do modal para deixar claro que, sem setor cadastrado na loja parceira, não há como unificar a escala.
 
-3. Corrigir regra de acesso
-- Revisar `src/pages/Index.tsx` e `src/components/layout/AppSidebar.tsx` para alinhar permissões.
-- Se o recurso é admin + operador, o acesso visual e o render precisam seguir a mesma regra em todos os lugares.
+2. Fazer o Editor de Escalas operar com “setor efetivo compartilhado”
+- Em `ManualScheduleGrid`, calcular `effectiveSectorIds = [setorAtual + setorParceiro]` quando houver parceria.
+- Usar esses ids combinados em toda a leitura da tela:
+  - escalas da semana,
+  - funcionários já escalados,
+  - métricas diárias,
+  - contagem de freelancers,
+  - badges e indicadores do POP,
+  - quadro base do setor.
 
-4. Ajustar UX para ficar claro
-- Dentro de `StaffingMatrixConfig`, posicionar:
-  - card “Lojas Casadas”
-  - depois seletor da unidade
-  - depois banner da loja parceira e a matriz
-- Assim o usuário primeiro vincula as lojas e depois já configura a matriz unificada.
+3. Mostrar as duas equipes juntas de verdade
+- Unir a base de funcionários das duas lojas no setor compartilhado.
+- Considerar também os cargos vinculados dos dois setores, para o “Quadro base do setor” trazer CLTs dos dois lados, não só os já escalados.
+- Manter a identificação visual de quem pertence à loja parceira.
 
-5. Hardening de estado/carregamento
-- Garantir que a renderização da seção espere o carregamento de perfil/permissões antes de decidir esconder/exibir.
-- Isso evita sumiço temporário por loading de role.
+4. Salvar novas escalas no setor correto
+- Hoje novas escalas tendem a usar o setor local por padrão.
+- Ajustar para que, em setor compartilhado:
+  - funcionário da loja atual grave no setor atual,
+  - funcionário da loja parceira grave no setor parceiro,
+  - edição de uma escala existente continue respeitando o `sector_id` original.
+- Isso evita mistura errada de dados e mantém cada loja com seus próprios registros, mesmo na visão unificada.
 
-Arquivos a ajustar
-- `src/components/escalas/StaffingMatrixConfig.tsx` — adicionar a seção `Lojas Casadas` no fluxo de Escalas
-- `src/components/ConfigurationsTab.tsx` — manter ou simplificar a versão administrativa
-- `src/pages/Index.tsx` — alinhar render do tab `configuracoes`
-- `src/components/layout/AppSidebar.tsx` — alinhar visibilidade do menu com a mesma regra de permissão
-- Opcional: `src/hooks/useUserProfile.ts` — usar/loading guard de forma explícita no consumo
+5. Ajustar o fluxo de freelancer no setor compartilhado
+- Revisar `FreelancerAddModal`, porque hoje ele abre usando só a loja/setor local.
+- Em setor compartilhado, incluir escolha do lado correto (loja atual ou parceira) antes de lançar o freelancer.
+
+Arquivos principais
+- `src/components/escalas/SectorPartnerLinkModal.tsx`
+- `src/components/escalas/SectorJobTitleMapping.tsx`
+- `src/components/escalas/ManualScheduleGrid.tsx`
+- `src/components/escalas/FreelancerAddModal.tsx`
+- `src/hooks/useSectorPartnerships.ts`
+- possivelmente um helper novo para resolver “setor compartilhado efetivo”
+
+Impacto técnico
+- Não precisa de nova tabela.
+- A correção é principalmente de fluxo e leitura/escrita consistente sobre `sector_partnerships`.
+- O foco é transformar o vínculo em comportamento operacional real, não só em badge visual.
 
 Resultado esperado
-- Em `Escalas > Configurações`, a opção “Lojas Casadas” aparece antes da matriz.
-- O usuário consegue vincular MULT 12 ↔ NFE 03 e MULT 03 ↔ NFE 04 sem sair do módulo de Escalas.
-- O vínculo passa a ficar no ponto natural do processo de dimensionamento mínimo, reduzindo erro operacional e confusão de navegação.
+- Se a loja parceira estiver vazia, você conseguirá criar o setor parceiro e vincular no mesmo fluxo.
+- Depois de vinculado, Cozinha/Bar/ASG aparecerão como uma única frente operacional no Editor de Escalas.
+- Funcionários e escalas das duas lojas ficarão juntos na elaboração, mas cada lançamento continuará salvo no setor correto de origem.
+
+Validação que farei na implementação
+- Vincular MULT 12 ↔ NFE 03 em um setor compartilhado.
+- Garantir que o modal permita concluir o vínculo mesmo se a loja parceira estiver sem setor.
+- Confirmar que, no Editor de Escalas, aparecem juntos:
+  - funcionários da loja atual,
+  - funcionários da loja parceira,
+  - escalas já lançadas dos dois lados,
+  - quadro base e indicadores coerentes.

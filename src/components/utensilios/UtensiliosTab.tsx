@@ -16,12 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock } from "lucide-react";
+import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock, Network } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SETORES_UTENSILIOS } from "./SectorFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
+import { GlobalMinimumStockMatrix } from "./GlobalMinimumStockMatrix";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -36,6 +37,7 @@ export function UtensiliosTab() {
   const bulkCreate = useBulkCreateUtensiliosItems();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
   const [sectors, setSectors] = useState<Record<string, string>>({});
@@ -206,12 +208,26 @@ export function UtensiliosTab() {
       {isAdmin && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className={isMobile ? "space-y-3" : "flex items-center justify-between gap-4"}>
               <div>
-                <h3 className="font-semibold text-sm">Gestão em Massa</h3>
-                <p className="text-xs text-muted-foreground">Exporte o modelo, preencha e importe para configurar todas as unidades de uma vez.</p>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Network className="h-4 w-4 text-primary" />
+                  Gestão de Estoques Mínimos da Rede
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Edite os mínimos de todas as unidades em uma matriz visual, ou use a planilha para importação em massa.
+                </p>
               </div>
-              <BulkImportExport />
+              <div className={isMobile ? "flex flex-col gap-2 w-full" : "flex items-center gap-2 shrink-0"}>
+                <Button
+                  onClick={() => setMatrixOpen(true)}
+                  className={isMobile ? "w-full" : ""}
+                >
+                  <Network className="h-4 w-4 mr-2" />
+                  Editar Matriz da Rede
+                </Button>
+                <BulkImportExport />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -297,6 +313,11 @@ export function UtensiliosTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Matriz Global Loja x Item — admin only */}
+      {isAdmin && (
+        <GlobalMinimumStockMatrix open={matrixOpen} onOpenChange={setMatrixOpen} />
+      )}
     </div>
   );
 }

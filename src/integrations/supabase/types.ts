@@ -3906,6 +3906,10 @@ export type Database = {
           waste_qty: number
         }[]
       }
+      cleanup_units_schedule_data: {
+        Args: { p_unit_ids: string[] }
+        Returns: Json
+      }
       compute_kardex_daily: {
         Args: {
           p_end_date: string

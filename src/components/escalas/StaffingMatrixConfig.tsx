@@ -221,6 +221,9 @@ export function StaffingMatrixConfig() {
         </div>
       </div>
 
+      {/* Lojas Casadas — vincular unidades antes de configurar a matriz unificada */}
+      {canManagePartnerships && <UnitPartnershipsSection />}
+
       {/* Unit selector */}
       <Card>
         <CardHeader className="pb-3">

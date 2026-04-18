@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,14 +18,17 @@ import {
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Link2, Unlink, AlertTriangle, Loader2 } from "lucide-react";
+import { Link2, Unlink, AlertTriangle, Loader2, Plus } from "lucide-react";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
-import { useSectors } from "@/hooks/useStaffingMatrix";
+import { useSectors, useAddSector } from "@/hooks/useStaffingMatrix";
 import {
   useSectorPartner,
   useLinkSectors,
   useUnlinkSectors,
 } from "@/hooks/useSectorPartnerships";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Props {
   open: boolean;
@@ -44,16 +47,20 @@ export function SectorPartnerLinkModal({
   currentUnitId,
   currentUnitName,
 }: Props) {
+  const qc = useQueryClient();
   const { stores } = useAccessibleStores();
   const { data: existing, isLoading: loadingExisting } = useSectorPartner(sectorId);
   const linkSectors = useLinkSectors();
   const unlinkSectors = useUnlinkSectors();
+  const addSector = useAddSector();
 
   const [partnerUnitId, setPartnerUnitId] = useState<string>("");
   const [partnerSectorId, setPartnerSectorId] = useState<string>("");
   const [confirmText, setConfirmText] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const { data: partnerUnitSectors = [] } = useSectors(partnerUnitId || null);
+  const { data: partnerUnitSectors = [], isLoading: loadingPartnerSectors } =
+    useSectors(partnerUnitId || null);
 
   // Available stores: exclude current unit
   const availableStores = useMemo(
@@ -61,17 +68,44 @@ export function SectorPartnerLinkModal({
     [stores, currentUnitId]
   );
 
-  // Look up partner info for display when already linked
+  // Reset partner sector selection when partner unit changes
+  useEffect(() => {
+    setPartnerSectorId("");
+  }, [partnerUnitId]);
+
   const linkedSectorInfo = useMemo(() => {
     if (!existing) return null;
     return { partnerSectorId: existing.partnerSectorId, partnershipId: existing.id };
   }, [existing]);
 
-  const { data: linkedUnitInfoSectors = [] } = useSectors(
-    // We need to figure out the unit_id from the partner sector — we'll fetch all stores' sectors lazily.
-    // Simplest: query all sectors when we have a linked partner and look it up.
-    null
-  );
+  // Suggest a matching sector by name when partner unit is selected
+  useEffect(() => {
+    if (!partnerUnitId || partnerUnitSectors.length === 0) return;
+    const norm = (s: string) => s.trim().toLowerCase();
+    const match = partnerUnitSectors.find((s) => norm(s.name) === norm(sectorName));
+    if (match && !partnerSectorId) setPartnerSectorId(match.id);
+  }, [partnerUnitId, partnerUnitSectors, sectorName, partnerSectorId]);
+
+  async function handleCreatePartnerSector() {
+    if (!partnerUnitId) return;
+    setIsCreating(true);
+    try {
+      // Create sector in partner unit using same name
+      const { data, error } = await supabase
+        .from("sectors")
+        .insert({ unit_id: partnerUnitId, name: sectorName })
+        .select("id")
+        .single();
+      if (error) throw error;
+      toast.success(`Setor "${sectorName}" criado na loja parceira.`);
+      qc.invalidateQueries({ queryKey: ["sectors"] });
+      setPartnerSectorId(data.id);
+    } catch (err: any) {
+      toast.error("Erro ao criar setor: " + err.message);
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   function handleLink() {
     if (!partnerSectorId) return;
@@ -99,6 +133,8 @@ export function SectorPartnerLinkModal({
     });
   }
 
+  const partnerUnitName = stores.find((s) => s.id === partnerUnitId)?.nome || "";
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
@@ -118,7 +154,6 @@ export function SectorPartnerLinkModal({
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : linkedSectorInfo ? (
-          // Already linked — show partner + unlink option
           <LinkedView
             partnerSectorId={linkedSectorInfo.partnerSectorId}
             confirmText={confirmText}
@@ -127,7 +162,6 @@ export function SectorPartnerLinkModal({
             isUnlinking={unlinkSectors.isPending}
           />
         ) : (
-          // Not linked — show form to create link
           <div className="space-y-4">
             <Alert>
               <AlertTriangle className="h-4 w-4" />
@@ -139,13 +173,7 @@ export function SectorPartnerLinkModal({
 
             <div className="space-y-2">
               <Label className="text-xs">Loja parceira</Label>
-              <Select
-                value={partnerUnitId}
-                onValueChange={(v) => {
-                  setPartnerUnitId(v);
-                  setPartnerSectorId("");
-                }}
-              >
+              <Select value={partnerUnitId} onValueChange={setPartnerUnitId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Escolha a loja casada" />
                 </SelectTrigger>
@@ -164,10 +192,18 @@ export function SectorPartnerLinkModal({
               <Select
                 value={partnerSectorId}
                 onValueChange={setPartnerSectorId}
-                disabled={!partnerUnitId}
+                disabled={!partnerUnitId || partnerUnitSectors.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={partnerUnitId ? "Escolha o setor equivalente" : "Selecione a loja primeiro"} />
+                  <SelectValue
+                    placeholder={
+                      !partnerUnitId
+                        ? "Selecione a loja primeiro"
+                        : partnerUnitSectors.length === 0
+                        ? "Loja sem setores cadastrados"
+                        : "Escolha o setor equivalente"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {partnerUnitSectors.map((s) => (
@@ -177,11 +213,59 @@ export function SectorPartnerLinkModal({
                   ))}
                 </SelectContent>
               </Select>
-              {partnerUnitSectors.length === 0 && partnerUnitId && (
-                <p className="text-xs text-muted-foreground">
-                  Esta loja ainda não tem setores cadastrados.
-                </p>
+
+              {/* No sectors in partner unit → offer to auto-create */}
+              {partnerUnitId && !loadingPartnerSectors && partnerUnitSectors.length === 0 && (
+                <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 p-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    A loja <strong className="text-foreground">{partnerUnitName}</strong> ainda não
+                    tem setores cadastrados. Posso criar agora um setor chamado{" "}
+                    <strong className="text-foreground uppercase">"{sectorName}"</strong> nela e já
+                    deixar pronto para vincular.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleCreatePartnerSector}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <>
+                        <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        Criar setor "{sectorName}" em {partnerUnitName}
+                      </>
+                    )}
+                  </Button>
+                </div>
               )}
+
+              {/* Has sectors but none matches the current sector name → also offer create */}
+              {partnerUnitId &&
+                !loadingPartnerSectors &&
+                partnerUnitSectors.length > 0 &&
+                !partnerUnitSectors.some(
+                  (s) => s.name.trim().toLowerCase() === sectorName.trim().toLowerCase()
+                ) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="w-full text-xs h-7"
+                    onClick={handleCreatePartnerSector}
+                    disabled={isCreating}
+                  >
+                    {isCreating ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Não vejo "{sectorName}" — criar nesta loja
+                      </>
+                    )}
+                  </Button>
+                )}
             </div>
           </div>
         )}
@@ -224,7 +308,6 @@ function LinkedView({
   onUnlink: () => void;
   isUnlinking: boolean;
 }) {
-  // Lazy fetch partner sector info via inline query
   const { partnerSector, partnerUnit } = usePartnerSectorDisplay(partnerSectorId);
 
   return (
@@ -279,17 +362,14 @@ function LinkedView({
   );
 }
 
-/** Inline hook for displaying partner sector + unit name */
 function usePartnerSectorDisplay(partnerSectorId: string) {
   const { stores } = useAccessibleStores();
-  // Fetch the sector to know its unit_id
   const [partnerSector, setPartnerSector] = useState<string>("");
   const [partnerUnit, setPartnerUnit] = useState<string>("");
 
-  useMemo(() => {
+  useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase
         .from("sectors")
         .select("name, unit_id")
@@ -301,7 +381,9 @@ function usePartnerSectorDisplay(partnerSectorId: string) {
         setPartnerUnit(unit?.nome || "");
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [partnerSectorId, stores]);
 
   return { partnerSector, partnerUnit };

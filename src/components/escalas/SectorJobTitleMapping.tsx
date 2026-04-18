@@ -218,25 +218,45 @@ function SectorCard({
   allJTs,
   onToggle,
   saving,
+  isLinked,
+  onLinkClick,
 }: {
   sectorName: string;
   selectedJTs: { id: string; name: string }[];
   allJTs: { id: string; name: string }[];
   onToggle: (jtId: string) => void;
   saving: boolean;
+  isLinked: boolean;
+  onLinkClick: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const selectedIds = new Set(selectedJTs.map((jt) => jt.id));
 
   return (
-    <Card>
+    <Card className={cn(isLinked && "border-primary/40 bg-primary/[0.02]")}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{sectorName}</span>
-          <Badge variant="secondary" className="text-xs font-normal">
-            {selectedJTs.length} cargo(s)
-          </Badge>
+        <CardTitle className="text-base flex items-center justify-between gap-2">
+          <span className="truncate">{sectorName}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <Badge variant="secondary" className="text-xs font-normal">
+              {selectedJTs.length} cargo(s)
+            </Badge>
+            <Button
+              variant={isLinked ? "default" : "ghost"}
+              size="icon"
+              className="h-6 w-6"
+              onClick={onLinkClick}
+              title={isLinked ? "Setor compartilhado — clique para gerenciar" : "Vincular setor parceiro"}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </CardTitle>
+        {isLinked && (
+          <p className="text-[11px] text-primary font-medium mt-0.5">
+            🔗 Compartilhado com loja parceira
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Selected tags */}

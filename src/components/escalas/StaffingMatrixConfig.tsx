@@ -122,10 +122,31 @@ export function StaffingMatrixConfig() {
   const { data: shifts = [], isLoading: loadingShifts } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
   const { data: matrix = [], isLoading: loadingMatrix } = useStaffingMatrix(sectorIds);
+  const { data: sectorPartnerships } = useSectorPartnerships(sectorIds);
+  const { data: unitPartner } = useUnitPartner(selectedUnit);
+  const partnerLojaName = lojas.options.find((l) => l.id === unitPartner?.partnerUnitId)?.nome;
   const upsertMatrix = useUpsertStaffingMatrix();
   const addSector = useAddSector();
   const deleteSector = useDeleteSector();
   const clearMatrix = useClearStaffingMatrix();
+
+  // Wraps the upsert: when the sector has a partnership, mirror the values to the partner sector.
+  const upsertWithMirror = useCallback(
+    async (row: {
+      sector_id: string;
+      day_of_week: number;
+      shift_type: string;
+      required_count: number;
+      extras_count?: number;
+    }) => {
+      await upsertMatrix.mutateAsync(row);
+      const partnerSectorId = sectorPartnerships?.get(row.sector_id);
+      if (partnerSectorId && partnerSectorId !== row.sector_id) {
+        await upsertMatrix.mutateAsync({ ...row, sector_id: partnerSectorId });
+      }
+    },
+    [upsertMatrix, sectorPartnerships]
+  );
 
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
 

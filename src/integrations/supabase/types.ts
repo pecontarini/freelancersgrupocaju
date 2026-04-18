@@ -114,6 +114,48 @@ export type Database = {
           },
         ]
       }
+      agenda_eventos: {
+        Row: {
+          categoria: string
+          concluido: boolean
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          descricao: string | null
+          google_event_id: string | null
+          id: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categoria?: string
+          concluido?: boolean
+          created_at?: string
+          data_fim?: string | null
+          data_inicio: string
+          descricao?: string | null
+          google_event_id?: string | null
+          id?: string
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categoria?: string
+          concluido?: boolean
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string | null
+          google_event_id?: string | null
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_alerts: {
         Row: {
           alert_type: string
@@ -3503,6 +3545,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_google_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

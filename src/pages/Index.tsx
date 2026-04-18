@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Loader2, Users } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import {
   SidebarInset,
@@ -112,6 +113,18 @@ const Index = () => {
 
   const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "escalas" : "budgets");
   const [isInitialized, setIsInitialized] = useState(false);
+  const navigate = useNavigate();
+
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      if (tab === "agenda") {
+        navigate("/agenda");
+        return;
+      }
+      setActiveTab(tab);
+    },
+    [navigate]
+  );
 
   // Set default tab for chefe_setor
   useEffect(() => {
@@ -269,7 +282,7 @@ const Index = () => {
       <SidebarProvider>
         <AppGlassBackground />
         <div className="flex min-h-screen flex-col pb-20 pt-14 w-full">
-          <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+          <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
           <div className="px-4 py-4">
             <PortalHeader
               title={currentTabConfig.title}
@@ -289,7 +302,7 @@ const Index = () => {
     <SidebarProvider>
       <AppGlassBackground />
       <div className="flex min-h-screen w-full">
-        <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         <SidebarInset>
           <PortalHeader
             title={currentTabConfig.title}

@@ -141,8 +141,11 @@ export function usePopCompliance(
       }
 
       function countScheduled(sectorId: string, dateStr: string, shiftType: string): number {
+        // Include partner sector schedules so shared sectors don't show false gaps
+        const partnerId = partnerMap.get(sectorId);
+        const sectorIdsToCheck = partnerId ? [sectorId, partnerId] : [sectorId];
         const daySchedules = schedules.filter(
-          (s) => s.sector_id === sectorId && s.schedule_date === dateStr
+          (s) => sectorIdsToCheck.includes(s.sector_id) && s.schedule_date === dateStr
         );
         const peak = shiftType === "almoco" ? LUNCH_PEAK_W : DINNER_PEAK_W;
         const windowStart = timeToMin(peak.start);

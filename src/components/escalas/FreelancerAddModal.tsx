@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Link2 } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
@@ -28,8 +28,13 @@ interface FreelancerAddModalProps {
   open: boolean;
   onClose: () => void;
   unitId: string;
+  unitName?: string;
   sectorId: string;
   date: string;
+  /** When sector is shared with a partner unit */
+  partnerUnitId?: string;
+  partnerUnitName?: string;
+  partnerSectorId?: string;
   onAdded?: (employeeId: string) => void;
 }
 
@@ -37,13 +42,31 @@ export function FreelancerAddModal({
   open,
   onClose,
   unitId,
+  unitName,
   sectorId,
   date,
+  partnerUnitId,
+  partnerUnitName,
+  partnerSectorId,
   onAdded,
 }: FreelancerAddModalProps) {
-  const { data: employees = [] } = useEmployees(unitId);
-  const { data: sectorJobTitles = [] } = useSectorJobTitles([sectorId]);
-  const { data: allJobTitles = [] } = useJobTitles(unitId);
+  const isShared = !!partnerUnitId && !!partnerSectorId;
+
+  // Track which side (loja) the freelancer will be linked to
+  const [targetUnitId, setTargetUnitId] = useState<string>(unitId);
+  const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : sectorId;
+
+  // Reset target when modal opens
+  useEffect(() => {
+    if (open) setTargetUnitId(unitId);
+  }, [open, unitId]);
+
+  // Fetch employees from BOTH units (so "existing" picker covers both sides)
+  const { data: employees = [] } = useEmployees(unitId, isShared ? [partnerUnitId!] : undefined);
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(
+    isShared ? [sectorId, partnerSectorId!] : [sectorId]
+  );
+  const { data: allJobTitles = [] } = useJobTitles(targetUnitId);
   const upsertSchedule = useUpsertSchedule();
   const { lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
 
@@ -114,12 +137,12 @@ export function FreelancerAddModal({
       try {
         const { supabase } = await import("@/integrations/supabase/client");
 
-        // Check for existing freelancer with same CPF in this unit
+        // Check for existing freelancer with same CPF in target unit
         if (cleanCpf) {
           const { data: existingEmp } = await supabase
             .from("employees")
             .select("id, name")
-            .eq("unit_id", unitId)
+            .eq("unit_id", targetUnitId)
             .eq("cpf", cleanCpf)
             .eq("worker_type", "freelancer")
             .eq("active", true)
@@ -131,12 +154,11 @@ export function FreelancerAddModal({
           }
         }
 
-        // Only create if not found
         if (!empId) {
           const { data, error } = await supabase
             .from("employees")
             .insert({
-              unit_id: unitId,
+              unit_id: targetUnitId,
               name: newName.trim(),
               gender: "M",
               worker_type: "freelancer" as const,
@@ -155,6 +177,33 @@ export function FreelancerAddModal({
         toast.error("Erro ao criar freelancer: " + err.message);
         return;
       }
+    } else {
+      // mode === "select" — auto-detect target unit from selected employee
+      const selectedEmp = freelancers.find((f) => f.id === selectedId);
+      if (selectedEmp && isShared) {
+        const detectedSector =
+          selectedEmp.unit_id === partnerUnitId ? partnerSectorId! : sectorId;
+        // For "select" mode, use the employee's own sector (not the toggle)
+        try {
+          await upsertSchedule.mutateAsync({
+            employee_id: selectedId,
+            schedule_date: date,
+            sector_id: detectedSector,
+            start_time: startTime,
+            end_time: endTime,
+            break_duration: 0,
+            schedule_type: "working",
+            agreed_rate: rateNum,
+          });
+          onAdded?.(selectedId);
+          onClose();
+          resetForm();
+          return;
+        } catch (err: any) {
+          toast.error("Erro ao escalar: " + err.message);
+          return;
+        }
+      }
     }
 
     if (!empId) {
@@ -166,7 +215,7 @@ export function FreelancerAddModal({
       await upsertSchedule.mutateAsync({
         employee_id: empId,
         schedule_date: date,
-        sector_id: sectorId,
+        sector_id: targetSectorId,
         start_time: startTime,
         end_time: endTime,
         break_duration: 0,
@@ -209,6 +258,30 @@ export function FreelancerAddModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Shared sector → unit toggle (only impacts mode="create") */}
+          {isShared && mode === "create" && (
+            <div className="space-y-1.5 rounded-md border-2 border-primary/30 bg-primary/5 p-3">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Link2 className="h-3.5 w-3.5 text-primary" />
+                Cadastrar em qual loja?
+              </Label>
+              <Select value={targetUnitId} onValueChange={setTargetUnitId}>
+                <SelectTrigger className="bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={unitId}>{unitName || "Loja atual"}</SelectItem>
+                  <SelectItem value={partnerUnitId!}>
+                    {partnerUnitName || "Loja parceira"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                O freelancer será cadastrado nesta loja e a escala salva no setor correspondente.
+              </p>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button
               variant={mode === "select" ? "default" : "outline"}
@@ -244,11 +317,19 @@ export function FreelancerAddModal({
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {freelancers.map((f) => (
-                      <SelectItem key={f.id} value={f.id} className="uppercase">
-                        {f.name} {f.job_title ? `(${f.job_title})` : ""}
-                      </SelectItem>
-                    ))}
+                    {freelancers.map((f) => {
+                      const isFromPartner = isShared && f.unit_id === partnerUnitId;
+                      return (
+                        <SelectItem key={f.id} value={f.id} className="uppercase">
+                          {f.name} {f.job_title ? `(${f.job_title})` : ""}
+                          {isFromPartner && (
+                            <span className="ml-1 text-[10px] text-primary normal-case">
+                              · {partnerUnitName}
+                            </span>
+                          )}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}

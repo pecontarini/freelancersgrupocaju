@@ -111,13 +111,6 @@ export function ManualScheduleGrid() {
 
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
 
-  // Sector job title mappings
-  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
-  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorIds);
-
-  // Staffing matrix for POP
-  const { data: staffingMatrix = [] } = useStaffingMatrix(sectorIds);
-
   // Partnership for active sector (loja casada)
   const { data: partnerInfo } = useSectorPartner(activeSectorId);
   const [partnerSectorMeta, setPartnerSectorMeta] = useState<{
@@ -156,6 +149,27 @@ export function ManualScheduleGrid() {
       cancelled = true;
     };
   }, [partnerInfo?.partnerSectorId, accessibleStores, lojas.options]);
+
+  // Effective sector ids: local sector + partner (when shared)
+  const partnerSectorId = partnerInfo?.partnerSectorId || null;
+  const effectiveSectorIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (activeSectorId) ids.add(activeSectorId);
+    if (partnerSectorId) ids.add(partnerSectorId);
+    return Array.from(ids);
+  }, [activeSectorId, partnerSectorId]);
+
+  // Sector job title mappings — include partner sector to unify base team
+  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
+  const sectorJobTitleQueryIds = useMemo(() => {
+    const all = new Set<string>(sectorIds);
+    if (partnerSectorId) all.add(partnerSectorId);
+    return Array.from(all);
+  }, [sectorIds, partnerSectorId]);
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorJobTitleQueryIds);
+
+  // Staffing matrix for POP — include partner sector for unified efetivo
+  const { data: staffingMatrix = [] } = useStaffingMatrix(sectorJobTitleQueryIds);
 
   const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
 

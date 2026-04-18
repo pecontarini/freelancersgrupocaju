@@ -895,8 +895,12 @@ export function ManualScheduleGrid() {
           open={freelancerModal.open}
           onClose={() => setFreelancerModal(null)}
           unitId={selectedUnit}
+          unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || ""}
           sectorId={activeSectorId}
           date={freelancerModal.date}
+          partnerUnitId={partnerSectorMeta?.unitId}
+          partnerUnitName={partnerSectorMeta?.unitName}
+          partnerSectorId={partnerSectorId || undefined}
         />
       )}
 

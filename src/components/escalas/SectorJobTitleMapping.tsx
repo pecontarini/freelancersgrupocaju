@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
@@ -32,6 +32,8 @@ import {
   useSectorJobTitles,
   useSetSectorJobTitles,
 } from "@/hooks/useSectorJobTitles";
+import { useSectorPartnerships } from "@/hooks/useSectorPartnerships";
+import { SectorPartnerLinkModal } from "./SectorPartnerLinkModal";
 
 export function SectorJobTitleMapping() {
   const lojas = useConfigLojas();
@@ -41,9 +43,17 @@ export function SectorJobTitleMapping() {
   const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(selectedUnit);
   const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
   const { data: mappings = [], isLoading: loadingMap } = useSectorJobTitles(sectorIds);
+  const { data: partnershipMap = new Map<string, string>() } = useSectorPartnerships(sectorIds);
   const setSectorJT = useSetSectorJobTitles();
 
+  const [linkModal, setLinkModal] = useState<{ sectorId: string; sectorName: string } | null>(null);
+
   const isLoading = loadingSectors || loadingJT || loadingMap;
+
+  const selectedUnitName = useMemo(
+    () => accessibleStores.find((s) => s.id === selectedUnit)?.nome || "",
+    [accessibleStores, selectedUnit]
+  );
 
   // Group mappings by sector
   const bySector = useMemo(() => {
@@ -147,6 +157,7 @@ export function SectorJobTitleMapping() {
         {sectors.map((sector) => {
           const sectorJTIds = bySector[sector.id] || [];
           const sectorJTs = jobTitles.filter((jt) => sectorJTIds.includes(jt.id));
+          const isLinked = partnershipMap.has(sector.id);
 
           return (
             <SectorCard
@@ -156,6 +167,8 @@ export function SectorJobTitleMapping() {
               allJTs={jobTitles.map((jt) => ({ id: jt.id, name: jt.name }))}
               onToggle={(jtId) => handleToggle(sector.id, jtId)}
               saving={setSectorJT.isPending}
+              isLinked={isLinked}
+              onLinkClick={() => setLinkModal({ sectorId: sector.id, sectorName: sector.name })}
             />
           );
         })}
@@ -184,6 +197,17 @@ export function SectorJobTitleMapping() {
           </CardContent>
         </Card>
       )}
+
+      {linkModal && selectedUnit && (
+        <SectorPartnerLinkModal
+          open
+          onClose={() => setLinkModal(null)}
+          sectorId={linkModal.sectorId}
+          sectorName={linkModal.sectorName}
+          currentUnitId={selectedUnit}
+          currentUnitName={selectedUnitName}
+        />
+      )}
     </div>
   );
 }
@@ -194,25 +218,45 @@ function SectorCard({
   allJTs,
   onToggle,
   saving,
+  isLinked,
+  onLinkClick,
 }: {
   sectorName: string;
   selectedJTs: { id: string; name: string }[];
   allJTs: { id: string; name: string }[];
   onToggle: (jtId: string) => void;
   saving: boolean;
+  isLinked: boolean;
+  onLinkClick: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const selectedIds = new Set(selectedJTs.map((jt) => jt.id));
 
   return (
-    <Card>
+    <Card className={cn(isLinked && "border-primary/40 bg-primary/[0.02]")}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center justify-between">
-          <span>{sectorName}</span>
-          <Badge variant="secondary" className="text-xs font-normal">
-            {selectedJTs.length} cargo(s)
-          </Badge>
+        <CardTitle className="text-base flex items-center justify-between gap-2">
+          <span className="truncate">{sectorName}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <Badge variant="secondary" className="text-xs font-normal">
+              {selectedJTs.length} cargo(s)
+            </Badge>
+            <Button
+              variant={isLinked ? "default" : "ghost"}
+              size="icon"
+              className="h-6 w-6"
+              onClick={onLinkClick}
+              title={isLinked ? "Setor compartilhado — clique para gerenciar" : "Vincular setor parceiro"}
+            >
+              <Link2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </CardTitle>
+        {isLinked && (
+          <p className="text-[11px] text-primary font-medium mt-0.5">
+            🔗 Compartilhado com loja parceira
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Selected tags */}

@@ -16,6 +16,7 @@ import {
   DollarSign,
   Trash2,
   ChevronDown,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,6 +62,7 @@ import {
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
 import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
+import { useSectorPartner } from "@/hooks/useSectorPartnerships";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
@@ -72,6 +74,7 @@ import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";
+import { supabase } from "@/integrations/supabase/client";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 
@@ -115,7 +118,48 @@ export function ManualScheduleGrid() {
   // Staffing matrix for POP
   const { data: staffingMatrix = [] } = useStaffingMatrix(sectorIds);
 
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  // Partnership for active sector (loja casada)
+  const { data: partnerInfo } = useSectorPartner(activeSectorId);
+  const [partnerSectorMeta, setPartnerSectorMeta] = useState<{
+    sectorName: string;
+    unitId: string;
+    unitName: string;
+  } | null>(null);
+
+  // Resolve partner sector → name + unit info
+  useEffect(() => {
+    let cancelled = false;
+    if (!partnerInfo?.partnerSectorId) {
+      setPartnerSectorMeta(null);
+      return;
+    }
+    (async () => {
+      const { data: partnerSector } = await supabase
+        .from("sectors")
+        .select("name, unit_id")
+        .eq("id", partnerInfo.partnerSectorId)
+        .maybeSingle();
+      if (!partnerSector || cancelled) return;
+      const unitName =
+        accessibleStores.find((s) => s.id === partnerSector.unit_id)?.nome ||
+        lojas.options.find((l) => l.id === partnerSector.unit_id)?.nome ||
+        "Loja parceira";
+      if (!cancelled) {
+        setPartnerSectorMeta({
+          sectorName: partnerSector.name,
+          unitId: partnerSector.unit_id,
+          unitName,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partnerInfo?.partnerSectorId, accessibleStores, lojas.options]);
+
+  const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
+
+  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit, additionalUnitIds);
   const { data: schedules = [], isLoading: loadingSch } = useManualSchedules(selectedUnit, weekStart, weekEnd);
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();
@@ -448,6 +492,19 @@ export function ManualScheduleGrid() {
             </Button>
           </div>
 
+          {/* Shared sector banner (loja casada) */}
+          {partnerSectorMeta && activeSectorId && (
+            <div className="flex items-center gap-2 rounded-lg border-2 border-primary/30 bg-primary/5 px-3 py-2">
+              <Link2 className="h-4 w-4 text-primary shrink-0" />
+              <p className="text-xs sm:text-sm">
+                <span className="font-semibold text-primary">Setor compartilhado</span>
+                <span className="text-muted-foreground"> com </span>
+                <span className="font-semibold uppercase">{partnerSectorMeta.unitName} / {partnerSectorMeta.sectorName}</span>
+                <span className="text-muted-foreground"> — funcionários e escalas das duas lojas aparecem aqui.</span>
+              </p>
+            </div>
+          )}
+
           {/* Grid */}
           <Card>
             <CardContent className="pt-4 px-0">
@@ -594,6 +651,7 @@ export function ManualScheduleGrid() {
                     <TableBody>
                       {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
+                        const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
                         return (
                           <TableRow key={emp.id}>
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
@@ -602,6 +660,11 @@ export function ManualScheduleGrid() {
                                  {isFreelancer && (
                                   <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
                                     FL
+                                  </Badge>
+                                )}
+                                {isFromPartner && (
+                                  <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
+                                    {partnerSectorMeta?.unitName.slice(0, 8)}
                                   </Badge>
                                 )}
                                 {canManage && (

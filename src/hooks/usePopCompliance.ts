@@ -79,6 +79,21 @@ export function usePopCompliance(
         matrixData = data || [];
       }
 
+      // Fetch sector partnerships (shared sectors across paired stores)
+      let partnershipsData: { sector_id: string; partner_sector_id: string }[] = [];
+      if (sectorIds.length > 0) {
+        const { data: pData } = await supabase
+          .from("sector_partnerships" as any)
+          .select("sector_id, partner_sector_id");
+        partnershipsData = (pData as any[]) || [];
+      }
+      // Build bidirectional partner lookup
+      const partnerMap = new Map<string, string>();
+      for (const p of partnershipsData) {
+        partnerMap.set(p.sector_id, p.partner_sector_id);
+        partnerMap.set(p.partner_sector_id, p.sector_id);
+      }
+
       // Fetch schedules for the week across all units
       interface ScheduleRow {
         id: string;
@@ -126,8 +141,11 @@ export function usePopCompliance(
       }
 
       function countScheduled(sectorId: string, dateStr: string, shiftType: string): number {
+        // Include partner sector schedules so shared sectors don't show false gaps
+        const partnerId = partnerMap.get(sectorId);
+        const sectorIdsToCheck = partnerId ? [sectorId, partnerId] : [sectorId];
         const daySchedules = schedules.filter(
-          (s) => s.sector_id === sectorId && s.schedule_date === dateStr
+          (s) => sectorIdsToCheck.includes(s.sector_id) && s.schedule_date === dateStr
         );
         const peak = shiftType === "almoco" ? LUNCH_PEAK_W : DINNER_PEAK_W;
         const windowStart = timeToMin(peak.start);

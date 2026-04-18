@@ -57,9 +57,29 @@ export default function Agenda() {
   const [profilesById, setProfilesById] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  const { data: eventos = [], create, update, remove, toggleConcluido } = useAgendaEventos({
+  const { data: eventos = [], create, update, remove, toggleConcluido, updateParticipantes } = useAgendaEventos({
     allUsers: canSeeAll,
   });
+
+  // Helper: converter participantes para formato Google
+  const toGoogleParticipantes = (ps: AgendaParticipante[]) =>
+    ps.map((p) => ({ email: p.email, nome: p.nome ?? undefined }));
+
+  // Helper: mesclar status retornados pelo Google nos participantes locais
+  const mergeGoogleStatus = (
+    local: AgendaParticipante[],
+    googleAttendees: { email: string; responseStatus?: string }[]
+  ): AgendaParticipante[] => {
+    const byEmail = new Map(
+      googleAttendees.map((a) => [a.email.toLowerCase(), a.responseStatus])
+    );
+    return local.map((p) => {
+      const gStatus = byEmail.get(p.email.toLowerCase());
+      if (gStatus === undefined) return p;
+      const newStatus = mapGoogleStatus(gStatus);
+      return newStatus !== p.status ? { ...p, status: newStatus } : p;
+    });
+  };
 
   useEffect(() => {
     initGoogleAuth().catch(() => {});

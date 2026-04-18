@@ -492,6 +492,19 @@ export function ManualScheduleGrid() {
             </Button>
           </div>
 
+          {/* Shared sector banner (loja casada) */}
+          {partnerSectorMeta && activeSectorId && (
+            <div className="flex items-center gap-2 rounded-lg border-2 border-primary/30 bg-primary/5 px-3 py-2">
+              <Link2 className="h-4 w-4 text-primary shrink-0" />
+              <p className="text-xs sm:text-sm">
+                <span className="font-semibold text-primary">Setor compartilhado</span>
+                <span className="text-muted-foreground"> com </span>
+                <span className="font-semibold uppercase">{partnerSectorMeta.unitName} / {partnerSectorMeta.sectorName}</span>
+                <span className="text-muted-foreground"> — funcionários e escalas das duas lojas aparecem aqui.</span>
+              </p>
+            </div>
+          )}
+
           {/* Grid */}
           <Card>
             <CardContent className="pt-4 px-0">

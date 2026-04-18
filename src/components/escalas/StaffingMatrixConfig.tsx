@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Trash2, Loader2, Pencil, Check, X } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Plus, Trash2, Loader2, Pencil, Check, X, Link2, Info } from "lucide-react";
 import {
   useSectors,
   useShifts,
@@ -13,6 +13,8 @@ import {
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
+import { useUnitPartner } from "@/hooks/useUnitPartnerships";
+import { useSectorPartnerships } from "@/hooks/useSectorPartnerships";
 import {
   Select,
   SelectContent,

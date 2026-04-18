@@ -118,7 +118,48 @@ export function ManualScheduleGrid() {
   // Staffing matrix for POP
   const { data: staffingMatrix = [] } = useStaffingMatrix(sectorIds);
 
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  // Partnership for active sector (loja casada)
+  const { data: partnerInfo } = useSectorPartner(activeSectorId);
+  const [partnerSectorMeta, setPartnerSectorMeta] = useState<{
+    sectorName: string;
+    unitId: string;
+    unitName: string;
+  } | null>(null);
+
+  // Resolve partner sector → name + unit info
+  useEffect(() => {
+    let cancelled = false;
+    if (!partnerInfo?.partnerSectorId) {
+      setPartnerSectorMeta(null);
+      return;
+    }
+    (async () => {
+      const { data: partnerSector } = await supabase
+        .from("sectors")
+        .select("name, unit_id")
+        .eq("id", partnerInfo.partnerSectorId)
+        .maybeSingle();
+      if (!partnerSector || cancelled) return;
+      const unitName =
+        accessibleStores.find((s) => s.id === partnerSector.unit_id)?.nome ||
+        lojas.options.find((l) => l.id === partnerSector.unit_id)?.nome ||
+        "Loja parceira";
+      if (!cancelled) {
+        setPartnerSectorMeta({
+          sectorName: partnerSector.name,
+          unitId: partnerSector.unit_id,
+          unitName,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [partnerInfo?.partnerSectorId, accessibleStores, lojas.options]);
+
+  const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
+
+  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit, additionalUnitIds);
   const { data: schedules = [], isLoading: loadingSch } = useManualSchedules(selectedUnit, weekStart, weekEnd);
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();

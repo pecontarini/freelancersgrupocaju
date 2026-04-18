@@ -16,6 +16,7 @@ import {
   DollarSign,
   Trash2,
   ChevronDown,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,6 +62,7 @@ import {
 import { useDailyBudgets, useUpsertDailyBudget } from "@/hooks/useDailyBudgets";
 import { useSectors, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
+import { useSectorPartner } from "@/hooks/useSectorPartnerships";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
@@ -72,6 +74,7 @@ import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";
+import { supabase } from "@/integrations/supabase/client";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 

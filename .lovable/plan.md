@@ -1,99 +1,86 @@
 
+O usuário precisa de uma forma de vincular duas unidades (lojas casadas) na aba **Configurações**, para que o dimensionamento mínimo (matriz POP) das duas seja tratado como uma unidade só ao subir/configurar.
 
-# Plano: Lojas Casadas (Setores Compartilhados)
+Hoje já existe `sector_partnerships` (vínculo entre setores). Mas o usuário quer um nível acima: **vínculo entre unidades** — uma "loja casada" no nível da loja, que automaticamente:
+1. Marca MULT 12 ↔ NFE 03 e MULT 03 ↔ NFE 04 como unidades parceiras
+2. Permite subir a matriz POP única para o par (cobre ambas)
+3. Serve de base para criar partnerships de setor automaticamente
 
-## Contexto do problema
-Operacionalmente existem pares de lojas que compartilham equipe em alguns setores:
-- **MULT 03 (Caminito SIG) + NFE 04 (Nazo SIG)** — mesmo prédio
-- **MULT 12 (Caminito Águas Claras) + NFE 03 (Nazo Águas Claras)** — mesmo prédio
+Vou propor uma seção nova em **Configurações** chamada "Lojas Casadas" + lógica para a matriz POP cobrir o par.
 
-Nesses casos, **Cozinha, Bar e ASG (Serviços Gerais)** operam com uma equipe única atendendo as duas lojas, mas hoje cada loja tem setores e funcionários isolados — o gerente precisa montar duas escalas separadas e replicar manualmente.
+---
 
-## Solução proposta: "Setor Compartilhado"
+# Plano: Vínculo de Unidades (Lojas Casadas) em Configurações
 
-Criar um vínculo configurável entre setores de duas lojas. Quando um setor está marcado como compartilhado com o setor equivalente da loja parceira, o Editor de Escalas:
-- Mostra **funcionários CLT das duas lojas** na mesma grade
-- Salva as escalas no setor da loja escolhida como "principal" (sem duplicar)
-- Exibe a escala unificada ao abrir qualquer uma das duas lojas
-- Exporta Excel/PDF com a equipe consolidada
-
-A configuração fica na aba **Cargos e Setores** (admin/operador), totalmente opcional — lojas não casadas seguem funcionando como hoje.
-
-## Componentes da solução
-
-### 1. Banco de dados (migration)
-Nova tabela `sector_partnerships` que liga dois setores entre si:
+## 1. Nova tabela: `unit_partnerships`
+Migração para criar tabela 1:1 entre unidades (similar à `sector_partnerships`, mas no nível de loja):
 
 ```sql
-create table sector_partnerships (
+create table unit_partnerships (
   id uuid primary key default gen_random_uuid(),
-  sector_id uuid not null references sectors(id) on delete cascade,
-  partner_sector_id uuid not null references sectors(id) on delete cascade,
+  unit_id uuid not null references config_lojas(id) on delete cascade,
+  partner_unit_id uuid not null references config_lojas(id) on delete cascade,
   created_at timestamptz default now(),
-  unique(sector_id, partner_sector_id),
-  check(sector_id <> partner_sector_id)
+  unique(unit_id, partner_unit_id),
+  check(unit_id <> partner_unit_id)
 );
 ```
+- Vínculo bidirecional (ao salvar A↔B, criar também B↔A)
+- RLS: admin/operador podem criar/remover; demais leitura
+- Restrição: cada loja pode ter no máximo **1 parceira**
 
-Vínculo bidirecional (ao salvar A↔B, criamos automaticamente B↔A para facilitar leitura). RLS: admin/operador/gerente da loja podem ver/criar; demais leitura.
+## 2. Hook `useUnitPartnerships`
+- `useUnitPartnerships()` — devolve mapa `unitId → partnerUnitId | null` para todas as lojas
+- `useUnitPartner(unitId)` — devolve a unidade parceira de uma específica
+- `useLinkUnits()` / `useUnlinkUnits()` — mutations
 
-### 2. Hook `useSectorPartnerships`
-- `useSectorPartnerships(sectorIds)` — devolve mapa `sectorId → partnerSectorId | null`
-- `useLinkSectors()` / `useUnlinkSectors()` — mutations para criar/remover par
+## 3. Nova seção em Configurações: "Lojas Casadas"
+Em `ConfigurationsTab.tsx`, **adicionar componente novo** `UnitPartnershipsSection` (apenas admin/operador):
 
-### 3. UI de configuração — `SectorJobTitleMapping.tsx`
-Adicionar, ao lado do nome de cada setor, um botão **"🔗 Vincular setor parceiro"**:
-- Abre modal com dois selects: **Loja parceira** + **Setor parceiro** (filtra apenas Cozinha/Bar/Serviços Gerais por padrão, mas permite qualquer)
-- Se já vinculado: mostra badge "Compartilhado com: NAZO SIG / Cozinha" e botão **Desvincular**
-- Confirmação obrigatória: "Esta ação fará a escala deste setor aparecer também na outra loja. Confirmar?"
+- Lista todas as lojas com status do vínculo:
+  - **Sem parceiro**: botão "🔗 Vincular loja parceira" → modal com select da loja parceira
+  - **Com parceiro**: badge "Casada com NFE 03" + botão "Desvincular" (com confirmação por texto "DESVINCULAR")
+- Ao vincular, opção checkbox: **"Aplicar automaticamente vínculo nos setores Cozinha, Bar e Serviços Gerais"** (cria as `sector_partnerships` correspondentes em lote)
+- Ao desvincular: pergunta se também remove os vínculos de setor associados
 
-### 4. Editor de Escalas — `ManualScheduleGrid.tsx`
-Quando o setor ativo tem parceiro:
-- **Banner azul no topo da grade**: "🔗 Setor compartilhado com NAZO SIG — funcionários das duas lojas aparecem aqui"
-- **Lista de funcionários** = união dos CLT das duas lojas (filtrados pelos cargos vinculados ao setor)
-- **Coluna extra "Loja"** ao lado do nome do funcionário (badge pequena identificando origem)
-- Ao salvar uma escala, ela é gravada no `sector_id` do setor onde o usuário está (não duplica)
-- Ao abrir a outra loja parceira, a escala aparece automaticamente porque a query inclui o setor parceiro
+## 4. Matriz POP unificada — `StaffingMatrixConfig.tsx`
+Quando a loja selecionada tem parceira:
+- **Banner no topo**: "🔗 Esta loja está casada com NFE 03. As alterações na matriz POP de setores compartilhados refletem em ambas."
+- Para setores que estão em partnership ativa: ao salvar `staffing_matrix`, também espelhar para o `partner_sector_id` (mesmo `required_count` e `extra_count`)
+- Para setores sem partnership: comportamento atual (independente)
+- Nas linhas do grid, badge pequena "🔗 Compartilhado" identifica visualmente os setores espelhados
 
-### 5. Hook `useEmployees` — modo "loja casada"
-Adicionar parâmetro opcional `additionalUnitIds?: string[]`:
-- Quando informado, busca funcionários de `unit_id IN [principal, ...adicionais]`
-- O `ManualScheduleGrid` calcula `additionalUnitIds` lendo a partnership do setor ativo
+## 5. Importador da Matriz — `StaffingMatrixImporter.tsx`
+Quando a planilha é importada para uma loja casada:
+- Após persistir na loja principal, detectar setores em partnership e replicar automaticamente os valores para o setor parceiro da outra loja
+- No modal de confirmação do importador, mostrar contagem: "120 entradas serão criadas (60 nesta loja + 60 espelhadas em NFE 03 - setores compartilhados)"
 
-### 6. Hook `useManualSchedules` — incluir setores parceiros
-Quando carregar schedules, incluir também o `sector_id` parceiro na query `.in("sector_id", [...])`. Os dados já voltam unificados na grade.
+## 6. Indicador visual em outros locais
+- **`UnidadeSelector`**: ao listar lojas casadas, exibir ícone 🔗 ao lado do nome
+- **`ConfigSection` de Lojas**: marcar lojas casadas com badge
 
-### 7. Exports Excel e PDF
-`scheduleMasterExport.ts` e `scheduleMasterPdf.ts` — ao montar um setor compartilhado, juntar funcionários das duas lojas e indicar no cabeçalho da página: **"COZINHA — COMPARTILHADO MULT 03 + NFE 04"**.
-
-### 8. Dashboard POP / Quadro Operacional
-`usePopCompliance` e `OperationalDashboard` consideram o setor parceiro ao contar pessoas escaladas (evitando "buracos" falsos no POP da outra loja).
-
-## Casos de borda tratados
-- **Funcionário em ambas as lojas (CPF duplicado)**: deduplicar por CPF mantendo o mais recente
-- **POP da matriz de staffing**: somar `required_count` dos dois setores (admin pode revisar)
-- **Importação Excel**: continua por loja; o vínculo só afeta visualização/exibição
-- **Remover vínculo**: não apaga escalas — apenas separa as visões novamente
-- **Triângulos** (3+ lojas): bloqueado — apenas pares 1:1
+## Casos de borda
+- **Já existe partnership de setor sem partnership de unidade**: continuar funcionando; o vínculo de unidade é "facilitador", não obrigatório
+- **Vincular unidades não cria automaticamente partnerships de setor** a menos que o checkbox seja marcado
+- **Desvincular unidades não apaga partnerships de setor existentes** (apenas remove o vínculo guarda-chuva)
+- **Triângulos**: bloqueados (1:1 apenas)
+- **Loja com parceira já definida**: select desabilita lojas que já têm parceira
 
 ## Arquivos
 
 | Tipo | Arquivo |
 |------|---------|
-| Migration | nova tabela `sector_partnerships` + RLS |
-| Criar | `src/hooks/useSectorPartnerships.ts` |
-| Criar | `src/components/escalas/SectorPartnerLinkModal.tsx` |
-| Editar | `src/components/escalas/SectorJobTitleMapping.tsx` — botão de vínculo |
-| Editar | `src/components/escalas/ManualScheduleGrid.tsx` — banner + união de funcionários |
-| Editar | `src/hooks/useEmployees.ts` — parâmetro `additionalUnitIds` |
-| Editar | `src/hooks/useManualSchedules.ts` — incluir setor parceiro |
-| Editar | `src/lib/scheduleMasterExport.ts` — cabeçalho compartilhado |
-| Editar | `src/lib/scheduleMasterPdf.ts` — cabeçalho compartilhado |
-| Editar | `src/hooks/usePopCompliance.ts` — somar setores parceiros |
+| Migration | nova tabela `unit_partnerships` + RLS |
+| Criar | `src/hooks/useUnitPartnerships.ts` |
+| Criar | `src/components/UnitPartnershipsSection.tsx` |
+| Criar | `src/components/UnitPartnerLinkModal.tsx` |
+| Editar | `src/components/ConfigurationsTab.tsx` — incluir nova seção (admin/operador) |
+| Editar | `src/components/escalas/StaffingMatrixConfig.tsx` — banner + espelho ao salvar |
+| Editar | `src/components/escalas/StaffingMatrixImporter.tsx` — replicação automática na importação |
+| Editar (opcional) | `src/components/UnidadeSelector.tsx` — ícone 🔗 |
 
 ## O que NÃO muda
-- Estrutura de lojas, setores e funcionários existentes
-- Outras lojas (CAJU, FB, MULT 05/14, MULT 02, NFE 01) continuam exatamente como hoje
-- Importação Excel, módulos de CMV, Estoque, Utensílios, Agenda
-- Schemas das tabelas `employees`, `schedules`, `sectors`
-
+- Estrutura de `config_lojas`, `sectors`, `staffing_matrix`
+- Partnerships de setor (`sector_partnerships`) já criadas continuam funcionando
+- Editor de Escalas, exports, dashboards (já entendem partnership de setor desde a feature anterior)
+- Demais módulos (CMV, Estoque, Utensílios, Agenda)

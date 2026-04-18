@@ -15,6 +15,7 @@ export interface ManualSchedule {
   break_duration: number;
   schedule_type: "working" | "off" | "vacation" | "sick_leave";
   agreed_rate: number;
+  praca_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -160,6 +161,7 @@ export function useUpsertSchedule() {
       schedule_type: "working" | "off" | "vacation" | "sick_leave";
       agreed_rate?: number;
       shift_type?: string;
+      praca_id?: string | null;
     }) => {
       const shiftId = await resolveShiftId(params.shift_type);
 
@@ -175,6 +177,7 @@ export function useUpsertSchedule() {
         break_duration: params.break_duration ?? 60,
         agreed_rate: params.agreed_rate ?? 0,
         shift_id: shiftId,
+        praca_id: params.praca_id ?? null,
       };
 
       let scheduleId: string | null = null;

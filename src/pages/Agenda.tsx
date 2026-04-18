@@ -217,7 +217,7 @@ export default function Agenda() {
                 data_inicio,
                 data_fim,
                 categoria: form.categoria,
-                participantes: form.participantes,
+                participantes: toGoogleParticipantes(form.participantes),
               });
             } else {
               const created = await createCalendarEvent(tokenRow.access_token, {
@@ -226,7 +226,7 @@ export default function Agenda() {
                 data_inicio,
                 data_fim,
                 categoria: form.categoria,
-                participantes: form.participantes,
+                participantes: toGoogleParticipantes(form.participantes),
               });
               googleEventId = created?.id ?? null;
             }
@@ -255,7 +255,7 @@ export default function Agenda() {
               data_inicio,
               data_fim,
               categoria: form.categoria,
-              participantes: form.participantes,
+              participantes: toGoogleParticipantes(form.participantes),
             });
             googleEventId = created?.id ?? null;
           } catch (err: any) {

@@ -112,7 +112,8 @@ function InlineSectorName({ sectorId, currentName }: { sectorId: string; current
 }
 
 export function StaffingMatrixConfig() {
-  const { isAdmin } = useUserProfile();
+  const { isAdmin, isOperator, isLoading: profileLoading } = useUserProfile();
+  const canManagePartnerships = !profileLoading && (isAdmin || isOperator);
   const lojas = useConfigLojas();
   const { stores: accessibleStores } = useAccessibleStores();
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);

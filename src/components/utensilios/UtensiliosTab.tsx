@@ -37,6 +37,7 @@ export function UtensiliosTab() {
   const bulkCreate = useBulkCreateUtensiliosItems();
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [matrixOpen, setMatrixOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
   const [sectors, setSectors] = useState<Record<string, string>>({});

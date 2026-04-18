@@ -124,7 +124,7 @@ export type Database = {
           descricao: string | null
           google_event_id: string | null
           id: string
-          participantes: string[]
+          participantes: Json
           titulo: string
           updated_at: string
           user_id: string
@@ -138,7 +138,7 @@ export type Database = {
           descricao?: string | null
           google_event_id?: string | null
           id?: string
-          participantes?: string[]
+          participantes?: Json
           titulo: string
           updated_at?: string
           user_id: string
@@ -152,7 +152,7 @@ export type Database = {
           descricao?: string | null
           google_event_id?: string | null
           id?: string
-          participantes?: string[]
+          participantes?: Json
           titulo?: string
           updated_at?: string
           user_id?: string
@@ -2586,7 +2586,9 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
+          email: string | null
           full_name: string | null
           id: string
           unidade_id: string | null
@@ -2594,7 +2596,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           unidade_id?: string | null
@@ -2602,7 +2606,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
+          email?: string | null
           full_name?: string | null
           id?: string
           unidade_id?: string | null

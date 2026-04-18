@@ -111,13 +111,6 @@ export function ManualScheduleGrid() {
 
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
 
-  // Sector job title mappings
-  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
-  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorIds);
-
-  // Staffing matrix for POP
-  const { data: staffingMatrix = [] } = useStaffingMatrix(sectorIds);
-
   // Partnership for active sector (loja casada)
   const { data: partnerInfo } = useSectorPartner(activeSectorId);
   const [partnerSectorMeta, setPartnerSectorMeta] = useState<{
@@ -157,6 +150,27 @@ export function ManualScheduleGrid() {
     };
   }, [partnerInfo?.partnerSectorId, accessibleStores, lojas.options]);
 
+  // Effective sector ids: local sector + partner (when shared)
+  const partnerSectorId = partnerInfo?.partnerSectorId || null;
+  const effectiveSectorIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (activeSectorId) ids.add(activeSectorId);
+    if (partnerSectorId) ids.add(partnerSectorId);
+    return Array.from(ids);
+  }, [activeSectorId, partnerSectorId]);
+
+  // Sector job title mappings — include partner sector to unify base team
+  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
+  const sectorJobTitleQueryIds = useMemo(() => {
+    const all = new Set<string>(sectorIds);
+    if (partnerSectorId) all.add(partnerSectorId);
+    return Array.from(all);
+  }, [sectorIds, partnerSectorId]);
+  const { data: sectorJobTitles = [] } = useSectorJobTitles(sectorJobTitleQueryIds);
+
+  // Staffing matrix for POP — include partner sector for unified efetivo
+  const { data: staffingMatrix = [] } = useStaffingMatrix(sectorJobTitleQueryIds);
+
   const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
 
   const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit, additionalUnitIds);
@@ -193,25 +207,35 @@ export function ManualScheduleGrid() {
   const [editingBudgetDate, setEditingBudgetDate] = useState<string | null>(null);
   const [budgetValue, setBudgetValue] = useState("");
 
-  // Filter employees by sector's linked job titles
+  const effectiveSectorIdSet = useMemo(
+    () => new Set(effectiveSectorIds),
+    [effectiveSectorIds]
+  );
+
+  // Filter employees by sector's linked job titles (across local + partner sector mappings)
   const sectorLinkedJobTitleIds = useMemo(() => {
     if (!activeSectorId) return new Set<string>();
     return new Set(
       sectorJobTitles
-        .filter((sjt) => sjt.sector_id === activeSectorId)
+        .filter((sjt) => effectiveSectorIdSet.has(sjt.sector_id))
         .map((sjt) => sjt.job_title_id)
     );
-  }, [sectorJobTitles, activeSectorId]);
+  }, [sectorJobTitles, activeSectorId, effectiveSectorIdSet]);
 
-  // Employees with active schedules in this sector+week
+  // Employees with active schedules in this sector+week (local OR partner sector)
   const scheduledEmployeeIds = useMemo(() => {
     if (!activeSectorId) return new Set<string>();
     return new Set(
       schedules
-        .filter((s) => s.sector_id === activeSectorId && s.status !== "cancelled" && s.employee_id)
+        .filter(
+          (s) =>
+            effectiveSectorIdSet.has(s.sector_id) &&
+            s.status !== "cancelled" &&
+            s.employee_id
+        )
         .map((s) => s.employee_id!)
     );
-  }, [schedules, activeSectorId]);
+  }, [schedules, activeSectorId, effectiveSectorIdSet]);
 
   // Primary: employees actually scheduled this week
   const scheduledEmployees = useMemo(() => {
@@ -244,45 +268,65 @@ export function ManualScheduleGrid() {
     return [...sectorBaseEmployees].sort((a, b) => a.name.localeCompare(b.name));
   }, [sectorBaseEmployees]);
 
-  // Build employee map for worker_type lookup
+  // Build employee map for worker_type + unit_id lookup
   const employeeMap = useMemo(() => {
     const m = new Map<string, string>();
     employees.forEach((e) => m.set(e.id, e.worker_type || "clt"));
     return m;
   }, [employees]);
 
-  // Calculate max extras slots needed across the week for the active sector
+  const employeeUnitMap = useMemo(() => {
+    const m = new Map<string, string>();
+    employees.forEach((e) => m.set(e.id, e.unit_id));
+    return m;
+  }, [employees]);
+
+  // Resolve which sector_id should hold a given employee's schedule (own unit's sector)
+  function resolveSectorForEmployee(employeeId: string): string {
+    if (!partnerSectorId || !partnerSectorMeta) return activeSectorId || "";
+    const empUnitId = employeeUnitMap.get(employeeId);
+    if (empUnitId === partnerSectorMeta.unitId) return partnerSectorId;
+    return activeSectorId || "";
+  }
+
+  // Calculate max extras slots needed across the week (combined local + partner)
   const extraSlots = useMemo(() => {
     if (!activeSectorId) return 0;
     let maxExtras = 0;
     for (const day of weekDays) {
       const dow = jsDayToPopDay(day.getDay());
       const entries = staffingMatrix.filter(
-        (m) => m.sector_id === activeSectorId && m.day_of_week === dow
+        (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
       );
       const dayExtras = entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
       if (dayExtras > maxExtras) maxExtras = dayExtras;
     }
     return maxExtras;
-  }, [activeSectorId, staffingMatrix, weekDays]);
+  }, [activeSectorId, staffingMatrix, weekDays, effectiveSectorIdSet]);
 
-  // Count how many freelancers are already scheduled per day
+  // Count freelancers scheduled per day (across both sectors)
   const freelancerCountPerDay = useMemo(() => {
     const counts = new Map<string, number>();
     for (const day of weekDays) {
       const dateStr = format(day, "yyyy-MM-dd");
       const count = schedules.filter(
-        (s) => s.schedule_date === dateStr && s.sector_id === activeSectorId && s.employee_id && employeeMap.get(s.employee_id) === "freelancer"
+        (s) =>
+          s.schedule_date === dateStr &&
+          effectiveSectorIdSet.has(s.sector_id) &&
+          s.employee_id &&
+          employeeMap.get(s.employee_id) === "freelancer"
       ).length;
       counts.set(dateStr, count);
     }
     return counts;
-  }, [schedules, activeSectorId, weekDays, employeeMap]);
+  }, [schedules, effectiveSectorIdSet, weekDays, employeeMap]);
 
-  // Calculate daily metrics using time-intersection logic
+  // Daily metrics — sum across both sectors
   function getDayMetrics(dateStr: string) {
     const daySchedules = schedules
-      .filter((s) => s.schedule_date === dateStr && s.sector_id === activeSectorId)
+      .filter(
+        (s) => s.schedule_date === dateStr && effectiveSectorIdSet.has(s.sector_id)
+      )
       .map((s) => ({
         ...s,
         worker_type: s.employee_id ? employeeMap.get(s.employee_id) || "clt" : "clt",
@@ -290,19 +334,26 @@ export function ManualScheduleGrid() {
     return calculateDailyMetrics(daySchedules);
   }
 
+  // POP target — sum required + extras across local + partner sector
   function getPopTarget(dayOfWeek: number, shiftType: string): { efetivos: number; extras: number; total: number } {
     if (!activeSectorId) return { efetivos: 0, extras: 0, total: 0 };
-    const entry = staffingMatrix.find(
-      (m) => m.sector_id === activeSectorId && m.day_of_week === dayOfWeek && m.shift_type === shiftType
+    const entries = staffingMatrix.filter(
+      (m) =>
+        effectiveSectorIdSet.has(m.sector_id) &&
+        m.day_of_week === dayOfWeek &&
+        m.shift_type === shiftType
     );
-    const efetivos = entry?.required_count ?? 0;
-    const extras = entry?.extras_count ?? 0;
+    const efetivos = entries.reduce((s, e) => s + (e.required_count ?? 0), 0);
+    const extras = entries.reduce((s, e) => s + (e.extras_count ?? 0), 0);
     return { efetivos, extras, total: efetivos + extras };
   }
 
   function getScheduleForCell(employeeId: string, dateStr: string): ManualSchedule | undefined {
     return schedules.find(
-      (s) => s.employee_id === employeeId && s.schedule_date === dateStr && s.sector_id === activeSectorId
+      (s) =>
+        s.employee_id === employeeId &&
+        s.schedule_date === dateStr &&
+        effectiveSectorIdSet.has(s.sector_id)
     );
   }
 
@@ -312,13 +363,15 @@ export function ManualScheduleGrid() {
 
   function handleCellClick(emp: any, dateStr: string) {
     const existing = getScheduleForCell(emp.id, dateStr) || null;
+    // Honor existing record's sector. For new entries, route to the employee's own sector.
+    const targetSectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
     setEditModal({
       open: true,
       employeeId: emp.id,
       employeeName: emp.name,
       isFreelancer: emp.worker_type === "freelancer",
       date: dateStr,
-      sectorId: existing?.sector_id || activeSectorId || "",
+      sectorId: targetSectorId,
       existing,
     });
   }
@@ -714,9 +767,9 @@ export function ManualScheduleGrid() {
                           {weekDays.map((day, i) => {
                             const dateStr = format(day, "yyyy-MM-dd");
                             const dow = day.getDay();
-                            // Check if this slot is within the day's quota
+                            // Check if this slot is within the day's quota (combined local + partner)
                             const dayEntries = staffingMatrix.filter(
-                              (m) => m.sector_id === activeSectorId && m.day_of_week === dow
+                              (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
                             );
                             const dayQuota = dayEntries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
                             const alreadyFilled = freelancerCountPerDay.get(dateStr) || 0;
@@ -842,8 +895,12 @@ export function ManualScheduleGrid() {
           open={freelancerModal.open}
           onClose={() => setFreelancerModal(null)}
           unitId={selectedUnit}
+          unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || ""}
           sectorId={activeSectorId}
           date={freelancerModal.date}
+          partnerUnitId={partnerSectorMeta?.unitId}
+          partnerUnitName={partnerSectorMeta?.unitName}
+          partnerSectorId={partnerSectorId || undefined}
         />
       )}
 

@@ -313,6 +313,11 @@ export function UtensiliosTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Matriz Global Loja x Item — admin only */}
+      {isAdmin && (
+        <GlobalMinimumStockMatrix open={matrixOpen} onOpenChange={setMatrixOpen} />
+      )}
     </div>
   );
 }

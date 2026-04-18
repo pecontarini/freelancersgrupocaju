@@ -22,6 +22,8 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
+import { PracaSelector } from "./PracaSelector";
+import { dateStrToDiaPraca, inferTurnoFromTime } from "@/hooks/usePracas";
 
 interface ScheduleEditModalProps {
   open: boolean;
@@ -33,6 +35,8 @@ interface ScheduleEditModalProps {
   sectorId: string;
   shiftType?: string;
   existing?: ManualSchedule | null;
+  unitId?: string | null;
+  sectorName?: string | null;
 }
 
 function calculateHours(start: string, end: string, breakMin: number): string {
@@ -66,6 +70,8 @@ export function ScheduleEditModal({
   sectorId,
   shiftType,
   existing,
+  unitId,
+  sectorName,
 }: ScheduleEditModalProps) {
   const upsert = useUpsertSchedule();
   const cancel = useCancelSchedule();
@@ -75,6 +81,7 @@ export function ScheduleEditModal({
   const [endTime, setEndTime] = useState("16:20");
   const [breakDuration, setBreakDuration] = useState(60);
   const [agreedRate, setAgreedRate] = useState("");
+  const [pracaId, setPracaId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("turno");
 
   // Vacation sub-form state
@@ -91,6 +98,7 @@ export function ScheduleEditModal({
       setEndTime(existing.end_time?.slice(0, 5) || "16:20");
       setBreakDuration(existing.break_duration ?? 60);
       setAgreedRate(existing.agreed_rate ? String(existing.agreed_rate) : (isFreelancer ? "120" : ""));
+      setPracaId(existing.praca_id ?? null);
       if (existing.schedule_type !== "working") {
         setActiveTab("ausencias");
       } else {
@@ -101,6 +109,7 @@ export function ScheduleEditModal({
       setEndTime("16:20");
       setBreakDuration(60);
       setAgreedRate(isFreelancer ? "120" : "");
+      setPracaId(null);
       setActiveTab("turno");
     }
     setShowVacationForm(false);
@@ -136,6 +145,7 @@ export function ScheduleEditModal({
       schedule_type: "working",
       agreed_rate: parseFloat(agreedRate) || 0,
       shift_type: shiftType,
+      praca_id: pracaId,
     });
     onClose();
   }

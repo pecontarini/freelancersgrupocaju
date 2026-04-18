@@ -1,72 +1,61 @@
 
-Objetivo: fazer o vínculo de setores realmente funcionar e fazer os dois lados aparecerem juntos no Editor de Escalas.
 
-Diagnóstico
-- Pelo print, o bloqueio imediato é este: a loja parceira selecionada não tem setores cadastrados, então o modal fica sem opção de “setor parceiro” e o vínculo não pode ser concluído.
-- No código, mesmo quando existe `sector_partnership`, o Editor de Escalas ainda mistura só uma parte dos dados:
-  - traz funcionários da loja parceira,
-  - mas continua filtrando escalas, métricas, quadro base e edição principalmente pelo `activeSectorId` local.
-- Resultado: o setor pode até ficar “vinculado”, mas não vira de fato uma área única na elaboração da escala.
+## Plano: Cadastro e Gestão de Praças do Plano de Chão
 
-Plano de correção
+### Diagnóstico
+Hoje o sistema já lê `pracas_plano_chao` no Editor de Escalas (seletor de praça + painel de status), mas **não existe tela para cadastrar/editar essas praças**. O seed inicial criou as praças padrão, mas qualquer ajuste por loja precisa ser feito direto no banco. Falta o lado administrativo que fecha o ciclo: cadastrar → vincular → monitorar.
 
-1. Corrigir o fluxo de vínculo de setor
-- Ajustar `SectorPartnerLinkModal` para não parar em beco sem saída quando a loja parceira estiver sem setores.
-- Quando não existir setor correspondente na loja parceira, mostrar ação para:
-  - criar o setor parceiro automaticamente, usando o nome do setor atual, e
-  - já concluir o vínculo na sequência.
-- Melhorar o texto do modal para deixar claro que, sem setor cadastrado na loja parceira, não há como unificar a escala.
+### Onde colocar
+Dentro de **Escalas > Configurações**, adicionar uma nova sub-seção “Plano de Chão (Praças)” logo abaixo de “Vincular Cargos por Setor”. Mesmo módulo, mesmo padrão visual, sem criar nova rota.
 
-2. Fazer o Editor de Escalas operar com “setor efetivo compartilhado”
-- Em `ManualScheduleGrid`, calcular `effectiveSectorIds = [setorAtual + setorParceiro]` quando houver parceria.
-- Usar esses ids combinados em toda a leitura da tela:
-  - escalas da semana,
-  - funcionários já escalados,
-  - métricas diárias,
-  - contagem de freelancers,
-  - badges e indicadores do POP,
-  - quadro base do setor.
+### O que será construído
 
-3. Mostrar as duas equipes juntas de verdade
-- Unir a base de funcionários das duas lojas no setor compartilhado.
-- Considerar também os cargos vinculados dos dois setores, para o “Quadro base do setor” trazer CLTs dos dois lados, não só os já escalados.
-- Manter a identificação visual de quem pertence à loja parceira.
+**1. Componente `PracasConfig.tsx` (novo)**
+- Seletor de unidade (igual aos outros configs do módulo)
+- Para a unidade escolhida, lista as praças agrupadas por **Setor → Turno (Almoço/Jantar/Tarde)**
+- Cada praça mostra:
+  - Nome da praça (ex: “Garçom Almoço”, “Fogão”)
+  - Linha com 7 inputs numéricos (Seg → Dom) para `qtd_necessaria`
+  - Botão de remover praça
+- Botões de ação por setor:
+  - “+ Nova praça” (abre diálogo: nome + turno; cria as 7 linhas Seg-Dom com qtd=1)
+  - “Replicar de outra loja” (copia praças de uma unidade origem para a atual)
+- Botão global “Aplicar seed padrão” (apenas se a loja não tem praças cadastradas) — usa o mesmo conjunto do seed inicial
 
-4. Salvar novas escalas no setor correto
-- Hoje novas escalas tendem a usar o setor local por padrão.
-- Ajustar para que, em setor compartilhado:
-  - funcionário da loja atual grave no setor atual,
-  - funcionário da loja parceira grave no setor parceiro,
-  - edição de uma escala existente continue respeitando o `sector_id` original.
-- Isso evita mistura errada de dados e mantém cada loja com seus próprios registros, mesmo na visão unificada.
+**2. Hook `usePracasAdmin.ts` (novo)**
+- `useUpsertPraca` — criar/atualizar uma praça (linha única setor+nome+turno+dia)
+- `useUpdatePracaQtd` — atualizar `qtd_necessaria` (chamado em onBlur do input)
+- `useDeletePraca` — remover praça
+- `useDeletePracaGrupo` — remover todas as 7 linhas de uma praça (setor+nome+turno)
+- `useReplicarPracas` — copiar todas as praças de uma unidade origem para destino
+- `useApplySeedPracas` — inserir o pacote padrão (Subchefe, Garçom, Cumin, Hostess, Caixa, Parrilla, Cozinha, Bar, Serv. Gerais, Produção)
+- Invalida `["pracas-unit", unitId]` (mesma queryKey usada no Editor de Escalas) para sincronizar instantaneamente
 
-5. Ajustar o fluxo de freelancer no setor compartilhado
-- Revisar `FreelancerAddModal`, porque hoje ele abre usando só a loja/setor local.
-- Em setor compartilhado, incluir escolha do lado correto (loja atual ou parceira) antes de lançar o freelancer.
+**3. Integração com setores existentes**
+- Carregar `sectors` da unidade via hook já existente (`useSectors`)
+- Ao criar praça, oferecer dropdown com os setores cadastrados na loja (evita digitar nome solto que não casa com `sectors.name` usado no fuzzy match do `usePracas`)
+- Mostrar aviso se houver praça com `setor` que não bate com nenhum `sectors.name` da unidade (ajuda a corrigir desalinhamentos)
 
-Arquivos principais
-- `src/components/escalas/SectorPartnerLinkModal.tsx`
-- `src/components/escalas/SectorJobTitleMapping.tsx`
-- `src/components/escalas/ManualScheduleGrid.tsx`
-- `src/components/escalas/FreelancerAddModal.tsx`
-- `src/hooks/useSectorPartnerships.ts`
-- possivelmente um helper novo para resolver “setor compartilhado efetivo”
+**4. Conexão com o Editor de Escalas (já pronta)**
+- Não precisa mexer em `ManualScheduleGrid`, `ScheduleEditModal` ou `usePracas` — eles já consomem `pracas_plano_chao` por unidade/setor/turno/dia
+- A invalidação de cache faz com que qualquer alteração apareça imediatamente no seletor de praça e no painel “Plano de chão — status do turno”
 
-Impacto técnico
-- Não precisa de nova tabela.
-- A correção é principalmente de fluxo e leitura/escrita consistente sobre `sector_partnerships`.
-- O foco é transformar o vínculo em comportamento operacional real, não só em badge visual.
+**5. RLS**
+- A tabela `pracas_plano_chao` provavelmente já está liberada para leitura (o hook lê hoje). Vou verificar e, se necessário, adicionar policies de INSERT/UPDATE/DELETE para `admin` e `operator` (mesmo padrão de `staffing_matrix`).
 
-Resultado esperado
-- Se a loja parceira estiver vazia, você conseguirá criar o setor parceiro e vincular no mesmo fluxo.
-- Depois de vinculado, Cozinha/Bar/ASG aparecerão como uma única frente operacional no Editor de Escalas.
-- Funcionários e escalas das duas lojas ficarão juntos na elaboração, mas cada lançamento continuará salvo no setor correto de origem.
+### Arquivos
+- **Novo**: `src/components/escalas/PracasConfig.tsx`
+- **Novo**: `src/hooks/usePracasAdmin.ts`
+- **Editado**: `src/components/escalas/EscalasTab.tsx` (renderizar `PracasConfig` na aba Configurações, abaixo de `SectorJobTitleMapping`)
+- **Migration** (se necessário): policies RLS de escrita em `pracas_plano_chao`
 
-Validação que farei na implementação
-- Vincular MULT 12 ↔ NFE 03 em um setor compartilhado.
-- Garantir que o modal permita concluir o vínculo mesmo se a loja parceira estiver sem setor.
-- Confirmar que, no Editor de Escalas, aparecem juntos:
-  - funcionários da loja atual,
-  - funcionários da loja parceira,
-  - escalas já lançadas dos dois lados,
-  - quadro base e indicadores coerentes.
+### Fluxo final do usuário
+1. Vai em **Escalas > Configurações > Plano de Chão**
+2. Escolhe a loja (ex: MULT 12)
+3. Vê todos os setores e suas praças por turno
+4. Ajusta as quantidades por dia da semana inline, ou cria/remove praças
+5. Volta para **Editor de Escalas** → ao escalar um colaborador, o seletor “Praça” já mostra as opções atualizadas e o painel “Plano de chão” reflete a nova realidade
+
+### Resultado esperado
+Ciclo completo: **cadastrar praça → escalar colaborador na praça → acompanhar cobertura por turno**, tudo dentro do módulo de Escalas, sem alterar nada fora dele.
+

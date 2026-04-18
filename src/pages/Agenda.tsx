@@ -21,10 +21,16 @@ import { AgendaWeekView } from "@/components/agenda/AgendaWeekView";
 import { AgendaListView } from "@/components/agenda/AgendaListView";
 import { AgendaEventModal, type AgendaEventoForm } from "@/components/agenda/AgendaEventModal";
 import { combineDateTime, splitDateTime } from "@/components/agenda/agendaUtils";
-import { useAgendaEventos, type AgendaEvento } from "@/hooks/useAgendaEventos";
+import {
+  useAgendaEventos,
+  type AgendaEvento,
+  type AgendaParticipante,
+  mapGoogleStatus,
+} from "@/hooks/useAgendaEventos";
 import {
   createCalendarEvent,
   deleteCalendarEvent,
+  getCalendarEventAttendees,
   getTokenFromSupabase,
   initGoogleAuth,
   requestGoogleToken,

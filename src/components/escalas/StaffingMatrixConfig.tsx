@@ -388,7 +388,8 @@ export function StaffingMatrixConfig() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

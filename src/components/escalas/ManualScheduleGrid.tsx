@@ -651,6 +651,7 @@ export function ManualScheduleGrid() {
                     <TableBody>
                       {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
+                        const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
                         return (
                           <TableRow key={emp.id}>
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
@@ -659,6 +660,11 @@ export function ManualScheduleGrid() {
                                  {isFreelancer && (
                                   <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
                                     FL
+                                  </Badge>
+                                )}
+                                {isFromPartner && (
+                                  <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
+                                    {partnerSectorMeta?.unitName.slice(0, 8)}
                                   </Badge>
                                 )}
                                 {canManage && (

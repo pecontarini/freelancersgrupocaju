@@ -126,7 +126,11 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   // ── SECTOR PAGES ──
   for (const sector of sectors) {
     doc.addPage();
-    addSectorHeader(doc, sector.name);
+    const partner = (sector as any)._partner;
+    const sectorTitle = partner
+      ? `${sector.name} 🔗 COMPARTILHADO — ${unitName} + ${partner.unitName}`
+      : sector.name;
+    addSectorHeader(doc, sectorTitle);
 
     const sectorSchedules = scheduleBySector.get(sector.id) || [];
     const empIds = new Set(sectorSchedules.map((s: any) => s.employee_id).filter(Boolean));
@@ -244,7 +248,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
       didDrawPage: () => {
         // Header on continuation pages
         if (doc.internal.pages.length > 2) {
-          addSectorHeader(doc, sector.name);
+          addSectorHeader(doc, sectorTitle);
         }
       },
     });
@@ -314,7 +318,7 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
     // Check if we need a new page for summary
     if (summaryY + 30 > pageHeight - 20) {
       doc.addPage();
-      addSectorHeader(doc, sector.name);
+      addSectorHeader(doc, sectorTitle);
       autoTable(doc, {
         head: summaryHead,
         body: summaryBody,

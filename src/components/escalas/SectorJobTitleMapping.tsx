@@ -157,6 +157,7 @@ export function SectorJobTitleMapping() {
         {sectors.map((sector) => {
           const sectorJTIds = bySector[sector.id] || [];
           const sectorJTs = jobTitles.filter((jt) => sectorJTIds.includes(jt.id));
+          const isLinked = partnershipMap.has(sector.id);
 
           return (
             <SectorCard
@@ -166,6 +167,8 @@ export function SectorJobTitleMapping() {
               allJTs={jobTitles.map((jt) => ({ id: jt.id, name: jt.name }))}
               onToggle={(jtId) => handleToggle(sector.id, jtId)}
               saving={setSectorJT.isPending}
+              isLinked={isLinked}
+              onLinkClick={() => setLinkModal({ sectorId: sector.id, sectorName: sector.name })}
             />
           );
         })}
@@ -193,6 +196,17 @@ export function SectorJobTitleMapping() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {linkModal && selectedUnit && (
+        <SectorPartnerLinkModal
+          open
+          onClose={() => setLinkModal(null)}
+          sectorId={linkModal.sectorId}
+          sectorName={linkModal.sectorName}
+          currentUnitId={selectedUnit}
+          currentUnitName={selectedUnitName}
+        />
       )}
     </div>
   );

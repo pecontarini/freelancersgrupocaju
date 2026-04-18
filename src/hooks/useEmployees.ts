@@ -8,6 +8,7 @@ export interface Employee {
   name: string;
   gender: "M" | "F";
   phone: string | null;
+  cpf: string | null;
   job_title: string | null;
   job_title_id: string | null;
   active: boolean;

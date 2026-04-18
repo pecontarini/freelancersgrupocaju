@@ -34,10 +34,24 @@ export function useManualSchedules(unitId: string | null, weekStart: string, wee
 
       const sectorIds = sectors.map((s) => s.id);
 
+      // Include partner sectors so shared-sector schedules show up in both stores
+      const { data: partnerships } = await supabase
+        .from("sector_partnerships" as any)
+        .select("sector_id, partner_sector_id")
+        .or(
+          `sector_id.in.(${sectorIds.join(",")}),partner_sector_id.in.(${sectorIds.join(",")})`
+        );
+
+      const allSectorIds = new Set<string>(sectorIds);
+      for (const row of (partnerships as any[]) || []) {
+        allSectorIds.add(row.sector_id);
+        allSectorIds.add(row.partner_sector_id);
+      }
+
       const { data, error } = await supabase
         .from("schedules")
         .select("*")
-        .in("sector_id", sectorIds)
+        .in("sector_id", Array.from(allSectorIds))
         .gte("schedule_date", weekStart)
         .lte("schedule_date", weekEnd)
         .neq("status", "cancelled");

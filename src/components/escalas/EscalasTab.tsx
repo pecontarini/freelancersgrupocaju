@@ -8,6 +8,7 @@ import { TeamManagement } from "./TeamManagement";
 import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
+import { PracasConfig } from "./PracasConfig";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -89,7 +90,10 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
         <TeamManagement />
       </TabsContent>
       <TabsContent value="cargos-setores">
-        <SectorJobTitleMapping />
+        <div className="space-y-4">
+          <SectorJobTitleMapping />
+          <PracasConfig />
+        </div>
       </TabsContent>
       <TabsContent value="matrix">
         <StaffingMatrixConfig />

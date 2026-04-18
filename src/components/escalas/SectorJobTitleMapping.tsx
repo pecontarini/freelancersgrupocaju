@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown, AlertTriangle, Briefcase, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
@@ -32,6 +32,8 @@ import {
   useSectorJobTitles,
   useSetSectorJobTitles,
 } from "@/hooks/useSectorJobTitles";
+import { useSectorPartnerships } from "@/hooks/useSectorPartnerships";
+import { SectorPartnerLinkModal } from "./SectorPartnerLinkModal";
 
 export function SectorJobTitleMapping() {
   const lojas = useConfigLojas();
@@ -41,9 +43,17 @@ export function SectorJobTitleMapping() {
   const { data: jobTitles = [], isLoading: loadingJT } = useJobTitles(selectedUnit);
   const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
   const { data: mappings = [], isLoading: loadingMap } = useSectorJobTitles(sectorIds);
+  const { data: partnershipMap = new Map<string, string>() } = useSectorPartnerships(sectorIds);
   const setSectorJT = useSetSectorJobTitles();
 
+  const [linkModal, setLinkModal] = useState<{ sectorId: string; sectorName: string } | null>(null);
+
   const isLoading = loadingSectors || loadingJT || loadingMap;
+
+  const selectedUnitName = useMemo(
+    () => accessibleStores.find((s) => s.id === selectedUnit)?.nome || "",
+    [accessibleStores, selectedUnit]
+  );
 
   // Group mappings by sector
   const bySector = useMemo(() => {

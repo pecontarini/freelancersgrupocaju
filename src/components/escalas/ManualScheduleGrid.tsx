@@ -767,9 +767,9 @@ export function ManualScheduleGrid() {
                           {weekDays.map((day, i) => {
                             const dateStr = format(day, "yyyy-MM-dd");
                             const dow = day.getDay();
-                            // Check if this slot is within the day's quota
+                            // Check if this slot is within the day's quota (combined local + partner)
                             const dayEntries = staffingMatrix.filter(
-                              (m) => m.sector_id === activeSectorId && m.day_of_week === dow
+                              (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
                             );
                             const dayQuota = dayEntries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
                             const alreadyFilled = freelancerCountPerDay.get(dateStr) || 0;

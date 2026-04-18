@@ -2893,6 +2893,45 @@ export type Database = {
           },
         ]
       }
+      sector_partnerships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          partner_sector_id: string
+          sector_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          partner_sector_id: string
+          sector_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          partner_sector_id?: string
+          sector_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sector_partnerships_partner_sector_id_fkey"
+            columns: ["partner_sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sector_partnerships_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sectors: {
         Row: {
           created_at: string

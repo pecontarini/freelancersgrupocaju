@@ -109,6 +109,7 @@ export function ManualScheduleGrid() {
 
   // Sector selection
   const { data: sectors = [], isLoading: loadingSectors } = useSectors(selectedUnit);
+  const { data: pracasOfUnit = [] } = usePracasByUnit(selectedUnit);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [showAllEmployees, setShowAllEmployees] = useState(false);
 
@@ -869,6 +870,16 @@ export function ManualScheduleGrid() {
               )}
             </CardContent>
           </Card>
+
+          {/* Plano de chão — status do dia ativo (primeiro dia da semana com escalas) */}
+          {activeSectorId && (
+            <PlanoChaoStatus
+              unitId={selectedUnit}
+              sectorName={sectors.find((s) => s.id === activeSectorId)?.name}
+              date={format(weekDays[0], "yyyy-MM-dd")}
+              schedules={schedules.filter((s) => effectiveSectorIdSet.has(s.sector_id))}
+            />
+          )}
 
           {/* Weekly Hours Summary */}
           {schedules.length > 0 && employees.length > 0 && (

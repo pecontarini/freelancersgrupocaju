@@ -2584,6 +2584,50 @@ export type Database = {
           },
         ]
       }
+      pracas_plano_chao: {
+        Row: {
+          created_at: string
+          dia_semana: string
+          id: string
+          nome_praca: string
+          qtd_necessaria: number
+          setor: string
+          turno: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dia_semana: string
+          id?: string
+          nome_praca: string
+          qtd_necessaria?: number
+          setor: string
+          turno: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dia_semana?: string
+          id?: string
+          nome_praca?: string
+          qtd_necessaria?: number
+          setor?: string
+          turno?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pracas_plano_chao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2792,6 +2836,7 @@ export type Database = {
           employee_id: string | null
           end_time: string | null
           id: string
+          praca_id: string | null
           schedule_date: string
           schedule_type: Database["public"]["Enums"]["schedule_type"]
           sector_id: string
@@ -2811,6 +2856,7 @@ export type Database = {
           employee_id?: string | null
           end_time?: string | null
           id?: string
+          praca_id?: string | null
           schedule_date: string
           schedule_type?: Database["public"]["Enums"]["schedule_type"]
           sector_id: string
@@ -2830,6 +2876,7 @@ export type Database = {
           employee_id?: string | null
           end_time?: string | null
           id?: string
+          praca_id?: string | null
           schedule_date?: string
           schedule_type?: Database["public"]["Enums"]["schedule_type"]
           sector_id?: string
@@ -2845,6 +2892,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedules_praca_id_fkey"
+            columns: ["praca_id"]
+            isOneToOne: false
+            referencedRelation: "pracas_plano_chao"
             referencedColumns: ["id"]
           },
           {

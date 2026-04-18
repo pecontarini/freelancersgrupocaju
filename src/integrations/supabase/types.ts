@@ -124,6 +124,7 @@ export type Database = {
           descricao: string | null
           google_event_id: string | null
           id: string
+          participantes: string[]
           titulo: string
           updated_at: string
           user_id: string
@@ -137,6 +138,7 @@ export type Database = {
           descricao?: string | null
           google_event_id?: string | null
           id?: string
+          participantes?: string[]
           titulo: string
           updated_at?: string
           user_id: string
@@ -150,6 +152,7 @@ export type Database = {
           descricao?: string | null
           google_event_id?: string | null
           id?: string
+          participantes?: string[]
           titulo?: string
           updated_at?: string
           user_id?: string

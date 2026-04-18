@@ -39,17 +39,61 @@ export async function fetchScheduleData({ unitId, weekStart }: { unitId: string;
 
   const sectorIds = sectors.map((s) => s.id);
 
+  // Sector partnerships (loja casada) — extend sector & unit reach
+  const { data: partnerships } = await supabase
+    .from("sector_partnerships" as any)
+    .select("sector_id, partner_sector_id")
+    .or(`sector_id.in.(${sectorIds.join(",")}),partner_sector_id.in.(${sectorIds.join(",")})`);
+
+  const partnerSectorIds = new Set<string>();
+  for (const p of (partnerships as any[]) || []) {
+    if (!sectorIds.includes(p.sector_id)) partnerSectorIds.add(p.sector_id);
+    if (!sectorIds.includes(p.partner_sector_id)) partnerSectorIds.add(p.partner_sector_id);
+  }
+
+  // Fetch partner sector meta (name + unit) and partner unit names
+  const partnerSectorMeta = new Map<string, { name: string; unit_id: string; unit_name: string }>();
+  let partnerUnitIds = new Set<string>();
+  if (partnerSectorIds.size > 0) {
+    const { data: pSectors } = await supabase
+      .from("sectors").select("id, name, unit_id").in("id", Array.from(partnerSectorIds));
+    for (const ps of pSectors || []) {
+      partnerSectorMeta.set(ps.id, { name: ps.name, unit_id: ps.unit_id, unit_name: "" });
+      partnerUnitIds.add(ps.unit_id);
+    }
+    if (partnerUnitIds.size > 0) {
+      const { data: pUnits } = await supabase
+        .from("config_lojas").select("id, nome").in("id", Array.from(partnerUnitIds));
+      for (const u of pUnits || []) {
+        for (const [, meta] of partnerSectorMeta) {
+          if (meta.unit_id === u.id) meta.unit_name = u.nome;
+        }
+      }
+    }
+  }
+
+  // Map sector → partner sector id (bidirectional)
+  const partnerOf = new Map<string, string>();
+  for (const p of (partnerships as any[]) || []) {
+    partnerOf.set(p.sector_id, p.partner_sector_id);
+    partnerOf.set(p.partner_sector_id, p.sector_id);
+  }
+
+  const allScheduleSectorIds = [...sectorIds, ...Array.from(partnerSectorIds)];
+
   const { data: schedules, error: schErr } = await supabase
-    .from("schedules").select("*").in("sector_id", sectorIds)
+    .from("schedules").select("*").in("sector_id", allScheduleSectorIds)
     .gte("schedule_date", startStr).lte("schedule_date", endStr).neq("status", "cancelled");
   if (schErr) throw new Error("Erro ao buscar escalas: " + schErr.message);
 
+  // Include partner-unit employees too so shared-sector names render correctly
+  const allUnitIds = [unitId, ...Array.from(partnerUnitIds)];
   const { data: employees, error: empErr } = await supabase
-    .from("employees").select("id, name, worker_type").eq("unit_id", unitId).eq("active", true);
+    .from("employees").select("id, name, worker_type, unit_id").in("unit_id", allUnitIds).eq("active", true);
   if (empErr) throw new Error("Erro ao buscar funcionários: " + empErr.message);
 
   const { data: matrixData } = await supabase
-    .from("staffing_matrix").select("*").in("sector_id", sectorIds);
+    .from("staffing_matrix").select("*").in("sector_id", allScheduleSectorIds);
   const matrix = matrixData || [];
 
   const { data: shiftsData } = await supabase
@@ -60,11 +104,31 @@ export async function fetchScheduleData({ unitId, weekStart }: { unitId: string;
   const empMap = new Map<string, { name: string; worker_type: string }>();
   (employees || []).forEach((e) => empMap.set(e.id, { name: e.name, worker_type: e.worker_type || "clt" }));
 
+  // For shared sectors: merge schedules from both sectors under the local sector_id
   const scheduleBySector = new Map<string, any[]>();
   for (const s of schedules || []) {
-    const arr = scheduleBySector.get(s.sector_id) || [];
+    let bucketSectorId = s.sector_id;
+    // If this schedule belongs to a partner sector, attach it to the local sector that matches
+    if (!sectorIds.includes(s.sector_id)) {
+      const localPartner = partnerOf.get(s.sector_id);
+      if (localPartner && sectorIds.includes(localPartner)) {
+        bucketSectorId = localPartner;
+      }
+    }
+    const arr = scheduleBySector.get(bucketSectorId) || [];
     arr.push(s);
-    scheduleBySector.set(s.sector_id, arr);
+    scheduleBySector.set(bucketSectorId, arr);
+  }
+
+  // Attach partnership meta to each local sector for downstream use
+  for (const sec of sectors as any[]) {
+    const partnerId = partnerOf.get(sec.id);
+    if (partnerId) {
+      const meta = partnerSectorMeta.get(partnerId);
+      if (meta) {
+        sec._partner = { sectorName: meta.name, unitName: meta.unit_name };
+      }
+    }
   }
 
   return { sectors, schedules: schedules || [], employees: employees || [], matrix, shifts, weekDays, empMap, scheduleBySector, shiftTypes };

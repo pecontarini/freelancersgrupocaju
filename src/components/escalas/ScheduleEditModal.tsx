@@ -238,6 +238,16 @@ export function ScheduleEditModal({
               <Label>Intervalo (minutos)</Label>
               <Input type="number" min={0} max={180} value={breakDuration} onChange={(e) => setBreakDuration(Number(e.target.value))} />
             </div>
+            {unitId && sectorName && (
+              <PracaSelector
+                unitId={unitId}
+                sectorName={sectorName}
+                turno={inferTurnoFromTime(startTime)}
+                dia={dateStrToDiaPraca(date)}
+                value={pracaId}
+                onChange={setPracaId}
+              />
+            )}
             <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
               <span className="text-sm font-medium">Total de horas:</span>
               <span className="text-lg font-bold">{totalHours}</span>

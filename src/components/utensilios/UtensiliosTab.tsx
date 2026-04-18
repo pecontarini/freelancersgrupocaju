@@ -16,12 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock } from "lucide-react";
+import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock, Network } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SETORES_UTENSILIOS } from "./SectorFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
+import { GlobalMinimumStockMatrix } from "./GlobalMinimumStockMatrix";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");

@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StaffingMatrixImporter } from "./StaffingMatrixImporter";
+import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
 
 const DAYS = [
   { value: 0, label: "Seg" },
@@ -111,7 +112,8 @@ function InlineSectorName({ sectorId, currentName }: { sectorId: string; current
 }
 
 export function StaffingMatrixConfig() {
-  const { isAdmin } = useUserProfile();
+  const { isAdmin, isOperator, isLoading: profileLoading } = useUserProfile();
+  const canManagePartnerships = !profileLoading && (isAdmin || isOperator);
   const lojas = useConfigLojas();
   const { stores: accessibleStores } = useAccessibleStores();
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
@@ -218,6 +220,9 @@ export function StaffingMatrixConfig() {
           </p>
         </div>
       </div>
+
+      {/* Lojas Casadas — vincular unidades antes de configurar a matriz unificada */}
+      {canManagePartnerships && <UnitPartnershipsSection />}
 
       {/* Unit selector */}
       <Card>

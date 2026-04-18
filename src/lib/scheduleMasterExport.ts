@@ -300,7 +300,11 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     let row = 0;
 
     // Row 0: Merged header
-    const titleText = `${sector.name} — ${unitName} — ${format(weekDays[0], "dd/MM")} a ${format(weekDays[6], "dd/MM/yyyy")}`;
+    const partner = (sector as any)._partner;
+    const sharedTag = partner
+      ? ` 🔗 COMPARTILHADO ${unitName} + ${partner.unitName}`
+      : "";
+    const titleText = `${sector.name}${sharedTag} — ${partner ? `${unitName} & ${partner.unitName}` : unitName} — ${format(weekDays[0], "dd/MM")} a ${format(weekDays[6], "dd/MM/yyyy")}`;
     ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = { v: titleText, s: STYLE.headerMerged };
     for (let c = 1; c <= 7; c++) {
       ws[XLSX.utils.encode_cell({ r: row, c })] = { v: "", s: STYLE.headerMerged };

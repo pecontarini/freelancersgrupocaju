@@ -126,7 +126,11 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   // ── SECTOR PAGES ──
   for (const sector of sectors) {
     doc.addPage();
-    addSectorHeader(doc, sector.name);
+    const partner = (sector as any)._partner;
+    const sectorTitle = partner
+      ? `${sector.name} 🔗 COMPARTILHADO — ${unitName} + ${partner.unitName}`
+      : sector.name;
+    addSectorHeader(doc, sectorTitle);
 
     const sectorSchedules = scheduleBySector.get(sector.id) || [];
     const empIds = new Set(sectorSchedules.map((s: any) => s.employee_id).filter(Boolean));

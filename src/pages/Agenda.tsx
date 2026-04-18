@@ -157,7 +157,7 @@ export default function Agenda() {
     setModalOpen(true);
   };
 
-  const openEdit = (e: AgendaEvento) => {
+  const openEdit = async (e: AgendaEvento) => {
     setEditing(e);
     const ini = splitDateTime(e.data_inicio);
     const fim = splitDateTime(e.data_fim ?? e.data_inicio);
@@ -176,6 +176,23 @@ export default function Agenda() {
       participantes: e.participantes ?? [],
     });
     setModalOpen(true);
+
+    // Sincroniza status dos participantes com o Google em background
+    if (e.google_event_id && (e.participantes ?? []).length > 0) {
+      try {
+        const tokenRow = await getTokenFromSupabase();
+        if (!tokenRow?.access_token) return;
+        const attendees = await getCalendarEventAttendees(tokenRow.access_token, e.google_event_id);
+        const merged = mergeGoogleStatus(e.participantes ?? [], attendees);
+        const changed = merged.some((p, i) => p.status !== (e.participantes ?? [])[i]?.status);
+        if (changed) {
+          await updateParticipantes.mutateAsync({ id: e.id, participantes: merged });
+          setInitialModal((prev) => (prev ? { ...prev, participantes: merged } : prev));
+        }
+      } catch (err) {
+        console.warn("[Agenda] Falha ao sincronizar status do Google:", err);
+      }
+    }
   };
 
   const handleSubmit = async (form: AgendaEventoForm) => {

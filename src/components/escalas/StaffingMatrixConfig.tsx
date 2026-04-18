@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Trash2, Loader2, Pencil, Check, X } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Plus, Trash2, Loader2, Pencil, Check, X, Link2, Info } from "lucide-react";
 import {
   useSectors,
   useShifts,
@@ -13,6 +13,8 @@ import {
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
+import { useUnitPartner } from "@/hooks/useUnitPartnerships";
+import { useSectorPartnerships } from "@/hooks/useSectorPartnerships";
 import {
   Select,
   SelectContent,
@@ -120,10 +122,31 @@ export function StaffingMatrixConfig() {
   const { data: shifts = [], isLoading: loadingShifts } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
   const { data: matrix = [], isLoading: loadingMatrix } = useStaffingMatrix(sectorIds);
+  const { data: sectorPartnerships } = useSectorPartnerships(sectorIds);
+  const { data: unitPartner } = useUnitPartner(selectedUnit);
+  const partnerLojaName = lojas.options.find((l) => l.id === unitPartner?.partnerUnitId)?.nome;
   const upsertMatrix = useUpsertStaffingMatrix();
   const addSector = useAddSector();
   const deleteSector = useDeleteSector();
   const clearMatrix = useClearStaffingMatrix();
+
+  // Wraps the upsert: when the sector has a partnership, mirror the values to the partner sector.
+  const upsertWithMirror = useCallback(
+    async (row: {
+      sector_id: string;
+      day_of_week: number;
+      shift_type: string;
+      required_count: number;
+      extras_count?: number;
+    }) => {
+      await upsertMatrix.mutateAsync(row);
+      const partnerSectorId = sectorPartnerships?.get(row.sector_id);
+      if (partnerSectorId && partnerSectorId !== row.sector_id) {
+        await upsertMatrix.mutateAsync({ ...row, sector_id: partnerSectorId });
+      }
+    },
+    [upsertMatrix, sectorPartnerships]
+  );
 
   const shiftTypes = [...new Set(shifts.map((s) => s.type))];
 
@@ -145,7 +168,7 @@ export function StaffingMatrixConfig() {
   const handleCountChange = (sectorId: string, day: number, shiftType: string, value: string) => {
     const num = parseInt(value) || 0;
     const currentExtras = getExtras(sectorId, day, shiftType);
-    upsertMatrix.mutate({
+    void upsertWithMirror({
       sector_id: sectorId,
       day_of_week: day,
       shift_type: shiftType,
@@ -157,7 +180,7 @@ export function StaffingMatrixConfig() {
   const handleExtrasChange = (sectorId: string, day: number, shiftType: string, value: string) => {
     const num = parseInt(value) || 0;
     const currentCount = getCount(sectorId, day, shiftType);
-    upsertMatrix.mutate({
+    void upsertWithMirror({
       sector_id: sectorId,
       day_of_week: day,
       shift_type: shiftType,
@@ -243,7 +266,7 @@ export function StaffingMatrixConfig() {
               <StaffingMatrixImporter
                 selectedUnit={selectedUnit}
                 sectors={sectors}
-                onUpsert={async (row) => { await upsertMatrix.mutateAsync(row); }}
+                onUpsert={async (row) => { await upsertWithMirror(row); }}
                 onAddSector={async (params) => { await addSector.mutateAsync(params); }}
                 onClearMatrix={async (ids) => { await clearMatrix.mutateAsync(ids); }}
               />
@@ -251,6 +274,22 @@ export function StaffingMatrixConfig() {
           )}
         </CardContent>
       </Card>
+
+      {/* Banner: lojas casadas */}
+      {selectedUnit && unitPartner && partnerLojaName && (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <Link2 className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">
+              Esta loja está casada com <span className="text-primary">{partnerLojaName}</span>.
+            </p>
+            <p className="text-muted-foreground text-xs mt-1">
+              Alterações na matriz POP de setores compartilhados (com vínculo entre setores)
+              são espelhadas automaticamente para a loja parceira.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Matrix */}
       {!selectedUnit && (
@@ -303,10 +342,23 @@ export function StaffingMatrixConfig() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sectors.map((sector) => (
+                    {sectors.map((sector) => {
+                      const isShared = !!sectorPartnerships?.get(sector.id);
+                      return (
                       <TableRow key={sector.id}>
                         <TableCell>
-                          <InlineSectorName sectorId={sector.id} currentName={sector.name} />
+                          <div className="flex items-center gap-2">
+                            <InlineSectorName sectorId={sector.id} currentName={sector.name} />
+                            {isShared && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[9px] px-1.5 py-0 gap-0.5"
+                                title="Setor compartilhado com a loja parceira"
+                              >
+                                <Link2 className="h-2.5 w-2.5" /> Compartilhado
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         {DAYS.map((d) => {
                           const count = getCount(sector.id, d.value, shiftType);
@@ -357,7 +409,8 @@ export function StaffingMatrixConfig() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

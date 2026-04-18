@@ -7,6 +7,7 @@ import { CargosConfigSection } from "@/components/CargosConfigSection";
 import { GoogleSheetsSync } from "@/components/GoogleSheetsSync";
 import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { LegacySyncPanel } from "@/components/LegacySyncPanel";
+import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   useConfigLojas,
@@ -31,6 +32,9 @@ export function ConfigurationsTab() {
         </div>
         {isAdmin && <ClearEntriesModal />}
       </div>
+
+      {/* Lojas Casadas - Admin + Operador */}
+      {(isAdmin || isOperator) && <UnitPartnershipsSection />}
 
       {/* Budget Configuration - Admin Only */}
       {(isAdmin || isOperator) && (

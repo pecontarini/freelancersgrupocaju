@@ -3588,6 +3588,45 @@ export type Database = {
           },
         ]
       }
+      unit_partnerships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          partner_unit_id: string
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          partner_unit_id: string
+          unit_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          partner_unit_id?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_partnerships_partner_unit_id_fkey"
+            columns: ["partner_unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_partnerships_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_google_tokens: {
         Row: {
           access_token: string

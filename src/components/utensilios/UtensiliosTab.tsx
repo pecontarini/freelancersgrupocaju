@@ -208,12 +208,26 @@ export function UtensiliosTab() {
       {isAdmin && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+            <div className={isMobile ? "space-y-3" : "flex items-center justify-between gap-4"}>
               <div>
-                <h3 className="font-semibold text-sm">Gestão em Massa</h3>
-                <p className="text-xs text-muted-foreground">Exporte o modelo, preencha e importe para configurar todas as unidades de uma vez.</p>
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Network className="h-4 w-4 text-primary" />
+                  Gestão de Estoques Mínimos da Rede
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Edite os mínimos de todas as unidades em uma matriz visual, ou use a planilha para importação em massa.
+                </p>
               </div>
-              <BulkImportExport />
+              <div className={isMobile ? "flex flex-col gap-2 w-full" : "flex items-center gap-2 shrink-0"}>
+                <Button
+                  onClick={() => setMatrixOpen(true)}
+                  className={isMobile ? "w-full" : ""}
+                >
+                  <Network className="h-4 w-4 mr-2" />
+                  Editar Matriz da Rede
+                </Button>
+                <BulkImportExport />
+              </div>
             </div>
           </CardContent>
         </Card>

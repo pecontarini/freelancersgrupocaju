@@ -802,13 +802,26 @@ export function ManualScheduleGrid() {
                                 {canManage && !copyMode && (
                                   <button
                                     className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                    title="Copiar escala desta pessoa"
+                                    title="Copiar escala desta pessoa para outro colaborador"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setCopyMode({ sourceId: emp.id, sourceName: emp.name });
                                     }}
                                   >
                                     <Copy className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {canManage && !copyMode && (
+                                  <button
+                                    className="shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                    title="Copiar escala desta semana para a próxima"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOverwriteNextWeek(false);
+                                      setNextWeekConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                    }}
+                                  >
+                                    <CopyPlus className="h-3.5 w-3.5" />
                                   </button>
                                 )}
                                 {canManage && !copyMode && (

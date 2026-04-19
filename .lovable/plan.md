@@ -1,61 +1,72 @@
 
 
-## Plano: Cadastro e Gestão de Praças do Plano de Chão
+## Plano: 4 melhorias de usabilidade
 
-### Diagnóstico
-Hoje o sistema já lê `pracas_plano_chao` no Editor de Escalas (seletor de praça + painel de status), mas **não existe tela para cadastrar/editar essas praças**. O seed inicial criou as praças padrão, mas qualquer ajuste por loja precisa ser feito direto no banco. Falta o lado administrativo que fecha o ciclo: cadastrar → vincular → monitorar.
+### 1) Utensílios — ocultar item da contagem
+**Onde:** `ContagemSemanal.tsx` (lista/tabela e cards mobile).
 
-### Onde colocar
-Dentro de **Escalas > Configurações**, adicionar uma nova sub-seção “Plano de Chão (Praças)” logo abaixo de “Vincular Cargos por Setor”. Mesmo módulo, mesmo padrão visual, sem criar nova rota.
+**O que farei:**
+- Adicionar um botão simples (ícone `EyeOff`) em cada linha da contagem que marca o item como oculto **para a loja atual**.
+- Implementar como soft-hide setando `is_active = false` em `utensilios_items` (mesma flag já filtrada por `useUtensiliosItems`). Assim o item some imediatamente da contagem da loja, sem afetar outras unidades nem o catálogo global.
+- Acima da lista, um pequeno toggle "Mostrar ocultos (N)" que, quando ligado, lista os ocultos com botão `Eye` para reativar.
+- Novo hook `useToggleUtensilioVisibility` em `useUtensilios.ts` (update + invalidate `utensilios_items`).
 
-### O que será construído
+**Por que assim:** reaproveita coluna existente, é reversível, e por ser por loja respeita a operação de cada unidade.
 
-**1. Componente `PracasConfig.tsx` (novo)**
-- Seletor de unidade (igual aos outros configs do módulo)
-- Para a unidade escolhida, lista as praças agrupadas por **Setor → Turno (Almoço/Jantar/Tarde)**
-- Cada praça mostra:
-  - Nome da praça (ex: “Garçom Almoço”, “Fogão”)
-  - Linha com 7 inputs numéricos (Seg → Dom) para `qtd_necessaria`
-  - Botão de remover praça
-- Botões de ação por setor:
-  - “+ Nova praça” (abre diálogo: nome + turno; cria as 7 linhas Seg-Dom com qtd=1)
-  - “Replicar de outra loja” (copia praças de uma unidade origem para a atual)
-- Botão global “Aplicar seed padrão” (apenas se a loja não tem praças cadastradas) — usa o mesmo conjunto do seed inicial
+---
 
-**2. Hook `usePracasAdmin.ts` (novo)**
-- `useUpsertPraca` — criar/atualizar uma praça (linha única setor+nome+turno+dia)
-- `useUpdatePracaQtd` — atualizar `qtd_necessaria` (chamado em onBlur do input)
-- `useDeletePraca` — remover praça
-- `useDeletePracaGrupo` — remover todas as 7 linhas de uma praça (setor+nome+turno)
-- `useReplicarPracas` — copiar todas as praças de uma unidade origem para destino
-- `useApplySeedPracas` — inserir o pacote padrão (Subchefe, Garçom, Cumin, Hostess, Caixa, Parrilla, Cozinha, Bar, Serv. Gerais, Produção)
-- Invalida `["pracas-unit", unitId]` (mesma queryKey usada no Editor de Escalas) para sincronizar instantaneamente
+### 2) Escalas — copiar escala de um colaborador para outro
+**Onde:** `ManualScheduleGrid.tsx` (linha do colaborador) + `useManualSchedules.ts`.
 
-**3. Integração com setores existentes**
-- Carregar `sectors` da unidade via hook já existente (`useSectors`)
-- Ao criar praça, oferecer dropdown com os setores cadastrados na loja (evita digitar nome solto que não casa com `sectors.name` usado no fuzzy match do `usePracas`)
-- Mostrar aviso se houver praça com `setor` que não bate com nenhum `sectors.name` da unidade (ajuda a corrigir desalinhamentos)
+**O que farei:**
+- Adicionar um botão `Copy` ao lado do `Trash2` na célula sticky do nome (linha do funcionário). Ao clicar, entra em **modo "copiar"**: a linha fica destacada e aparece uma faixa no topo do grid: *"Copiando escala de FULANO. Selecione um colaborador destino"* + botão Cancelar.
+- Ao clicar em outra linha de funcionário (ou em um item de uma lista de seleção compacta), abrimos um diálogo de confirmação curto:
+  - Lista os turnos que serão copiados (dia/turno/setor/horário).
+  - Opção "Sobrescrever escalas existentes do destino" (default: pular dias já preenchidos).
+- Novo hook `useCopyEmployeeWeek({ sourceEmployeeId, targetEmployeeId, weekStart, weekEnd, sectorIds, overwrite })`:
+  - Lê `schedules` do origem na semana.
+  - Para cada um, faz `upsert` em `schedules` trocando `employee_id` para o destino, mantendo `schedule_date`, `shift_id`, `sector_id`, `start_time`, `end_time`, `praca_id`, `daily_rate`.
+  - Respeita as constraints de unicidade já existentes (skip se overwrite=false e já houver schedule no dia).
+- Após copiar, o usuário pode clicar em qualquer célula do destino para refinar (já existe — abre `ScheduleEditModal`).
 
-**4. Conexão com o Editor de Escalas (já pronta)**
-- Não precisa mexer em `ManualScheduleGrid`, `ScheduleEditModal` ou `usePracas` — eles já consomem `pracas_plano_chao` por unidade/setor/turno/dia
-- A invalidação de cache faz com que qualquer alteração apareça imediatamente no seletor de praça e no painel “Plano de chão — status do turno”
+**Por que assim:** sem nova UI pesada, fluxo clique→clique→confirma; aproveita o `ScheduleEditModal` para edição posterior.
 
-**5. RLS**
-- A tabela `pracas_plano_chao` provavelmente já está liberada para leitura (o hook lê hoje). Vou verificar e, se necessário, adicionar policies de INSERT/UPDATE/DELETE para `admin` e `operator` (mesmo padrão de `staffing_matrix`).
+---
+
+### 3) Remover "Estoque Geral" apenas visualmente
+**Onde:** apenas navegação — `BottomNavigation.tsx` e `AppSidebar.tsx`.
+
+**O que farei:**
+- Remover o item `{ id: "estoque", label: "Estoque", icon: Warehouse }` do array `navItems` em `BottomNavigation.tsx`.
+- Remover o item `ESTOQUE GERAL` do `menuItems` em `AppSidebar.tsx`.
+- **Não** mexer em `Index.tsx` (rota/case `estoque` continua existindo) nem em `EstoqueTab.tsx` — assim a aba some do menu mas o módulo permanece intacto, podendo ser religada depois trocando uma linha.
+
+---
+
+### 4) Agenda na versão mobile
+**Onde:** `BottomNavigation.tsx` + `Index.tsx` (já delega `agenda` para `navigate("/agenda")`).
+
+**O que farei:**
+- Adicionar `Agenda` ao painel/menu mobile. Como o bottom bar já tem 5 itens + Perfil (cheio), vou colocar a Agenda em **dois lugares** para garantir alcance:
+  1. Botão dedicado dentro do `Sheet` lateral do header e do `Sheet` inferior do "Perfil" (ao lado de Utensílios). Visível para todos os perfis (não só admin).
+  2. Substituir `Estoque` (que será removido no item 3) por `Agenda` no bottom bar — assim ela ganha o slot fixo que o Estoque deixou. Ícone `Calendar`, label "Agenda".
+- O clique chama `onTabChange("agenda")`, que `Index.tsx` já intercepta e roteia para `/agenda`.
+- A página `/agenda` em si já existe; vou apenas verificar que ela renderiza bem em 440px (sem mexer na lógica). Se houver overflow no header de filtros, aplico `flex-wrap` mínimo — sem reescrever o módulo.
+
+---
 
 ### Arquivos
-- **Novo**: `src/components/escalas/PracasConfig.tsx`
-- **Novo**: `src/hooks/usePracasAdmin.ts`
-- **Editado**: `src/components/escalas/EscalasTab.tsx` (renderizar `PracasConfig` na aba Configurações, abaixo de `SectorJobTitleMapping`)
-- **Migration** (se necessário): policies RLS de escrita em `pracas_plano_chao`
+- **Editar**: `src/hooks/useUtensilios.ts` (novo hook `useToggleUtensilioVisibility`).
+- **Editar**: `src/components/utensilios/ContagemSemanal.tsx` (botão ocultar/reexibir + filtro "mostrar ocultos").
+- **Editar**: `src/hooks/useManualSchedules.ts` (novo `useCopyEmployeeWeek`).
+- **Editar**: `src/components/escalas/ManualScheduleGrid.tsx` (botão Copy, modo copiar, banner, diálogo).
+- **Editar**: `src/components/layout/BottomNavigation.tsx` (remover Estoque, adicionar Agenda no bottom bar e nos Sheets).
+- **Editar**: `src/components/layout/AppSidebar.tsx` (remover Estoque do menu desktop).
+- **Eventual ajuste mínimo**: `src/pages/Agenda.tsx` se houver quebra visual em 440px (apenas wrap/spacing, nada funcional).
 
-### Fluxo final do usuário
-1. Vai em **Escalas > Configurações > Plano de Chão**
-2. Escolhe a loja (ex: MULT 12)
-3. Vê todos os setores e suas praças por turno
-4. Ajusta as quantidades por dia da semana inline, ou cria/remove praças
-5. Volta para **Editor de Escalas** → ao escalar um colaborador, o seletor “Praça” já mostra as opções atualizadas e o painel “Plano de chão” reflete a nova realidade
-
-### Resultado esperado
-Ciclo completo: **cadastrar praça → escalar colaborador na praça → acompanhar cobertura por turno**, tudo dentro do módulo de Escalas, sem alterar nada fora dele.
+### Validação que farei
+- Ocultar um utensílio na loja A e confirmar que continua aparecendo na loja B.
+- Copiar escala de um funcionário CLT para outro na mesma semana (com e sem overwrite).
+- Conferir que "Estoque Geral" sumiu do menu mobile e desktop, mas a rota interna ainda funciona.
+- Abrir Agenda pelo bottom bar e pelo Sheet de Perfil em 440px.
 

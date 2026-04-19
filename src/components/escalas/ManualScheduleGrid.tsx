@@ -724,8 +724,32 @@ export function ManualScheduleGrid() {
                       {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
                         const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
+                        const isCopySource = copyMode?.sourceId === emp.id;
+                        const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
                         return (
-                          <TableRow key={emp.id}>
+                          <TableRow
+                            key={emp.id}
+                            className={
+                              isCopySource
+                                ? "bg-primary/10 ring-1 ring-primary"
+                                : isCopyTarget
+                                ? "cursor-pointer hover:bg-primary/5"
+                                : ""
+                            }
+                            onClick={
+                              isCopyTarget
+                                ? () => {
+                                    setCopyConfirm({
+                                      sourceId: copyMode!.sourceId,
+                                      sourceName: copyMode!.sourceName,
+                                      targetId: emp.id,
+                                      targetName: emp.name,
+                                    });
+                                    setOverwriteCopy(false);
+                                  }
+                                : undefined
+                            }
+                          >
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                               <div className="flex items-center gap-1.5">
                                 <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
@@ -739,9 +763,21 @@ export function ManualScheduleGrid() {
                                     {partnerSectorMeta?.unitName.slice(0, 8)}
                                   </Badge>
                                 )}
-                                {canManage && (
+                                {canManage && !copyMode && (
                                   <button
-                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                    title="Copiar escala desta pessoa"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCopyMode({ sourceId: emp.id, sourceName: emp.name });
+                                    }}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {canManage && !copyMode && (
+                                  <button
+                                    className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Remover da semana"
                                     onClick={(e) => {
                                       e.stopPropagation();

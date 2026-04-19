@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { format, addDays, startOfWeek, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -1030,7 +1030,7 @@ export function ManualScheduleGrid() {
                               </TableRow>
                             );
                           })}
-                        </>
+                        </React.Fragment>
                       ))}
                       {/* VAGA EXTRA placeholder rows */}
                       {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (

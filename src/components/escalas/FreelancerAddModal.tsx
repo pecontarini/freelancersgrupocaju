@@ -202,9 +202,11 @@ export function FreelancerAddModal({
     const rateNum = parseFloat(rate) || 0;
     const cleanCpf = cpfValue.replace(/\D/g, "");
 
-    if (!cleanCpf || cleanCpf.length !== 11) {
-      toast.error("Informe um CPF válido (11 dígitos).");
-      return;
+    if (!noCpfMode) {
+      if (!cleanCpf || cleanCpf.length !== 11) {
+        toast.error("Informe um CPF válido (11 dígitos).");
+        return;
+      }
     }
     if (!name.trim()) {
       toast.error("Nome é obrigatório.");
@@ -223,6 +225,9 @@ export function FreelancerAddModal({
         const { supabase } = await import("@/integrations/supabase/client");
         const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
 
+        // In no-CPF mode, leave cpf NULL so we don't pollute lookup tables
+        const cpfToStore = noCpfMode ? null : cleanCpf;
+
         const { data, error } = await supabase
           .from("employees")
           .insert({
@@ -233,7 +238,7 @@ export function FreelancerAddModal({
             default_rate: rateNum,
             job_title: chosenJt?.name || "Freelancer",
             job_title_id: selectedJobTitleId,
-            cpf: cleanCpf,
+            cpf: cpfToStore,
             phone: phone.trim() || null,
           })
           .select("id")
@@ -242,8 +247,8 @@ export function FreelancerAddModal({
         if (error) throw error;
         empId = data.id;
 
-        // Optionally also persist to freelancer_profiles for future lookups
-        if (pixKey || phone) {
+        // Only persist to freelancer_profiles when we have a real CPF
+        if (!noCpfMode && (pixKey || phone)) {
           await supabase
             .from("freelancer_profiles" as any)
             .upsert(
@@ -279,6 +284,12 @@ export function FreelancerAddModal({
         schedule_type: "working",
         agreed_rate: rateNum,
       });
+
+      if (noCpfMode) {
+        toast.warning("Freelancer escalado sem CPF. Lembre de completar o cadastro depois para liberar pagamento.", {
+          duration: 5000,
+        });
+      }
 
       onAdded?.(empId);
       onClose();

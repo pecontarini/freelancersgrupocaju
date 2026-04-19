@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import cajuparLogo from "@/assets/cc98afa7-a70b-4603-9079-2b37d438a7fd.png";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -16,22 +18,45 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [forgotPassword, setForgotPassword] = useState(false);
+  const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Cooldown timer for resend
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) {
       toast.error("Informe seu e-mail.");
       return;
     }
+    if (!EMAIL_REGEX.test(trimmed)) {
+      toast.error("E-mail inválido. Verifique o formato.");
+      return;
+    }
+    if (resendCooldown > 0) {
+      toast.error(`Aguarde ${resendCooldown}s para reenviar.`);
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Link de recuperação enviado! Verifique seu e-mail.");
-      setForgotPassword(false);
+      setRecoveryEmailSent(true);
+      setResendCooldown(60);
+      toast.success("Link de recuperação enviado!", {
+        description: "Verifique sua caixa de entrada e a pasta de spam.",
+      });
     }
     setLoading(false);
   };

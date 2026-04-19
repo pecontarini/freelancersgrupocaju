@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { format, addDays, startOfWeek, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -19,6 +19,8 @@ import {
   Trash2,
   ChevronDown,
   Link2,
+  ArrowRight,
+  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -290,19 +292,87 @@ export function ManualScheduleGrid() {
     });
   }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
-  // Sort: CLT first, then freelancers
+  // Sort mode + job title filter
+  const [sortMode, setSortMode] = useState<"function" | "alpha">("function");
+  const [filterJobTitleIds, setFilterJobTitleIds] = useState<Set<string>>(new Set());
+
+  // Apply job title filter (if any)
+  const filteredScheduled = useMemo(() => {
+    if (filterJobTitleIds.size === 0) return scheduledEmployees;
+    return scheduledEmployees.filter(
+      (e: any) => e.job_title_id && filterJobTitleIds.has(e.job_title_id)
+    );
+  }, [scheduledEmployees, filterJobTitleIds]);
+
+  const filteredBase = useMemo(() => {
+    if (filterJobTitleIds.size === 0) return sectorBaseEmployees;
+    return sectorBaseEmployees.filter(
+      (e: any) => e.job_title_id && filterJobTitleIds.has(e.job_title_id)
+    );
+  }, [sectorBaseEmployees, filterJobTitleIds]);
+
+  // Sort: CLT first, then freelancers (legacy alpha sort)
   const sortedScheduled = useMemo(() => {
-    return [...scheduledEmployees].sort((a, b) => {
+    return [...filteredScheduled].sort((a, b) => {
       const aType = a.worker_type || "clt";
       const bType = b.worker_type || "clt";
       if (aType === bType) return a.name.localeCompare(b.name);
       return aType === "clt" ? -1 : 1;
     });
-  }, [scheduledEmployees]);
+  }, [filteredScheduled]);
 
   const sortedBase = useMemo(() => {
-    return [...sectorBaseEmployees].sort((a, b) => a.name.localeCompare(b.name));
-  }, [sectorBaseEmployees]);
+    return [...filteredBase].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredBase]);
+
+  // Group employees by job title for "function" sort mode
+  type EmpGroup = { jobTitle: string; jobTitleId: string | null; employees: typeof sortedScheduled };
+  const groupedScheduled = useMemo<EmpGroup[]>(() => {
+    if (sortMode !== "function") {
+      return [{ jobTitle: "", jobTitleId: null, employees: sortedScheduled }];
+    }
+    const map = new Map<string, EmpGroup>();
+    for (const emp of sortedScheduled) {
+      const key = emp.job_title_id || "__no_title__";
+      const label = emp.job_title || "Sem cargo definido";
+      if (!map.has(key)) {
+        map.set(key, { jobTitle: label, jobTitleId: emp.job_title_id || null, employees: [] });
+      }
+      map.get(key)!.employees.push(emp);
+    }
+    // Sort groups: alphabetic by job title name; within each, CLT then freelancer then alpha
+    const groups = Array.from(map.values());
+    groups.sort((a, b) => a.jobTitle.localeCompare(b.jobTitle));
+    for (const g of groups) {
+      g.employees.sort((a, b) => {
+        const aType = a.worker_type || "clt";
+        const bType = b.worker_type || "clt";
+        if (aType === bType) return a.name.localeCompare(b.name);
+        return aType === "clt" ? -1 : 1;
+      });
+    }
+    return groups;
+  }, [sortedScheduled, sortMode]);
+
+  // Available job titles in this view (from scheduled + base) for the filter chips
+  const availableJobTitles = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of [...scheduledEmployees, ...sectorBaseEmployees]) {
+      if (e.job_title_id) map.set(e.job_title_id, e.job_title || "Sem nome");
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [scheduledEmployees, sectorBaseEmployees]);
+
+  function toggleJobTitleFilter(id: string) {
+    setFilterJobTitleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Build employee map for worker_type + unit_id lookup
   const employeeMap = useMemo(() => {
@@ -644,6 +714,51 @@ export function ManualScheduleGrid() {
             </div>
           )}
 
+          {/* Sort + Job Title filter */}
+          {activeSectorId && (sortedScheduled.length > 0 || sortedBase.length > 0 || availableJobTitles.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <div className="flex items-center gap-1.5">
+                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Ordenar:</span>
+                <Tabs value={sortMode} onValueChange={(v) => setSortMode(v as "function" | "alpha")}>
+                  <TabsList className="h-7">
+                    <TabsTrigger value="function" className="text-[11px] h-5 px-2">Por função</TabsTrigger>
+                    <TabsTrigger value="alpha" className="text-[11px] h-5 px-2">Alfabético</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              {availableJobTitles.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1 ml-auto">
+                  <span className="text-xs text-muted-foreground">Filtrar:</span>
+                  {availableJobTitles.map((jt) => {
+                    const active = filterJobTitleIds.has(jt.id);
+                    return (
+                      <button
+                        key={jt.id}
+                        onClick={() => toggleJobTitleFilter(jt.id)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors uppercase ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        }`}
+                      >
+                        {jt.name}
+                      </button>
+                    );
+                  })}
+                  {filterJobTitleIds.size > 0 && (
+                    <button
+                      onClick={() => setFilterJobTitleIds(new Set())}
+                      className="text-[10px] px-2 py-0.5 rounded-full text-muted-foreground hover:text-foreground underline"
+                    >
+                      limpar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Grid */}
           <Card>
             <CardContent className="pt-4 px-0">
@@ -788,113 +903,135 @@ export function ManualScheduleGrid() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedScheduled.map((emp) => {
-                        const isFreelancer = emp.worker_type === "freelancer";
-                        const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
-                        const isCopySource = copyMode?.sourceId === emp.id;
-                        const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
-                        return (
-                          <TableRow
-                            key={emp.id}
-                            className={
-                              isCopySource
-                                ? "bg-primary/10 ring-1 ring-primary"
-                                : isCopyTarget
-                                ? "cursor-pointer hover:bg-primary/5"
-                                : ""
-                            }
-                            onClick={
-                              isCopyTarget
-                                ? () => {
-                                    setCopyConfirm({
-                                      sourceId: copyMode!.sourceId,
-                                      sourceName: copyMode!.sourceName,
-                                      targetId: emp.id,
-                                      targetName: emp.name,
-                                    });
-                                    setOverwriteCopy(false);
-                                  }
-                                : undefined
-                            }
-                          >
-                            <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
-                                 {isFreelancer && (
-                                  <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
-                                    FL
+                      {groupedScheduled.map((group, gIdx) => (
+                        <React.Fragment key={`group-frag-${gIdx}`}>
+                          {sortMode === "function" && group.employees.length > 0 && (
+                            <TableRow key={`group-${gIdx}`} className="bg-muted/40 hover:bg-muted/40">
+                              <TableCell
+                                colSpan={8}
+                                className="py-1 px-3 sticky left-0 bg-muted/40 border-r"
+                              >
+                                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  <Briefcase className="h-3 w-3" />
+                                  <span>{group.jobTitle}</span>
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                                    {group.employees.length}
                                   </Badge>
-                                )}
-                                {isFromPartner && (
-                                  <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
-                                    {partnerSectorMeta?.unitName.slice(0, 8)}
-                                  </Badge>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                    title="Copiar escala desta pessoa para outro colaborador"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setCopyMode({ sourceId: emp.id, sourceName: emp.name });
-                                    }}
-                                  >
-                                    <Copy className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                    title="Copiar escala desta semana para a próxima"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOverwriteNextWeek(false);
-                                      setNextWeekConfirm({ employeeId: emp.id, employeeName: emp.name });
-                                    }}
-                                  >
-                                    <CopyPlus className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Remover da semana"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                              {emp.job_title && (
-                                <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
-                               )}
-                             </TableCell>
-                             {weekDays.map((day, i) => {
-                              const dateStr = format(day, "yyyy-MM-dd");
-                              const schedule = getScheduleForCell(emp.id, dateStr);
-                              const pracaName = schedule?.praca_id
-                                ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
-                                : null;
-                              return (
-                                <TableCell
-                                  key={i}
-                                  className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
-                                  onClick={(e) => {
-                                    if (copyMode) return; // let row click handle target selection
-                                    e.stopPropagation();
-                                    handleCellClick(emp, dateStr);
-                                  }}
-                                >
-                                  <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {group.employees.map((emp) => {
+                            const isFreelancer = emp.worker_type === "freelancer";
+                            const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
+                            const isCopySource = copyMode?.sourceId === emp.id;
+                            const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
+                            return (
+                              <TableRow
+                                key={emp.id}
+                                className={
+                                  isCopySource
+                                    ? "bg-primary/10 ring-1 ring-primary"
+                                    : isCopyTarget
+                                    ? "cursor-pointer hover:bg-primary/5"
+                                    : ""
+                                }
+                                onClick={
+                                  isCopyTarget
+                                    ? () => {
+                                        setCopyConfirm({
+                                          sourceId: copyMode!.sourceId,
+                                          sourceName: copyMode!.sourceName,
+                                          targetId: emp.id,
+                                          targetName: emp.name,
+                                        });
+                                        setOverwriteCopy(false);
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
+                                    {isFreelancer && (
+                                      <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
+                                        FL
+                                      </Badge>
+                                    )}
+                                    {isFromPartner && (
+                                      <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
+                                        {partnerSectorMeta?.unitName.slice(0, 8)}
+                                      </Badge>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                        title="Copiar escala desta pessoa para outro colaborador"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCopyMode({ sourceId: emp.id, sourceName: emp.name });
+                                        }}
+                                      >
+                                        <Copy className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-[9px] font-semibold transition-colors"
+                                        title="Copiar escala desta semana para a próxima"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOverwriteNextWeek(false);
+                                          setNextWeekConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                        }}
+                                      >
+                                        <CopyPlus className="h-2.5 w-2.5" />
+                                        <span>próxima</span>
+                                        <ArrowRight className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                        title="Remover da semana"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                        }}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {emp.job_title && sortMode !== "function" && (
+                                    <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
+                                  )}
                                 </TableCell>
-                              );
-                            })}
-                          </TableRow>
-                        );
-                      })}
+                                {weekDays.map((day, i) => {
+                                  const dateStr = format(day, "yyyy-MM-dd");
+                                  const schedule = getScheduleForCell(emp.id, dateStr);
+                                  const pracaName = schedule?.praca_id
+                                    ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
+                                    : null;
+                                  return (
+                                    <TableCell
+                                      key={i}
+                                      className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
+                                      onClick={(e) => {
+                                        if (copyMode) return;
+                                        e.stopPropagation();
+                                        handleCellClick(emp, dateStr);
+                                      }}
+                                    >
+                                      <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
                       {/* VAGA EXTRA placeholder rows */}
                       {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (
                         <TableRow key={`extra-slot-${slotIdx}`} className="bg-amber-50/50 dark:bg-amber-950/10">
@@ -1212,7 +1349,7 @@ export function ManualScheduleGrid() {
                 if (!nextWeekConfirm) return;
                 setIsCopyingNextWeek(true);
                 try {
-                  await copyEmployeeToNextWeek.mutateAsync({
+                  const res = await copyEmployeeToNextWeek.mutateAsync({
                     employeeId: nextWeekConfirm.employeeId,
                     sourceWeekStart: weekStart,
                     sourceWeekEnd: weekEnd,
@@ -1220,6 +1357,9 @@ export function ManualScheduleGrid() {
                     overwrite: overwriteNextWeek,
                   });
                   setNextWeekConfirm(null);
+                  if (res?.copied > 0) {
+                    setCurrentWeekBase((prev) => addDays(prev, 7));
+                  }
                 } catch {
                   // toast handled in hook
                 } finally {
@@ -1278,13 +1418,16 @@ export function ManualScheduleGrid() {
                 e.preventDefault();
                 setIsReplicatingWeek(true);
                 try {
-                  await copyWeekToNextWeek.mutateAsync({
+                  const res = await copyWeekToNextWeek.mutateAsync({
                     sourceWeekStart: weekStart,
                     sourceWeekEnd: weekEnd,
                     sectorIds: effectiveSectorIds,
                     overwrite: overwriteReplicate,
                   });
                   setReplicateWeekOpen(false);
+                  if (res?.copied > 0) {
+                    setCurrentWeekBase((prev) => addDays(prev, 7));
+                  }
                 } catch {
                   // toast handled in hook
                 } finally {

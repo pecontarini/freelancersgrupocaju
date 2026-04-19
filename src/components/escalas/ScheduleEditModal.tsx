@@ -20,10 +20,19 @@ import {
   Loader2,
   Trash2,
   ArrowLeft,
+  Clock4,
+  Sun,
+  CheckCircle2,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { PracaSelector } from "./PracaSelector";
 import { dateStrToDiaPraca, inferTurnoFromTime } from "@/hooks/usePracas";
+import {
+  useEmployeeSundaysOff,
+  monthRefFromDate,
+  isSundayDate,
+  formatSundayShort,
+} from "@/hooks/useSundayOff";
 
 interface ScheduleEditModalProps {
   open: boolean;
@@ -150,7 +159,7 @@ export function ScheduleEditModal({
     onClose();
   }
 
-  async function handleSetAbsence(type: "off" | "sick_leave") {
+  async function handleSetAbsence(type: "off" | "sick_leave" | "banco_horas") {
     await upsert.mutateAsync({
       id: existing?.id,
       employee_id: employeeId,

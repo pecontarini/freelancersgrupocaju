@@ -50,7 +50,7 @@ import {
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, useCopyEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
+import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, useCopyEmployeeWeek, useCopyEmployeeToNextWeek, useCopyWeekToNextWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
 import {
   AlertDialog,
   AlertDialogAction,

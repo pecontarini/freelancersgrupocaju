@@ -186,6 +186,8 @@ export function ManualScheduleGrid() {
   const copyDay = useCopyPreviousDay();
   const cancelEmployeeWeek = useCancelEmployeeWeek();
   const copyEmployeeWeek = useCopyEmployeeWeek();
+  const copyEmployeeToNextWeek = useCopyEmployeeToNextWeek();
+  const copyWeekToNextWeek = useCopyWeekToNextWeek();
 
   // Delete employee from week state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -207,6 +209,19 @@ export function ManualScheduleGrid() {
   } | null>(null);
   const [overwriteCopy, setOverwriteCopy] = useState(false);
   const [isCopyingWeek, setIsCopyingWeek] = useState(false);
+
+  // Copy employee schedule to NEXT week
+  const [nextWeekConfirm, setNextWeekConfirm] = useState<{
+    employeeId: string;
+    employeeName: string;
+  } | null>(null);
+  const [overwriteNextWeek, setOverwriteNextWeek] = useState(false);
+  const [isCopyingNextWeek, setIsCopyingNextWeek] = useState(false);
+
+  // Replicate ENTIRE week to next
+  const [replicateWeekOpen, setReplicateWeekOpen] = useState(false);
+  const [overwriteReplicate, setOverwriteReplicate] = useState(false);
+  const [isReplicatingWeek, setIsReplicatingWeek] = useState(false);
   const [showSectorBase, setShowSectorBase] = useState(false);
   const [editModal, setEditModal] = useState<{
     open: boolean;

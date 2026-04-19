@@ -20,10 +20,19 @@ import {
   Loader2,
   Trash2,
   ArrowLeft,
+  Clock4,
+  Sun,
+  CheckCircle2,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { PracaSelector } from "./PracaSelector";
 import { dateStrToDiaPraca, inferTurnoFromTime } from "@/hooks/usePracas";
+import {
+  useEmployeeSundaysOff,
+  monthRefFromDate,
+  isSundayDate,
+  formatSundayShort,
+} from "@/hooks/useSundayOff";
 
 interface ScheduleEditModalProps {
   open: boolean;
@@ -150,7 +159,7 @@ export function ScheduleEditModal({
     onClose();
   }
 
-  async function handleSetAbsence(type: "off" | "sick_leave") {
+  async function handleSetAbsence(type: "off" | "sick_leave" | "banco_horas") {
     await upsert.mutateAsync({
       id: existing?.id,
       employee_id: employeeId,
@@ -183,6 +192,16 @@ export function ScheduleEditModal({
     }
     onClose();
   }
+
+  // Sunday-off tracking (CLT only) — month of currently displayed date
+  const monthRef = useMemo(() => monthRefFromDate(date), [date]);
+  const dateIsSunday = useMemo(() => isSundayDate(date), [date]);
+  const { data: sundaysOff = [] } = useEmployeeSundaysOff(
+    !isFreelancer ? employeeId : null,
+    !isFreelancer ? monthRef : null
+  );
+  const hasSundayOffThisMonth = sundaysOff.length > 0;
+  const monthLabel = new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
 
   const isSaving = upsert.isPending || cancel.isPending || bulkVacation.isPending;
 
@@ -258,6 +277,23 @@ export function ScheduleEditModal({
                 <span>Atenção: Jornada acima de 10h (Art. 59 CLT)</span>
               </div>
             )}
+            {!isFreelancer && dateIsSunday && (
+              hasSundayOffThisMonth ? (
+                <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 dark:bg-green-950/20 p-2.5 text-xs text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>
+                    {employeeName.split(" ")[0]} já teve folga dominical em {monthLabel} ({sundaysOff.map(formatSundayShort).join(", ")}).
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-2.5 text-xs text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    {employeeName.split(" ")[0]} ainda não teve domingo de folga em {monthLabel}.
+                  </span>
+                </div>
+              )
+            )}
             <Button className="w-full" onClick={handleSaveShift} disabled={isSaving}>
               {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Salvar Turno
@@ -294,6 +330,15 @@ export function ScheduleEditModal({
                 >
                   <Stethoscope className="h-5 w-5" />
                   ATESTADO
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full h-14 text-base gap-2 border-2 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/30"
+                  onClick={() => handleSetAbsence("banco_horas")}
+                  disabled={isSaving}
+                >
+                  <Clock4 className="h-5 w-5" />
+                  BANCO DE HORAS
                 </Button>
               </>
             ) : (

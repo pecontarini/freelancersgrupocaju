@@ -70,6 +70,8 @@ import { useSectorPartner } from "@/hooks/useSectorPartnerships";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
+import { EditEmployeeQuickModal } from "./EditEmployeeQuickModal";
+import { useEmployeeSundaysOff, monthRefFromDate } from "@/hooks/useSundayOff";
 import { formatCurrency } from "@/lib/formatters";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -239,6 +241,17 @@ export function ManualScheduleGrid() {
   const [freelancerModal, setFreelancerModal] = useState<{
     open: boolean;
     date: string;
+  } | null>(null);
+
+  // Quick edit employee modal
+  const [editEmployeeModal, setEditEmployeeModal] = useState<{
+    id: string;
+    name: string;
+    gender: string;
+    phone: string | null;
+    job_title: string | null;
+    job_title_id: string | null;
+    unit_id: string;
   } | null>(null);
 
   // Budget edit popover state
@@ -958,14 +971,40 @@ export function ManualScheduleGrid() {
                                         FL
                                       </Badge>
                                     )}
+                                    {!isFreelancer && (
+                                      <SundayOffIndicator
+                                        employeeId={emp.id}
+                                        monthRef={monthRefFromDate(currentWeekBase)}
+                                      />
+                                    )}
                                     {isFromPartner && (
                                       <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
                                         {partnerSectorMeta?.unitName.slice(0, 8)}
                                       </Badge>
                                     )}
-                                    {canManage && !copyMode && (
+                                    {canManage && !copyMode && !isFromPartner && (
                                       <button
                                         className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                        title="Editar funcionário (cargo, telefone, gênero)"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditEmployeeModal({
+                                            id: emp.id,
+                                            name: emp.name,
+                                            gender: emp.gender || "M",
+                                            phone: emp.phone || null,
+                                            job_title: emp.job_title || null,
+                                            job_title_id: emp.job_title_id || null,
+                                            unit_id: emp.unit_id,
+                                          });
+                                        }}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className={`${isFromPartner ? "ml-auto" : ""} shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors`}
                                         title="Copiar escala desta pessoa para outro colaborador"
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1194,6 +1233,13 @@ export function ManualScheduleGrid() {
           partnerSectorId={partnerSectorId || undefined}
         />
       )}
+
+      {/* Quick Edit Employee Modal */}
+      <EditEmployeeQuickModal
+        open={!!editEmployeeModal}
+        onClose={() => setEditEmployeeModal(null)}
+        employee={editEmployeeModal}
+      />
 
       {/* Delete employee from week confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o && !isDeletingWeek) setDeleteConfirm(null); }}>
@@ -1445,6 +1491,36 @@ export function ManualScheduleGrid() {
   );
 }
 
+/* ─── Sunday-off indicator (per-employee monthly badge) ─── */
+function SundayOffIndicator({
+  employeeId,
+  monthRef,
+}: {
+  employeeId: string;
+  monthRef: string;
+}) {
+  const { data: sundays = [] } = useEmployeeSundaysOff(employeeId, monthRef);
+  const had = sundays.length > 0;
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[9px] px-1 py-0 shrink-0 gap-0.5 ${
+        had
+          ? "border-green-500/60 text-green-700 dark:text-green-400"
+          : "border-orange-400/60 text-orange-600 dark:text-orange-400"
+      }`}
+      title={
+        had
+          ? `Já teve ${sundays.length} domingo(s) de folga este mês`
+          : "Ainda não teve domingo de folga este mês"
+      }
+    >
+      <Sun className="h-2.5 w-2.5" />
+      DOM {had ? "✓" : "✗"}
+    </Badge>
+  );
+}
+
 /* ─── Mini POP Badge (Almoço / Jantar) ─── */
 
 function MiniPopBadge({
@@ -1522,6 +1598,14 @@ function ScheduleCell({
     return (
       <div className="h-10 flex items-center justify-center rounded-md bg-red-100 dark:bg-red-900/30">
         <span className="text-xs font-bold text-red-600 dark:text-red-400">ATESTADO</span>
+      </div>
+    );
+  }
+
+  if (type === "banco_horas") {
+    return (
+      <div className="h-10 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
+        <span className="text-xs font-bold text-blue-700 dark:text-blue-400">BH</span>
       </div>
     );
   }

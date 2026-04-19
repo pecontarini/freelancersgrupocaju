@@ -1782,6 +1782,8 @@ export type Database = {
           loja: string
           loja_id: string | null
           nome_completo: string
+          origem: string
+          schedule_id: string | null
           valor: number
         }
         Insert: {
@@ -1796,6 +1798,8 @@ export type Database = {
           loja: string
           loja_id?: string | null
           nome_completo: string
+          origem?: string
+          schedule_id?: string | null
           valor: number
         }
         Update: {
@@ -1810,6 +1814,8 @@ export type Database = {
           loja?: string
           loja_id?: string | null
           nome_completo?: string
+          origem?: string
+          schedule_id?: string | null
           valor?: number
         }
         Relationships: [
@@ -1818,6 +1824,13 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freelancer_entries_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
             referencedColumns: ["id"]
           },
         ]

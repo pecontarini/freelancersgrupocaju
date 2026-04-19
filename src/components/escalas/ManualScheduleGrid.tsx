@@ -714,6 +714,51 @@ export function ManualScheduleGrid() {
             </div>
           )}
 
+          {/* Sort + Job Title filter */}
+          {activeSectorId && (sortedScheduled.length > 0 || sortedBase.length > 0 || availableJobTitles.length > 0) && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <div className="flex items-center gap-1.5">
+                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Ordenar:</span>
+                <Tabs value={sortMode} onValueChange={(v) => setSortMode(v as "function" | "alpha")}>
+                  <TabsList className="h-7">
+                    <TabsTrigger value="function" className="text-[11px] h-5 px-2">Por função</TabsTrigger>
+                    <TabsTrigger value="alpha" className="text-[11px] h-5 px-2">Alfabético</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+              {availableJobTitles.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1 ml-auto">
+                  <span className="text-xs text-muted-foreground">Filtrar:</span>
+                  {availableJobTitles.map((jt) => {
+                    const active = filterJobTitleIds.has(jt.id);
+                    return (
+                      <button
+                        key={jt.id}
+                        onClick={() => toggleJobTitleFilter(jt.id)}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors uppercase ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        }`}
+                      >
+                        {jt.name}
+                      </button>
+                    );
+                  })}
+                  {filterJobTitleIds.size > 0 && (
+                    <button
+                      onClick={() => setFilterJobTitleIds(new Set())}
+                      className="text-[10px] px-2 py-0.5 rounded-full text-muted-foreground hover:text-foreground underline"
+                    >
+                      limpar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Grid */}
           <Card>
             <CardContent className="pt-4 px-0">

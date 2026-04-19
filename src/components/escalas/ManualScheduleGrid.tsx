@@ -70,6 +70,8 @@ import { useSectorPartner } from "@/hooks/useSectorPartnerships";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
+import { EditEmployeeQuickModal } from "./EditEmployeeQuickModal";
+import { useEmployeeSundaysOff, monthRefFromDate } from "@/hooks/useSundayOff";
 import { formatCurrency } from "@/lib/formatters";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -239,6 +241,17 @@ export function ManualScheduleGrid() {
   const [freelancerModal, setFreelancerModal] = useState<{
     open: boolean;
     date: string;
+  } | null>(null);
+
+  // Quick edit employee modal
+  const [editEmployeeModal, setEditEmployeeModal] = useState<{
+    id: string;
+    name: string;
+    gender: string;
+    phone: string | null;
+    job_title: string | null;
+    job_title_id: string | null;
+    unit_id: string;
   } | null>(null);
 
   // Budget edit popover state
@@ -1522,6 +1535,14 @@ function ScheduleCell({
     return (
       <div className="h-10 flex items-center justify-center rounded-md bg-red-100 dark:bg-red-900/30">
         <span className="text-xs font-bold text-red-600 dark:text-red-400">ATESTADO</span>
+      </div>
+    );
+  }
+
+  if (type === "banco_horas") {
+    return (
+      <div className="h-10 flex items-center justify-center rounded-md bg-blue-100 dark:bg-blue-900/30">
+        <span className="text-xs font-bold text-blue-700 dark:text-blue-400">BH</span>
       </div>
     );
   }

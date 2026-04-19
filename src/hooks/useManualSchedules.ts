@@ -589,6 +589,7 @@ export function useCopyEmployeeToNextWeek() {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
       qc.invalidateQueries({ queryKey: ["schedules"] });
+      qc.invalidateQueries({ queryKey: ["freelancer-checkins"] });
       const msg = res.skipped > 0
         ? `${res.copied} escala(s) copiada(s) para próxima semana, ${res.skipped} ignorada(s).`
         : `${res.copied} escala(s) copiada(s) para próxima semana!`;

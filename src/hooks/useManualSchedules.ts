@@ -724,6 +724,7 @@ export function useCopyWeekToNextWeek() {
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
       qc.invalidateQueries({ queryKey: ["schedules"] });
+      qc.invalidateQueries({ queryKey: ["freelancer-checkins"] });
       const msg = res.skipped > 0
         ? `Semana replicada: ${res.copied} escala(s), ${res.skipped} ignorada(s).`
         : `Semana replicada: ${res.copied} escala(s) copiada(s)!`;

@@ -1,77 +1,67 @@
 
 
-User wants to copy an employee's full week schedule to the NEXT week (currently the existing copy is employee→employee in the SAME week, and there's a "copy previous day" but no "copy previous week"). Let me check the current state.
-<lov-tool-use id="toolu_vrtx_01H8aWgt3R7B7uoCvUpEi8Lw" name="code--search_files" integration-id="code" data="{\"query\": \"useCopyEmployeeWeek|useCopyPreviousDay|Copiar semana|copyWeek\", \"include_patterns\": \"src/**/*.tsx,src/**/*.ts\"}">
-</lov-tool-use>
+## Plano: 3 melhorias definitivas no Editor de Escalas
 
-<lov-tool-use id="toolu_vrtx_014eyj9z2qykn5Z74Jfu5Ucn" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"src/**/*.tsx,src/**/*.ts\", \"query\": \"useCopyEmployeeWeek|useCopyPreviousDay|Copiar semana|copyWeek|copy-mode|copyMode\"}">
-</lov-tool-use>
-The current copy flow copies WITHIN the same week. The user wants to copy to the FOLLOWING week. Let me look at the current state and confirm.
-<lov-tool-use id="toolu_vrtx_01KsBm6Q9TX63o7YgxCqNBHe" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/escalas/ManualScheduleGrid.tsx\", \"lines\": \"180-260\"}">
-</lov-tool-use>
+### Problema 1 — Lançamento de Extra com CPF como campo principal
 
-<lov-tool-use id="toolu_vrtx_01DjVHrzBRyHRwMApJ3v1p4R" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/escalas/ManualScheduleGrid.tsx\", \"lines\": \"1050-1110\"}">
-</lov-tool-use>
-Now I have full context. The user wants to copy a single employee's schedule to the FOLLOWING WEEK (same employee, next week). Currently the "Copy" feature copies between two employees within the same week, not across weeks. Let me design this clearly.
+**Hoje:** O `FreelancerAddModal` abre em modo "Existente" (lista). O CPF só aparece em "Criar Novo" e o lookup só preenche o nome — não traz cargo, PIX, diária, etc.
 
-<lov-plan>
+**O que vou fazer:**
+- Inverter o padrão: modal abre direto com **CPF como primeiro campo** (mesmo padrão da `FreelancerForm` em Budgets Gerenciais).
+- Ao digitar 11 dígitos, dispara `lookupUnifiedByCpf` que já busca em 3 fontes (`freelancer_profiles`, `employees`, `freelancer_entries`).
+- Pré-preenche automaticamente: **Nome, Cargo (se existe no setor), Chave PIX, Tipo PIX, Telefone**. Campos preenchidos ganham destaque verde (igual ao Budget).
+- Se o CPF já existe como `employees` da loja → modo "vincular existente" silencioso (reusa o ID, sem precisar trocar de aba).
+- Se não encontrar nada → mostra os campos para criar do zero (com CPF já preenchido).
+- Mantém o toggle "Existente / Criar" como secundário, mas o fluxo padrão fica orientado por CPF.
 
-## Plano: Copiar escala do colaborador para a semana seguinte
+**Arquivo:** `src/components/escalas/FreelancerAddModal.tsx` (refatoração de UX, sem novos hooks — `useCpfLookup` já está pronto).
 
-### Diagnóstico
-Hoje no Editor de Escalas existem dois mecanismos:
-- **Copiar dia anterior** (botão por dia) — replica todas as escalas do dia X-1 para X
-- **Copiar entre colaboradores** (botão `Copy` na linha) — copia da pessoa A para a pessoa B na **mesma semana**
+---
 
-**O que falta:** copiar a escala da própria pessoa para a **semana seguinte** (auto-replicação semana → semana). É o caso mais comum: "essa semana ficou pronta, replica essa pessoa pra próxima".
+### Problema 2 — Copiar escala para semana seguinte (deixar 100% fluído)
 
-### O que vou construir
+**Hoje:** Os hooks `useCopyEmployeeToNextWeek` e `useCopyWeekToNextWeek` já existem e funcionam. Os botões `CopyPlus` (linha do colaborador) e "Replicar → próxima" (header) também. **O problema é discoverability + feedback pós-cópia**, não a lógica.
 
-**1. Nova ação por colaborador: "Copiar para próxima semana"**
-- Adicionar um segundo ícone na célula sticky do nome do funcionário, ao lado do `Copy` atual: ícone `CopyPlus` (ou `ArrowRightToLine`) com tooltip *"Copiar escala desta semana para a próxima"*
-- Ao clicar, abre diálogo de confirmação com:
-  - Resumo: *"Copiar X turnos de FULANO da semana DD/MM–DD/MM para DD/MM–DD/MM"*
-  - Checkbox "Sobrescrever escalas já existentes na semana destino" (default desligado)
-  - Aviso visual se já houver escalas na semana destino (e quantas seriam ignoradas/sobrescritas)
-- Ao confirmar, executa cópia e exibe toast com `N escalas copiadas, M ignoradas`
+**O que vou fazer:**
+- **Tornar o botão de copiar mais visível na linha do colaborador**: trocar o ícone `CopyPlus` discreto por botão pequeno com label "→ próxima" (texto + ícone), ainda compacto, mas óbvio.
+- **No diálogo de confirmação**, adicionar pré-cálculo: *"FULANO tem N escalas nesta semana. Y já existem na próxima → sobrescrever?"*. Mostrar lista resumida (dia → horário → setor) antes de confirmar.
+- **Pós-confirmação**, em vez de só toast, oferecer botão **"Ver próxima semana"** que avança automaticamente a navegação para `currentWeekBase + 7`. Hoje o usuário tem que clicar no `>` manualmente para conferir.
+- **Botão "Replicar semana inteira"**: mover do header para uma posição mais visível (ao lado do navegador de semana, com cor primária leve). Adicionar o mesmo pré-cálculo de conflitos.
+- Garantir que ao copiar, **todos os dados originais são preservados**: `start_time`, `end_time`, `break_duration`, `sector_id`, `praca_id`, `agreed_rate`, `schedule_type`. (Já está correto no hook — vou validar com query de teste.)
+- Adicionar tratamento explícito de **freelancers**: se o destino já tem freelancer marcado para outro dia, criar `freelancer_checkins` pendente automaticamente (já acontece via `useUpsertSchedule`, mas não no batch — vou replicar a lógica de `autoCreatePendingCheckin` no copy).
 
-**2. Novo hook `useCopyEmployeeToNextWeek` em `useManualSchedules.ts`**
-- Parâmetros: `{ employeeId, sourceWeekStart, sourceWeekEnd, targetWeekStart, sectorIds, overwrite }`
-- Lê `schedules` ativos do colaborador na semana origem (em todos os setores acessíveis)
-- Calcula offset de 7 dias e gera `target_date = source_date + 7`
-- Mantém `sector_id`, `shift_id`, `start_time`, `end_time`, `break_duration`, `praca_id`, `agreed_rate`, `schedule_type`
-- Verifica unicidade no destino (por `employee_id + schedule_date + sector_id`):
-  - Se existe e `overwrite=false` → pula
-  - Se existe e `overwrite=true` → faz UPDATE no registro existente
-  - Se não existe → INSERT novo
-- Invalida `["manual-schedules"]` e `["schedules"]` para refletir imediatamente
-- Retorna `{ copied, skipped }` para o toast
+**Arquivos:**
+- `src/components/escalas/ManualScheduleGrid.tsx` — UI dos botões + diálogos com pré-cálculo + auto-navegação.
+- `src/hooks/useManualSchedules.ts` — adicionar `autoCreatePendingCheckin` no loop dos 2 hooks de copy (para freelancers).
 
-**3. Atalho complementar: "Copiar semana inteira para próxima"**
-- Botão extra próximo aos navegadores de semana (apenas para `canManage`): *"Replicar semana atual → próxima"*
-- Abre o mesmo diálogo, mas para **todos os colaboradores escalados** desta semana
-- Útil quando o gestor terminou a semana e quer só duplicar tudo
-- Reusa o mesmo hook iterando por colaborador (ou versão batch `useCopyWeekToNextWeek`)
+---
 
-**4. Fluxo do usuário (cenário principal)**
-1. Gestor está na semana 21–27/abr montando escalas
-2. Termina a escala da Maria, clica no novo ícone `CopyPlus` na linha dela
-3. Confirma → toast: *"7 escalas copiadas para 28/abr–04/mai"*
-4. Navega para a próxima semana com o controle existente → vê tudo replicado
-5. Pode ajustar pontualmente clicando nas células (modal já existente)
+### Problema 3 — Filtrar/agrupar escala por função (não alfabético)
 
-### Arquivos
-- **Editar**: `src/hooks/useManualSchedules.ts` — adicionar `useCopyEmployeeToNextWeek` e (opcional) `useCopyWeekToNextWeek`
-- **Editar**: `src/components/escalas/ManualScheduleGrid.tsx`:
-  - Novo botão `CopyPlus` na linha do funcionário
-  - Estado `nextWeekCopyConfirm`
-  - Novo `AlertDialog` de confirmação com pré-cálculo de conflitos
-  - Botão "Replicar semana → próxima" no header de navegação
-- **Sem mudanças** em banco/migrations (constraints já existem) e sem mudanças no `ScheduleEditModal`
+**Hoje:** Linhas ordenadas por: CLT primeiro → freelancer, e dentro de cada grupo por nome alfabético (`a.name.localeCompare(b.name)`).
 
-### Validação
-- Copiar um CLT com 6 dias na semana → próxima semana → todos os 6 dias aparecem nas mesmas datas+7
-- Copiar um freelancer com diária definida → mantém `agreed_rate` e cria checkin pendente automaticamente (já tratado pelo upsert via fluxo existente)
-- Tentar copiar quando destino já tem escalas → respeita `overwrite=false` (pula) e `overwrite=true` (atualiza)
-- Botão "Replicar semana inteira" cobre todos os colaboradores ativos da semana atual
+**O que vou fazer:**
+- Adicionar um pequeno **seletor "Ordenar por"** acima do grid, com 2 opções:
+  - **"Por função"** (default novo) — agrupa visualmente por `job_title`, com sub-cabeçalho cinza separando cada grupo (ex: *PARRILHEIRO (3)*, *AUXILIAR (5)*, *FREELANCER (2)*). Dentro de cada grupo, ordena por nome.
+  - **"Alfabético"** — comportamento atual.
+- Adicionar um filtro multi-select **"Função"** opcional (chips), que esconde linhas de quem não bate. Se vazio, mostra todas.
+- Manter a divisão CLT vs Freelancer como sub-camada (CLTs aparecem primeiro dentro de cada função, freelancers no final do bloco).
+- Aplicar a mesma ordenação ao "Quadro base do setor" (linhas colapsadas).
+
+**Arquivo:** `src/components/escalas/ManualScheduleGrid.tsx` — adicionar estado `sortMode` + `filterJobTitleIds`, novo `useMemo` para `groupedRows` que retorna estrutura `{ jobTitle, employees[] }[]`, e renderizar sub-headers entre os grupos.
+
+---
+
+### Validação que farei
+- Abrir lançamento de extra → digitar CPF de freelancer já cadastrado → confirmar que nome/cargo/PIX preenchem sozinhos.
+- Copiar semana inteira → conferir que próximas 7 datas têm exatamente os mesmos horários, setores, praças e diárias, e que freelancers ganham checkin pendente.
+- Trocar ordenação para "Por função" → conferir que grupos aparecem com contagem correta e funções vazias somem.
+- Aplicar filtro de função → só funcionários daquela função aparecem.
+
+### Arquivos resumidos
+- **Editar**: `src/components/escalas/FreelancerAddModal.tsx`
+- **Editar**: `src/components/escalas/ManualScheduleGrid.tsx`
+- **Editar**: `src/hooks/useManualSchedules.ts`
+
+Sem mudanças de banco/migrations.
 

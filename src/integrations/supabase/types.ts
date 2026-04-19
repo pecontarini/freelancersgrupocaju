@@ -4105,7 +4105,12 @@ export type Database = {
         | "gerente_back"
         | "chefia_front"
         | "chefia_back"
-      schedule_type: "working" | "off" | "vacation" | "sick_leave"
+      schedule_type:
+        | "working"
+        | "off"
+        | "vacation"
+        | "sick_leave"
+        | "banco_horas"
       sector_type: "salao" | "back" | "apv" | "delivery"
       setor_back: "cozinha" | "bar" | "parrilla" | "sushi"
       worker_type: "clt" | "freelancer"
@@ -4271,7 +4276,13 @@ export const Constants = {
         "chefia_front",
         "chefia_back",
       ],
-      schedule_type: ["working", "off", "vacation", "sick_leave"],
+      schedule_type: [
+        "working",
+        "off",
+        "vacation",
+        "sick_leave",
+        "banco_horas",
+      ],
       sector_type: ["salao", "back", "apv", "delivery"],
       setor_back: ["cozinha", "bar", "parrilla", "sushi"],
       worker_type: ["clt", "freelancer"],

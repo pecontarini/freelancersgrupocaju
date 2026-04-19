@@ -1,0 +1,1 @@
+ALTER TYPE schedule_type ADD VALUE IF NOT EXISTS 'banco_horas';

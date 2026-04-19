@@ -1,41 +1,51 @@
 
 
-## Diagnóstico do erro
+## Diagnóstico
 
-Erro: `duplicate key value violates unique constraint "unique_active_schedule"`
+O auto-preenchimento por CPF no editor de escalas usa o **mesmo hook** (`lookupUnifiedByCpf`) do Budget Gerencial. O fluxo está correto. O problema raiz é de **dados + permissão**:
 
-**Constraint envolvida:** índice único parcial em `schedules (employee_id, schedule_date, sector_id) WHERE status <> 'cancelled'`.
+1. **`freelancer_profiles`** (tabela "rica" com nome, telefone, PIX): pública para leitura, mas **a maioria dos freelancers cadastrados via Budget nunca foi escrita aqui**. Está vazia para esses CPFs.
+2. **`employees`** (worker_type=freelancer): só tem freelancers que já foram escalados manualmente — ainda não cobre os CPFs em questão.
+3. **`freelancer_entries`** (histórico de Budget Gerencial): tem milhares de registros, mas **bloqueado por RLS por loja**. Quando o gestor da Loja A tenta escalar um freelancer que só rodou nas Lojas B/C, o lookup volta vazio.
 
-**Causa real (vista no `ScheduleExcelFlow.tsx` linhas 327–359):**
-A deduplicação atual compara as linhas da planilha **contra o que já existe no banco**, mas **não deduplica linhas duplicadas dentro do próprio arquivo Excel**. Quando a planilha do usuário tem o mesmo funcionário aparecendo duas vezes na mesma data/setor (caso comum em Excel multi-aba quando o funcionário foi listado em duas abas de setor, ou quando há linhas repetidas no template), o `insert(newRows)` envia 2 linhas idênticas no mesmo batch e o Postgres rejeita tudo.
+No Budget Gerencial o auto-preenchimento "funciona" porque o gestor sempre lança em sua própria loja, então só precisa do histórico local — a RLS deixa passar.
 
-Confirmei via query SQL: não há duplicatas atuais no banco para a semana 20–26/04 nessa unidade. Logo, a duplicação está **dentro do arquivo enviado**.
+## Solução
 
-## Plano de correção
+Preciso de 2 mudanças combinadas para garantir paridade com o Budget e cobrir freelancers cross-loja:
 
-### 1) Deduplicação intra-batch (correção principal)
-Em `src/components/escalas/ScheduleExcelFlow.tsx`, antes do filtro `existingKeys`, adicionar uma deduplicação interna:
-- Percorrer `rows` mantendo um `Map<string, row>` com chave `${employee_id}|${schedule_date}|${sector_id}`.
-- Se a mesma chave aparecer 2x, manter a **última ocorrência** (sobrescreve) e contar quantas foram colapsadas.
-- Toast informativo: *"N linha(s) duplicada(s) na planilha foram unificadas."*
+### 1) Backfill: popular `freelancer_profiles` a partir de `freelancer_entries`
 
-### 2) Mensagem de erro mais clara (defesa em profundidade)
-Caso o erro ainda ocorra (corrida com outro usuário inserindo simultaneamente, por exemplo), trocar o toast genérico por uma mensagem orientativa: *"Existem escalas conflitantes para esta semana. Use 'Zerar Escalas' antes de reimportar, ou ajuste manualmente."*
+Migration única que copia para `freelancer_profiles` os dados consolidados (mais recentes) de cada CPF em `freelancer_entries`:
+- Para cada CPF distinto, pega o registro mais recente: `nome_completo`, `chave_pix`.
+- `INSERT ... ON CONFLICT (cpf) DO NOTHING` — não sobrescreve perfis já preenchidos manualmente.
+- Como `freelancer_profiles` é público, isso resolve o lookup global.
 
-### 3) Aplicar a mesma proteção em `useImportEscalas` (se existir caminho paralelo)
-Vou conferir se há outro fluxo de import além do `ScheduleExcelFlow.tsx` que faça `insert` em batch — se houver, replico a deduplicação lá também.
+### 2) RPC pública `lookup_freelancer_by_cpf`
 
-### Como o usuário deve proceder agora (sem mudar código)
-Enquanto o ajuste não é aplicado, o usuário pode:
-1. **Zerar Escalas** da semana 20–26/04 dessa unidade (botão laranja "Zerar Escalas" no topo do Editor).
-2. Abrir o arquivo Excel e verificar se algum funcionário aparece em **mais de uma aba/setor** na mesma data — remover a duplicata.
-3. Reimportar.
+Function `SECURITY DEFINER` que busca em `freelancer_entries` ignorando RLS, retornando apenas dados não-sensíveis (nome, função, gerência, chave_pix) do registro mais recente do CPF. O hook `useCpfLookup` passa a chamar essa RPC como **fallback** quando a busca direta retorna vazio. Isso cobre futuros CPFs novos lançados em outras lojas, sem depender do backfill.
 
-### Arquivo a editar
-- `src/components/escalas/ScheduleExcelFlow.tsx` — adicionar dedup intra-batch e melhorar mensagem.
+### 3) Ajuste no `useCpfLookup`
 
-### Validação que farei
-- Importar planilha com linha duplicada propositalmente → confirma que importa apenas 1 e mostra toast informativo.
-- Importar planilha limpa → comportamento normal.
-- Reimportar a mesma planilha (já existente no banco) → ignora corretamente como antes.
+No `lookupUnifiedByCpf`, adicionar 4ª camada (após as 3 atuais): chamar `supabase.rpc('lookup_freelancer_by_cpf', { p_cpf: cleanCpf })`. Mantém o mesmo formato de retorno (`UnifiedLookupResult`) com source `"freelancer_entries"`.
+
+### 4) Garantir que novos cadastros via Budget também populem `freelancer_profiles`
+
+No `createEntry` do `useFreelancerEntries`, fazer `upsert` simultâneo em `freelancer_profiles` com o CPF, nome e PIX (sem sobrescrever telefone se já existir). Assim, o cadastro futuro fica disponível globalmente para o editor de escalas sem depender de RLS.
+
+## Arquivos
+
+- **Migration nova**: backfill `freelancer_profiles` + criar RPC `lookup_freelancer_by_cpf` (SECURITY DEFINER, retorna registro mais recente).
+- **`src/hooks/useCpfLookup.ts`**: adicionar 4ª camada de busca via RPC.
+- **`src/hooks/useFreelancerEntries.ts`**: no `createEntry`, fazer upsert paralelo em `freelancer_profiles`.
+
+## Validação
+
+- Abrir editor de escalas → "+ Freelancer extra" → digitar CPF `086.942.831-40` (Gabriel) → nome, função e PIX devem preencher automaticamente.
+- Cadastrar um freelancer novo via Budget Gerencial → ir ao editor de escalas em outra loja → o CPF deve ser reconhecido imediatamente.
+- Confirmar que o destaque verde aparece nos campos preenchidos (mesma UX do Budget).
+
+## Sem mudanças de UX
+
+A interface não muda — só a busca passa a encontrar mais resultados.
 

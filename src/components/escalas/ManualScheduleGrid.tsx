@@ -292,19 +292,87 @@ export function ManualScheduleGrid() {
     });
   }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
-  // Sort: CLT first, then freelancers
+  // Sort mode + job title filter
+  const [sortMode, setSortMode] = useState<"function" | "alpha">("function");
+  const [filterJobTitleIds, setFilterJobTitleIds] = useState<Set<string>>(new Set());
+
+  // Apply job title filter (if any)
+  const filteredScheduled = useMemo(() => {
+    if (filterJobTitleIds.size === 0) return scheduledEmployees;
+    return scheduledEmployees.filter(
+      (e: any) => e.job_title_id && filterJobTitleIds.has(e.job_title_id)
+    );
+  }, [scheduledEmployees, filterJobTitleIds]);
+
+  const filteredBase = useMemo(() => {
+    if (filterJobTitleIds.size === 0) return sectorBaseEmployees;
+    return sectorBaseEmployees.filter(
+      (e: any) => e.job_title_id && filterJobTitleIds.has(e.job_title_id)
+    );
+  }, [sectorBaseEmployees, filterJobTitleIds]);
+
+  // Sort: CLT first, then freelancers (legacy alpha sort)
   const sortedScheduled = useMemo(() => {
-    return [...scheduledEmployees].sort((a, b) => {
+    return [...filteredScheduled].sort((a, b) => {
       const aType = a.worker_type || "clt";
       const bType = b.worker_type || "clt";
       if (aType === bType) return a.name.localeCompare(b.name);
       return aType === "clt" ? -1 : 1;
     });
-  }, [scheduledEmployees]);
+  }, [filteredScheduled]);
 
   const sortedBase = useMemo(() => {
-    return [...sectorBaseEmployees].sort((a, b) => a.name.localeCompare(b.name));
-  }, [sectorBaseEmployees]);
+    return [...filteredBase].sort((a, b) => a.name.localeCompare(b.name));
+  }, [filteredBase]);
+
+  // Group employees by job title for "function" sort mode
+  type EmpGroup = { jobTitle: string; jobTitleId: string | null; employees: typeof sortedScheduled };
+  const groupedScheduled = useMemo<EmpGroup[]>(() => {
+    if (sortMode !== "function") {
+      return [{ jobTitle: "", jobTitleId: null, employees: sortedScheduled }];
+    }
+    const map = new Map<string, EmpGroup>();
+    for (const emp of sortedScheduled) {
+      const key = emp.job_title_id || "__no_title__";
+      const label = emp.job_title || "Sem cargo definido";
+      if (!map.has(key)) {
+        map.set(key, { jobTitle: label, jobTitleId: emp.job_title_id || null, employees: [] });
+      }
+      map.get(key)!.employees.push(emp);
+    }
+    // Sort groups: alphabetic by job title name; within each, CLT then freelancer then alpha
+    const groups = Array.from(map.values());
+    groups.sort((a, b) => a.jobTitle.localeCompare(b.jobTitle));
+    for (const g of groups) {
+      g.employees.sort((a, b) => {
+        const aType = a.worker_type || "clt";
+        const bType = b.worker_type || "clt";
+        if (aType === bType) return a.name.localeCompare(b.name);
+        return aType === "clt" ? -1 : 1;
+      });
+    }
+    return groups;
+  }, [sortedScheduled, sortMode]);
+
+  // Available job titles in this view (from scheduled + base) for the filter chips
+  const availableJobTitles = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of [...scheduledEmployees, ...sectorBaseEmployees]) {
+      if (e.job_title_id) map.set(e.job_title_id, e.job_title || "Sem nome");
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [scheduledEmployees, sectorBaseEmployees]);
+
+  function toggleJobTitleFilter(id: string) {
+    setFilterJobTitleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   // Build employee map for worker_type + unit_id lookup
   const employeeMap = useMemo(() => {

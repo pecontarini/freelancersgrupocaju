@@ -1234,6 +1234,13 @@ export function ManualScheduleGrid() {
         />
       )}
 
+      {/* Quick Edit Employee Modal */}
+      <EditEmployeeQuickModal
+        open={!!editEmployeeModal}
+        onClose={() => setEditEmployeeModal(null)}
+        employee={editEmployeeModal}
+      />
+
       {/* Delete employee from week confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o && !isDeletingWeek) setDeleteConfirm(null); }}>
         <AlertDialogContent>
@@ -1481,6 +1488,36 @@ export function ManualScheduleGrid() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/* ─── Sunday-off indicator (per-employee monthly badge) ─── */
+function SundayOffIndicator({
+  employeeId,
+  monthRef,
+}: {
+  employeeId: string;
+  monthRef: string;
+}) {
+  const { data: sundays = [] } = useEmployeeSundaysOff(employeeId, monthRef);
+  const had = sundays.length > 0;
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[9px] px-1 py-0 shrink-0 gap-0.5 ${
+        had
+          ? "border-green-500/60 text-green-700 dark:text-green-400"
+          : "border-orange-400/60 text-orange-600 dark:text-orange-400"
+      }`}
+      title={
+        had
+          ? `Já teve ${sundays.length} domingo(s) de folga este mês`
+          : "Ainda não teve domingo de folga este mês"
+      }
+    >
+      <Sun className="h-2.5 w-2.5" />
+      DOM {had ? "✓" : "✗"}
+    </Badge>
   );
 }
 

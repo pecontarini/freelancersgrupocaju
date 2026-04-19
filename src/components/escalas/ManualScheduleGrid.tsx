@@ -420,6 +420,25 @@ export function ManualScheduleGrid() {
 
   return (
     <div className="space-y-4 fade-in">
+      {/* Copy mode banner */}
+      {copyMode && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <Copy className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate">
+              Copiando escala de <strong className="uppercase">{copyMode.sourceName}</strong>. Clique em outro colaborador para definir o destino.
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0"
+            onClick={() => setCopyMode(null)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>

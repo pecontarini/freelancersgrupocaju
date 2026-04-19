@@ -904,7 +904,7 @@ export function ManualScheduleGrid() {
                     </TableHeader>
                     <TableBody>
                       {groupedScheduled.map((group, gIdx) => (
-                        <>
+                        <React.Fragment key={`group-frag-${gIdx}`}>
                           {sortMode === "function" && group.employees.length > 0 && (
                             <TableRow key={`group-${gIdx}`} className="bg-muted/40 hover:bg-muted/40">
                               <TableCell

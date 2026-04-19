@@ -76,6 +76,7 @@ export function FreelancerAddModal({
   );
 
   // Form state — CPF-first flow
+  const [noCpfMode, setNoCpfMode] = useState(false);
   const [cpfValue, setCpfValue] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");

@@ -903,113 +903,135 @@ export function ManualScheduleGrid() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedScheduled.map((emp) => {
-                        const isFreelancer = emp.worker_type === "freelancer";
-                        const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
-                        const isCopySource = copyMode?.sourceId === emp.id;
-                        const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
-                        return (
-                          <TableRow
-                            key={emp.id}
-                            className={
-                              isCopySource
-                                ? "bg-primary/10 ring-1 ring-primary"
-                                : isCopyTarget
-                                ? "cursor-pointer hover:bg-primary/5"
-                                : ""
-                            }
-                            onClick={
-                              isCopyTarget
-                                ? () => {
-                                    setCopyConfirm({
-                                      sourceId: copyMode!.sourceId,
-                                      sourceName: copyMode!.sourceName,
-                                      targetId: emp.id,
-                                      targetName: emp.name,
-                                    });
-                                    setOverwriteCopy(false);
-                                  }
-                                : undefined
-                            }
-                          >
-                            <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
-                                 {isFreelancer && (
-                                  <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
-                                    FL
+                      {groupedScheduled.map((group, gIdx) => (
+                        <>
+                          {sortMode === "function" && group.employees.length > 0 && (
+                            <TableRow key={`group-${gIdx}`} className="bg-muted/40 hover:bg-muted/40">
+                              <TableCell
+                                colSpan={8}
+                                className="py-1 px-3 sticky left-0 bg-muted/40 border-r"
+                              >
+                                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  <Briefcase className="h-3 w-3" />
+                                  <span>{group.jobTitle}</span>
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                                    {group.employees.length}
                                   </Badge>
-                                )}
-                                {isFromPartner && (
-                                  <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
-                                    {partnerSectorMeta?.unitName.slice(0, 8)}
-                                  </Badge>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                    title="Copiar escala desta pessoa para outro colaborador"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setCopyMode({ sourceId: emp.id, sourceName: emp.name });
-                                    }}
-                                  >
-                                    <Copy className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-                                    title="Copiar escala desta semana para a próxima"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOverwriteNextWeek(false);
-                                      setNextWeekConfirm({ employeeId: emp.id, employeeName: emp.name });
-                                    }}
-                                  >
-                                    <CopyPlus className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {canManage && !copyMode && (
-                                  <button
-                                    className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Remover da semana"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                              </div>
-                              {emp.job_title && (
-                                <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
-                               )}
-                             </TableCell>
-                             {weekDays.map((day, i) => {
-                              const dateStr = format(day, "yyyy-MM-dd");
-                              const schedule = getScheduleForCell(emp.id, dateStr);
-                              const pracaName = schedule?.praca_id
-                                ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
-                                : null;
-                              return (
-                                <TableCell
-                                  key={i}
-                                  className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
-                                  onClick={(e) => {
-                                    if (copyMode) return; // let row click handle target selection
-                                    e.stopPropagation();
-                                    handleCellClick(emp, dateStr);
-                                  }}
-                                >
-                                  <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {group.employees.map((emp) => {
+                            const isFreelancer = emp.worker_type === "freelancer";
+                            const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
+                            const isCopySource = copyMode?.sourceId === emp.id;
+                            const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
+                            return (
+                              <TableRow
+                                key={emp.id}
+                                className={
+                                  isCopySource
+                                    ? "bg-primary/10 ring-1 ring-primary"
+                                    : isCopyTarget
+                                    ? "cursor-pointer hover:bg-primary/5"
+                                    : ""
+                                }
+                                onClick={
+                                  isCopyTarget
+                                    ? () => {
+                                        setCopyConfirm({
+                                          sourceId: copyMode!.sourceId,
+                                          sourceName: copyMode!.sourceName,
+                                          targetId: emp.id,
+                                          targetName: emp.name,
+                                        });
+                                        setOverwriteCopy(false);
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
+                                    {isFreelancer && (
+                                      <Badge variant="outline" className="border-orange-400 text-orange-600 text-[9px] px-1 py-0 shrink-0">
+                                        FL
+                                      </Badge>
+                                    )}
+                                    {isFromPartner && (
+                                      <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
+                                        {partnerSectorMeta?.unitName.slice(0, 8)}
+                                      </Badge>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                        title="Copiar escala desta pessoa para outro colaborador"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCopyMode({ sourceId: emp.id, sourceName: emp.name });
+                                        }}
+                                      >
+                                        <Copy className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary text-[9px] font-semibold transition-colors"
+                                        title="Copiar escala desta semana para a próxima"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOverwriteNextWeek(false);
+                                          setNextWeekConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                        }}
+                                      >
+                                        <CopyPlus className="h-2.5 w-2.5" />
+                                        <span>próxima</span>
+                                        <ArrowRight className="h-2.5 w-2.5" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                        title="Remover da semana"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeleteConfirm({ employeeId: emp.id, employeeName: emp.name });
+                                        }}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                  {emp.job_title && sortMode !== "function" && (
+                                    <div className="text-[10px] text-muted-foreground truncate uppercase">{emp.job_title}</div>
+                                  )}
                                 </TableCell>
-                              );
-                            })}
-                          </TableRow>
-                        );
-                      })}
+                                {weekDays.map((day, i) => {
+                                  const dateStr = format(day, "yyyy-MM-dd");
+                                  const schedule = getScheduleForCell(emp.id, dateStr);
+                                  const pracaName = schedule?.praca_id
+                                    ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
+                                    : null;
+                                  return (
+                                    <TableCell
+                                      key={i}
+                                      className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
+                                      onClick={(e) => {
+                                        if (copyMode) return;
+                                        e.stopPropagation();
+                                        handleCellClick(emp, dateStr);
+                                      }}
+                                    >
+                                      <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                        </>
+                      ))}
                       {/* VAGA EXTRA placeholder rows */}
                       {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (
                         <TableRow key={`extra-slot-${slotIdx}`} className="bg-amber-50/50 dark:bg-amber-950/10">

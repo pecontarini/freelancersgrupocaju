@@ -801,8 +801,12 @@ export function ManualScheduleGrid() {
                               return (
                                 <TableCell
                                   key={i}
-                                  className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                  onClick={() => handleCellClick(emp, dateStr)}
+                                  className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
+                                  onClick={(e) => {
+                                    if (copyMode) return; // let row click handle target selection
+                                    e.stopPropagation();
+                                    handleCellClick(emp, dateStr);
+                                  }}
                                 >
                                   <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
                                 </TableCell>

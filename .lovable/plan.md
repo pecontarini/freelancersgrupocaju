@@ -1,67 +1,87 @@
 
 
-## Plano: 3 melhorias definitivas no Editor de Escalas
+## Plano: 3 melhorias na aba de Escalas
 
-### Problema 1 — Lançamento de Extra com CPF como campo principal
+### 1) Editar cargo de funcionário direto da escala
 
-**Hoje:** O `FreelancerAddModal` abre em modo "Existente" (lista). O CPF só aparece em "Criar Novo" e o lookup só preenche o nome — não traz cargo, PIX, diária, etc.
+**Hoje:** Para mudar cargo só na aba "Equipe" (Team Management). O gestor que está montando escala precisa sair da tela.
 
 **O que vou fazer:**
-- Inverter o padrão: modal abre direto com **CPF como primeiro campo** (mesmo padrão da `FreelancerForm` em Budgets Gerenciais).
-- Ao digitar 11 dígitos, dispara `lookupUnifiedByCpf` que já busca em 3 fontes (`freelancer_profiles`, `employees`, `freelancer_entries`).
-- Pré-preenche automaticamente: **Nome, Cargo (se existe no setor), Chave PIX, Tipo PIX, Telefone**. Campos preenchidos ganham destaque verde (igual ao Budget).
-- Se o CPF já existe como `employees` da loja → modo "vincular existente" silencioso (reusa o ID, sem precisar trocar de aba).
-- Se não encontrar nada → mostra os campos para criar do zero (com CPF já preenchido).
-- Mantém o toggle "Existente / Criar" como secundário, mas o fluxo padrão fica orientado por CPF.
+- Adicionar um pequeno botão `Pencil` ao lado do nome do colaborador na coluna sticky do grid (do lado do `→ próxima` já existente).
+- Clicar abre um **mini-modal "Editar funcionário"** com: nome, cargo (select com `job_titles` da loja + opção "Outro"), telefone, gênero. Mesmos campos do `TeamManagement`, mas enxuto.
+- Salvar usa `useUpdateEmployee` + `useUpsertJobTitle` (já existentes) → invalida `["employees"]` → grid atualiza imediatamente, inclusive a re-agrupação por função.
+- Sem nova tabela. Sem nova migration.
 
-**Arquivo:** `src/components/escalas/FreelancerAddModal.tsx` (refatoração de UX, sem novos hooks — `useCpfLookup` já está pronto).
+**Arquivo:** `src/components/escalas/ManualScheduleGrid.tsx` + novo componente leve `src/components/escalas/EditEmployeeQuickModal.tsx` (reutilizando os hooks existentes).
 
 ---
 
-### Problema 2 — Copiar escala para semana seguinte (deixar 100% fluído)
+### 2) Justificativa para "Banco de Horas" como tipo de ausência
 
-**Hoje:** Os hooks `useCopyEmployeeToNextWeek` e `useCopyWeekToNextWeek` já existem e funcionam. Os botões `CopyPlus` (linha do colaborador) e "Replicar → próxima" (header) também. **O problema é discoverability + feedback pós-cópia**, não a lógica.
+**Hoje:** O `ScheduleEditModal` aba "Ausências" tem 3 botões: FOLGA, FÉRIAS, ATESTADO. Não tem opção para "Banco de Horas" (compensação).
 
 **O que vou fazer:**
-- **Tornar o botão de copiar mais visível na linha do colaborador**: trocar o ícone `CopyPlus` discreto por botão pequeno com label "→ próxima" (texto + ícone), ainda compacto, mas óbvio.
-- **No diálogo de confirmação**, adicionar pré-cálculo: *"FULANO tem N escalas nesta semana. Y já existem na próxima → sobrescrever?"*. Mostrar lista resumida (dia → horário → setor) antes de confirmar.
-- **Pós-confirmação**, em vez de só toast, oferecer botão **"Ver próxima semana"** que avança automaticamente a navegação para `currentWeekBase + 7`. Hoje o usuário tem que clicar no `>` manualmente para conferir.
-- **Botão "Replicar semana inteira"**: mover do header para uma posição mais visível (ao lado do navegador de semana, com cor primária leve). Adicionar o mesmo pré-cálculo de conflitos.
-- Garantir que ao copiar, **todos os dados originais são preservados**: `start_time`, `end_time`, `break_duration`, `sector_id`, `praca_id`, `agreed_rate`, `schedule_type`. (Já está correto no hook — vou validar com query de teste.)
-- Adicionar tratamento explícito de **freelancers**: se o destino já tem freelancer marcado para outro dia, criar `freelancer_checkins` pendente automaticamente (já acontece via `useUpsertSchedule`, mas não no batch — vou replicar a lógica de `autoCreatePendingCheckin` no copy).
+- **Migration 1**: estender o enum `schedule_type` adicionando o valor `'banco_horas'`.
+- Adicionar 4º botão "BANCO DE HORAS" na aba Ausências (cor azul, ícone `Clock4`), com mesmo padrão dos outros (clicar → salva direto via `useUpsertSchedule`).
+- No grid, células com `schedule_type='banco_horas'` mostram badge cinza-azul "BH" (igual ao padrão atual de "FOLGA"/"FÉRIAS").
+- Atualizar o tipo TS `schedule_type` em `useManualSchedules.ts` + `ScheduleEditModal.tsx` para incluir o novo valor.
+- **`useImportEscalas` keyword mapping** (se existir): adicionar "BANCO HORAS" → `banco_horas` no parser.
 
 **Arquivos:**
-- `src/components/escalas/ManualScheduleGrid.tsx` — UI dos botões + diálogos com pré-cálculo + auto-navegação.
-- `src/hooks/useManualSchedules.ts` — adicionar `autoCreatePendingCheckin` no loop dos 2 hooks de copy (para freelancers).
+- Migration `ALTER TYPE schedule_type ADD VALUE 'banco_horas';`
+- `src/hooks/useManualSchedules.ts` — tipo
+- `src/components/escalas/ScheduleEditModal.tsx` — novo botão + handler
+- `src/components/escalas/ManualScheduleGrid.tsx` — badge na célula
 
 ---
 
-### Problema 3 — Filtrar/agrupar escala por função (não alfabético)
+### 3) "Domingo do mês" + badge de aviso ao escalar domingo
 
-**Hoje:** Linhas ordenadas por: CLT primeiro → freelancer, e dentro de cada grupo por nome alfabético (`a.name.localeCompare(b.name)`).
+**Hoje:** O sistema já valida domingos para CLT feminino (Art. 386 CLT) no `validate_schedule_clt`, mas não tem **marca explícita** que diga "este foi o domingo de folga do mês" e não exibe esse status no grid.
+
+**Estratégia:** Reutilizo `schedule_type='off'` + detecção por `EXTRACT(DOW)=0` na data. Não preciso criar campo novo — qualquer FOLGA num domingo conta como "domingo do mês". Isso mantém simples e usa dados que já existem.
 
 **O que vou fazer:**
-- Adicionar um pequeno **seletor "Ordenar por"** acima do grid, com 2 opções:
-  - **"Por função"** (default novo) — agrupa visualmente por `job_title`, com sub-cabeçalho cinza separando cada grupo (ex: *PARRILHEIRO (3)*, *AUXILIAR (5)*, *FREELANCER (2)*). Dentro de cada grupo, ordena por nome.
-  - **"Alfabético"** — comportamento atual.
-- Adicionar um filtro multi-select **"Função"** opcional (chips), que esconde linhas de quem não bate. Se vazio, mostra todas.
-- Manter a divisão CLT vs Freelancer como sub-camada (CLTs aparecem primeiro dentro de cada função, freelancers no final do bloco).
-- Aplicar a mesma ordenação ao "Quadro base do setor" (linhas colapsadas).
 
-**Arquivo:** `src/components/escalas/ManualScheduleGrid.tsx` — adicionar estado `sortMode` + `filterJobTitleIds`, novo `useMemo` para `groupedRows` que retorna estrutura `{ jobTitle, employees[] }[]`, e renderizar sub-headers entre os grupos.
+**a) Marcação visual ao salvar FOLGA num domingo**
+- Quando usuário marca FOLGA via `ScheduleEditModal` numa data que é domingo → o registro `off` no domingo já fica como "domingo do mês" automaticamente (sem campo extra).
+- Toast de confirmação extra: *"Domingo de folga registrado para FULANO em ABRIL."*
+
+**b) Novo hook `useEmployeeSundaysOff(employeeId, monthRef)`**
+- Conta no `schedules` quantos domingos com `schedule_type='off'` (ou `vacation`) o funcionário tem no mês de referência (mês da semana atualmente exibida).
+- Cacheado por `(employeeId, YYYY-MM)`.
+- Usado para exibir badge.
+
+**c) Badge "🌞 DOM ✓" no grid**
+- Na coluna sticky do nome, quando o funcionário **já tem ≥1 domingo de folga no mês corrente**, mostra um badge verde compacto "DOM ✓" (ícone `Sun` da lucide).
+- Quando **não tem nenhum domingo de folga no mês**, mostra badge laranja "DOM ✗" (alerta visual).
+- Apenas para colaboradores CLT (freelancers ignorados).
+
+**d) Aviso ao escalar trabalho num domingo**
+- No `ScheduleEditModal`, quando o usuário abre a célula de um **domingo** e o tipo selecionado é "Turno" (working):
+  - Lê o status de domingos do mês via novo hook.
+  - Se a pessoa **já não teve nenhum domingo de folga neste mês**, mostra alerta amarelo:  
+    *"⚠️ FULANO ainda não teve domingo de folga em ABRIL."*
+  - Se já teve → texto verde discreto: *"✓ FULANO já teve folga dominical este mês (DD/MM)."*
+- Não bloqueia o salvar — só informa, mantendo padrão de "soft warnings" (mem `scheduler-clt-compliance`).
+
+**Arquivos:**
+- Novo hook `src/hooks/useSundayOff.ts` — `useEmployeeSundaysOff`
+- `src/components/escalas/ManualScheduleGrid.tsx` — badge na coluna nome
+- `src/components/escalas/ScheduleEditModal.tsx` — alerta no domingo + toast melhorado
 
 ---
 
 ### Validação que farei
-- Abrir lançamento de extra → digitar CPF de freelancer já cadastrado → confirmar que nome/cargo/PIX preenchem sozinhos.
-- Copiar semana inteira → conferir que próximas 7 datas têm exatamente os mesmos horários, setores, praças e diárias, e que freelancers ganham checkin pendente.
-- Trocar ordenação para "Por função" → conferir que grupos aparecem com contagem correta e funções vazias somem.
-- Aplicar filtro de função → só funcionários daquela função aparecem.
+- Editar cargo de "Auxiliar" → "Parrilheiro" na linha → grid re-agrupa imediatamente sob nova função.
+- Marcar BH para um colaborador → célula mostra badge "BH" cinza-azul, salvo no banco como `schedule_type='banco_horas'`.
+- Marcar FOLGA num domingo → próxima vez que clicar nesse colaborador, badge "DOM ✓" aparece no nome.
+- Tentar escalar trabalho num domingo de quem ainda não folgou → alerta amarelo no modal.
+- Mesmo colaborador entre semanas: a contagem de domingos é por mês corrente da visualização.
 
-### Arquivos resumidos
-- **Editar**: `src/components/escalas/FreelancerAddModal.tsx`
-- **Editar**: `src/components/escalas/ManualScheduleGrid.tsx`
-- **Editar**: `src/hooks/useManualSchedules.ts`
-
-Sem mudanças de banco/migrations.
+### Resumo técnico
+- **1 migration**: `ALTER TYPE schedule_type ADD VALUE 'banco_horas';`
+- **3 arquivos editados**: `ManualScheduleGrid.tsx`, `ScheduleEditModal.tsx`, `useManualSchedules.ts`
+- **2 arquivos novos**: `EditEmployeeQuickModal.tsx`, `useSundayOff.ts`
+- **Sem novas RLS** — reusa policies existentes em `schedules`/`employees`.
 

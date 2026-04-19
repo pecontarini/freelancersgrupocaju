@@ -1349,7 +1349,7 @@ export function ManualScheduleGrid() {
                 if (!nextWeekConfirm) return;
                 setIsCopyingNextWeek(true);
                 try {
-                  await copyEmployeeToNextWeek.mutateAsync({
+                  const res = await copyEmployeeToNextWeek.mutateAsync({
                     employeeId: nextWeekConfirm.employeeId,
                     sourceWeekStart: weekStart,
                     sourceWeekEnd: weekEnd,
@@ -1357,6 +1357,9 @@ export function ManualScheduleGrid() {
                     overwrite: overwriteNextWeek,
                   });
                   setNextWeekConfirm(null);
+                  if (res?.copied > 0) {
+                    setCurrentWeekBase((prev) => addDays(prev, 7));
+                  }
                 } catch {
                   // toast handled in hook
                 } finally {
@@ -1415,13 +1418,16 @@ export function ManualScheduleGrid() {
                 e.preventDefault();
                 setIsReplicatingWeek(true);
                 try {
-                  await copyWeekToNextWeek.mutateAsync({
+                  const res = await copyWeekToNextWeek.mutateAsync({
                     sourceWeekStart: weekStart,
                     sourceWeekEnd: weekEnd,
                     sectorIds: effectiveSectorIds,
                     overwrite: overwriteReplicate,
                   });
                   setReplicateWeekOpen(false);
+                  if (res?.copied > 0) {
+                    setCurrentWeekBase((prev) => addDays(prev, 7));
+                  }
                 } catch {
                   // toast handled in hook
                 } finally {

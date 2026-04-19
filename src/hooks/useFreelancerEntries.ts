@@ -45,6 +45,25 @@ export function useFreelancerEntries() {
         .single();
       
       if (error) throw error;
+
+      // Espelha no cadastro global de freelancers para lookup cross-loja por CPF
+      const cleanCpf = formData.cpf.replace(/\D/g, "");
+      if (cleanCpf.length === 11) {
+        const { error: profileError } = await supabase
+          .from("freelancer_profiles")
+          .upsert(
+            {
+              cpf: cleanCpf,
+              nome_completo: formData.nome_completo,
+              chave_pix: formData.chave_pix,
+            },
+            { onConflict: "cpf", ignoreDuplicates: false }
+          );
+        if (profileError) {
+          console.warn("Falha ao espelhar perfil global de freelancer:", profileError);
+        }
+      }
+
       return data;
     },
     onSuccess: () => {

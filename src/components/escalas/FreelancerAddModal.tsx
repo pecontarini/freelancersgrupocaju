@@ -355,40 +355,77 @@ export function FreelancerAddModal({
             </div>
           )}
 
-          {/* CPF — primary entry */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-semibold flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-primary" />
-              CPF do freelancer *
-            </Label>
-            <div className="relative">
-              <Input
-                value={cpfValue}
-                onChange={(e) => handleCpfChange(e.target.value)}
-                placeholder="000.000.000-00"
-                maxLength={14}
-                inputMode="numeric"
-                className="text-base"
-                autoFocus
-              />
-              {isLookingUp && (
-                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+          {/* CPF — primary entry (skipped in no-CPF mode) */}
+          {!noCpfMode && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5 text-primary" />
+                CPF do freelancer *
+              </Label>
+              <div className="relative">
+                <Input
+                  value={cpfValue}
+                  onChange={(e) => handleCpfChange(e.target.value)}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  inputMode="numeric"
+                  className="text-base"
+                  autoFocus
+                />
+                {isLookingUp && (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {linkedSourceLabel && (
+                <p className="text-xs text-success flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {linkedSourceLabel}
+                </p>
+              )}
+              {!cpfReady && (
+                <>
+                  <p className="text-[11px] text-muted-foreground">
+                    Ao informar o CPF, o sistema busca automaticamente os dados nos cadastros existentes.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => setNoCpfMode(true)}
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Lançar sem CPF (cadastro provisório)
+                  </Button>
+                </>
               )}
             </div>
-            {linkedSourceLabel && (
-              <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {linkedSourceLabel}
-              </p>
-            )}
-            {!cpfReady && (
-              <p className="text-[11px] text-muted-foreground">
-                Ao informar o CPF, o sistema busca automaticamente os dados nos cadastros existentes.
-              </p>
-            )}
-          </div>
+          )}
 
-          {cpfReady && (
+          {noCpfMode && (
+            <div className="rounded-md border-2 border-warning/40 bg-warning/10 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-warning shrink-0 mt-0.5" />
+                <div className="flex-1 text-xs text-foreground">
+                  <p className="font-semibold">Modo sem CPF ativado</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    O freelancer entrará na escala como cadastro provisório. Sem CPF, o pagamento via Budget Gerencial fica pendente até completar os dados.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={() => { setNoCpfMode(false); }}
+              >
+                ← Voltar e informar CPF
+              </Button>
+            </div>
+          )}
+
+          {showFormFields && (
             <>
               <div className="space-y-1.5">
                 <Label>Nome completo *</Label>

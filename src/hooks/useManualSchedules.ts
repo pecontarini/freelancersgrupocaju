@@ -675,6 +675,7 @@ export function useCopyWeekToNextWeek() {
           praca_id: s.praca_id ?? null,
         };
 
+        let scheduleId: string | null = null;
         if (existsId) {
           if (!params.overwrite) {
             skipped++;
@@ -685,11 +686,35 @@ export function useCopyWeekToNextWeek() {
             .update(payload)
             .eq("id", existsId);
           if (error) throw error;
+          scheduleId = existsId;
           copied++;
         } else {
-          const { error } = await supabase.from("schedules").insert(payload);
+          const { data: inserted, error } = await supabase
+            .from("schedules")
+            .insert(payload)
+            .select("id")
+            .single();
           if (error) throw error;
+          scheduleId = inserted?.id ?? null;
           copied++;
+        }
+
+        // Auto-create pending checkin for freelancers
+        if (scheduleId && payload.schedule_type === "working") {
+          const { data: sector } = await supabase
+            .from("sectors")
+            .select("unit_id")
+            .eq("id", payload.sector_id)
+            .single();
+          if (sector) {
+            await autoCreatePendingCheckin(
+              s.employee_id,
+              targetDate,
+              sector.unit_id,
+              payload.agreed_rate ?? 0,
+              scheduleId
+            );
+          }
         }
       }
 

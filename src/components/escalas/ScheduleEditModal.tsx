@@ -331,6 +331,15 @@ export function ScheduleEditModal({
                   <Stethoscope className="h-5 w-5" />
                   ATESTADO
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full h-14 text-base gap-2 border-2 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/30"
+                  onClick={() => handleSetAbsence("banco_horas")}
+                  disabled={isSaving}
+                >
+                  <Clock4 className="h-5 w-5" />
+                  BANCO DE HORAS
+                </Button>
               </>
             ) : (
               <div className="space-y-4">

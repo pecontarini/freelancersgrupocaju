@@ -1035,6 +1035,75 @@ export function ManualScheduleGrid() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Copy employee week confirmation */}
+      <AlertDialog
+        open={!!copyConfirm}
+        onOpenChange={(o) => {
+          if (!o && !isCopyingWeek) {
+            setCopyConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar escala da semana</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Copiar todos os turnos de{" "}
+                  <strong className="uppercase">{copyConfirm?.sourceName}</strong> para{" "}
+                  <strong className="uppercase">{copyConfirm?.targetName}</strong> nesta semana?
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={overwriteCopy}
+                    onChange={(e) => setOverwriteCopy(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Sobrescrever escalas existentes do destino
+                </label>
+                {!overwriteCopy && (
+                  <p className="text-xs text-muted-foreground">
+                    Dias já preenchidos no destino serão preservados.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCopyingWeek}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isCopyingWeek}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!copyConfirm) return;
+                setIsCopyingWeek(true);
+                try {
+                  await copyEmployeeWeek.mutateAsync({
+                    sourceEmployeeId: copyConfirm.sourceId,
+                    targetEmployeeId: copyConfirm.targetId,
+                    weekStart,
+                    weekEnd,
+                    sectorIds: effectiveSectorIds,
+                    overwrite: overwriteCopy,
+                  });
+                  setCopyConfirm(null);
+                  setCopyMode(null);
+                } catch {
+                  // toast handled in hook
+                } finally {
+                  setIsCopyingWeek(false);
+                }
+              }}
+            >
+              {isCopyingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Copiar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

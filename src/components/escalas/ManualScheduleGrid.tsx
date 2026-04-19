@@ -183,6 +183,7 @@ export function ManualScheduleGrid() {
   const upsertBudget = useUpsertDailyBudget();
   const copyDay = useCopyPreviousDay();
   const cancelEmployeeWeek = useCancelEmployeeWeek();
+  const copyEmployeeWeek = useCopyEmployeeWeek();
 
   // Delete employee from week state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -190,6 +191,20 @@ export function ManualScheduleGrid() {
     employeeName: string;
   } | null>(null);
   const [isDeletingWeek, setIsDeletingWeek] = useState(false);
+
+  // Copy schedule between employees
+  const [copyMode, setCopyMode] = useState<{
+    sourceId: string;
+    sourceName: string;
+  } | null>(null);
+  const [copyConfirm, setCopyConfirm] = useState<{
+    sourceId: string;
+    sourceName: string;
+    targetId: string;
+    targetName: string;
+  } | null>(null);
+  const [overwriteCopy, setOverwriteCopy] = useState(false);
+  const [isCopyingWeek, setIsCopyingWeek] = useState(false);
   const [showSectorBase, setShowSectorBase] = useState(false);
   const [editModal, setEditModal] = useState<{
     open: boolean;

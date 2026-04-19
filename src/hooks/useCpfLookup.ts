@@ -127,6 +127,22 @@ export function useCpfLookup() {
         };
       }
 
+      // 4. Fallback cross-loja via RPC (ignora RLS) — cobre CPFs lançados em outras unidades
+      const { data: rpcRows, error: rpcError } = await supabase
+        .rpc("lookup_freelancer_by_cpf", { p_cpf: cleanCpf });
+
+      if (!rpcError && rpcRows && rpcRows.length > 0) {
+        const rpcEntry = rpcRows[0];
+        toast.success("Dados recuperados do histórico global de freelancers.", { duration: 3000 });
+        return {
+          nome_completo: rpcEntry.nome_completo,
+          funcao: rpcEntry.funcao ?? undefined,
+          gerencia: rpcEntry.gerencia ?? undefined,
+          chave_pix: rpcEntry.chave_pix ?? undefined,
+          source: "freelancer_entries",
+        };
+      }
+
       return null;
     } catch (error) {
       console.error("Error in unified CPF lookup:", error);

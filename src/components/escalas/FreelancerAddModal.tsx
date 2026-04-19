@@ -300,6 +300,7 @@ export function FreelancerAddModal({
   }
 
   function resetForm() {
+    setNoCpfMode(false);
     setCpfValue("");
     setName("");
     setPhone("");
@@ -316,6 +317,7 @@ export function FreelancerAddModal({
   }
 
   const cpfReady = cpfValue.replace(/\D/g, "").length === 11;
+  const showFormFields = cpfReady || noCpfMode;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>

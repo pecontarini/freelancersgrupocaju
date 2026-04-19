@@ -13,7 +13,7 @@ export interface ManualSchedule {
   start_time: string | null;
   end_time: string | null;
   break_duration: number;
-  schedule_type: "working" | "off" | "vacation" | "sick_leave";
+  schedule_type: "working" | "off" | "vacation" | "sick_leave" | "banco_horas";
   agreed_rate: number;
   praca_id: string | null;
   created_at: string;
@@ -158,7 +158,7 @@ export function useUpsertSchedule() {
       start_time?: string | null;
       end_time?: string | null;
       break_duration?: number;
-      schedule_type: "working" | "off" | "vacation" | "sick_leave";
+      schedule_type: "working" | "off" | "vacation" | "sick_leave" | "banco_horas";
       agreed_rate?: number;
       shift_type?: string;
       praca_id?: string | null;

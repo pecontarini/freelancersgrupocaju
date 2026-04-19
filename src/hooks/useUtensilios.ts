@@ -183,6 +183,58 @@ export function useBulkCreateUtensiliosItems() {
   });
 }
 
+// ── Hidden items (is_active = false) for current store ──
+export function useHiddenUtensiliosItems(lojaId: string | null) {
+  return useQuery({
+    queryKey: ["utensilios_items_hidden", lojaId],
+    enabled: !!lojaId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("utensilios_items")
+        .select("*, items_catalog(*)")
+        .eq("loja_id", lojaId!)
+        .eq("is_active", false);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+// ── Toggle visibility for a store-level utensilio item ──
+// Hides/shows the item for the current store (soft-hide via is_active flag).
+export function useToggleUtensilioVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      catalog_item_id: string;
+      loja_id: string;
+      is_active: boolean;
+      // optional defaults used when row does not exist yet
+      estoque_minimo?: number;
+      area_responsavel?: string;
+    }) => {
+      const row = {
+        catalog_item_id: params.catalog_item_id,
+        loja_id: params.loja_id,
+        is_active: params.is_active,
+        estoque_minimo: params.estoque_minimo ?? 0,
+        valor_unitario: 0,
+        area_responsavel: params.area_responsavel || "Front",
+      };
+      const { error } = await supabase
+        .from("utensilios_items")
+        .upsert(row, { onConflict: "catalog_item_id,loja_id" });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ["utensilios_items"] });
+      qc.invalidateQueries({ queryKey: ["utensilios_items_hidden"] });
+      toast.success(vars.is_active ? "Item reexibido" : "Item ocultado");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+}
+
 export function useUpdateUtensilioItem() {
   const qc = useQueryClient();
   return useMutation({

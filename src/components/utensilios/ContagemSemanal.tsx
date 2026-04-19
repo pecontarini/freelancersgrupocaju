@@ -4,12 +4,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { useUtensiliosCatalog, useUtensiliosItems, useDistinctSemanas, useUtensiliosContagens, useSaveContagem } from "@/hooks/useUtensilios";
+import {
+  useUtensiliosCatalog,
+  useUtensiliosItems,
+  useDistinctSemanas,
+  useUtensiliosContagens,
+  useSaveContagem,
+  useHiddenUtensiliosItems,
+  useToggleUtensilioVisibility,
+} from "@/hooks/useUtensilios";
 import { SectorFilter } from "./SectorFilter";
-import { Save, CheckCircle, AlertTriangle, MinusCircle, Search } from "lucide-react";
+import { Save, CheckCircle, AlertTriangle, MinusCircle, Search, EyeOff, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -18,8 +27,10 @@ export function ContagemSemanal() {
   const { effectiveUnidadeId } = useUnidade();
   const { data: catalog, isLoading: loadingCatalog } = useUtensiliosCatalog();
   const { data: storeItems } = useUtensiliosItems(effectiveUnidadeId);
+  const { data: hiddenItems } = useHiddenUtensiliosItems(effectiveUnidadeId);
   const { data: semanas, isLoading: loadingSemanas } = useDistinctSemanas(effectiveUnidadeId);
   const saveContagem = useSaveContagem();
+  const toggleVisibility = useToggleUtensilioVisibility();
   const isMobile = useIsMobile();
 
   const [semanaRef, setSemanaRef] = useState("");
@@ -28,6 +39,7 @@ export function ContagemSemanal() {
   const [setor, setSetor] = useState("Todos");
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
 
   const activeSemana = semanaRef || "";
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);
@@ -37,6 +49,12 @@ export function ContagemSemanal() {
     storeItems?.forEach((si: any) => { map[si.catalog_item_id] = si; });
     return map;
   }, [storeItems]);
+
+  const hiddenSet = useMemo(() => {
+    const set = new Set<string>();
+    hiddenItems?.forEach((h: any) => set.add(h.catalog_item_id));
+    return set;
+  }, [hiddenItems]);
 
   const existingCounts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -51,6 +69,7 @@ export function ContagemSemanal() {
     const q = search.toLowerCase();
     return catalog
       .filter((c: any) => c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
+      .filter((c: any) => showHidden ? hiddenSet.has(c.id) : !hiddenSet.has(c.id))
       .map((c: any) => {
         const storeItem = storeMap[c.id];
         return {
@@ -65,7 +84,19 @@ export function ContagemSemanal() {
         };
       })
       .filter((i) => setor === "Todos" || i.setor === setor);
-  }, [catalog, storeMap, search, setor]);
+  }, [catalog, storeMap, search, setor, showHidden, hiddenSet]);
+
+  const handleToggleHide = (catalogId: string, hide: boolean) => {
+    if (!effectiveUnidadeId) return;
+    const storeItem = storeMap[catalogId];
+    toggleVisibility.mutate({
+      catalog_item_id: catalogId,
+      loja_id: effectiveUnidadeId,
+      is_active: !hide,
+      estoque_minimo: storeItem?.estoque_minimo ?? 0,
+      area_responsavel: storeItem?.area_responsavel || "Front",
+    });
+  };
 
   const handleSave = () => {
     if (!effectiveUnidadeId) return;
@@ -108,6 +139,8 @@ export function ContagemSemanal() {
     return <Badge className="bg-green-600 text-xs"><CheckCircle className="h-3 w-3 mr-1" />OK</Badge>;
   };
 
+  const hiddenCount = hiddenItems?.length || 0;
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -143,9 +176,18 @@ export function ContagemSemanal() {
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30">
+          <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
+          <Label htmlFor="show-hidden" className="text-xs cursor-pointer flex items-center gap-1">
+            <EyeOff className="h-3.5 w-3.5" />
+            Ocultos {hiddenCount > 0 && <Badge variant="secondary" className="text-[10px] h-4 px-1">{hiddenCount}</Badge>}
+          </Label>
+        </div>
       </div>
 
       {displayItems.length > 0 ? (
@@ -154,25 +196,40 @@ export function ContagemSemanal() {
             {displayItems.map((item) => {
               const existingQty = item.storeItemId ? existingCounts[item.storeItemId] : undefined;
               const qty = counts[item.catalogId] ?? existingQty ?? "";
+              const isHidden = hiddenSet.has(item.catalogId);
               return (
                 <Card key={item.catalogId}>
                   <CardContent className="p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm truncate">{item.name}</p>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge variant="outline" className="text-[10px]">{item.setor}</Badge>
                           <span className="text-xs text-muted-foreground">{item.code} · {item.unit}</span>
                           {item.estoque_minimo !== null && <span className="text-xs text-muted-foreground">Mín: {item.estoque_minimo}</span>}
                         </div>
                       </div>
-                      {getStatusBadge(qty, item.estoque_minimo)}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {getStatusBadge(qty, item.estoque_minimo)}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title={isHidden ? "Reexibir item" : "Ocultar item desta loja"}
+                          disabled={toggleVisibility.isPending}
+                          onClick={() => handleToggleHide(item.catalogId, !isHidden)}
+                        >
+                          {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                        </Button>
+                      </div>
                     </div>
-                    <Input
-                      type="number" min={0} placeholder="Qtd contada" value={qty} disabled={!item.storeItemId}
-                      onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
-                    />
-                    {!item.storeItemId && <p className="text-[10px] text-muted-foreground">Configure o estoque mínimo primeiro</p>}
+                    {!isHidden && (
+                      <Input
+                        type="number" min={0} placeholder="Qtd contada" value={qty} disabled={!item.storeItemId}
+                        onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
+                      />
+                    )}
+                    {!item.storeItemId && !isHidden && <p className="text-[10px] text-muted-foreground">Configure o estoque mínimo primeiro</p>}
                   </CardContent>
                 </Card>
               );
@@ -190,12 +247,14 @@ export function ContagemSemanal() {
                     <TableHead className="text-right">Mínimo</TableHead>
                     <TableHead className="text-right">Contagem</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayItems.map((item) => {
                     const existingQty = item.storeItemId ? existingCounts[item.storeItemId] : undefined;
                     const qty = counts[item.catalogId] ?? existingQty ?? "";
+                    const isHidden = hiddenSet.has(item.catalogId);
                     return (
                       <TableRow key={item.catalogId}>
                         <TableCell className="font-medium">{item.name}</TableCell>
@@ -206,11 +265,23 @@ export function ContagemSemanal() {
                         </TableCell>
                         <TableCell className="text-right">
                           <Input
-                            type="number" min={0} className="w-20 ml-auto text-right" value={qty} disabled={!item.storeItemId}
+                            type="number" min={0} className="w-20 ml-auto text-right" value={qty} disabled={!item.storeItemId || isHidden}
                             onChange={(e) => setCounts(prev => ({ ...prev, [item.catalogId]: parseInt(e.target.value) || 0 }))}
                           />
                         </TableCell>
                         <TableCell>{getStatusBadge(qty, item.estoque_minimo)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title={isHidden ? "Reexibir item" : "Ocultar item desta loja"}
+                            disabled={toggleVisibility.isPending}
+                            onClick={() => handleToggleHide(item.catalogId, !isHidden)}
+                          >
+                            {isHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -220,7 +291,9 @@ export function ContagemSemanal() {
           </Card>
         )
       ) : (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">Nenhum utensílio encontrado.</CardContent></Card>
+        <Card><CardContent className="py-10 text-center text-muted-foreground">
+          {showHidden ? "Nenhum item oculto." : "Nenhum utensílio encontrado."}
+        </CardContent></Card>
       )}
     </div>
   );

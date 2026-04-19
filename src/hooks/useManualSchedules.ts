@@ -458,3 +458,108 @@ export function useCopyPreviousDay() {
     onError: (err: Error) => toast.error(err.message),
   });
 }
+
+// ─── Copy a full week of schedules from one employee to another ───
+// Reads source employee's schedules in the week range (across given sectors)
+// and clones them onto target employee. Honours uniqueness by skipping
+// dates already filled on the destination unless overwrite=true.
+export function useCopyEmployeeWeek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      sourceEmployeeId: string;
+      targetEmployeeId: string;
+      weekStart: string;
+      weekEnd: string;
+      sectorIds: string[];
+      overwrite?: boolean;
+    }) => {
+      if (params.sourceEmployeeId === params.targetEmployeeId) {
+        throw new Error("Origem e destino são o mesmo colaborador.");
+      }
+      if (!params.sectorIds.length) {
+        throw new Error("Nenhum setor informado.");
+      }
+
+      // 1. Fetch source schedules
+      const { data: sourceSchedules, error: srcErr } = await supabase
+        .from("schedules")
+        .select("*")
+        .eq("employee_id", params.sourceEmployeeId)
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", params.weekStart)
+        .lte("schedule_date", params.weekEnd)
+        .neq("status", "cancelled");
+      if (srcErr) throw srcErr;
+      if (!sourceSchedules || sourceSchedules.length === 0) {
+        throw new Error("O colaborador de origem não tem escalas nesta semana.");
+      }
+
+      // 2. Fetch existing destination schedules
+      const { data: existing } = await supabase
+        .from("schedules")
+        .select("id, schedule_date, sector_id")
+        .eq("employee_id", params.targetEmployeeId)
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", params.weekStart)
+        .lte("schedule_date", params.weekEnd)
+        .neq("status", "cancelled");
+
+      const existingMap = new Map<string, string>();
+      (existing || []).forEach((e) => {
+        existingMap.set(`${e.schedule_date}_${e.sector_id}`, e.id);
+      });
+
+      let copied = 0;
+      let skipped = 0;
+
+      for (const s of sourceSchedules) {
+        const key = `${s.schedule_date}_${s.sector_id}`;
+        const existsId = existingMap.get(key);
+
+        const payload = {
+          employee_id: params.targetEmployeeId,
+          user_id: params.targetEmployeeId,
+          schedule_date: s.schedule_date,
+          shift_id: s.shift_id,
+          sector_id: s.sector_id,
+          status: "scheduled",
+          start_time: s.start_time,
+          end_time: s.end_time,
+          break_duration: s.break_duration,
+          schedule_type: s.schedule_type,
+          agreed_rate: s.agreed_rate,
+          praca_id: s.praca_id ?? null,
+        };
+
+        if (existsId) {
+          if (!params.overwrite) {
+            skipped++;
+            continue;
+          }
+          const { error } = await supabase
+            .from("schedules")
+            .update(payload)
+            .eq("id", existsId);
+          if (error) throw error;
+          copied++;
+        } else {
+          const { error } = await supabase.from("schedules").insert(payload);
+          if (error) throw error;
+          copied++;
+        }
+      }
+
+      return { copied, skipped };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+      const msg = res.skipped > 0
+        ? `${res.copied} escala(s) copiada(s), ${res.skipped} ignorada(s).`
+        : `${res.copied} escala(s) copiada(s)!`;
+      toast.success(msg);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}

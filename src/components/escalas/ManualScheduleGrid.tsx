@@ -48,7 +48,7 @@ import {
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
+import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, useCopyEmployeeWeek, type ManualSchedule } from "@/hooks/useManualSchedules";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -183,6 +183,7 @@ export function ManualScheduleGrid() {
   const upsertBudget = useUpsertDailyBudget();
   const copyDay = useCopyPreviousDay();
   const cancelEmployeeWeek = useCancelEmployeeWeek();
+  const copyEmployeeWeek = useCopyEmployeeWeek();
 
   // Delete employee from week state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -190,6 +191,20 @@ export function ManualScheduleGrid() {
     employeeName: string;
   } | null>(null);
   const [isDeletingWeek, setIsDeletingWeek] = useState(false);
+
+  // Copy schedule between employees
+  const [copyMode, setCopyMode] = useState<{
+    sourceId: string;
+    sourceName: string;
+  } | null>(null);
+  const [copyConfirm, setCopyConfirm] = useState<{
+    sourceId: string;
+    sourceName: string;
+    targetId: string;
+    targetName: string;
+  } | null>(null);
+  const [overwriteCopy, setOverwriteCopy] = useState(false);
+  const [isCopyingWeek, setIsCopyingWeek] = useState(false);
   const [showSectorBase, setShowSectorBase] = useState(false);
   const [editModal, setEditModal] = useState<{
     open: boolean;
@@ -405,6 +420,25 @@ export function ManualScheduleGrid() {
 
   return (
     <div className="space-y-4 fade-in">
+      {/* Copy mode banner */}
+      {copyMode && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <Copy className="h-4 w-4 text-primary shrink-0" />
+            <span className="truncate">
+              Copiando escala de <strong className="uppercase">{copyMode.sourceName}</strong>. Clique em outro colaborador para definir o destino.
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0"
+            onClick={() => setCopyMode(null)}
+          >
+            Cancelar
+          </Button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
@@ -709,8 +743,32 @@ export function ManualScheduleGrid() {
                       {sortedScheduled.map((emp) => {
                         const isFreelancer = emp.worker_type === "freelancer";
                         const isFromPartner = partnerSectorMeta && emp.unit_id === partnerSectorMeta.unitId;
+                        const isCopySource = copyMode?.sourceId === emp.id;
+                        const isCopyTarget = !!copyMode && copyMode.sourceId !== emp.id;
                         return (
-                          <TableRow key={emp.id}>
+                          <TableRow
+                            key={emp.id}
+                            className={
+                              isCopySource
+                                ? "bg-primary/10 ring-1 ring-primary"
+                                : isCopyTarget
+                                ? "cursor-pointer hover:bg-primary/5"
+                                : ""
+                            }
+                            onClick={
+                              isCopyTarget
+                                ? () => {
+                                    setCopyConfirm({
+                                      sourceId: copyMode!.sourceId,
+                                      sourceName: copyMode!.sourceName,
+                                      targetId: emp.id,
+                                      targetName: emp.name,
+                                    });
+                                    setOverwriteCopy(false);
+                                  }
+                                : undefined
+                            }
+                          >
                             <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
                               <div className="flex items-center gap-1.5">
                                 <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
@@ -724,9 +782,21 @@ export function ManualScheduleGrid() {
                                     {partnerSectorMeta?.unitName.slice(0, 8)}
                                   </Badge>
                                 )}
-                                {canManage && (
+                                {canManage && !copyMode && (
                                   <button
-                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                    title="Copiar escala desta pessoa"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setCopyMode({ sourceId: emp.id, sourceName: emp.name });
+                                    }}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {canManage && !copyMode && (
+                                  <button
+                                    className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                                     title="Remover da semana"
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -750,8 +820,12 @@ export function ManualScheduleGrid() {
                               return (
                                 <TableCell
                                   key={i}
-                                  className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                  onClick={() => handleCellClick(emp, dateStr)}
+                                  className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
+                                  onClick={(e) => {
+                                    if (copyMode) return; // let row click handle target selection
+                                    e.stopPropagation();
+                                    handleCellClick(emp, dateStr);
+                                  }}
                                 >
                                   <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
                                 </TableCell>
@@ -957,6 +1031,75 @@ export function ManualScheduleGrid() {
             >
               {isDeletingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Copy employee week confirmation */}
+      <AlertDialog
+        open={!!copyConfirm}
+        onOpenChange={(o) => {
+          if (!o && !isCopyingWeek) {
+            setCopyConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar escala da semana</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Copiar todos os turnos de{" "}
+                  <strong className="uppercase">{copyConfirm?.sourceName}</strong> para{" "}
+                  <strong className="uppercase">{copyConfirm?.targetName}</strong> nesta semana?
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={overwriteCopy}
+                    onChange={(e) => setOverwriteCopy(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Sobrescrever escalas existentes do destino
+                </label>
+                {!overwriteCopy && (
+                  <p className="text-xs text-muted-foreground">
+                    Dias já preenchidos no destino serão preservados.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCopyingWeek}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isCopyingWeek}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!copyConfirm) return;
+                setIsCopyingWeek(true);
+                try {
+                  await copyEmployeeWeek.mutateAsync({
+                    sourceEmployeeId: copyConfirm.sourceId,
+                    targetEmployeeId: copyConfirm.targetId,
+                    weekStart,
+                    weekEnd,
+                    sectorIds: effectiveSectorIds,
+                    overwrite: overwriteCopy,
+                  });
+                  setCopyConfirm(null);
+                  setCopyMode(null);
+                } catch {
+                  // toast handled in hook
+                } finally {
+                  setIsCopyingWeek(false);
+                }
+              }}
+            >
+              {isCopyingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Copiar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

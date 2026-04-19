@@ -433,7 +433,8 @@ export function FreelancerAddModal({
                   value={name}
                   onChange={(e) => { setName(e.target.value); setFilled((f) => ({ ...f, name: false })); }}
                   placeholder="Nome completo"
-                  className={filled.name ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
+                  className={filled.name ? "border-primary bg-primary/5" : ""}
+                  autoFocus={noCpfMode}
                 />
               </div>
 
@@ -457,26 +458,28 @@ export function FreelancerAddModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Telefone</Label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
-                    placeholder="(00) 00000-0000"
-                    className={filled.phone ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
-                  />
+              {!noCpfMode && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Telefone</Label>
+                    <Input
+                      value={phone}
+                      onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
+                      placeholder="(00) 00000-0000"
+                      className={filled.phone ? "border-primary bg-primary/5" : ""}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Chave PIX</Label>
+                    <Input
+                      value={pixKey}
+                      onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
+                      placeholder="Chave PIX"
+                      className={filled.pix ? "border-primary bg-primary/5" : ""}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Chave PIX</Label>
-                  <Input
-                    value={pixKey}
-                    onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
-                    placeholder="Chave PIX"
-                    className={filled.pix ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
-                  />
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -502,7 +505,11 @@ export function FreelancerAddModal({
 
               <Button className="w-full" onClick={handleSubmit} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {linkedEmployeeId ? "Adicionar à Escala" : "Cadastrar e Adicionar à Escala"}
+                {linkedEmployeeId
+                  ? "Adicionar à Escala"
+                  : noCpfMode
+                    ? "Escalar sem CPF (provisório)"
+                    : "Cadastrar e Adicionar à Escala"}
               </Button>
             </>
           )}

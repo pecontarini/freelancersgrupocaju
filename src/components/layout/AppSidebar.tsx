@@ -106,12 +106,6 @@ const menuItems = [
     description: "Controle de utensílios e budget",
   },
   {
-    title: "ESTOQUE GERAL",
-    id: "estoque",
-    icon: Warehouse,
-    description: "Gestão de estoque por setor",
-  },
-  {
     title: "AGENDA",
     id: "agenda",
     icon: Calendar,

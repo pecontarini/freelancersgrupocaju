@@ -377,7 +377,7 @@ export function FreelancerAddModal({
                 )}
               </div>
               {linkedSourceLabel && (
-                <p className="text-xs text-success flex items-center gap-1">
+                <p className="text-xs text-primary flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" />
                   {linkedSourceLabel}
                 </p>

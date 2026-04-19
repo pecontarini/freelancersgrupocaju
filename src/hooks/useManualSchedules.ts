@@ -459,6 +459,229 @@ export function useCopyPreviousDay() {
   });
 }
 
+// ─── Copy a single employee's full week to the NEXT week (date + 7) ───
+// Reads source employee's active schedules within [sourceWeekStart, sourceWeekEnd]
+// (across given sectors) and replicates them shifted +7 days for the same employee.
+// Honours destination uniqueness: skips by default, updates if overwrite=true.
+export function useCopyEmployeeToNextWeek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      employeeId: string;
+      sourceWeekStart: string; // YYYY-MM-DD
+      sourceWeekEnd: string;   // YYYY-MM-DD
+      sectorIds: string[];
+      overwrite?: boolean;
+    }) => {
+      if (!params.sectorIds.length) {
+        throw new Error("Nenhum setor informado.");
+      }
+
+      const addDays = (iso: string, days: number) => {
+        const d = new Date(iso + "T12:00:00");
+        d.setDate(d.getDate() + days);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const targetWeekStart = addDays(params.sourceWeekStart, 7);
+      const targetWeekEnd = addDays(params.sourceWeekEnd, 7);
+
+      // 1. Fetch source schedules
+      const { data: sourceSchedules, error: srcErr } = await supabase
+        .from("schedules")
+        .select("*")
+        .eq("employee_id", params.employeeId)
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", params.sourceWeekStart)
+        .lte("schedule_date", params.sourceWeekEnd)
+        .neq("status", "cancelled");
+      if (srcErr) throw srcErr;
+      if (!sourceSchedules || sourceSchedules.length === 0) {
+        throw new Error("Este colaborador não tem escalas na semana atual.");
+      }
+
+      // 2. Fetch existing destination schedules in target week
+      const { data: existing } = await supabase
+        .from("schedules")
+        .select("id, schedule_date, sector_id")
+        .eq("employee_id", params.employeeId)
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", targetWeekStart)
+        .lte("schedule_date", targetWeekEnd)
+        .neq("status", "cancelled");
+
+      const existingMap = new Map<string, string>();
+      (existing || []).forEach((e) => {
+        existingMap.set(`${e.schedule_date}_${e.sector_id}`, e.id);
+      });
+
+      let copied = 0;
+      let skipped = 0;
+
+      for (const s of sourceSchedules) {
+        const targetDate = addDays(s.schedule_date, 7);
+        const key = `${targetDate}_${s.sector_id}`;
+        const existsId = existingMap.get(key);
+
+        const payload = {
+          employee_id: params.employeeId,
+          user_id: params.employeeId,
+          schedule_date: targetDate,
+          shift_id: s.shift_id,
+          sector_id: s.sector_id,
+          status: "scheduled",
+          start_time: s.start_time,
+          end_time: s.end_time,
+          break_duration: s.break_duration,
+          schedule_type: s.schedule_type,
+          agreed_rate: s.agreed_rate,
+          praca_id: s.praca_id ?? null,
+        };
+
+        if (existsId) {
+          if (!params.overwrite) {
+            skipped++;
+            continue;
+          }
+          const { error } = await supabase
+            .from("schedules")
+            .update(payload)
+            .eq("id", existsId);
+          if (error) throw error;
+          copied++;
+        } else {
+          const { error } = await supabase.from("schedules").insert(payload);
+          if (error) throw error;
+          copied++;
+        }
+      }
+
+      return { copied, skipped, targetWeekStart, targetWeekEnd };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+      const msg = res.skipped > 0
+        ? `${res.copied} escala(s) copiada(s) para próxima semana, ${res.skipped} ignorada(s).`
+        : `${res.copied} escala(s) copiada(s) para próxima semana!`;
+      toast.success(msg);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+// ─── Copy ALL employees' schedules from current week to NEXT week (batch) ───
+export function useCopyWeekToNextWeek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      sourceWeekStart: string;
+      sourceWeekEnd: string;
+      sectorIds: string[];
+      overwrite?: boolean;
+    }) => {
+      if (!params.sectorIds.length) {
+        throw new Error("Nenhum setor informado.");
+      }
+
+      const addDays = (iso: string, days: number) => {
+        const d = new Date(iso + "T12:00:00");
+        d.setDate(d.getDate() + days);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const targetWeekStart = addDays(params.sourceWeekStart, 7);
+      const targetWeekEnd = addDays(params.sourceWeekEnd, 7);
+
+      // Fetch all source schedules in the week range
+      const { data: sourceSchedules, error: srcErr } = await supabase
+        .from("schedules")
+        .select("*")
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", params.sourceWeekStart)
+        .lte("schedule_date", params.sourceWeekEnd)
+        .neq("status", "cancelled");
+      if (srcErr) throw srcErr;
+      if (!sourceSchedules || sourceSchedules.length === 0) {
+        throw new Error("Não há escalas na semana atual para copiar.");
+      }
+
+      // Fetch existing destination
+      const { data: existing } = await supabase
+        .from("schedules")
+        .select("id, schedule_date, sector_id, employee_id")
+        .in("sector_id", params.sectorIds)
+        .gte("schedule_date", targetWeekStart)
+        .lte("schedule_date", targetWeekEnd)
+        .neq("status", "cancelled");
+
+      const existingMap = new Map<string, string>();
+      (existing || []).forEach((e) => {
+        existingMap.set(`${e.employee_id}_${e.schedule_date}_${e.sector_id}`, e.id);
+      });
+
+      let copied = 0;
+      let skipped = 0;
+
+      for (const s of sourceSchedules) {
+        if (!s.employee_id) continue;
+        const targetDate = addDays(s.schedule_date, 7);
+        const key = `${s.employee_id}_${targetDate}_${s.sector_id}`;
+        const existsId = existingMap.get(key);
+
+        const payload = {
+          employee_id: s.employee_id,
+          user_id: s.employee_id,
+          schedule_date: targetDate,
+          shift_id: s.shift_id,
+          sector_id: s.sector_id,
+          status: "scheduled",
+          start_time: s.start_time,
+          end_time: s.end_time,
+          break_duration: s.break_duration,
+          schedule_type: s.schedule_type,
+          agreed_rate: s.agreed_rate,
+          praca_id: s.praca_id ?? null,
+        };
+
+        if (existsId) {
+          if (!params.overwrite) {
+            skipped++;
+            continue;
+          }
+          const { error } = await supabase
+            .from("schedules")
+            .update(payload)
+            .eq("id", existsId);
+          if (error) throw error;
+          copied++;
+        } else {
+          const { error } = await supabase.from("schedules").insert(payload);
+          if (error) throw error;
+          copied++;
+        }
+      }
+
+      return { copied, skipped };
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      qc.invalidateQueries({ queryKey: ["schedules"] });
+      const msg = res.skipped > 0
+        ? `Semana replicada: ${res.copied} escala(s), ${res.skipped} ignorada(s).`
+        : `Semana replicada: ${res.copied} escala(s) copiada(s)!`;
+      toast.success(msg);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 // ─── Copy a full week of schedules from one employee to another ───
 // Reads source employee's schedules in the week range (across given sectors)
 // and clones them onto target employee. Honours uniqueness by skipping

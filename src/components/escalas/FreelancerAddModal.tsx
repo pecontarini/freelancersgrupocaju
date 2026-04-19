@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2 } from "lucide-react";
+import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
@@ -76,6 +76,7 @@ export function FreelancerAddModal({
   );
 
   // Form state — CPF-first flow
+  const [noCpfMode, setNoCpfMode] = useState(false);
   const [cpfValue, setCpfValue] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -201,9 +202,11 @@ export function FreelancerAddModal({
     const rateNum = parseFloat(rate) || 0;
     const cleanCpf = cpfValue.replace(/\D/g, "");
 
-    if (!cleanCpf || cleanCpf.length !== 11) {
-      toast.error("Informe um CPF válido (11 dígitos).");
-      return;
+    if (!noCpfMode) {
+      if (!cleanCpf || cleanCpf.length !== 11) {
+        toast.error("Informe um CPF válido (11 dígitos).");
+        return;
+      }
     }
     if (!name.trim()) {
       toast.error("Nome é obrigatório.");
@@ -222,6 +225,9 @@ export function FreelancerAddModal({
         const { supabase } = await import("@/integrations/supabase/client");
         const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
 
+        // In no-CPF mode, leave cpf NULL so we don't pollute lookup tables
+        const cpfToStore = noCpfMode ? null : cleanCpf;
+
         const { data, error } = await supabase
           .from("employees")
           .insert({
@@ -232,7 +238,7 @@ export function FreelancerAddModal({
             default_rate: rateNum,
             job_title: chosenJt?.name || "Freelancer",
             job_title_id: selectedJobTitleId,
-            cpf: cleanCpf,
+            cpf: cpfToStore,
             phone: phone.trim() || null,
           })
           .select("id")
@@ -241,8 +247,8 @@ export function FreelancerAddModal({
         if (error) throw error;
         empId = data.id;
 
-        // Optionally also persist to freelancer_profiles for future lookups
-        if (pixKey || phone) {
+        // Only persist to freelancer_profiles when we have a real CPF
+        if (!noCpfMode && (pixKey || phone)) {
           await supabase
             .from("freelancer_profiles" as any)
             .upsert(
@@ -279,6 +285,12 @@ export function FreelancerAddModal({
         agreed_rate: rateNum,
       });
 
+      if (noCpfMode) {
+        toast.warning("Freelancer escalado sem CPF. Lembre de completar o cadastro depois para liberar pagamento.", {
+          duration: 5000,
+        });
+      }
+
       onAdded?.(empId);
       onClose();
       resetForm();
@@ -288,6 +300,7 @@ export function FreelancerAddModal({
   }
 
   function resetForm() {
+    setNoCpfMode(false);
     setCpfValue("");
     setName("");
     setPhone("");
@@ -304,6 +317,7 @@ export function FreelancerAddModal({
   }
 
   const cpfReady = cpfValue.replace(/\D/g, "").length === 11;
+  const showFormFields = cpfReady || noCpfMode;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
@@ -341,40 +355,77 @@ export function FreelancerAddModal({
             </div>
           )}
 
-          {/* CPF — primary entry */}
-          <div className="space-y-1.5">
-            <Label className="text-sm font-semibold flex items-center gap-1.5">
-              <Search className="h-3.5 w-3.5 text-primary" />
-              CPF do freelancer *
-            </Label>
-            <div className="relative">
-              <Input
-                value={cpfValue}
-                onChange={(e) => handleCpfChange(e.target.value)}
-                placeholder="000.000.000-00"
-                maxLength={14}
-                inputMode="numeric"
-                className="text-base"
-                autoFocus
-              />
-              {isLookingUp && (
-                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+          {/* CPF — primary entry (skipped in no-CPF mode) */}
+          {!noCpfMode && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Search className="h-3.5 w-3.5 text-primary" />
+                CPF do freelancer *
+              </Label>
+              <div className="relative">
+                <Input
+                  value={cpfValue}
+                  onChange={(e) => handleCpfChange(e.target.value)}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  inputMode="numeric"
+                  className="text-base"
+                  autoFocus
+                />
+                {isLookingUp && (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {linkedSourceLabel && (
+                <p className="text-xs text-primary flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {linkedSourceLabel}
+                </p>
+              )}
+              {!cpfReady && (
+                <>
+                  <p className="text-[11px] text-muted-foreground">
+                    Ao informar o CPF, o sistema busca automaticamente os dados nos cadastros existentes.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => setNoCpfMode(true)}
+                  >
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                    Lançar sem CPF (cadastro provisório)
+                  </Button>
+                </>
               )}
             </div>
-            {linkedSourceLabel && (
-              <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                {linkedSourceLabel}
-              </p>
-            )}
-            {!cpfReady && (
-              <p className="text-[11px] text-muted-foreground">
-                Ao informar o CPF, o sistema busca automaticamente os dados nos cadastros existentes.
-              </p>
-            )}
-          </div>
+          )}
 
-          {cpfReady && (
+          {noCpfMode && (
+            <div className="rounded-md border-2 border-destructive/40 bg-destructive/10 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1 text-xs text-foreground">
+                  <p className="font-semibold">Modo sem CPF ativado</p>
+                  <p className="text-muted-foreground mt-0.5">
+                    O freelancer entrará na escala como cadastro provisório. Sem CPF, o pagamento via Budget Gerencial fica pendente até completar os dados.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={() => { setNoCpfMode(false); }}
+              >
+                ← Voltar e informar CPF
+              </Button>
+            </div>
+          )}
+
+          {showFormFields && (
             <>
               <div className="space-y-1.5">
                 <Label>Nome completo *</Label>
@@ -382,7 +433,8 @@ export function FreelancerAddModal({
                   value={name}
                   onChange={(e) => { setName(e.target.value); setFilled((f) => ({ ...f, name: false })); }}
                   placeholder="Nome completo"
-                  className={filled.name ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
+                  className={filled.name ? "border-primary bg-primary/5" : ""}
+                  autoFocus={noCpfMode}
                 />
               </div>
 
@@ -406,26 +458,28 @@ export function FreelancerAddModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Telefone</Label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
-                    placeholder="(00) 00000-0000"
-                    className={filled.phone ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
-                  />
+              {!noCpfMode && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Telefone</Label>
+                    <Input
+                      value={phone}
+                      onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
+                      placeholder="(00) 00000-0000"
+                      className={filled.phone ? "border-primary bg-primary/5" : ""}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Chave PIX</Label>
+                    <Input
+                      value={pixKey}
+                      onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
+                      placeholder="Chave PIX"
+                      className={filled.pix ? "border-primary bg-primary/5" : ""}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Chave PIX</Label>
-                  <Input
-                    value={pixKey}
-                    onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
-                    placeholder="Chave PIX"
-                    className={filled.pix ? "border-green-500 bg-green-50 dark:bg-green-950/20" : ""}
-                  />
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -451,7 +505,11 @@ export function FreelancerAddModal({
 
               <Button className="w-full" onClick={handleSubmit} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {linkedEmployeeId ? "Adicionar à Escala" : "Cadastrar e Adicionar à Escala"}
+                {linkedEmployeeId
+                  ? "Adicionar à Escala"
+                  : noCpfMode
+                    ? "Escalar sem CPF (provisório)"
+                    : "Cadastrar e Adicionar à Escala"}
               </Button>
             </>
           )}

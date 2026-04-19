@@ -193,6 +193,16 @@ export function ScheduleEditModal({
     onClose();
   }
 
+  // Sunday-off tracking (CLT only) — month of currently displayed date
+  const monthRef = useMemo(() => monthRefFromDate(date), [date]);
+  const dateIsSunday = useMemo(() => isSundayDate(date), [date]);
+  const { data: sundaysOff = [] } = useEmployeeSundaysOff(
+    !isFreelancer ? employeeId : null,
+    !isFreelancer ? monthRef : null
+  );
+  const hasSundayOffThisMonth = sundaysOff.length > 0;
+  const monthLabel = new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { month: "long" }).toUpperCase();
+
   const isSaving = upsert.isPending || cancel.isPending || bulkVacation.isPending;
 
   return (
@@ -266,6 +276,23 @@ export function ScheduleEditModal({
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <span>Atenção: Jornada acima de 10h (Art. 59 CLT)</span>
               </div>
+            )}
+            {!isFreelancer && dateIsSunday && (
+              hasSundayOffThisMonth ? (
+                <div className="flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 dark:bg-green-950/20 p-2.5 text-xs text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>
+                    {employeeName.split(" ")[0]} já teve folga dominical em {monthLabel} ({sundaysOff.map(formatSundayShort).join(", ")}).
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-2.5 text-xs text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    {employeeName.split(" ")[0]} ainda não teve domingo de folga em {monthLabel}.
+                  </span>
+                </div>
+              )
             )}
             <Button className="w-full" onClick={handleSaveShift} disabled={isSaving}>
               {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

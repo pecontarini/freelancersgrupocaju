@@ -559,8 +559,9 @@ export function BudgetsGerenciaisTab({
                 );
               })}
 
-              {/* Manual freelancer entries */}
+              {/* Freelancer entries (manual + provisórios da escala) */}
               {filteredFreelancers.slice(0, 20).map((entry) => {
+                const isFromSchedule = entry.origem === 'escala';
                 if (isMobile) {
                   return (
                     <MobileFreelancerCard
@@ -577,50 +578,66 @@ export function BudgetsGerenciaisTab({
                     className="flex items-center justify-between rounded-xl bg-muted/50 p-4 transition-colors hover:bg-muted"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isFromSchedule ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'}`}>
                         <User className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="font-medium">{entry.nome_completo}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{entry.nome_completo}</p>
+                          {isFromSchedule && (
+                            <Badge variant="outline" className="bg-amber-500/15 text-amber-700 border-amber-200 dark:text-amber-400 dark:border-amber-800 text-[10px] px-1.5">
+                              Previsto (Escala)
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {entry.funcao} • {entry.loja} • {`${day}/${month}/${year}`}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <EditFreelancerDialog entry={entry} />
+                      {!isFromSchedule && <EditFreelancerDialog entry={entry} />}
                       <p className="font-semibold text-primary">
                         {formatCurrency(entry.valor)}
                       </p>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Deseja excluir este lançamento?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta ação é permanente e removerá o gasto de{" "}
-                              <strong>{entry.nome_completo}</strong> do cálculo de budget da unidade.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteFreelancer.mutate(entry.id)}
-                              className="bg-destructive hover:bg-destructive/90"
+                      {isFromSchedule ? (
+                        <span
+                          className="text-[10px] text-muted-foreground italic max-w-[140px] text-right leading-tight"
+                          title="Este lançamento é gerado automaticamente pela escala. Para alterar, edite o turno no Editor de Escalas."
+                        >
+                          Sincronizado da escala
+                        </span>
+                      ) : (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Deseja excluir este lançamento?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Esta ação é permanente e removerá o gasto de{" "}
+                                <strong>{entry.nome_completo}</strong> do cálculo de budget da unidade.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteFreelancer.mutate(entry.id)}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                 );

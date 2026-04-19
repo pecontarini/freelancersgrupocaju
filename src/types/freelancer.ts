@@ -11,6 +11,8 @@ export interface FreelancerEntry {
   created_at: string;
   created_by: string | null;
   loja_id: string | null;
+  schedule_id?: string | null;
+  origem?: 'manual' | 'escala' | 'checkin';
 }
 
 export interface FreelancerFormData {

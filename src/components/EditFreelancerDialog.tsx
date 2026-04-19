@@ -69,6 +69,12 @@ export function EditFreelancerDialog({ entry, variant = "icon" }: EditFreelancer
     }
   };
 
+  // Lançamentos automáticos (origem 'escala' ou 'checkin') não podem ser editados aqui
+  const isAutomatic = entry.origem === 'escala' || entry.origem === 'checkin';
+  if (isAutomatic) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>

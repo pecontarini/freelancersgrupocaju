@@ -1165,6 +1165,139 @@ export function ManualScheduleGrid() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Copy single employee week → next week */}
+      <AlertDialog
+        open={!!nextWeekConfirm}
+        onOpenChange={(o) => {
+          if (!o && !isCopyingNextWeek) {
+            setNextWeekConfirm(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar para próxima semana</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Replicar todos os turnos de{" "}
+                  <strong className="uppercase">{nextWeekConfirm?.employeeName}</strong>{" "}
+                  da semana <strong>{format(weekDays[0], "dd/MM", { locale: ptBR })} – {format(weekDays[6], "dd/MM", { locale: ptBR })}</strong>{" "}
+                  para a semana <strong>{format(addDays(weekDays[0], 7), "dd/MM", { locale: ptBR })} – {format(addDays(weekDays[6], 7), "dd/MM", { locale: ptBR })}</strong>?
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={overwriteNextWeek}
+                    onChange={(e) => setOverwriteNextWeek(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Sobrescrever escalas já existentes na próxima semana
+                </label>
+                {!overwriteNextWeek && (
+                  <p className="text-xs text-muted-foreground">
+                    Dias já preenchidos na semana destino serão preservados.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCopyingNextWeek}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isCopyingNextWeek}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!nextWeekConfirm) return;
+                setIsCopyingNextWeek(true);
+                try {
+                  await copyEmployeeToNextWeek.mutateAsync({
+                    employeeId: nextWeekConfirm.employeeId,
+                    sourceWeekStart: weekStart,
+                    sourceWeekEnd: weekEnd,
+                    sectorIds: effectiveSectorIds,
+                    overwrite: overwriteNextWeek,
+                  });
+                  setNextWeekConfirm(null);
+                } catch {
+                  // toast handled in hook
+                } finally {
+                  setIsCopyingNextWeek(false);
+                }
+              }}
+            >
+              {isCopyingNextWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Copiar para próxima
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Replicate ENTIRE week to next */}
+      <AlertDialog
+        open={replicateWeekOpen}
+        onOpenChange={(o) => {
+          if (!o && !isReplicatingWeek) {
+            setReplicateWeekOpen(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replicar semana inteira</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Copiar <strong>todas as escalas de todos os colaboradores</strong> da semana{" "}
+                  <strong>{format(weekDays[0], "dd/MM", { locale: ptBR })} – {format(weekDays[6], "dd/MM", { locale: ptBR })}</strong>{" "}
+                  para a semana <strong>{format(addDays(weekDays[0], 7), "dd/MM", { locale: ptBR })} – {format(addDays(weekDays[6], 7), "dd/MM", { locale: ptBR })}</strong>?
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={overwriteReplicate}
+                    onChange={(e) => setOverwriteReplicate(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Sobrescrever escalas já existentes na próxima semana
+                </label>
+                {!overwriteReplicate && (
+                  <p className="text-xs text-muted-foreground">
+                    Dias já preenchidos na semana destino serão preservados.
+                  </p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReplicatingWeek}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isReplicatingWeek}
+              onClick={async (e) => {
+                e.preventDefault();
+                setIsReplicatingWeek(true);
+                try {
+                  await copyWeekToNextWeek.mutateAsync({
+                    sourceWeekStart: weekStart,
+                    sourceWeekEnd: weekEnd,
+                    sectorIds: effectiveSectorIds,
+                    overwrite: overwriteReplicate,
+                  });
+                  setReplicateWeekOpen(false);
+                } catch {
+                  // toast handled in hook
+                } finally {
+                  setIsReplicatingWeek(false);
+                }
+              }}
+            >
+              {isReplicatingWeek && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Replicar semana
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

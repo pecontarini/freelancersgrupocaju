@@ -971,14 +971,40 @@ export function ManualScheduleGrid() {
                                         FL
                                       </Badge>
                                     )}
+                                    {!isFreelancer && (
+                                      <SundayOffIndicator
+                                        employeeId={emp.id}
+                                        monthRef={monthRefFromDate(currentWeekBase)}
+                                      />
+                                    )}
                                     {isFromPartner && (
                                       <Badge variant="outline" className="border-primary/50 text-primary text-[9px] px-1 py-0 shrink-0" title={`Funcionário de ${partnerSectorMeta?.unitName}`}>
                                         {partnerSectorMeta?.unitName.slice(0, 8)}
                                       </Badge>
                                     )}
-                                    {canManage && !copyMode && (
+                                    {canManage && !copyMode && !isFromPartner && (
                                       <button
                                         className="ml-auto shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                                        title="Editar funcionário (cargo, telefone, gênero)"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditEmployeeModal({
+                                            id: emp.id,
+                                            name: emp.name,
+                                            gender: emp.gender || "M",
+                                            phone: emp.phone || null,
+                                            job_title: emp.job_title || null,
+                                            job_title_id: emp.job_title_id || null,
+                                            unit_id: emp.unit_id,
+                                          });
+                                        }}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                    {canManage && !copyMode && (
+                                      <button
+                                        className={`${isFromPartner ? "ml-auto" : ""} shrink-0 p-0.5 rounded hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors`}
                                         title="Copiar escala desta pessoa para outro colaborador"
                                         onClick={(e) => {
                                           e.stopPropagation();

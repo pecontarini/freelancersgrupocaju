@@ -1,51 +1,61 @@
 
 
-## Diagnóstico
+## Plano: Integração automática Escalas ↔ Budget Gerencial
 
-O auto-preenchimento por CPF no editor de escalas usa o **mesmo hook** (`lookupUnifiedByCpf`) do Budget Gerencial. O fluxo está correto. O problema raiz é de **dados + permissão**:
+### Conceito
+Quando um **freelancer** for escalado no Editor de Escalas (com diária definida), criar automaticamente um lançamento "provisório" no Budget Gerencial, com origem rastreável e que se atualiza/cancela conforme a escala muda.
 
-1. **`freelancer_profiles`** (tabela "rica" com nome, telefone, PIX): pública para leitura, mas **a maioria dos freelancers cadastrados via Budget nunca foi escrita aqui**. Está vazia para esses CPFs.
-2. **`employees`** (worker_type=freelancer): só tem freelancers que já foram escalados manualmente — ainda não cobre os CPFs em questão.
-3. **`freelancer_entries`** (histórico de Budget Gerencial): tem milhares de registros, mas **bloqueado por RLS por loja**. Quando o gestor da Loja A tenta escalar um freelancer que só rodou nas Lojas B/C, o lookup volta vazio.
+### 1) Schema: marcar origem do lançamento
+Migration adicionando 2 colunas em `freelancer_entries`:
+- `schedule_id uuid NULL` — referência opcional para `schedules.id`
+- `origem text NOT NULL DEFAULT 'manual'` — valores: `'manual'`, `'escala'`, `'checkin'`
 
-No Budget Gerencial o auto-preenchimento "funciona" porque o gestor sempre lança em sua própria loja, então só precisa do histórico local — a RLS deixa passar.
+Índice único parcial: `UNIQUE (schedule_id) WHERE schedule_id IS NOT NULL AND origem = 'escala'` — garante 1 lançamento por turno escalado.
 
-## Solução
+### 2) Trigger no Postgres: sincronizar `schedules` → `freelancer_entries`
 
-Preciso de 2 mudanças combinadas para garantir paridade com o Budget e cobrir freelancers cross-loja:
+Trigger `AFTER INSERT/UPDATE/DELETE` em `schedules`:
 
-### 1) Backfill: popular `freelancer_profiles` a partir de `freelancer_entries`
+- **INSERT** de escala `working` para freelancer com `daily_rate > 0`:
+  - Busca `cpf`, `nome`, `chave_pix` em `employees` (já está lá ao adicionar via FreelancerAddModal).
+  - Insere em `freelancer_entries` com `origem='escala'`, `schedule_id=NEW.id`, `valor=NEW.daily_rate`, `data_pop=NEW.schedule_date`, `loja_id` da unidade.
+  - Função/gerência: pega do `job_titles` vinculado.
 
-Migration única que copia para `freelancer_profiles` os dados consolidados (mais recentes) de cada CPF em `freelancer_entries`:
-- Para cada CPF distinto, pega o registro mais recente: `nome_completo`, `chave_pix`.
-- `INSERT ... ON CONFLICT (cpf) DO NOTHING` — não sobrescreve perfis já preenchidos manualmente.
-- Como `freelancer_profiles` é público, isso resolve o lookup global.
+- **UPDATE** mudando `daily_rate`, `schedule_date` ou `status='cancelled'`:
+  - Atualiza ou marca o entry correspondente. Se status virou cancelled → deleta o entry de origem `escala`.
 
-### 2) RPC pública `lookup_freelancer_by_cpf`
+- **DELETE** de escala: cascata deleta o entry de origem `escala`.
 
-Function `SECURITY DEFINER` que busca em `freelancer_entries` ignorando RLS, retornando apenas dados não-sensíveis (nome, função, gerência, chave_pix) do registro mais recente do CPF. O hook `useCpfLookup` passa a chamar essa RPC como **fallback** quando a busca direta retorna vazio. Isso cobre futuros CPFs novos lançados em outras lojas, sem depender do backfill.
+### 3) Evitar duplicação com check-in
+Quando o check-in for aprovado e `promote_approved_checkins` for chamada:
+- Antes de inserir em `checkin_budget_entries`, **deletar o lançamento provisório** de `freelancer_entries` referente ao mesmo `schedule_id` (`origem='escala'`).
+- Assim, a previsão (`escala`) é substituída pelo valor real (`checkin`) sem somar duas vezes.
 
-### 3) Ajuste no `useCpfLookup`
+### 4) UI: indicar origem no Budget Gerencial
+Em `BudgetsGerenciaisTab.tsx` (lista "Freelancers Escalados"):
+- Badge cinza "Previsto (Escala)" para entries com `origem='escala'`.
+- Badge verde "Check-in confirmado" para `checkin_budget_entries`.
+- Edição manual desses entries fica **bloqueada** (eles seguem a escala) — para alterar valor/data, o usuário muda na escala.
 
-No `lookupUnifiedByCpf`, adicionar 4ª camada (após as 3 atuais): chamar `supabase.rpc('lookup_freelancer_by_cpf', { p_cpf: cleanCpf })`. Mantém o mesmo formato de retorno (`UnifiedLookupResult`) com source `"freelancer_entries"`.
+### 5) Backfill
+Script único para criar entries `origem='escala'` para todas as escalas atuais de freelancers ainda não associados a um check-in aprovado.
 
-### 4) Garantir que novos cadastros via Budget também populem `freelancer_profiles`
+### Resultado para o usuário
+- Escalou um freela com diária R$ 120 na quinta → R$ 120 já aparece no Budget Gerencial daquele dia/loja como "Previsto".
+- Freela faz check-in e aprovador confirma R$ 130 → lançamento "previsto" some, "Check-in R$ 130" aparece.
+- Cancelou a escala → some do Budget automaticamente.
+- Sem dupla contagem, sem trabalho manual.
 
-No `createEntry` do `useFreelancerEntries`, fazer `upsert` simultâneo em `freelancer_profiles` com o CPF, nome e PIX (sem sobrescrever telefone se já existir). Assim, o cadastro futuro fica disponível globalmente para o editor de escalas sem depender de RLS.
+### Arquivos
+- **Migration nova**: 2 colunas em `freelancer_entries` + índice + trigger + ajuste em `promote_approved_checkins`.
+- **`src/components/dashboard/BudgetsGerenciaisTab.tsx`**: badges de origem + bloquear edição de entries automáticos.
+- **`src/components/EditFreelancerDialog.tsx`** e **`src/components/InlineBudgetEditor.tsx`**: respeitar origem ao permitir edição.
+- **Backfill SQL**: gerar entries para escalas existentes.
 
-## Arquivos
-
-- **Migration nova**: backfill `freelancer_profiles` + criar RPC `lookup_freelancer_by_cpf` (SECURITY DEFINER, retorna registro mais recente).
-- **`src/hooks/useCpfLookup.ts`**: adicionar 4ª camada de busca via RPC.
-- **`src/hooks/useFreelancerEntries.ts`**: no `createEntry`, fazer upsert paralelo em `freelancer_profiles`.
-
-## Validação
-
-- Abrir editor de escalas → "+ Freelancer extra" → digitar CPF `086.942.831-40` (Gabriel) → nome, função e PIX devem preencher automaticamente.
-- Cadastrar um freelancer novo via Budget Gerencial → ir ao editor de escalas em outra loja → o CPF deve ser reconhecido imediatamente.
-- Confirmar que o destaque verde aparece nos campos preenchidos (mesma UX do Budget).
-
-## Sem mudanças de UX
-
-A interface não muda — só a busca passa a encontrar mais resultados.
+### Validação
+- Escalar freela → confere entry novo no Budget com badge "Previsto".
+- Mudar diária na escala → valor atualiza no Budget.
+- Cancelar escala → entry some.
+- Aprovar check-in → "Previsto" vira "Confirmado" sem duplicar.
+- Editar entry manual antigo (`origem='manual'`) continua funcionando normalmente.
 

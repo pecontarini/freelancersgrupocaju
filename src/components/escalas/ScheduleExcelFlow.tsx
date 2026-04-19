@@ -324,9 +324,21 @@ export function ScheduleExcelFlow({
         };
       });
 
-      // Dedup: check which (employee_id, schedule_date, sector_id) already exist
-      const uniqueDates = [...new Set(rows.map((r) => r.schedule_date))];
-      const uniqueEmpIds = [...new Set(rows.map((r) => r.employee_id))];
+      // 1) Dedup intra-batch: collapse duplicate (employee, date, sector) within the spreadsheet itself
+      const intraBatchMap = new Map<string, typeof rows[number]>();
+      for (const r of rows) {
+        const key = `${r.employee_id}|${r.schedule_date}|${r.sector_id}`;
+        intraBatchMap.set(key, r); // last occurrence wins
+      }
+      const dedupedRows = Array.from(intraBatchMap.values());
+      const intraBatchCollapsed = rows.length - dedupedRows.length;
+      if (intraBatchCollapsed > 0) {
+        toast.info(`${intraBatchCollapsed} linha(s) duplicada(s) na planilha foram unificadas.`);
+      }
+
+      // 2) Dedup vs DB: check which (employee_id, schedule_date, sector_id) already exist
+      const uniqueDates = [...new Set(dedupedRows.map((r) => r.schedule_date))].sort();
+      const uniqueEmpIds = [...new Set(dedupedRows.map((r) => r.employee_id))];
       const { data: existingSchedules } = await supabase
         .from("schedules")
         .select("employee_id, schedule_date, sector_id")
@@ -341,11 +353,11 @@ export function ScheduleExcelFlow({
         )
       );
 
-      const newRows = rows.filter(
+      const newRows = dedupedRows.filter(
         (r) => !existingKeys.has(`${r.employee_id}|${r.schedule_date}|${r.sector_id}`)
       );
 
-      const ignoredCount = rows.length - newRows.length;
+      const ignoredCount = dedupedRows.length - newRows.length;
       if (ignoredCount > 0) {
         toast.info(`${ignoredCount} lançamento(s) ignorado(s) por já existirem.`);
       }
@@ -360,7 +372,14 @@ export function ScheduleExcelFlow({
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);
-        toast.error(`Erro ao salvar escalas: ${error.message}`, { duration: 8000 });
+        if (error.message?.includes("unique_active_schedule") || (error as any).code === "23505") {
+          toast.error(
+            "Existem escalas conflitantes para esta semana. Use 'Zerar Escalas' antes de reimportar, ou ajuste manualmente.",
+            { duration: 10000 }
+          );
+        } else {
+          toast.error(`Erro ao salvar escalas: ${error.message}`, { duration: 8000 });
+        }
         setIsSaving(false);
         return;
       }

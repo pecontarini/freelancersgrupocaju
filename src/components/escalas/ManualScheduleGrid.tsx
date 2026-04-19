@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  CopyPlus,
+  CalendarPlus,
   UserPlus,
   Pencil,
   Loader2,

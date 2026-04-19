@@ -588,17 +588,48 @@ export function ManualScheduleGrid() {
           )}
 
           {/* Week Navigation */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <Button variant="outline" size="icon" onClick={() => navigateWeek(-1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="font-semibold text-sm">
-              {format(weekDays[0], "dd MMM", { locale: ptBR })} — {format(weekDays[6], "dd MMM yyyy", { locale: ptBR })}
-            </span>
+            <div className="flex items-center gap-2 flex-1 justify-center min-w-0">
+              <span className="font-semibold text-sm truncate">
+                {format(weekDays[0], "dd MMM", { locale: ptBR })} — {format(weekDays[6], "dd MMM yyyy", { locale: ptBR })}
+              </span>
+              {canManage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 hidden sm:inline-flex"
+                  onClick={() => {
+                    setOverwriteReplicate(false);
+                    setReplicateWeekOpen(true);
+                  }}
+                  title="Replicar todas as escalas desta semana para a próxima"
+                >
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                  <span className="text-xs">Replicar → próxima</span>
+                </Button>
+              )}
+            </div>
             <Button variant="outline" size="icon" onClick={() => navigateWeek(1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {canManage && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 sm:hidden w-full"
+              onClick={() => {
+                setOverwriteReplicate(false);
+                setReplicateWeekOpen(true);
+              }}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              <span className="text-xs">Replicar semana → próxima</span>
+            </Button>
+          )}
 
           {/* Shared sector banner (loja casada) */}
           {partnerSectorMeta && activeSectorId && (

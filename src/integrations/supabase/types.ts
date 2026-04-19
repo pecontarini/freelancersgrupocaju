@@ -4053,6 +4053,15 @@ export type Database = {
         Returns: boolean
       }
       is_first_user: { Args: never; Returns: boolean }
+      lookup_freelancer_by_cpf: {
+        Args: { p_cpf: string }
+        Returns: {
+          chave_pix: string
+          funcao: string
+          gerencia: string
+          nome_completo: string
+        }[]
+      }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
       promote_approved_checkins: {
         Args: { p_approval_id: string }

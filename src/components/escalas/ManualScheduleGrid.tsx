@@ -439,6 +439,25 @@ export function ManualScheduleGrid() {
     return counts;
   }, [schedules, effectiveSectorIdSet, weekDays, employeeMap]);
 
+  // Slots per day (POP quota OR freelancers already scheduled OR 1 free slot — whichever is largest)
+  const slotsPerDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const day of weekDays) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
+      const filled = freelancerCountPerDay.get(dateStr) ?? 0;
+      map.set(dateStr, Math.max(quota, filled, 1));
+    }
+    return map;
+  }, [weekDays, extrasQuotaPerDay, freelancerCountPerDay]);
+
+  // Number of extra rows to render = max slots across the week
+  const extraSlots = useMemo(() => {
+    let max = 0;
+    for (const v of slotsPerDay.values()) if (v > max) max = v;
+    return activeSectorId ? max : 0;
+  }, [slotsPerDay, activeSectorId]);
+
   // Daily metrics — sum across both sectors
   function getDayMetrics(dateStr: string) {
     const daySchedules = schedules

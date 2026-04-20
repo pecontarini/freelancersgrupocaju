@@ -408,19 +408,18 @@ export function ManualScheduleGrid() {
     return activeSectorId || "";
   }
 
-  // Calculate max extras slots needed across the week (combined local + partner)
-  const extraSlots = useMemo(() => {
-    if (!activeSectorId) return 0;
-    let maxExtras = 0;
+  // POP quota of extras per day (from staffing matrix)
+  const extrasQuotaPerDay = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!activeSectorId) return map;
     for (const day of weekDays) {
       const dow = jsDayToPopDay(day.getDay());
       const entries = staffingMatrix.filter(
         (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
       );
-      const dayExtras = entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
-      if (dayExtras > maxExtras) maxExtras = dayExtras;
+      map.set(format(day, "yyyy-MM-dd"), entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0));
     }
-    return maxExtras;
+    return map;
   }, [activeSectorId, staffingMatrix, weekDays, effectiveSectorIdSet]);
 
   // Count freelancers scheduled per day (across both sectors)
@@ -439,6 +438,25 @@ export function ManualScheduleGrid() {
     }
     return counts;
   }, [schedules, effectiveSectorIdSet, weekDays, employeeMap]);
+
+  // Slots per day (POP quota OR freelancers already scheduled OR 1 free slot — whichever is largest)
+  const slotsPerDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const day of weekDays) {
+      const dateStr = format(day, "yyyy-MM-dd");
+      const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
+      const filled = freelancerCountPerDay.get(dateStr) ?? 0;
+      map.set(dateStr, Math.max(quota, filled, 1));
+    }
+    return map;
+  }, [weekDays, extrasQuotaPerDay, freelancerCountPerDay]);
+
+  // Number of extra rows to render = max slots across the week
+  const extraSlots = useMemo(() => {
+    let max = 0;
+    for (const v of slotsPerDay.values()) if (v > max) max = v;
+    return activeSectorId ? max : 0;
+  }, [slotsPerDay, activeSectorId]);
 
   // Daily metrics — sum across both sectors
   function getDayMetrics(dateStr: string) {
@@ -1071,34 +1089,53 @@ export function ManualScheduleGrid() {
                           })}
                         </React.Fragment>
                       ))}
-                      {/* VAGA EXTRA placeholder rows */}
-                      {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (
-                        <TableRow key={`extra-slot-${slotIdx}`} className="bg-amber-50/50 dark:bg-amber-950/10">
-                          <TableCell className="font-medium sticky left-0 bg-amber-50 dark:bg-amber-950/20 z-10 border-r">
+                      {/* VAGA EXTRA placeholder rows — always at least 1 free slot per day */}
+                      {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => {
+                        const isQuotaRowAnyDay = weekDays.some((day) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          return slotIdx < (extrasQuotaPerDay.get(dateStr) ?? 0);
+                        });
+                        return (
+                        <TableRow key={`extra-slot-${slotIdx}`} className={isQuotaRowAnyDay ? "bg-amber-50/50 dark:bg-amber-950/10" : "bg-muted/20"}>
+                          <TableCell className={`font-medium sticky left-0 z-10 border-r ${isQuotaRowAnyDay ? "bg-amber-50 dark:bg-amber-950/20" : "bg-muted/30"}`}>
                             <div className="flex items-center gap-1.5">
-                              <UserPlus className="h-3 w-3 text-amber-500" />
-                              <span className="text-amber-700 dark:text-amber-400 text-xs font-semibold">
-                                VAGA EXTRA {String(slotIdx + 1).padStart(2, "0")}
+                              <UserPlus className={`h-3 w-3 ${isQuotaRowAnyDay ? "text-amber-500" : "text-muted-foreground"}`} />
+                              <span className={`text-xs font-semibold ${isQuotaRowAnyDay ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                                {isQuotaRowAnyDay
+                                  ? `VAGA EXTRA ${String(slotIdx + 1).padStart(2, "0")}`
+                                  : "EXTRA AVULSO"}
                               </span>
                             </div>
                           </TableCell>
                           {weekDays.map((day, i) => {
                             const dateStr = format(day, "yyyy-MM-dd");
-                            const dow = day.getDay();
-                            // Check if this slot is within the day's quota (combined local + partner)
-                            const dayEntries = staffingMatrix.filter(
-                              (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
-                            );
-                            const dayQuota = dayEntries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
+                            const dayQuota = extrasQuotaPerDay.get(dateStr) ?? 0;
                             const alreadyFilled = freelancerCountPerDay.get(dateStr) || 0;
+                            const dayMaxSlots = slotsPerDay.get(dateStr) ?? 1;
                             const isWithinQuota = slotIdx < dayQuota;
                             const isFilled = slotIdx < alreadyFilled;
+                            const showSlot = slotIdx < dayMaxSlots;
 
-                            if (!isWithinQuota) {
+                            if (!showSlot) {
                               return (
                                 <TableCell key={i} className="text-center p-1">
                                   <div className="h-10 flex items-center justify-center">
                                     <span className="text-muted-foreground/20 text-xs">—</span>
+                                  </div>
+                                </TableCell>
+                              );
+                            }
+
+                            if (!isWithinQuota && !isFilled) {
+                              return (
+                                <TableCell
+                                  key={i}
+                                  className="text-center p-1 cursor-pointer hover:bg-muted/40 transition-colors"
+                                  onClick={() => setFreelancerModal({ open: true, date: dateStr })}
+                                  title="Adicionar freelancer avulso (fora da cota POP)"
+                                >
+                                  <div className="h-10 flex items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30">
+                                    <UserPlus className="h-3.5 w-3.5 text-muted-foreground/60" />
                                   </div>
                                 </TableCell>
                               );
@@ -1125,7 +1162,8 @@ export function ManualScheduleGrid() {
                             );
                           })}
                         </TableRow>
-                      ))}
+                        );
+                      })}
 
                       {/* Collapsible base section for CLTs not scheduled */}
                       {sortedBase.length > 0 && !showAllEmployees && (
@@ -1549,10 +1587,11 @@ function MiniPopBadge({
     bgClass = "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
   }
 
+  const excess = Math.max(0, scheduled - total);
   return (
-    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`} title={`${label}: ${scheduled} escalados / Meta: ${efetivos}+${extras}`}>
+    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`} title={`${label}: ${scheduled} escalados / Meta: ${efetivos}+${extras}${excess > 0 ? ` (${excess} avulso${excess > 1 ? "s" : ""} acima da cota)` : ""}`}>
       {icon}
-      <span>{scheduled}/{efetivos}{extras > 0 && <span className="text-orange-500">+{extras}</span>}</span>
+      <span>{scheduled}/{efetivos}{extras > 0 && <span className="text-orange-500">+{extras}</span>}{excess > 0 && <span className="ml-0.5 text-muted-foreground/80 font-normal">(+{excess})</span>}</span>
     </div>
   );
 }

@@ -194,15 +194,40 @@ export function ScheduleExcelFlow({
     const newEmployees: ScheduleEmployee[] = [];
 
     for (const reg of toRegister) {
+      const cleanName = reg.editedName.trim();
+      const cleanCargo = reg.cargo.trim();
+
+      // Defensive lookup: reuse existing active employee with the same name in this unit
+      // to avoid creating homonyms that later trigger unique_active_schedule conflicts.
+      const { data: existingEmp } = await supabase
+        .from("employees")
+        .select("id, name, job_title, worker_type")
+        .eq("unit_id", unitId)
+        .eq("active", true)
+        .ilike("name", cleanName)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (existingEmp && existingEmp.length > 0) {
+        const e = existingEmp[0];
+        newEmployees.push({
+          id: e.id,
+          name: e.name,
+          job_title: e.job_title,
+          worker_type: e.worker_type,
+        });
+        continue;
+      }
+
       let jobTitleId: string | null = null;
 
-      if (reg.cargo.trim()) {
+      if (cleanCargo) {
         // Try to find existing job_title for this unit
         const { data: existing } = await supabase
           .from("job_titles")
           .select("id")
           .eq("unit_id", unitId)
-          .ilike("name", reg.cargo.trim())
+          .ilike("name", cleanCargo)
           .limit(1);
 
         if (existing && existing.length > 0) {
@@ -211,25 +236,48 @@ export function ScheduleExcelFlow({
           // Create new job_title
           const { data: newJt } = await supabase
             .from("job_titles")
-            .insert({ name: reg.cargo.trim(), unit_id: unitId })
+            .insert({ name: cleanCargo, unit_id: unitId })
             .select("id")
             .single();
           if (newJt) jobTitleId = newJt.id;
         }
       }
 
-      const { data: newEmp } = await supabase
+      const { data: newEmp, error: empErr } = await supabase
         .from("employees")
         .insert({
-          name: reg.editedName.trim(),
+          name: cleanName,
           unit_id: unitId,
-          job_title: reg.cargo.trim() || null,
+          job_title: cleanCargo || null,
           job_title_id: jobTitleId,
           gender: "M",
           worker_type: "clt" as const,
         })
         .select("id, name, job_title, worker_type")
         .single();
+
+      if (empErr) {
+        // unique_active_employee_no_cpf race: someone else just created it → re-fetch
+        const { data: raceEmp } = await supabase
+          .from("employees")
+          .select("id, name, job_title, worker_type")
+          .eq("unit_id", unitId)
+          .eq("active", true)
+          .ilike("name", cleanName)
+          .order("created_at", { ascending: true })
+          .limit(1);
+        if (raceEmp && raceEmp.length > 0) {
+          newEmployees.push({
+            id: raceEmp[0].id,
+            name: raceEmp[0].name,
+            job_title: raceEmp[0].job_title,
+            worker_type: raceEmp[0].worker_type,
+          });
+          continue;
+        }
+        console.error("[Excel Import] Falha ao cadastrar funcionário:", empErr);
+        continue;
+      }
 
       if (newEmp) {
         newEmployees.push({

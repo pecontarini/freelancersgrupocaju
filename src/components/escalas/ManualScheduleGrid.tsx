@@ -1587,10 +1587,11 @@ function MiniPopBadge({
     bgClass = "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
   }
 
+  const excess = Math.max(0, scheduled - total);
   return (
-    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`} title={`${label}: ${scheduled} escalados / Meta: ${efetivos}+${extras}`}>
+    <div className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-semibold ${bgClass}`} title={`${label}: ${scheduled} escalados / Meta: ${efetivos}+${extras}${excess > 0 ? ` (${excess} avulso${excess > 1 ? "s" : ""} acima da cota)` : ""}`}>
       {icon}
-      <span>{scheduled}/{efetivos}{extras > 0 && <span className="text-orange-500">+{extras}</span>}</span>
+      <span>{scheduled}/{efetivos}{extras > 0 && <span className="text-orange-500">+{extras}</span>}{excess > 0 && <span className="ml-0.5 text-muted-foreground/80 font-normal">(+{excess})</span>}</span>
     </div>
   );
 }

@@ -228,24 +228,68 @@ export function FreelancerAddModal({
         // In no-CPF mode, leave cpf NULL so we don't pollute lookup tables
         const cpfToStore = noCpfMode ? null : cleanCpf;
 
-        const { data, error } = await supabase
-          .from("employees")
-          .insert({
-            unit_id: targetUnitId,
-            name: name.trim(),
-            gender: "M",
-            worker_type: "freelancer" as const,
-            default_rate: rateNum,
-            job_title: chosenJt?.name || "Freelancer",
-            job_title_id: selectedJobTitleId,
-            cpf: cpfToStore,
-            phone: phone.trim() || null,
-          })
-          .select("id")
-          .single();
+        // Defensive lookup: when in no-CPF mode (or CPF didn't match), check if there's
+        // already an active employee with the same name in this unit to avoid creating
+        // homonyms that violate unique_active_employee_no_cpf.
+        if (noCpfMode) {
+          const { data: existingByName } = await supabase
+            .from("employees")
+            .select("id, name, default_rate, job_title_id")
+            .eq("unit_id", targetUnitId)
+            .eq("active", true)
+            .ilike("name", name.trim())
+            .order("created_at", { ascending: true })
+            .limit(1);
 
-        if (error) throw error;
-        empId = data.id;
+          if (existingByName && existingByName.length > 0) {
+            empId = existingByName[0].id;
+            toast.info(
+              `Reutilizando cadastro existente de "${existingByName[0].name}" nesta loja.`
+            );
+          }
+        }
+
+        if (!empId) {
+          const { data, error } = await supabase
+            .from("employees")
+            .insert({
+              unit_id: targetUnitId,
+              name: name.trim(),
+              gender: "M",
+              worker_type: "freelancer" as const,
+              default_rate: rateNum,
+              job_title: chosenJt?.name || "Freelancer",
+              job_title_id: selectedJobTitleId,
+              cpf: cpfToStore,
+              phone: phone.trim() || null,
+            })
+            .select("id")
+            .single();
+
+          if (error) {
+            // Race condition with unique_active_employee_no_cpf → re-fetch
+            if ((error as any).code === "23505") {
+              const { data: race } = await supabase
+                .from("employees")
+                .select("id")
+                .eq("unit_id", targetUnitId)
+                .eq("active", true)
+                .ilike("name", name.trim())
+                .order("created_at", { ascending: true })
+                .limit(1);
+              if (race && race.length > 0) {
+                empId = race[0].id;
+                toast.info("Reutilizando cadastro existente desta loja.");
+              } else {
+                throw error;
+              }
+            } else {
+              throw error;
+            }
+          } else {
+            empId = data.id;
+          }
+        }
 
         // Only persist to freelancer_profiles when we have a real CPF
         if (!noCpfMode && (pixKey || phone)) {

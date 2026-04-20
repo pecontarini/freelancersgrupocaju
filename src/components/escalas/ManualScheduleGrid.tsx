@@ -1089,34 +1089,53 @@ export function ManualScheduleGrid() {
                           })}
                         </React.Fragment>
                       ))}
-                      {/* VAGA EXTRA placeholder rows */}
-                      {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => (
-                        <TableRow key={`extra-slot-${slotIdx}`} className="bg-amber-50/50 dark:bg-amber-950/10">
-                          <TableCell className="font-medium sticky left-0 bg-amber-50 dark:bg-amber-950/20 z-10 border-r">
+                      {/* VAGA EXTRA placeholder rows — always at least 1 free slot per day */}
+                      {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => {
+                        const isQuotaRowAnyDay = weekDays.some((day) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          return slotIdx < (extrasQuotaPerDay.get(dateStr) ?? 0);
+                        });
+                        return (
+                        <TableRow key={`extra-slot-${slotIdx}`} className={isQuotaRowAnyDay ? "bg-amber-50/50 dark:bg-amber-950/10" : "bg-muted/20"}>
+                          <TableCell className={`font-medium sticky left-0 z-10 border-r ${isQuotaRowAnyDay ? "bg-amber-50 dark:bg-amber-950/20" : "bg-muted/30"}`}>
                             <div className="flex items-center gap-1.5">
-                              <UserPlus className="h-3 w-3 text-amber-500" />
-                              <span className="text-amber-700 dark:text-amber-400 text-xs font-semibold">
-                                VAGA EXTRA {String(slotIdx + 1).padStart(2, "0")}
+                              <UserPlus className={`h-3 w-3 ${isQuotaRowAnyDay ? "text-amber-500" : "text-muted-foreground"}`} />
+                              <span className={`text-xs font-semibold ${isQuotaRowAnyDay ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+                                {isQuotaRowAnyDay
+                                  ? `VAGA EXTRA ${String(slotIdx + 1).padStart(2, "0")}`
+                                  : "EXTRA AVULSO"}
                               </span>
                             </div>
                           </TableCell>
                           {weekDays.map((day, i) => {
                             const dateStr = format(day, "yyyy-MM-dd");
-                            const dow = day.getDay();
-                            // Check if this slot is within the day's quota (combined local + partner)
-                            const dayEntries = staffingMatrix.filter(
-                              (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
-                            );
-                            const dayQuota = dayEntries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
+                            const dayQuota = extrasQuotaPerDay.get(dateStr) ?? 0;
                             const alreadyFilled = freelancerCountPerDay.get(dateStr) || 0;
+                            const dayMaxSlots = slotsPerDay.get(dateStr) ?? 1;
                             const isWithinQuota = slotIdx < dayQuota;
                             const isFilled = slotIdx < alreadyFilled;
+                            const showSlot = slotIdx < dayMaxSlots;
 
-                            if (!isWithinQuota) {
+                            if (!showSlot) {
                               return (
                                 <TableCell key={i} className="text-center p-1">
                                   <div className="h-10 flex items-center justify-center">
                                     <span className="text-muted-foreground/20 text-xs">—</span>
+                                  </div>
+                                </TableCell>
+                              );
+                            }
+
+                            if (!isWithinQuota && !isFilled) {
+                              return (
+                                <TableCell
+                                  key={i}
+                                  className="text-center p-1 cursor-pointer hover:bg-muted/40 transition-colors"
+                                  onClick={() => setFreelancerModal({ open: true, date: dateStr })}
+                                  title="Adicionar freelancer avulso (fora da cota POP)"
+                                >
+                                  <div className="h-10 flex items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30">
+                                    <UserPlus className="h-3.5 w-3.5 text-muted-foreground/60" />
                                   </div>
                                 </TableCell>
                               );
@@ -1143,7 +1162,8 @@ export function ManualScheduleGrid() {
                             );
                           })}
                         </TableRow>
-                      ))}
+                        );
+                      })}
 
                       {/* Collapsible base section for CLTs not scheduled */}
                       {sortedBase.length > 0 && !showAllEmployees && (

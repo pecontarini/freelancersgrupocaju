@@ -376,12 +376,34 @@ export function ScheduleExcelFlow({
       const intraBatchMap = new Map<string, typeof rows[number]>();
       for (const r of rows) {
         const key = `${r.employee_id}|${r.schedule_date}|${r.sector_id}`;
-        intraBatchMap.set(key, r); // last occurrence wins
+        // prefer 'working' over 'off' if conflict
+        const prev = intraBatchMap.get(key);
+        if (!prev || (prev.schedule_type === "off" && r.schedule_type === "working")) {
+          intraBatchMap.set(key, r);
+        }
       }
-      const dedupedRows = Array.from(intraBatchMap.values());
+      let dedupedRows = Array.from(intraBatchMap.values());
       const intraBatchCollapsed = rows.length - dedupedRows.length;
-      if (intraBatchCollapsed > 0) {
-        toast.info(`${intraBatchCollapsed} linha(s) duplicada(s) na planilha foram unificadas.`);
+
+      // 1b) Dedup by (employee_id, date) IGNORING sector — same person can only be
+      // in ONE sector on the same day. Keeps first occurrence (or 'working' over 'off').
+      const empDayMap = new Map<string, typeof dedupedRows[number]>();
+      for (const r of dedupedRows) {
+        const key = `${r.employee_id}|${r.schedule_date}`;
+        const prev = empDayMap.get(key);
+        if (!prev || (prev.schedule_type === "off" && r.schedule_type === "working")) {
+          empDayMap.set(key, r);
+        }
+      }
+      const beforeEmpDay = dedupedRows.length;
+      dedupedRows = Array.from(empDayMap.values());
+      const empDayCollapsed = beforeEmpDay - dedupedRows.length;
+
+      const totalCollapsed = intraBatchCollapsed + empDayCollapsed;
+      if (totalCollapsed > 0) {
+        toast.info(
+          `${totalCollapsed} linha(s) unificada(s) (mesmo funcionário em múltiplos setores/horários no mesmo dia).`
+        );
       }
 
       // 2) Dedup vs DB: check which (employee_id, schedule_date, sector_id) already exist
@@ -416,13 +438,32 @@ export function ScheduleExcelFlow({
         return;
       }
 
-      const { error, data } = await supabase.from("schedules").insert(newRows).select("id");
+      // 3) Upsert with ignoreDuplicates → idempotent against unique_active_schedule
+      const { error, data } = await supabase
+        .from("schedules")
+        .upsert(newRows, {
+          onConflict: "employee_id,schedule_date,sector_id",
+          ignoreDuplicates: true,
+        })
+        .select("id");
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);
-        if (error.message?.includes("unique_active_schedule") || (error as any).code === "23505") {
+        const isUnique =
+          error.message?.includes("unique_active_schedule") || (error as any).code === "23505";
+        if (isUnique) {
+          // Try to surface the offending row from error.details
+          const details = (error as any).details || "";
+          const empIdMatch = details.match(/employee_id\)=\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+          let conflictMsg = "Conflito de escala detectado.";
+          if (empIdMatch) {
+            const [, eid, dt] = empIdMatch;
+            const empName =
+              (allUnitEmployees || employees).find((e) => e.id === eid)?.name || eid;
+            conflictMsg = `Conflito: ${empName} em ${dt} já tem escala ativa.`;
+          }
           toast.error(
-            "Existem escalas conflitantes para esta semana. Use 'Zerar Escalas' antes de reimportar, ou ajuste manualmente.",
+            `${conflictMsg} Use "Zerar Escalas" antes de reimportar, ou ajuste no editor.`,
             { duration: 10000 }
           );
         } else {

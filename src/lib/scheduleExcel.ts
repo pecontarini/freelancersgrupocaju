@@ -496,7 +496,11 @@ function parse3ColSheet(
     }
   }
 
-  // Build name→id map for fuzzy matching
+  // Build name→id map for fuzzy matching.
+  // When two employees share the same normalized name (homonyms without CPF),
+  // we keep the FIRST occurrence (assumed canonical / oldest) and warn — this
+  // prevents the importer from picking different IDs for the same logical person
+  // and triggering unique_active_schedule conflicts downstream.
   const nameMap = new Map<string, { id: string; name: string }>();
   if (metaEmployees) {
     metaEmployees.forEach((v, k) => nameMap.set(k, v));
@@ -506,6 +510,15 @@ function parse3ColSheet(
       const norm = normalizeString(emp.name);
       if (!nameMap.has(norm)) {
         nameMap.set(norm, { id: emp.id, name: emp.name });
+      } else {
+        const existing = nameMap.get(norm)!;
+        if (existing.id !== emp.id) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `[scheduleExcel] Funcionário homônimo detectado "${emp.name}". ` +
+              `Usando ID canônico ${existing.id} e ignorando duplicado ${emp.id}.`
+          );
+        }
       }
     }
   }

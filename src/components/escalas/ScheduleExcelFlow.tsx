@@ -194,15 +194,40 @@ export function ScheduleExcelFlow({
     const newEmployees: ScheduleEmployee[] = [];
 
     for (const reg of toRegister) {
+      const cleanName = reg.editedName.trim();
+      const cleanCargo = reg.cargo.trim();
+
+      // Defensive lookup: reuse existing active employee with the same name in this unit
+      // to avoid creating homonyms that later trigger unique_active_schedule conflicts.
+      const { data: existingEmp } = await supabase
+        .from("employees")
+        .select("id, name, job_title, worker_type")
+        .eq("unit_id", unitId)
+        .eq("active", true)
+        .ilike("name", cleanName)
+        .order("created_at", { ascending: true })
+        .limit(1);
+
+      if (existingEmp && existingEmp.length > 0) {
+        const e = existingEmp[0];
+        newEmployees.push({
+          id: e.id,
+          name: e.name,
+          job_title: e.job_title,
+          worker_type: e.worker_type,
+        });
+        continue;
+      }
+
       let jobTitleId: string | null = null;
 
-      if (reg.cargo.trim()) {
+      if (cleanCargo) {
         // Try to find existing job_title for this unit
         const { data: existing } = await supabase
           .from("job_titles")
           .select("id")
           .eq("unit_id", unitId)
-          .ilike("name", reg.cargo.trim())
+          .ilike("name", cleanCargo)
           .limit(1);
 
         if (existing && existing.length > 0) {
@@ -211,25 +236,48 @@ export function ScheduleExcelFlow({
           // Create new job_title
           const { data: newJt } = await supabase
             .from("job_titles")
-            .insert({ name: reg.cargo.trim(), unit_id: unitId })
+            .insert({ name: cleanCargo, unit_id: unitId })
             .select("id")
             .single();
           if (newJt) jobTitleId = newJt.id;
         }
       }
 
-      const { data: newEmp } = await supabase
+      const { data: newEmp, error: empErr } = await supabase
         .from("employees")
         .insert({
-          name: reg.editedName.trim(),
+          name: cleanName,
           unit_id: unitId,
-          job_title: reg.cargo.trim() || null,
+          job_title: cleanCargo || null,
           job_title_id: jobTitleId,
           gender: "M",
           worker_type: "clt" as const,
         })
         .select("id, name, job_title, worker_type")
         .single();
+
+      if (empErr) {
+        // unique_active_employee_no_cpf race: someone else just created it → re-fetch
+        const { data: raceEmp } = await supabase
+          .from("employees")
+          .select("id, name, job_title, worker_type")
+          .eq("unit_id", unitId)
+          .eq("active", true)
+          .ilike("name", cleanName)
+          .order("created_at", { ascending: true })
+          .limit(1);
+        if (raceEmp && raceEmp.length > 0) {
+          newEmployees.push({
+            id: raceEmp[0].id,
+            name: raceEmp[0].name,
+            job_title: raceEmp[0].job_title,
+            worker_type: raceEmp[0].worker_type,
+          });
+          continue;
+        }
+        console.error("[Excel Import] Falha ao cadastrar funcionário:", empErr);
+        continue;
+      }
 
       if (newEmp) {
         newEmployees.push({
@@ -328,12 +376,34 @@ export function ScheduleExcelFlow({
       const intraBatchMap = new Map<string, typeof rows[number]>();
       for (const r of rows) {
         const key = `${r.employee_id}|${r.schedule_date}|${r.sector_id}`;
-        intraBatchMap.set(key, r); // last occurrence wins
+        // prefer 'working' over 'off' if conflict
+        const prev = intraBatchMap.get(key);
+        if (!prev || (prev.schedule_type === "off" && r.schedule_type === "working")) {
+          intraBatchMap.set(key, r);
+        }
       }
-      const dedupedRows = Array.from(intraBatchMap.values());
+      let dedupedRows = Array.from(intraBatchMap.values());
       const intraBatchCollapsed = rows.length - dedupedRows.length;
-      if (intraBatchCollapsed > 0) {
-        toast.info(`${intraBatchCollapsed} linha(s) duplicada(s) na planilha foram unificadas.`);
+
+      // 1b) Dedup by (employee_id, date) IGNORING sector — same person can only be
+      // in ONE sector on the same day. Keeps first occurrence (or 'working' over 'off').
+      const empDayMap = new Map<string, typeof dedupedRows[number]>();
+      for (const r of dedupedRows) {
+        const key = `${r.employee_id}|${r.schedule_date}`;
+        const prev = empDayMap.get(key);
+        if (!prev || (prev.schedule_type === "off" && r.schedule_type === "working")) {
+          empDayMap.set(key, r);
+        }
+      }
+      const beforeEmpDay = dedupedRows.length;
+      dedupedRows = Array.from(empDayMap.values());
+      const empDayCollapsed = beforeEmpDay - dedupedRows.length;
+
+      const totalCollapsed = intraBatchCollapsed + empDayCollapsed;
+      if (totalCollapsed > 0) {
+        toast.info(
+          `${totalCollapsed} linha(s) unificada(s) (mesmo funcionário em múltiplos setores/horários no mesmo dia).`
+        );
       }
 
       // 2) Dedup vs DB: check which (employee_id, schedule_date, sector_id) already exist
@@ -368,13 +438,32 @@ export function ScheduleExcelFlow({
         return;
       }
 
-      const { error, data } = await supabase.from("schedules").insert(newRows).select("id");
+      // 3) Upsert with ignoreDuplicates → idempotent against unique_active_schedule
+      const { error, data } = await supabase
+        .from("schedules")
+        .upsert(newRows, {
+          onConflict: "employee_id,schedule_date,sector_id",
+          ignoreDuplicates: true,
+        })
+        .select("id");
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);
-        if (error.message?.includes("unique_active_schedule") || (error as any).code === "23505") {
+        const isUnique =
+          error.message?.includes("unique_active_schedule") || (error as any).code === "23505";
+        if (isUnique) {
+          // Try to surface the offending row from error.details
+          const details = (error as any).details || "";
+          const empIdMatch = details.match(/employee_id\)=\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+          let conflictMsg = "Conflito de escala detectado.";
+          if (empIdMatch) {
+            const [, eid, dt] = empIdMatch;
+            const empName =
+              (allUnitEmployees || employees).find((e) => e.id === eid)?.name || eid;
+            conflictMsg = `Conflito: ${empName} em ${dt} já tem escala ativa.`;
+          }
           toast.error(
-            "Existem escalas conflitantes para esta semana. Use 'Zerar Escalas' antes de reimportar, ou ajuste manualmente.",
+            `${conflictMsg} Use "Zerar Escalas" antes de reimportar, ou ajuste no editor.`,
             { duration: 10000 }
           );
         } else {

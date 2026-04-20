@@ -31,7 +31,10 @@ export function MasterExportButton({ unitId, unitName, weekStart }: MasterExport
         toast.success("PDF da Escala Geral exportado!");
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao exportar escala.");
+      console.error("[MasterExport] Falha ao exportar escala:", err);
+      toast.error(err?.message || "Erro ao exportar escala. Veja o console (F12) para detalhes.", {
+        duration: 8000,
+      });
     } finally {
       setLoading(null);
     }

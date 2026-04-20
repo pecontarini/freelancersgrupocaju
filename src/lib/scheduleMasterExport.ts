@@ -1,4 +1,4 @@
-import XLSX from "xlsx-js-style";
+import * as XLSX from "xlsx-js-style";
 import { format, addDays, startOfWeek } from "date-fns";
 import { downloadWorkbook } from "@/lib/excelUtils";
 import { supabase } from "@/integrations/supabase/client";

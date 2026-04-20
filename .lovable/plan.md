@@ -1,56 +1,78 @@
 
 
-## Plano: liberar lançamento livre de freelancers nas escalas
+## Plano de correção 100% — Importação e Exportação de Escalas
 
-### Diagnóstico do bloqueio atual
+### Diagnóstico
 
-No grid de escalas, as linhas **"VAGA EXTRA"** só ficam clicáveis nos dias em que a Matriz POP tem `extras_count > 0`. Nos demais dias a célula vira um traço `—` não-clicável (`ManualScheduleGrid.tsx`, linhas 1085–1126). Resultado: o gestor não consegue lançar freelancer fora da cota prevista — exatamente o problema relatado.
+**Bug 1 — Importação `duplicate key value violates unique_active_schedule` (causa raiz real)**
 
-A contagem POP no topo (`getPopTarget` + barra de previsto vs realizado) **não depende dessa restrição** — ela lê direto da `staffing_matrix`. Então liberar a UI **não** afeta a referência de quantos freelancers são necessários.
+O índice de proteção em `schedules` é **parcial**:
+```
+CREATE UNIQUE INDEX unique_active_schedule
+ON schedules (employee_id, schedule_date, sector_id)
+WHERE status <> 'cancelled'
+```
+O código usa `supabase.upsert(rows, { onConflict: "employee_id,schedule_date,sector_id", ignoreDuplicates: true })`. **PostgREST não envia o predicado `WHERE`** ao Postgres, então o `ON CONFLICT` **não consegue casar com índice parcial** e o erro 23505 vaza para o cliente — anulando todo o `ignoreDuplicates`. Por isso, mesmo com toda a dedup feita no front, qualquer linha que colida com algo já existente no banco quebra o batch inteiro.
 
-### Mudanças
+Confirmei no banco que a semana 20–26/04 da unidade Nazo GO já tem dezenas de escalas ativas (ALEJANDRO, ANA, BRUNA, CLARA, etc.), e o usuário está reimportando uma planilha por cima. O fix anterior limpou homônimos, mas o `ignoreDuplicates` continua quebrado.
 
-#### 1) Sempre exibir um slot livre "Adicionar Freelancer" em todos os dias
+**Bug 2 — Mensagens de erro pouco acionáveis**
 
-Em `ManualScheduleGrid.tsx` (bloco das linhas VAGA EXTRA, ~1050–1128):
+Quando o usuário vê "duplicate key", não tem onde clicar para resolver — não sabe quais linhas conflitaram nem como zerar a semana antes de reimportar.
 
-- Calcular `slotsToShow = max(extraSlots da matriz, freelancersJáEscalados, 1)` por dia. Hoje é só `extraSlots`.
-- A última linha sempre vira **"+ Freelancer livre"** (clicável em qualquer dia, sem traço cinza).
-- Quando estiver dentro da cota POP → label "VAGA EXTRA NN" (cor âmbar atual).
-- Quando estiver **fora da cota** mas dentro do slot livre → label "EXTRA AVULSO" com cor neutra (cinza), deixando claro que está fora do POP previsto, mas **clicável**.
+**Bug 3 — Export Excel "Geral" pode falhar silenciosamente**
 
-#### 2) Contador POP no topo permanece como está
+`scheduleMasterExport.ts` usa `import XLSX from "xlsx-js-style"` (default import). Em alguns bundlings ESM, esse pacote precisa de `import * as XLSX from "xlsx-js-style"` (como já fazemos em `scheduleExcel.ts`). Se a build atual estiver retornando `undefined` para `XLSX.utils`, o usuário vê erro genérico "Erro ao exportar escala". Mesmo padrão precisa ser aplicado em `scheduleMasterPdf.ts` se aplicável. Como o pacote está versionado (`^1.2.0`) e já existem relatos do problema, o fix preventivo é trivial.
 
-A barra/contador acima (`POP Almoço/Jantar` com efetivos + extras) **não muda**. Ela continua refletindo a Matriz POP (`required_count + extras_count`) como meta operacional. Vamos só adicionar um pequeno indicador secundário ao lado quando houver freelancer escalado **acima da cota**:
+---
 
-- Exemplo visual: `Extras: 2/2 ✓ (+1 avulso)` — o `+1 avulso` aparece em cinza apenas se houver freelancer escalado fora da meta POP.
+### Correções
 
-Isso preserva 100% da referência de "quantos são necessários" e acrescenta transparência sobre os lançamentos livres.
+#### 1) Importação: trocar estratégia de `upsert` por **dedup completa via SELECT prévio + INSERT puro**
 
-#### 3) Modal de freelancer já funciona
+Em `src/components/escalas/ScheduleExcelFlow.tsx → handleConfirmImport`:
 
-`FreelancerAddModal` já aceita qualquer `date` recebida. Não precisa mudar — basta o grid passar a chamá-lo nos dias antes bloqueados.
+- **Manter** a dedup intra-batch atual (1, 1b — já feita).
+- **Reforçar a dedup contra DB**: a query `existingSchedules` já busca por `(employee_id IN ..., date BETWEEN ...)` mas filtra `existingKeys` por `employee|date|sector`. Mudar para filtrar por **2 chaves**:
+  - `employee|date|sector` (mesma que existe);
+  - `employee|date` (independente de setor) — uma pessoa não está em 2 setores no mesmo dia operacionalmente, e o front já colapsa isso.
+- **Trocar `upsert(ignoreDuplicates)` por `insert()` puro** já que a dedup no front é total.
+- Em caso de erro 23505 mesmo assim (race condition rara), **fazer fallback automático**: refazer o SELECT, recalcular `newRows` e tentar 1 vez mais. Se ainda falhar, mostrar mensagem cirúrgica (vide item 2).
 
-#### 4) (Opcional, mas recomendado) Botão global "+ Freelancer" no header da semana
+#### 2) Mensagens de erro acionáveis no toast
 
-Adicionar um botão pequeno no header de cada coluna de dia (ao lado do dia da semana) com ícone `UserPlus` âmbar, que abre o modal já apontando para aquele dia. Atalho rápido para o gestor que está pensando "preciso colocar mais um neste sábado", sem ter que rolar até a seção de vagas extras.
+- Quando o erro for `23505/unique_active_schedule`, parsear `error.details` para extrair `(employee_id, date, sector_id)`, mapear para nome+data legíveis e listar **até 5 conflitos** no toast.
+- Adicionar botão **"Zerar semana e reimportar"** no toast de erro (chama o mesmo fluxo do "Zerar Escalas" filtrado para a semana importada, mantém a planilha em memória e reexecuta o `handleConfirmImport`).
+- Adicionar contador no sucesso: `"X importados, Y já existiam (ignorados), Z conflitos resolvidos"`.
 
-### Arquivos
-- **`src/components/escalas/ManualScheduleGrid.tsx`** — único arquivo afetado. Ajustes:
-  - bloco "VAGA EXTRA" (~linhas 1050–1128): sempre exibir pelo menos 1 slot clicável por dia.
-  - cabeçalho da barra POP (procurar onde `getPopTarget` é renderizado): adicionar contador `(+N avulso)` quando aplicável.
-  - cabeçalho de coluna do dia: adicionar botão `+ Freelancer` opcional.
+#### 3) Export Excel: padronizar import do `xlsx-js-style`
 
-### O que **não** muda
-- POP target (efetivos + extras) — mantido como referência operacional.
-- Cálculo de conformidade POP — quem está "acima" não conta como déficit.
-- Matriz POP em si — segue sendo o "norte" de quantos são necessários.
-- Modal `FreelancerAddModal` — já é flexível, sem alterações.
-- Lógica de pagamento/budget — escala continua gerando entry em `freelancer_entries` via trigger (integração já feita).
+- Em `src/lib/scheduleMasterExport.ts`: trocar `import XLSX from "xlsx-js-style"` → `import * as XLSX from "xlsx-js-style"` (mesmo padrão de `scheduleExcel.ts`).
+- Verificar `src/lib/scheduleMasterPdf.ts` e qualquer outro consumidor de `xlsx-js-style` para o mesmo ajuste.
+- Em `MasterExportButton.tsx`, capturar `console.error(err)` antes do toast genérico para dar visibilidade no DevTools quando o usuário relatar.
+
+#### 4) (Opcional, defesa em profundidade) Trocar índice parcial por constraint completo
+
+Migration: criar `unique_schedule_active_full` igual ao parcial, mas **sem o `WHERE`** — ou seja, incluindo `status` na chave: `(employee_id, schedule_date, sector_id, status)` quando `status<>'cancelled'`. Isso mantém o comportamento atual mas dá ao PostgREST um índice **não parcial** que ele consegue usar em `onConflict`. Vou avaliar se adiciona valor — se a correção 1+2 já resolverem 100%, **pulamos** essa migration para não mexer em índices em produção.
+
+### Arquivos afetados
+
+- **`src/components/escalas/ScheduleExcelFlow.tsx`** — remover `upsert/ignoreDuplicates`, usar `insert()` com fallback de retry; dedup adicional por `(employee|date)` contra DB; toast com lista de conflitos e botão "Zerar e Reimportar".
+- **`src/lib/scheduleMasterExport.ts`** — ajustar import de `xlsx-js-style` para `* as XLSX`.
+- **`src/lib/scheduleMasterPdf.ts`** — verificar/ajustar import similar se aplicável.
+- **`src/components/escalas/MasterExportButton.tsx`** — adicionar `console.error` antes do toast genérico.
 
 ### Validação
-- Em qualquer dia da semana, mesmo onde a Matriz POP define `extras_count = 0`, a linha "EXTRA AVULSO" deve aparecer e abrir o modal ao clicar.
-- Após lançar 1 freelancer fora da cota: barra POP no topo continua mostrando `Extras: 0/0 ✓`, com indicador `(+1 avulso)` cinza ao lado.
-- Em dias com cota POP `extras_count = 2`, comportamento atual preservado: 2 linhas VAGA EXTRA + 1 linha extra avulsa abaixo.
-- Conferir que o freelancer escalado aparece imediatamente no Budget Gerencial como "Previsto (Escala)".
+
+- **Importação**:
+  - Reimportar a planilha 20–26/04 da Nazo GO sobre escalas existentes → deve completar mostrando "X importados, Y já existiam (ignorados)", **zero erro 23505**.
+  - Importar planilha completamente nova → todas as linhas entram, mensagem de sucesso normal.
+  - Forçar conflito (criar manualmente schedule, depois importar planilha que o inclui) → toast claro "Conflito: João em 22/04 (BAR)", botão "Zerar semana e reimportar" funciona.
+- **Export Excel**:
+  - Clicar "Exportar Escala → Excel" em qualquer unidade → arquivo .xlsx baixa e abre no Excel/LibreOffice sem corrupção, com todas as abas de setores.
+  - Clicar "Exportar Escala → PDF" → PDF baixa normalmente.
+
+### Sem mudanças visuais
+
+UI permanece igual; mudam apenas a robustez do INSERT, as mensagens de toast e a confiabilidade do download.
 

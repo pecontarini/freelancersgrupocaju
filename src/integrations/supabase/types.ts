@@ -4075,6 +4075,7 @@ export type Database = {
           nome_completo: string
         }[]
       }
+      merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
       promote_approved_checkins: {
         Args: { p_approval_id: string }

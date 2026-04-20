@@ -408,19 +408,18 @@ export function ManualScheduleGrid() {
     return activeSectorId || "";
   }
 
-  // Calculate max extras slots needed across the week (combined local + partner)
-  const extraSlots = useMemo(() => {
-    if (!activeSectorId) return 0;
-    let maxExtras = 0;
+  // POP quota of extras per day (from staffing matrix)
+  const extrasQuotaPerDay = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!activeSectorId) return map;
     for (const day of weekDays) {
       const dow = jsDayToPopDay(day.getDay());
       const entries = staffingMatrix.filter(
         (m) => effectiveSectorIdSet.has(m.sector_id) && m.day_of_week === dow
       );
-      const dayExtras = entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0);
-      if (dayExtras > maxExtras) maxExtras = dayExtras;
+      map.set(format(day, "yyyy-MM-dd"), entries.reduce((sum, e) => sum + (e.extras_count ?? 0), 0));
     }
-    return maxExtras;
+    return map;
   }, [activeSectorId, staffingMatrix, weekDays, effectiveSectorIdSet]);
 
   // Count freelancers scheduled per day (across both sectors)

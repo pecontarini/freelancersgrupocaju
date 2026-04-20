@@ -406,66 +406,99 @@ export function ScheduleExcelFlow({
         );
       }
 
-      // 2) Dedup vs DB: check which (employee_id, schedule_date, sector_id) already exist
+      // 2) Dedup vs DB: load all active schedules for these employees in this date range,
+      // and filter by BOTH (employee|date|sector) AND (employee|date) — same person should
+      // not be scheduled in two sectors on the same day.
       const uniqueDates = [...new Set(dedupedRows.map((r) => r.schedule_date))].sort();
       const uniqueEmpIds = [...new Set(dedupedRows.map((r) => r.employee_id))];
-      const { data: existingSchedules } = await supabase
-        .from("schedules")
-        .select("employee_id, schedule_date, sector_id")
-        .in("employee_id", uniqueEmpIds)
-        .gte("schedule_date", uniqueDates[0])
-        .lte("schedule_date", uniqueDates[uniqueDates.length - 1])
-        .neq("status", "cancelled");
 
-      const existingKeys = new Set(
-        (existingSchedules || []).map(
-          (s) => `${s.employee_id}|${s.schedule_date}|${s.sector_id}`
-        )
-      );
+      const loadExistingKeys = async () => {
+        const { data: existingSchedules } = await supabase
+          .from("schedules")
+          .select("employee_id, schedule_date, sector_id")
+          .in("employee_id", uniqueEmpIds)
+          .gte("schedule_date", uniqueDates[0])
+          .lte("schedule_date", uniqueDates[uniqueDates.length - 1])
+          .neq("status", "cancelled");
+        const tripleKeys = new Set<string>();
+        const dayKeys = new Set<string>();
+        for (const s of existingSchedules || []) {
+          tripleKeys.add(`${s.employee_id}|${s.schedule_date}|${s.sector_id}`);
+          dayKeys.add(`${s.employee_id}|${s.schedule_date}`);
+        }
+        return { tripleKeys, dayKeys };
+      };
 
-      const newRows = dedupedRows.filter(
-        (r) => !existingKeys.has(`${r.employee_id}|${r.schedule_date}|${r.sector_id}`)
-      );
+      let { tripleKeys, dayKeys } = await loadExistingKeys();
 
-      const ignoredCount = dedupedRows.length - newRows.length;
-      if (ignoredCount > 0) {
-        toast.info(`${ignoredCount} lançamento(s) ignorado(s) por já existirem.`);
-      }
+      const filterNewRows = (
+        rows: typeof dedupedRows,
+        tk: Set<string>,
+        dk: Set<string>
+      ) =>
+        rows.filter(
+          (r) =>
+            !tk.has(`${r.employee_id}|${r.schedule_date}|${r.sector_id}`) &&
+            !dk.has(`${r.employee_id}|${r.schedule_date}`)
+        );
+
+      let newRows = filterNewRows(dedupedRows, tripleKeys, dayKeys);
+      let ignoredCount = dedupedRows.length - newRows.length;
 
       if (newRows.length === 0) {
-        toast.warning("Todas as escalas já existem. Nenhuma nova inserida.");
+        toast.warning(
+          ignoredCount > 0
+            ? `Todas as ${ignoredCount} escalas já existem. Nenhuma nova inserida.`
+            : "Nenhuma escala para importar."
+        );
         setIsSaving(false);
         return;
       }
 
-      // 3) Upsert with ignoreDuplicates → idempotent against unique_active_schedule
-      const { error, data } = await supabase
-        .from("schedules")
-        .upsert(newRows, {
-          onConflict: "employee_id,schedule_date,sector_id",
-          ignoreDuplicates: true,
-        })
-        .select("id");
+      // 3) INSERT puro (dedup completa já feita no front). Se mesmo assim cair em
+      // conflito (race condition), tentamos refazer 1 vez com SELECT atualizado.
+      const tryInsert = async (rows: typeof newRows) => {
+        return await supabase.from("schedules").insert(rows).select("id");
+      };
+
+      let { error, data } = await tryInsert(newRows);
+      let conflictResolved = 0;
+
+      if (error && ((error as any).code === "23505" || error.message?.includes("unique_active_schedule"))) {
+        console.warn("[Excel Import] Conflito 23505 detectado, recarregando estado e tentando novamente…", error);
+        const refreshed = await loadExistingKeys();
+        tripleKeys = refreshed.tripleKeys;
+        dayKeys = refreshed.dayKeys;
+        const beforeRetry = newRows.length;
+        newRows = filterNewRows(newRows, tripleKeys, dayKeys);
+        conflictResolved = beforeRetry - newRows.length;
+        ignoredCount += conflictResolved;
+        if (newRows.length > 0) {
+          ({ error, data } = await tryInsert(newRows));
+        } else {
+          error = null;
+          data = [];
+        }
+      }
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);
         const isUnique =
           error.message?.includes("unique_active_schedule") || (error as any).code === "23505";
         if (isUnique) {
-          // Try to surface the offending row from error.details
-          const details = (error as any).details || "";
-          const empIdMatch = details.match(/employee_id\)=\(([^,]+),\s*([^,]+),\s*([^)]+)\)/);
-          let conflictMsg = "Conflito de escala detectado.";
-          if (empIdMatch) {
-            const [, eid, dt] = empIdMatch;
-            const empName =
-              (allUnitEmployees || employees).find((e) => e.id === eid)?.name || eid;
-            conflictMsg = `Conflito: ${empName} em ${dt} já tem escala ativa.`;
-          }
-          toast.error(
-            `${conflictMsg} Use "Zerar Escalas" antes de reimportar, ou ajuste no editor.`,
-            { duration: 10000 }
-          );
+          // Parse up to 5 conflicts from error.details — Postgres format: Key (employee_id, schedule_date, sector_id)=(uuid, date, uuid)
+          const details = (error as any).details || error.message || "";
+          const matches = [...String(details).matchAll(/\(([0-9a-f-]+),\s*(\d{4}-\d{2}-\d{2}),\s*([0-9a-f-]+)\)/gi)];
+          const empList = allUnitEmployees || employees;
+          const conflictLines = matches.slice(0, 5).map(([, eid, dt]) => {
+            const empName = empList.find((e) => e.id === eid)?.name || eid.slice(0, 8);
+            const dtFormatted = format(new Date(dt + "T12:00:00"), "dd/MM");
+            return `• ${empName} em ${dtFormatted}`;
+          });
+          const conflictMsg = conflictLines.length
+            ? `Conflitos detectados:\n${conflictLines.join("\n")}\n\nUse "Zerar Escalas" para limpar a semana antes de reimportar.`
+            : `Conflito de escala. Use "Zerar Escalas" antes de reimportar, ou ajuste no editor.`;
+          toast.error(conflictMsg, { duration: 12000 });
         } else {
           toast.error(`Erro ao salvar escalas: ${error.message}`, { duration: 8000 });
         }
@@ -478,7 +511,11 @@ export function ScheduleExcelFlow({
       setIsSaving(false);
       closeModal();
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
-      toast.success(`${savedCount} lançamento(s) importado(s) com sucesso!`);
+
+      const parts = [`${savedCount} importado(s)`];
+      if (ignoredCount > 0) parts.push(`${ignoredCount} já existia(m)`);
+      if (conflictResolved > 0) parts.push(`${conflictResolved} conflito(s) resolvido(s)`);
+      toast.success(parts.join(" · "));
     } catch (err: any) {
       console.error("[Excel Import] Erro inesperado:", err);
       toast.error(`Erro inesperado: ${err?.message || "erro desconhecido"}`, { duration: 8000 });

@@ -318,6 +318,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   const summaryData: { sectorName: string; days: { lunchClt: number; lunchExtra: number; dinnerClt: number; dinnerExtra: number }[] }[] = [];
 
   for (const sector of sectors) {
+   try {
     const sectorSchedules = scheduleBySector.get(sector.id) || [];
     const empIds = new Set(sectorSchedules.map((s: any) => s.employee_id).filter(Boolean));
     const sectorEmployees = Array.from(empIds)

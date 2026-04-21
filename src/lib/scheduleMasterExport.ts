@@ -492,7 +492,7 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
   }
 
   // ── "Resumo Geral" tab ──
-  {
+  try {
     const ws: XLSX.WorkSheet = {};
     let row = 0;
 
@@ -573,9 +573,18 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     ws["!cols"] = [{ wch: 32 }, ...Array(7).fill({ wch: 22 })];
     ws["!rows"] = [{ hpt: 30 }];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Resumo Geral");
+    // "Resumo Geral" can never collide because it's appended last and sector names
+    // were sanitized; if it somehow collides, safeSheetName will dedupe.
+    const summarySheetName = safeSheetName("Resumo Geral", usedSheetNames);
+    XLSX.utils.book_append_sheet(wb, ws, summarySheetName);
+  } catch (err: any) {
+    throw new Error(`Falha ao montar "Resumo Geral": ${err?.message || err}`);
   }
 
-  const fileName = `Escala_Geral_${unitName.replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
-  downloadWorkbook(wb as any, fileName);
+  try {
+    const fileName = `Escala_Geral_${unitName.replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
+    downloadWorkbook(wb as any, fileName);
+  } catch (err: any) {
+    throw new Error(`Falha ao gerar arquivo Excel: ${err?.message || err}`);
+  }
 }

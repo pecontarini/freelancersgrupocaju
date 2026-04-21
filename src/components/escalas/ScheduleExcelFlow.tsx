@@ -292,6 +292,48 @@ export function ScheduleExcelFlow({
     return newEmployees;
   }
 
+  /**
+   * Cancel all active schedules in the target week for this unit, then re-run the import.
+   * Triggered from the conflict toast action so the user has a one-click recovery path.
+   */
+  const clearWeekAndReimport = useCallback(async () => {
+    if (!unitId || !targetMonday) {
+      toast.error("Não foi possível identificar unidade/semana para zerar.");
+      return;
+    }
+    const startStr = format(startOfWeek(targetMonday, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    const endStr = format(addDays(startOfWeek(targetMonday, { weekStartsOn: 1 }), 6), "yyyy-MM-dd");
+    try {
+      // Resolve sectors for this unit so the cancel only targets the right sector_ids
+      const { data: sectorRows, error: secErr } = await supabase
+        .from("sectors")
+        .select("id")
+        .eq("unit_id", unitId);
+      if (secErr) throw secErr;
+      const sectorIds = (sectorRows || []).map((s) => s.id);
+      if (sectorIds.length === 0) {
+        toast.warning("Nenhum setor encontrado nesta unidade.");
+        return;
+      }
+      const { error: updErr } = await supabase
+        .from("schedules")
+        .update({ status: "cancelled" })
+        .in("sector_id", sectorIds)
+        .gte("schedule_date", startStr)
+        .lte("schedule_date", endStr)
+        .neq("status", "cancelled");
+      if (updErr) throw updErr;
+      toast.success("Semana zerada. Reiniciando importação…");
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      // Re-run the same import with the same parsed file
+      await handleConfirmImport();
+    } catch (err: any) {
+      console.error("[Excel Import] Falha ao zerar semana:", err);
+      toast.error(`Não foi possível zerar a semana: ${err?.message || err}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitId, targetMonday, qc]);
+
   async function handleConfirmImport() {
     if (!parseResult) return;
 
@@ -483,22 +525,53 @@ export function ScheduleExcelFlow({
 
       if (error) {
         console.error("[Excel Import] Erro ao salvar escalas:", error);
+        const errStr = [
+          (error as any).code,
+          error.message,
+          (error as any).details,
+          (error as any).hint,
+          (error as any).error_description,
+        ]
+          .filter(Boolean)
+          .join(" | ");
         const isUnique =
-          error.message?.includes("unique_active_schedule") || (error as any).code === "23505";
+          (error as any).code === "23505" ||
+          /unique_active_schedule|duplicate key/i.test(errStr);
         if (isUnique) {
-          // Parse up to 5 conflicts from error.details — Postgres format: Key (employee_id, schedule_date, sector_id)=(uuid, date, uuid)
-          const details = (error as any).details || error.message || "";
-          const matches = [...String(details).matchAll(/\(([0-9a-f-]+),\s*(\d{4}-\d{2}-\d{2}),\s*([0-9a-f-]+)\)/gi)];
+          // Parse up to 5 conflicts from error details — Postgres format:
+          // Key (employee_id, schedule_date, sector_id)=(uuid, date, uuid)
+          const matches = [...errStr.matchAll(/\(([0-9a-f-]+),\s*(\d{4}-\d{2}-\d{2}),\s*([0-9a-f-]+)\)/gi)];
           const empList = allUnitEmployees || employees;
-          const conflictLines = matches.slice(0, 5).map(([, eid, dt]) => {
+          // Try to look up sector names
+          const conflictSectorIds = [...new Set(matches.map((m) => m[3]))];
+          let sectorNameMap = new Map<string, string>();
+          if (conflictSectorIds.length > 0) {
+            const { data: secRows } = await supabase
+              .from("sectors")
+              .select("id, name")
+              .in("id", conflictSectorIds);
+            for (const s of secRows || []) sectorNameMap.set(s.id, s.name);
+          }
+          const conflictLines = matches.slice(0, 5).map(([, eid, dt, sid]) => {
             const empName = empList.find((e) => e.id === eid)?.name || eid.slice(0, 8);
             const dtFormatted = format(new Date(dt + "T12:00:00"), "dd/MM");
-            return `• ${empName} em ${dtFormatted}`;
+            const secName = sectorNameMap.get(sid);
+            return secName ? `• ${empName} em ${dtFormatted} (${secName})` : `• ${empName} em ${dtFormatted}`;
           });
+          const totalConflicts = matches.length || newRows.length;
+          const more = matches.length > 5 ? `\n…e mais ${matches.length - 5} conflito(s).` : "";
           const conflictMsg = conflictLines.length
-            ? `Conflitos detectados:\n${conflictLines.join("\n")}\n\nUse "Zerar Escalas" para limpar a semana antes de reimportar.`
-            : `Conflito de escala. Use "Zerar Escalas" antes de reimportar, ou ajuste no editor.`;
-          toast.error(conflictMsg, { duration: 12000 });
+            ? `${totalConflicts} conflito(s) detectado(s):\n${conflictLines.join("\n")}${more}\n\nClique em "Zerar semana e reimportar" para limpar e tentar de novo.`
+            : `Conflito de escala detectado. Clique em "Zerar semana e reimportar" para resolver.`;
+          toast.error(conflictMsg, {
+            duration: 20000,
+            action: unitId && targetMonday
+              ? {
+                  label: "Zerar semana e reimportar",
+                  onClick: () => clearWeekAndReimport(),
+                }
+              : undefined,
+          });
         } else {
           toast.error(`Erro ao salvar escalas: ${error.message}`, { duration: 8000 });
         }

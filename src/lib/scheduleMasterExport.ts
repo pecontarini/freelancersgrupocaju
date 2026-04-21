@@ -274,16 +274,51 @@ function getCellStyle(type: string, isExtra: boolean, rowIndex: number) {
 
 // ── Main export ──
 
+/**
+ * Sanitize a sheet name for Excel:
+ * - strip invalid chars: : \ / ? * [ ]
+ * - normalize whitespace
+ * - truncate to 31 chars
+ * - guarantee uniqueness against `usedNames` (adds " (2)", " (3)"… suffix)
+ */
+function safeSheetName(rawName: string, usedNames: Set<string>): string {
+  let base = (rawName || "Setor")
+    .replace(/[\[\]\:\*\?\/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!base) base = "Setor";
+  if (base.length > 31) base = base.slice(0, 31).trim();
+
+  let candidate = base;
+  let i = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const suffix = ` (${i})`;
+    const maxBase = 31 - suffix.length;
+    candidate = (base.length > maxBase ? base.slice(0, maxBase).trim() : base) + suffix;
+    i++;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
 export async function exportMasterSchedule({ unitId, unitName, weekStart }: ExportParams) {
-  const data = await fetchScheduleData({ unitId, weekStart });
+  let stage = "buscar dados";
+  let data: ScheduleDataResult;
+  try {
+    data = await fetchScheduleData({ unitId, weekStart });
+  } catch (err: any) {
+    throw new Error(`Falha ao ${stage}: ${err?.message || err}`);
+  }
   const { sectors, weekDays, empMap, scheduleBySector, matrix, shifts, shiftTypes } = data;
 
   const wb = XLSX.utils.book_new();
+  const usedSheetNames = new Set<string>();
 
   // Track summary data for "Resumo Geral" tab
   const summaryData: { sectorName: string; days: { lunchClt: number; lunchExtra: number; dinnerClt: number; dinnerExtra: number }[] }[] = [];
 
   for (const sector of sectors) {
+   try {
     const sectorSchedules = scheduleBySector.get(sector.id) || [];
     const empIds = new Set(sectorSchedules.map((s: any) => s.employee_id).filter(Boolean));
     const sectorEmployees = Array.from(empIds)
@@ -449,12 +484,15 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     ws["!cols"] = [{ wch: 32 }, ...Array(7).fill({ wch: 22 })];
     ws["!rows"] = [{ hpt: 30 }]; // taller first row
 
-    const sheetName = sector.name.length > 31 ? sector.name.slice(0, 31) : sector.name;
+    const sheetName = safeSheetName(sector.name, usedSheetNames);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
+   } catch (err: any) {
+     throw new Error(`Falha ao montar aba do setor "${sector?.name || "?"}": ${err?.message || err}`);
+   }
   }
 
   // ── "Resumo Geral" tab ──
-  {
+  try {
     const ws: XLSX.WorkSheet = {};
     let row = 0;
 
@@ -535,9 +573,18 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     ws["!cols"] = [{ wch: 32 }, ...Array(7).fill({ wch: 22 })];
     ws["!rows"] = [{ hpt: 30 }];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Resumo Geral");
+    // "Resumo Geral" can never collide because it's appended last and sector names
+    // were sanitized; if it somehow collides, safeSheetName will dedupe.
+    const summarySheetName = safeSheetName("Resumo Geral", usedSheetNames);
+    XLSX.utils.book_append_sheet(wb, ws, summarySheetName);
+  } catch (err: any) {
+    throw new Error(`Falha ao montar "Resumo Geral": ${err?.message || err}`);
   }
 
-  const fileName = `Escala_Geral_${unitName.replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
-  downloadWorkbook(wb as any, fileName);
+  try {
+    const fileName = `Escala_Geral_${unitName.replace(/\s+/g, "_")}_${format(weekDays[0], "ddMMyyyy")}.xlsx`;
+    downloadWorkbook(wb as any, fileName);
+  } catch (err: any) {
+    throw new Error(`Falha ao gerar arquivo Excel: ${err?.message || err}`);
+  }
 }

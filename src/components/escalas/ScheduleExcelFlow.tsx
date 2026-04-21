@@ -292,6 +292,48 @@ export function ScheduleExcelFlow({
     return newEmployees;
   }
 
+  /**
+   * Cancel all active schedules in the target week for this unit, then re-run the import.
+   * Triggered from the conflict toast action so the user has a one-click recovery path.
+   */
+  const clearWeekAndReimport = useCallback(async () => {
+    if (!unitId || !targetMonday) {
+      toast.error("Não foi possível identificar unidade/semana para zerar.");
+      return;
+    }
+    const startStr = format(startOfWeek(targetMonday, { weekStartsOn: 1 }), "yyyy-MM-dd");
+    const endStr = format(addDays(startOfWeek(targetMonday, { weekStartsOn: 1 }), 6), "yyyy-MM-dd");
+    try {
+      // Resolve sectors for this unit so the cancel only targets the right sector_ids
+      const { data: sectorRows, error: secErr } = await supabase
+        .from("sectors")
+        .select("id")
+        .eq("unit_id", unitId);
+      if (secErr) throw secErr;
+      const sectorIds = (sectorRows || []).map((s) => s.id);
+      if (sectorIds.length === 0) {
+        toast.warning("Nenhum setor encontrado nesta unidade.");
+        return;
+      }
+      const { error: updErr } = await supabase
+        .from("schedules")
+        .update({ status: "cancelled" })
+        .in("sector_id", sectorIds)
+        .gte("schedule_date", startStr)
+        .lte("schedule_date", endStr)
+        .neq("status", "cancelled");
+      if (updErr) throw updErr;
+      toast.success("Semana zerada. Reiniciando importação…");
+      qc.invalidateQueries({ queryKey: ["manual-schedules"] });
+      // Re-run the same import with the same parsed file
+      await handleConfirmImport();
+    } catch (err: any) {
+      console.error("[Excel Import] Falha ao zerar semana:", err);
+      toast.error(`Não foi possível zerar a semana: ${err?.message || err}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitId, targetMonday, qc]);
+
   async function handleConfirmImport() {
     if (!parseResult) return;
 

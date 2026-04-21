@@ -274,11 +274,45 @@ function getCellStyle(type: string, isExtra: boolean, rowIndex: number) {
 
 // ── Main export ──
 
+/**
+ * Sanitize a sheet name for Excel:
+ * - strip invalid chars: : \ / ? * [ ]
+ * - normalize whitespace
+ * - truncate to 31 chars
+ * - guarantee uniqueness against `usedNames` (adds " (2)", " (3)"… suffix)
+ */
+function safeSheetName(rawName: string, usedNames: Set<string>): string {
+  let base = (rawName || "Setor")
+    .replace(/[\[\]\:\*\?\/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!base) base = "Setor";
+  if (base.length > 31) base = base.slice(0, 31).trim();
+
+  let candidate = base;
+  let i = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const suffix = ` (${i})`;
+    const maxBase = 31 - suffix.length;
+    candidate = (base.length > maxBase ? base.slice(0, maxBase).trim() : base) + suffix;
+    i++;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
 export async function exportMasterSchedule({ unitId, unitName, weekStart }: ExportParams) {
-  const data = await fetchScheduleData({ unitId, weekStart });
+  let stage = "buscar dados";
+  let data: ScheduleDataResult;
+  try {
+    data = await fetchScheduleData({ unitId, weekStart });
+  } catch (err: any) {
+    throw new Error(`Falha ao ${stage}: ${err?.message || err}`);
+  }
   const { sectors, weekDays, empMap, scheduleBySector, matrix, shifts, shiftTypes } = data;
 
   const wb = XLSX.utils.book_new();
+  const usedSheetNames = new Set<string>();
 
   // Track summary data for "Resumo Geral" tab
   const summaryData: { sectorName: string; days: { lunchClt: number; lunchExtra: number; dinnerClt: number; dinnerExtra: number }[] }[] = [];

@@ -1,78 +1,196 @@
 
+## Plano de correção 100% — Escalas via modelo e exportação Excel
 
-## Plano de correção 100% — Importação e Exportação de Escalas
+### Problema real
+Hoje existem **dois problemas ainda não encerrados**:
 
-### Diagnóstico
+1. **Importação continua falhando com `unique_active_schedule`**
+   - O código atual já tenta deduplicar e retry, mas o usuário ainda recebe o toast genérico de conflito.
+   - Isso indica uma destas situações:
+     - a versão publicada ainda não está refletindo integralmente o fix;
+     - o erro está vindo em um formato diferente do esperado pelo branch atual;
+     - ainda existe um caso de conflito não coberto antes do `insert`.
 
-**Bug 1 — Importação `duplicate key value violates unique_active_schedule` (causa raiz real)**
+2. **Exportação Excel ainda quebra**
+   - O ajuste de import do `xlsx-js-style` já foi feito, então o problema restante provavelmente está no **processo de geração do workbook** e não só no import do pacote.
+   - Em `scheduleMasterExport.ts` ainda há risco de erro por:
+     - **nome de aba inválido** para Excel (`[]:*?/\\`);
+     - **nomes duplicados/truncados** ao limitar a 31 caracteres;
+     - erro silencioso em alguma etapa de fetch/montagem/download sendo mascarado pelo toast genérico.
 
-O índice de proteção em `schedules` é **parcial**:
-```
-CREATE UNIQUE INDEX unique_active_schedule
-ON schedules (employee_id, schedule_date, sector_id)
-WHERE status <> 'cancelled'
-```
-O código usa `supabase.upsert(rows, { onConflict: "employee_id,schedule_date,sector_id", ignoreDuplicates: true })`. **PostgREST não envia o predicado `WHERE`** ao Postgres, então o `ON CONFLICT` **não consegue casar com índice parcial** e o erro 23505 vaza para o cliente — anulando todo o `ignoreDuplicates`. Por isso, mesmo com toda a dedup feita no front, qualquer linha que colida com algo já existente no banco quebra o batch inteiro.
-
-Confirmei no banco que a semana 20–26/04 da unidade Nazo GO já tem dezenas de escalas ativas (ALEJANDRO, ANA, BRUNA, CLARA, etc.), e o usuário está reimportando uma planilha por cima. O fix anterior limpou homônimos, mas o `ignoreDuplicates` continua quebrado.
-
-**Bug 2 — Mensagens de erro pouco acionáveis**
-
-Quando o usuário vê "duplicate key", não tem onde clicar para resolver — não sabe quais linhas conflitaram nem como zerar a semana antes de reimportar.
-
-**Bug 3 — Export Excel "Geral" pode falhar silenciosamente**
-
-`scheduleMasterExport.ts` usa `import XLSX from "xlsx-js-style"` (default import). Em alguns bundlings ESM, esse pacote precisa de `import * as XLSX from "xlsx-js-style"` (como já fazemos em `scheduleExcel.ts`). Se a build atual estiver retornando `undefined` para `XLSX.utils`, o usuário vê erro genérico "Erro ao exportar escala". Mesmo padrão precisa ser aplicado em `scheduleMasterPdf.ts` se aplicável. Como o pacote está versionado (`^1.2.0`) e já existem relatos do problema, o fix preventivo é trivial.
+### Objetivo
+Eliminar o erro na importação e na exportação com:
+- tratamento de conflito realmente idempotente;
+- mensagens acionáveis;
+- export robusto mesmo com nomes de setores problemáticos;
+- validação explícita no preview e no publicado.
 
 ---
 
-### Correções
+## Frente 1 — Blindar a importação até ficar realmente idempotente
 
-#### 1) Importação: trocar estratégia de `upsert` por **dedup completa via SELECT prévio + INSERT puro**
+### 1.1 Reforçar o filtro pré-insert
+Em `src/components/escalas/ScheduleExcelFlow.tsx`:
 
-Em `src/components/escalas/ScheduleExcelFlow.tsx → handleConfirmImport`:
+- manter a dedup atual por:
+  - `(employee_id, date, sector_id)`;
+  - `(employee_id, date)`;
+- adicionar uma etapa explícita de **detecção de conflitos restantes por lote**, construindo uma lista legível antes do `insert`;
+- separar em memória:
+  - `rowsToInsert`
+  - `rowsIgnoredExisting`
+  - `rowsBlockedConflict`
 
-- **Manter** a dedup intra-batch atual (1, 1b — já feita).
-- **Reforçar a dedup contra DB**: a query `existingSchedules` já busca por `(employee_id IN ..., date BETWEEN ...)` mas filtra `existingKeys` por `employee|date|sector`. Mudar para filtrar por **2 chaves**:
-  - `employee|date|sector` (mesma que existe);
-  - `employee|date` (independente de setor) — uma pessoa não está em 2 setores no mesmo dia operacionalmente, e o front já colapsa isso.
-- **Trocar `upsert(ignoreDuplicates)` por `insert()` puro** já que a dedup no front é total.
-- Em caso de erro 23505 mesmo assim (race condition rara), **fazer fallback automático**: refazer o SELECT, recalcular `newRows` e tentar 1 vez mais. Se ainda falhar, mostrar mensagem cirúrgica (vide item 2).
+Assim o import não depende só do erro do banco para explicar o problema.
 
-#### 2) Mensagens de erro acionáveis no toast
+### 1.2 Tornar o branch de erro 23505 mais abrangente
+Hoje o código só reconhece alguns formatos do erro. Ajustar para capturar também:
+- `error.code === "23505"`
+- `error.message`
+- `error.details`
+- `error.hint`
+- `error.error_description`
+- qualquer texto contendo `unique_active_schedule`
 
-- Quando o erro for `23505/unique_active_schedule`, parsear `error.details` para extrair `(employee_id, date, sector_id)`, mapear para nome+data legíveis e listar **até 5 conflitos** no toast.
-- Adicionar botão **"Zerar semana e reimportar"** no toast de erro (chama o mesmo fluxo do "Zerar Escalas" filtrado para a semana importada, mantém a planilha em memória e reexecuta o `handleConfirmImport`).
-- Adicionar contador no sucesso: `"X importados, Y já existiam (ignorados), Z conflitos resolvidos"`.
+Isso garante que o usuário nunca mais veja só o texto cru do banco.
 
-#### 3) Export Excel: padronizar import do `xlsx-js-style`
+### 1.3 Retry realmente defensivo
+Depois do primeiro `insert` com falha:
+- recarregar schedules existentes;
+- recalcular os conflitos;
+- tentar novamente só com o subconjunto ainda inserível;
+- se persistir, mostrar a lista dos nomes/datas que bloquearam.
 
-- Em `src/lib/scheduleMasterExport.ts`: trocar `import XLSX from "xlsx-js-style"` → `import * as XLSX from "xlsx-js-style"` (mesmo padrão de `scheduleExcel.ts`).
-- Verificar `src/lib/scheduleMasterPdf.ts` e qualquer outro consumidor de `xlsx-js-style` para o mesmo ajuste.
-- Em `MasterExportButton.tsx`, capturar `console.error(err)` antes do toast genérico para dar visibilidade no DevTools quando o usuário relatar.
+### 1.4 Ação direta para resolver
+Aproveitar a lógica já existente de limpeza em massa e acoplar ao fluxo de import:
+- botão/ação “**Zerar semana e reimportar**” para a mesma unidade/semana;
+- reaproveitar o arquivo já em memória;
+- reexecutar o `handleConfirmImport` sem o usuário precisar começar tudo de novo.
 
-#### 4) (Opcional, defesa em profundidade) Trocar índice parcial por constraint completo
+---
 
-Migration: criar `unique_schedule_active_full` igual ao parcial, mas **sem o `WHERE`** — ou seja, incluindo `status` na chave: `(employee_id, schedule_date, sector_id, status)` quando `status<>'cancelled'`. Isso mantém o comportamento atual mas dá ao PostgREST um índice **não parcial** que ele consegue usar em `onConflict`. Vou avaliar se adiciona valor — se a correção 1+2 já resolverem 100%, **pulamos** essa migration para não mexer em índices em produção.
+## Frente 2 — Melhorar a usabilidade do erro de importação
 
-### Arquivos afetados
+### Em `src/components/escalas/ScheduleExcelFlow.tsx`
+Substituir o erro genérico por retorno operacional:
 
-- **`src/components/escalas/ScheduleExcelFlow.tsx`** — remover `upsert/ignoreDuplicates`, usar `insert()` com fallback de retry; dedup adicional por `(employee|date)` contra DB; toast com lista de conflitos e botão "Zerar e Reimportar".
-- **`src/lib/scheduleMasterExport.ts`** — ajustar import de `xlsx-js-style` para `* as XLSX`.
-- **`src/lib/scheduleMasterPdf.ts`** — verificar/ajustar import similar se aplicável.
-- **`src/components/escalas/MasterExportButton.tsx`** — adicionar `console.error` antes do toast genérico.
+- mostrar até 5 conflitos com:
+  - nome do funcionário;
+  - data;
+  - setor, quando disponível;
+- sucesso com resumo:
+  - `X importados`
+  - `Y já existiam`
+  - `Z conflitos resolvidos`
+  - `W ignorados por conflito`
 
-### Validação
+Também manter os erros de parsing separados dos erros de banco, para não misturar:
+- “horário inválido”;
+- “conflito com escala já existente”.
 
-- **Importação**:
-  - Reimportar a planilha 20–26/04 da Nazo GO sobre escalas existentes → deve completar mostrando "X importados, Y já existiam (ignorados)", **zero erro 23505**.
-  - Importar planilha completamente nova → todas as linhas entram, mensagem de sucesso normal.
-  - Forçar conflito (criar manualmente schedule, depois importar planilha que o inclui) → toast claro "Conflito: João em 22/04 (BAR)", botão "Zerar semana e reimportar" funciona.
-- **Export Excel**:
-  - Clicar "Exportar Escala → Excel" em qualquer unidade → arquivo .xlsx baixa e abre no Excel/LibreOffice sem corrupção, com todas as abas de setores.
-  - Clicar "Exportar Escala → PDF" → PDF baixa normalmente.
+---
 
-### Sem mudanças visuais
+## Frente 3 — Corrigir a exportação Excel na geração do workbook
 
-UI permanece igual; mudam apenas a robustez do INSERT, as mensagens de toast e a confiabilidade do download.
+### 3.1 Sanitizar e deduplicar nomes de abas
+Em `src/lib/scheduleMasterExport.ts`:
 
+Criar helper de nome seguro para abas:
+- remover caracteres inválidos de Excel: `: \ / ? * [ ]`
+- normalizar espaços
+- truncar para 31 chars
+- garantir unicidade com sufixo automático quando houver colisão:
+  - `ATENDIMENTO`
+  - `ATENDIMENTO (2)`
+
+Isso elimina uma causa clássica de falha silenciosa em export.
+
+### 3.2 Quebrar a exportação em etapas com erros específicos
+Ainda em `scheduleMasterExport.ts`, separar e nomear falhas:
+- erro ao buscar setores;
+- erro ao buscar escalas;
+- erro ao montar aba do setor X;
+- erro ao montar “Resumo Geral”;
+- erro ao gerar arquivo para download.
+
+Assim o toast deixa de ser “Erro ao exportar escala” e passa a apontar exatamente o estágio quebrado.
+
+### 3.3 Validar a etapa de download
+Em `src/components/escalas/MasterExportButton.tsx`:
+- manter `console.error`;
+- melhorar o toast com mensagem vinda do estágio real;
+- se necessário, envolver `downloadWorkbook` com try/catch local para separar:
+  - geração do workbook;
+  - disparo do download.
+
+### 3.4 Padronizar robustez do workbook
+Revisar `scheduleMasterExport.ts` para:
+- garantir `!merges`, `!ref`, `!cols`, `!rows` coerentes por aba;
+- evitar qualquer referência fora do range final;
+- garantir que “Resumo Geral” nunca colida com alguma aba de setor.
+
+---
+
+## Frente 4 — Garantir que preview e publicado estão alinhados
+
+O print anexado é do domínio publicado. Então a correção precisa validar explicitamente:
+
+- **preview**
+- **publicado**
+
+Se o preview estiver correto e o publicado não:
+- revisar o caminho real usado na tela publicada;
+- confirmar que o fluxo chama os arquivos já corrigidos:
+  - `ScheduleExcelFlow.tsx`
+  - `MasterExportButton.tsx`
+  - `scheduleMasterExport.ts`
+
+Se houver divergência, ajustar o fluxo para que a mesma tela/mesmo botão usem a implementação corrigida em ambos os ambientes.
+
+---
+
+## Arquivos principais
+- `src/components/escalas/ScheduleExcelFlow.tsx`
+- `src/lib/scheduleMasterExport.ts`
+- `src/components/escalas/MasterExportButton.tsx`
+
+### Arquivos de apoio para conferência
+- `src/lib/excelUtils.ts`
+- `src/lib/scheduleExcel.ts`
+- `src/components/escalas/ManualScheduleGrid.tsx`
+
+---
+
+## Validação obrigatória
+
+### Importação
+1. Importar a mesma semana já existente na unidade que está falhando.
+   - Resultado esperado:
+     - sem toast cru do banco;
+     - resumo claro de importados/ignorados/conflitos.
+2. Reimportar imediatamente o mesmo arquivo.
+   - Resultado esperado:
+     - zero duplicação;
+     - comportamento idempotente.
+3. Forçar conflito real.
+   - Resultado esperado:
+     - nomes e datas listados;
+     - ação para limpar semana e reimportar.
+
+### Exportação Excel
+1. Exportar em unidade com vários setores.
+   - Arquivo deve baixar e abrir normalmente.
+2. Exportar em unidade com nomes de setores longos ou parecidos.
+   - Nenhuma falha por nome de aba.
+3. Conferir abas:
+   - todos os setores presentes;
+   - “Resumo Geral” presente;
+   - sem corrupção no Excel/LibreOffice.
+
+### Paridade
+- testar no preview e no publicado para confirmar que o usuário final não ficou preso numa versão antiga do fluxo.
+
+## Resultado esperado
+- Importação por modelo fica segura, repetível e explicável.
+- Exportação Excel deixa de falhar por workbook/aba.
+- O usuário deixa de ver erro técnico cru e passa a ter saída prática para resolver na hora.

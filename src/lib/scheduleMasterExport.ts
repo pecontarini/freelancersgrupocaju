@@ -484,8 +484,11 @@ export async function exportMasterSchedule({ unitId, unitName, weekStart }: Expo
     ws["!cols"] = [{ wch: 32 }, ...Array(7).fill({ wch: 22 })];
     ws["!rows"] = [{ hpt: 30 }]; // taller first row
 
-    const sheetName = sector.name.length > 31 ? sector.name.slice(0, 31) : sector.name;
+    const sheetName = safeSheetName(sector.name, usedSheetNames);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
+   } catch (err: any) {
+     throw new Error(`Falha ao montar aba do setor "${sector?.name || "?"}": ${err?.message || err}`);
+   }
   }
 
   // ── "Resumo Geral" tab ──

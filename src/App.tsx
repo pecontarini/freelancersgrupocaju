@@ -13,6 +13,7 @@ import ConfirmShift from "./pages/ConfirmShift";
 import DailyChecklist from "./pages/DailyChecklist";
 import ChecklistCorrections from "./pages/ChecklistCorrections";
 import FreelancerCheckin from "./pages/FreelancerCheckin";
+import FreelancerCheckinDemo from "./pages/FreelancerCheckinDemo";
 import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 import LiquidGlassDemo from "./pages/LiquidGlassDemo";
@@ -48,6 +49,7 @@ function App() {
                   element={<ChecklistCorrections />}
                 />
                 <Route path="/checkin" element={<FreelancerCheckin />} />
+                <Route path="/checkin-demo" element={<FreelancerCheckinDemo />} />
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />

@@ -23,6 +23,7 @@ export interface FreelancerCheckin {
   valor_approved_at: string | null;
   rejection_reason: string | null;
   checkin_date: string;
+  schedule_id: string | null;
   created_at: string;
   freelancer_profiles?: {
     id: string;

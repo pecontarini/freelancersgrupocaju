@@ -4075,6 +4075,19 @@ export type Database = {
           nome_completo: string
         }[]
       }
+      lookup_freelancer_unified: {
+        Args: { p_cpf: string }
+        Returns: {
+          chave_pix: string
+          foto_url: string
+          found_in: string[]
+          funcao: string
+          gerencia: string
+          nome_completo: string
+          telefone: string
+          tipo_chave_pix: string
+        }[]
+      }
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
       promote_approved_checkins: {

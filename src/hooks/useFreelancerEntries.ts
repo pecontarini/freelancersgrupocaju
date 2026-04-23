@@ -27,6 +27,10 @@ export function useFreelancerEntries() {
         throw new Error("Usuário não autenticado");
       }
 
+      // Padrão canônico: CPF sempre limpo (11 dígitos) em todas as tabelas
+      const cleanCpf = formData.cpf.replace(/\D/g, "");
+      const cpfToStore = cleanCpf.length === 11 ? cleanCpf : formData.cpf;
+
       const { data, error } = await supabase
         .from("freelancer_entries")
         .insert({
@@ -36,7 +40,7 @@ export function useFreelancerEntries() {
           gerencia: formData.gerencia,
           data_pop: formData.data_pop, // Já é string YYYY-MM-DD
           valor: formData.valor,
-          cpf: formData.cpf,
+          cpf: cpfToStore,
           chave_pix: formData.chave_pix,
           created_by: user.id,
           loja_id: formData.loja_id,
@@ -47,7 +51,6 @@ export function useFreelancerEntries() {
       if (error) throw error;
 
       // Espelha no cadastro global de freelancers para lookup cross-loja por CPF
-      const cleanCpf = formData.cpf.replace(/\D/g, "");
       if (cleanCpf.length === 11) {
         const { error: profileError } = await supabase
           .from("freelancer_profiles")

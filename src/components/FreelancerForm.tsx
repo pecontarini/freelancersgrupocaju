@@ -91,6 +91,8 @@ export function FreelancerForm() {
 
   const onSubmit = async (data: FormData) => {
     try {
+      // Normaliza CPF para o padrão canônico (11 dígitos limpos) antes de salvar
+      const cleanCpf = data.cpf.replace(/\D/g, "");
       await createEntry.mutateAsync({
         loja: data.loja,
         nome_completo: data.nome_completo,
@@ -98,7 +100,7 @@ export function FreelancerForm() {
         gerencia: data.gerencia,
         data_pop: data.data_pop,
         valor: data.valor,
-        cpf: data.cpf,
+        cpf: cleanCpf.length === 11 ? cleanCpf : data.cpf,
         chave_pix: data.chave_pix,
         loja_id: data.loja_id,
       });
@@ -140,72 +142,67 @@ export function FreelancerForm() {
     }
   };
 
+  const lastLookupRef = useRef<string>("");
+
+  const handleCpfLookup = useCallback(async (cpf: string) => {
+    const cleanCpf = cpf.replace(/\D/g, "");
+    if (cleanCpf.length !== 11) return;
+    if (lastLookupRef.current === cleanCpf) return; // evita re-disparo no mesmo CPF
+    lastLookupRef.current = cleanCpf;
+
+    const unified = await lookupUnifiedByCpf(cleanCpf);
+    if (!unified) return;
+
+    form.setValue("nome_completo", unified.nome_completo);
+    const filledFields = new Set<string>(["nome_completo"]);
+
+    if (unified.chave_pix) {
+      form.setValue("chave_pix", unified.chave_pix);
+      filledFields.add("chave_pix");
+    }
+
+    if (unified.funcao) {
+      const funcaoExists = funcoes.some(f => f.nome === unified.funcao);
+      if (funcaoExists) {
+        form.setValue("funcao", unified.funcao);
+        filledFields.add("funcao");
+      }
+    }
+
+    if (unified.gerencia) {
+      const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
+      if (gerenciaExists) {
+        form.setValue("gerencia", unified.gerencia);
+        filledFields.add("gerencia");
+      }
+    }
+
+    setAutoFilledFields(filledFields);
+  }, [lookupUnifiedByCpf, form, funcoes, gerencias]);
+
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCPF(e.target.value);
     setCpfValue(formatted);
     form.setValue("cpf", formatted);
-    
-    // Auto-lookup when CPF is complete (14 chars with formatting: 000.000.000-00)
-    if (formatted.length === 14) {
-      handleCpfLookup(formatted);
+
+    // Reset memoization quando CPF muda para algo incompleto
+    const cleanCpf = formatted.replace(/\D/g, "");
+    if (cleanCpf.length < 11) {
+      lastLookupRef.current = "";
+    }
+
+    // Auto-lookup assim que tiver 11 dígitos (formatado ou cru)
+    if (cleanCpf.length === 11) {
+      handleCpfLookup(cleanCpf);
     }
   };
 
-  const handleCpfLookup = useCallback(async (cpf: string) => {
-    // Try unified lookup first (searches profiles, employees, then entries)
-    const unified = await lookupUnifiedByCpf(cpf);
-    if (unified) {
-      form.setValue("nome_completo", unified.nome_completo);
-      const filledFields = new Set<string>(["nome_completo"]);
-
-      if (unified.chave_pix) {
-        form.setValue("chave_pix", unified.chave_pix);
-        filledFields.add("chave_pix");
-      }
-
-      if (unified.funcao) {
-        const funcaoExists = funcoes.some(f => f.nome === unified.funcao);
-        if (funcaoExists) {
-          form.setValue("funcao", unified.funcao);
-          filledFields.add("funcao");
-        }
-      }
-
-      if (unified.gerencia) {
-        const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
-        if (gerenciaExists) {
-          form.setValue("gerencia", unified.gerencia);
-          filledFields.add("gerencia");
-        }
-      }
-
-      setAutoFilledFields(filledFields);
-      return;
+  const handleCpfBlur = () => {
+    const cleanCpf = cpfValue.replace(/\D/g, "");
+    if (cleanCpf.length === 11) {
+      handleCpfLookup(cleanCpf);
     }
-
-    // Fallback to legacy lookup
-    const result = await lookupFreelancerByCpf(cpf);
-    if (result) {
-      form.setValue("nome_completo", result.nome_completo);
-      form.setValue("chave_pix", result.chave_pix);
-      
-      const filledFields = new Set<string>(["nome_completo", "chave_pix"]);
-      
-      const funcaoExists = funcoes.some(f => f.nome === result.funcao);
-      if (funcaoExists) {
-        form.setValue("funcao", result.funcao);
-        filledFields.add("funcao");
-      }
-      
-      const gerenciaExists = gerencias.some(g => g.nome === result.gerencia);
-      if (gerenciaExists) {
-        form.setValue("gerencia", result.gerencia);
-        filledFields.add("gerencia");
-      }
-      
-      setAutoFilledFields(filledFields);
-    }
-  }, [lookupUnifiedByCpf, lookupFreelancerByCpf, form, funcoes, gerencias]);
+  };
 
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCurrencyInput(e.target.value);
@@ -424,6 +421,7 @@ export function FreelancerForm() {
                   placeholder="000.000.000-00"
                   value={cpfValue}
                   onChange={handleCPFChange}
+                  onBlur={handleCpfBlur}
                   className="input-focus-ring"
                 />
                 {isLookingUp && (

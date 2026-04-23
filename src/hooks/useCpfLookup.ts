@@ -21,168 +21,142 @@ interface UnifiedLookupResult {
   chave_pix?: string;
   telefone?: string;
   tipo_chave_pix?: string;
+  foto_url?: string;
   source: "freelancer_profiles" | "employees" | "freelancer_entries";
+  found_in: string[];
 }
 
+/**
+ * Motor único de lookup de freelancer por CPF.
+ * Usa o RPC `lookup_freelancer_unified` que normaliza CPF (com ou sem máscara)
+ * em todas as 3 fontes: cadastro central, escala (employees) e histórico de budget.
+ */
 export function useCpfLookup() {
   const [isLookingUp, setIsLookingUp] = useState(false);
 
-  const lookupFreelancerByCpf = useCallback(async (cpf: string): Promise<FreelancerLookupResult | null> => {
-    const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length !== 11) return null;
+  const lookupUnifiedByCpf = useCallback(
+    async (cpf: string): Promise<UnifiedLookupResult | null> => {
+      const cleanCpf = cpf.replace(/\D/g, "");
+      if (cleanCpf.length !== 11) return null;
 
-    setIsLookingUp(true);
-    try {
-      const { data, error } = await supabase
-        .from("freelancer_entries")
-        .select("nome_completo, funcao, gerencia, chave_pix, created_at")
-        .eq("cpf", cpf)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      setIsLookingUp(true);
+      try {
+        const { data, error } = await supabase.rpc("lookup_freelancer_unified", {
+          p_cpf: cleanCpf,
+        });
 
-      if (error) {
-        console.error("Error looking up CPF:", error);
+        if (error) {
+          console.error("Error in unified CPF lookup RPC:", error);
+          return null;
+        }
+
+        if (!data || data.length === 0) return null;
+
+        const row = data[0] as {
+          nome_completo: string;
+          funcao: string | null;
+          gerencia: string | null;
+          chave_pix: string | null;
+          tipo_chave_pix: string | null;
+          telefone: string | null;
+          foto_url: string | null;
+          found_in: string[] | null;
+        };
+
+        const foundIn = row.found_in ?? [];
+        // Origem mais informativa para o toast
+        const primarySource: UnifiedLookupResult["source"] = foundIn.includes(
+          "freelancer_profiles"
+        )
+          ? "freelancer_profiles"
+          : foundIn.includes("employees")
+            ? "employees"
+            : "freelancer_entries";
+
+        const sourceLabel =
+          primarySource === "freelancer_profiles"
+            ? "cadastro central"
+            : primarySource === "employees"
+              ? "escala de freelancers"
+              : "histórico de budget";
+
+        toast.success(`Dados recuperados do ${sourceLabel}.`, { duration: 3000 });
+
+        return {
+          nome_completo: row.nome_completo,
+          funcao: row.funcao ?? undefined,
+          gerencia: row.gerencia ?? undefined,
+          chave_pix: row.chave_pix ?? undefined,
+          tipo_chave_pix: row.tipo_chave_pix ?? undefined,
+          telefone: row.telefone ?? undefined,
+          foto_url: row.foto_url ?? undefined,
+          source: primarySource,
+          found_in: foundIn,
+        };
+      } catch (error) {
+        console.error("Error in unified CPF lookup:", error);
         return null;
+      } finally {
+        setIsLookingUp(false);
       }
+    },
+    []
+  );
 
-      if (data) {
-        toast.success("Dados recuperados automaticamente para este CPF.", { duration: 3000 });
-        return {
-          nome_completo: data.nome_completo,
-          funcao: data.funcao,
-          gerencia: data.gerencia,
-          chave_pix: data.chave_pix,
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error in CPF lookup:", error);
-      return null;
-    } finally {
-      setIsLookingUp(false);
-    }
-  }, []);
+  /**
+   * Wrapper legacy: mantém a API antiga para consumidores que ainda chamam
+   * `lookupFreelancerByCpf`. Internamente delega ao motor unificado.
+   */
+  const lookupFreelancerByCpf = useCallback(
+    async (cpf: string): Promise<FreelancerLookupResult | null> => {
+      const unified = await lookupUnifiedByCpf(cpf);
+      if (!unified) return null;
+      return {
+        nome_completo: unified.nome_completo,
+        funcao: unified.funcao ?? "",
+        gerencia: unified.gerencia ?? "",
+        chave_pix: unified.chave_pix ?? "",
+      };
+    },
+    [lookupUnifiedByCpf]
+  );
 
-  const lookupUnifiedByCpf = useCallback(async (cpf: string): Promise<UnifiedLookupResult | null> => {
-    const cleanCpf = cpf.replace(/\D/g, "");
-    if (cleanCpf.length !== 11) return null;
+  const lookupSupplierByCpfCnpj = useCallback(
+    async (cpfCnpj: string): Promise<SupplierLookupResult | null> => {
+      const cleanValue = cpfCnpj.replace(/\D/g, "");
+      if (cleanValue.length !== 11 && cleanValue.length !== 14) return null;
 
-    setIsLookingUp(true);
-    try {
-      // 1. freelancer_profiles (most complete — has photo, phone, PIX)
-      const { data: profile } = await supabase
-        .from("freelancer_profiles")
-        .select("nome_completo, telefone, tipo_chave_pix, chave_pix")
-        .eq("cpf", cleanCpf)
-        .maybeSingle();
+      setIsLookingUp(true);
+      try {
+        const { data, error } = await supabase
+          .from("maintenance_entries")
+          .select("fornecedor, chave_pix, created_at")
+          .eq("cpf_cnpj", cpfCnpj)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (profile) {
-        toast.success("Dados recuperados do cadastro de freelancer.", { duration: 3000 });
-        return {
-          nome_completo: profile.nome_completo,
-          chave_pix: profile.chave_pix ?? undefined,
-          telefone: profile.telefone ?? undefined,
-          tipo_chave_pix: profile.tipo_chave_pix ?? undefined,
-          source: "freelancer_profiles",
-        };
-      }
+        if (error) {
+          console.error("Error looking up supplier:", error);
+          return null;
+        }
 
-      // 2. employees (scheduling freelancers) — search both clean and formatted CPF
-      const { data: employee } = await supabase
-        .from("employees")
-        .select("name, phone")
-        .eq("worker_type", "freelancer")
-        .eq("cpf", cleanCpf)
-        .eq("active", true)
-        .limit(1)
-        .maybeSingle();
-
-      if (employee) {
-        toast.success("Dados recuperados da escala de freelancers.", { duration: 3000 });
-        return {
-          nome_completo: employee.name,
-          telefone: employee.phone ?? undefined,
-          source: "employees",
-        };
-      }
-
-      // 3. freelancer_entries (budget history) — uses formatted CPF
-      const { data: entry } = await supabase
-        .from("freelancer_entries")
-        .select("nome_completo, funcao, gerencia, chave_pix, created_at")
-        .eq("cpf", cpf)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (entry) {
-        toast.success("Dados recuperados do histórico de budget.", { duration: 3000 });
-        return {
-          nome_completo: entry.nome_completo,
-          funcao: entry.funcao,
-          gerencia: entry.gerencia,
-          chave_pix: entry.chave_pix,
-          source: "freelancer_entries",
-        };
-      }
-
-      // 4. Fallback cross-loja via RPC (ignora RLS) — cobre CPFs lançados em outras unidades
-      const { data: rpcRows, error: rpcError } = await supabase
-        .rpc("lookup_freelancer_by_cpf", { p_cpf: cleanCpf });
-
-      if (!rpcError && rpcRows && rpcRows.length > 0) {
-        const rpcEntry = rpcRows[0];
-        toast.success("Dados recuperados do histórico global de freelancers.", { duration: 3000 });
-        return {
-          nome_completo: rpcEntry.nome_completo,
-          funcao: rpcEntry.funcao ?? undefined,
-          gerencia: rpcEntry.gerencia ?? undefined,
-          chave_pix: rpcEntry.chave_pix ?? undefined,
-          source: "freelancer_entries",
-        };
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Error in unified CPF lookup:", error);
-      return null;
-    } finally {
-      setIsLookingUp(false);
-    }
-  }, []);
-
-  const lookupSupplierByCpfCnpj = useCallback(async (cpfCnpj: string): Promise<SupplierLookupResult | null> => {
-    const cleanValue = cpfCnpj.replace(/\D/g, "");
-    if (cleanValue.length !== 11 && cleanValue.length !== 14) return null;
-
-    setIsLookingUp(true);
-    try {
-      const { data, error } = await supabase
-        .from("maintenance_entries")
-        .select("fornecedor, chave_pix, created_at")
-        .eq("cpf_cnpj", cpfCnpj)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error looking up supplier:", error);
+        if (data) {
+          toast.success("Dados do fornecedor recuperados automaticamente.", {
+            duration: 3000,
+          });
+          return { fornecedor: data.fornecedor, chave_pix: data.chave_pix };
+        }
         return null;
+      } catch (error) {
+        console.error("Error in supplier lookup:", error);
+        return null;
+      } finally {
+        setIsLookingUp(false);
       }
-
-      if (data) {
-        toast.success("Dados do fornecedor recuperados automaticamente.", { duration: 3000 });
-        return { fornecedor: data.fornecedor, chave_pix: data.chave_pix };
-      }
-      return null;
-    } catch (error) {
-      console.error("Error in supplier lookup:", error);
-      return null;
-    } finally {
-      setIsLookingUp(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   return {
     isLookingUp,

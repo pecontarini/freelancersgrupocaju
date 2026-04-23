@@ -1683,6 +1683,7 @@ export type Database = {
           checkout_lng: number | null
           checkout_selfie_url: string | null
           created_at: string
+          entry_id: string | null
           freelancer_id: string
           id: string
           loja_id: string
@@ -1708,6 +1709,7 @@ export type Database = {
           checkout_lng?: number | null
           checkout_selfie_url?: string | null
           created_at?: string
+          entry_id?: string | null
           freelancer_id: string
           id?: string
           loja_id: string
@@ -1733,6 +1735,7 @@ export type Database = {
           checkout_lng?: number | null
           checkout_selfie_url?: string | null
           created_at?: string
+          entry_id?: string | null
           freelancer_id?: string
           id?: string
           loja_id?: string
@@ -1746,6 +1749,13 @@ export type Database = {
           valor_status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "freelancer_checkins_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "freelancer_checkins_freelancer_id_fkey"
             columns: ["freelancer_id"]

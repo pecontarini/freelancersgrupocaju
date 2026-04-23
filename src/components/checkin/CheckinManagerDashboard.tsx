@@ -54,14 +54,23 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "approved" && c.valor_status === "approved"
   );
 
-  // Match scheduled freelancers with checkins: schedule_id → CPF → name
+  // Match scheduled/manual freelancers with checkins: schedule_id → entry_id → CPF → name
   const scheduledWithStatus = scheduledFreelancers.map((sf) => {
-    // 1) schedule_id (most reliable — set by trigger or by /checkin)
-    const matchedBySchedule = checkins.find((c) => (c as any).schedule_id === sf.scheduleId);
-    if (matchedBySchedule) {
-      return { ...sf, checkedIn: matchedBySchedule.status !== "pending_schedule", checkinStatus: matchedBySchedule.status };
+    // 1) schedule_id (escala) — only when source is schedule
+    if (sf.source === "schedule") {
+      const matchedBySchedule = checkins.find((c) => (c as any).schedule_id === sf.scheduleId);
+      if (matchedBySchedule) {
+        return { ...sf, checkedIn: matchedBySchedule.status !== "pending_schedule", checkinStatus: matchedBySchedule.status };
+      }
     }
-    // 2) CPF normalization (robust against name variations)
+    // 2) entry_id (lançamento manual)
+    if (sf.entryId) {
+      const matchedByEntry = checkins.find((c) => (c as any).entry_id === sf.entryId);
+      if (matchedByEntry) {
+        return { ...sf, checkedIn: matchedByEntry.status !== "pending_schedule", checkinStatus: matchedByEntry.status };
+      }
+    }
+    // 3) CPF normalization (robust against name variations)
     const sfCpf = normalizeCpf(sf.cpf);
     if (sfCpf.length === 11) {
       const matchedByCpf = checkins.find(
@@ -71,7 +80,7 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
         return { ...sf, checkedIn: matchedByCpf.status !== "pending_schedule", checkinStatus: matchedByCpf.status };
       }
     }
-    // 3) Fallback: name normalization (legacy)
+    // 4) Fallback: name normalization (legacy)
     const normalizedScheduleName = normalizeName(sf.employeeName);
     const matchedCheckin = checkins.find((c) => {
       const checkinName = c.freelancer_profiles?.nome_completo;
@@ -156,17 +165,24 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
                           </Badge>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                         {sf.jobTitle && (
                           <span className="flex items-center gap-1">
                             <Briefcase className="h-3 w-3" />
                             {sf.jobTitle}
                           </span>
                         )}
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatTime(sf.startTime)} – {formatTime(sf.endTime)}
-                        </span>
+                        {sf.source === "schedule" ? (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatTime(sf.startTime)} – {formatTime(sf.endTime)}
+                          </span>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px] gap-1 h-5 px-1.5">
+                            <FileText className="h-3 w-3" />
+                            Lançamento manual — sem horário
+                          </Badge>
+                        )}
                         {sf.agreedRate != null && (
                           <span className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />

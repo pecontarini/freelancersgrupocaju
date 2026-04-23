@@ -51,6 +51,7 @@ function App() {
                 />
                 <Route path="/checkin" element={<FreelancerCheckin />} />
                 <Route path="/checkin-demo" element={<FreelancerCheckinDemo />} />
+                <Route path="/estacao-checkin" element={<EstacaoCheckin />} />
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />

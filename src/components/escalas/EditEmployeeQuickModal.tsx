@@ -166,7 +166,7 @@ export function EditEmployeeQuickModal({
           )}
 
           <div className="space-y-1.5">
-            <Label>Telefone</Label>
+            <Label>Telefone <span className="text-xs text-muted-foreground font-normal">(opcional — confirmado no check-in)</span></Label>
             <Input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}

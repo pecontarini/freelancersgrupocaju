@@ -299,6 +299,7 @@ export function TeamManagement() {
                   <Label htmlFor="emp-phone">
                     <Phone className="h-3.5 w-3.5 inline mr-1" />
                     Telefone / WhatsApp
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">(opcional — confirmado no check-in)</span>
                   </Label>
                   <Input
                     id="emp-phone"

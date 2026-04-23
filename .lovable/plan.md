@@ -1,102 +1,93 @@
 
 
-## Plano: ativar fluxo Escala → Presença → Pagamento de imediato
+## Plano: unificar lançamentos (Escala + Budget Manual) → mesma pendência de Check-in
 
-### Diagnóstico do estado atual (banco real)
+### Diagnóstico — respondendo direto à sua pergunta
 
-| Métrica | Valor | Significado |
-|---|---|---|
-| Escalas freelancer (últimos 7d) | **287** | Editor de escalas funcionando |
-| Lançamentos `origem='escala'` | **195** | Provisórios entrando no Budget |
-| Check-ins reais (últimos 7d) | **0** | App `/checkin` ainda não usado em produção |
-| Check-ins com `schedule_id` preenchido | **0** | Ponte escala→checkin nunca foi exercida |
-| Lançamentos via check-in aprovado | **0** | Fluxo de assinatura ainda não rodou |
-| Trigger `sync_schedule_to_freelancer_entry` ativo | **NÃO** | Sync de escala→budget está rodando por outro caminho (manual ou trigger removido) |
+**Os dois lançamentos vão pro mesmo lugar?**
+- **SIM**, ambos terminam na **mesma tabela `freelancer_entries`** que abastece o **Budget Gerencial**.
+- Mas eles têm origens diferentes:
+  - Escala (Editor de Escalas) → `origem = 'escala'`, com `schedule_id` preenchido (195 entries hoje)
+  - Formulário manual (aba Budget) → `origem = 'manual'`, sem `schedule_id` (6.616 entries hoje)
 
-### O que já funciona hoje na aba **Presença de Freelancers** (`Quadro Operacional → Presença`)
+**Os dois ativam pendência de check-in?**
+- **NÃO. Hoje nenhum dos dois está ativando — descoberta crítica:**
+  - Os triggers que criariam o stub `pending_schedule` em `freelancer_checkins` **não existem no banco** (consultei `pg_trigger` agora — vazio para `schedules`, `freelancer_entries` e `freelancer_checkins`).
+  - A função `create_pending_schedule_checkin()` foi criada na migração anterior, mas o `CREATE TRIGGER` não foi efetivado.
+  - O lançamento **manual** (formulário do Budget) **nunca teve** essa ponte — só foi pensada para escala.
 
-A aba carrega 2 fontes para a data selecionada:
-
-1. **`useScheduledFreelancers(unitId, date)`** → puxa `schedules` da loja + `employees.worker_type='freelancer'` com status `working`/`confirmed`/`scheduled`. Renderiza um card por agendado mostrando: nome, função, horário, valor combinado, e badge **"Aguardando"** ou **"Check-in realizado"**.
-2. **`useFreelancerCheckins(lojaId, date)`** → puxa `freelancer_checkins` da loja para a data. Cada check-in vira `CheckinApprovalCard` com selfie, GPS, valor informado e botões **Aprovar Presença / Rejeitar / Confirmar Valor**.
-
-O matching entre as duas listas hoje tenta **`schedule_id`** primeiro, depois cai para **normalização de nome**.
-
-### Os 3 gaps que impedem 100% funcional imediato
-
-**Gap 1 — Check-in real nunca grava `schedule_id`**
-`createCheckin` em `useFreelancerCheckins.ts` insere sem `schedule_id`. O matching por nome funciona, mas é frágil (mudança de acento, abreviação). Resultado: o card "Aguardando" pode não virar "Check-in realizado" mesmo após o freelancer fazer check-in.
-
-**Gap 2 — Não há "pré-criação" de checkin a partir da escala**
-Hoje, agendar um freelancer na escala **não cria um stub** em `freelancer_checkins` com status `pending_schedule`. O código já espera esse stub (`findPendingScheduleCheckin` existe), mas nada o cria. Sem isso, o `schedule_id` nunca é amarrado no momento do check-in.
-
-**Gap 3 — Trigger de sync escala→budget está desativado no banco**
-Mesmo com 195 entries `origem='escala'` históricas, o trigger atual está ausente. Novas escalas inseridas agora **não estão alimentando o budget automaticamente** (a menos que outro caminho — manual ou edge function — esteja fazendo isso).
+**Resultado prático hoje:** o card "Aguardando" na aba Presença não aparece nem para freelancer agendado, nem para freelancer lançado direto no Budget. Só aparece check-in real quando o freelancer abre o `/checkin` no celular.
 
 ### O que vou implementar
 
-#### 1. Reativar o trigger de sync escala→budget
-Recriar o trigger em `schedules`:
-```sql
-CREATE TRIGGER trg_sync_schedule_to_freelancer_entry
-AFTER INSERT OR UPDATE OR DELETE ON public.schedules
-FOR EACH ROW EXECUTE FUNCTION public.sync_schedule_to_freelancer_entry();
-```
-Garante que **toda escala de freelancer** com `worker_type='freelancer'`, `status='working'` e `agreed_rate>0` cria/atualiza um `freelancer_entries` com `origem='escala'` aparecendo no Budget Gerencial como **"Previsto - Escala"**.
+#### 1. Reativar os triggers que sumiram do banco
+Recriar via migração:
+- `trg_sync_schedule_to_freelancer_entry` em `schedules` (sync escala → budget)
+- `trg_create_pending_schedule_checkin` em `schedules` (cria card "Aguardando" para escala)
 
-#### 2. Criar stub de check-in pendente ao agendar freelancer
-Nova função SQL `create_pending_schedule_checkin()` + trigger em `schedules`. Quando uma escala de freelancer com CPF é criada/atualizada, insere um `freelancer_checkins` com:
-- `schedule_id` = id da escala
-- `freelancer_id` = perfil em `freelancer_profiles` (lookup por CPF)
-- `checkin_date` = `schedule_date`
-- `status = 'pending_schedule'`
-- `valor_informado` = `agreed_rate`
+Sem esses, nada do fluxo automático funciona.
 
-Quando a escala é cancelada, o stub `pending_schedule` é deletado.
+#### 2. **Nova ponte: lançamento manual também cria card "Aguardando"**
+Criar função SQL `create_pending_manual_checkin()` + trigger em `freelancer_entries`:
 
-#### 3. App `/checkin` passa a vincular `schedule_id`
-- `useFreelancerCheckins.findPendingScheduleCheckin` já busca pelo CPF/data.
-- Ajustar `createCheckin` para aceitar `schedule_id` opcional.
-- Em `FreelancerCheckin.tsx`, quando o lookup encontra um stub `pending_schedule`, o fluxo já atualiza esse registro (linhas 282-295). **Sem alteração de código aqui — só a criação do stub no passo 2 ativa esse caminho.**
-- Quando NÃO há stub (freelancer "avulso", não agendado), o checkin novo entra sem `schedule_id` igual hoje.
+- Quando alguém lança freelancer pelo formulário do Budget Gerencial **com CPF válido** e `data_pop >= hoje`, o trigger:
+  - Garante perfil em `freelancer_profiles` (lookup/insert por CPF)
+  - Insere stub em `freelancer_checkins` com `status = 'pending_schedule'`, `valor_informado = valor lançado`, `loja_id`, `checkin_date = data_pop`
+  - **Marca o stub com `entry_id`** (nova coluna nullable em `freelancer_checkins`) para amarrar de volta ao lançamento manual e permitir limpeza no DELETE
+- Se o lançamento for editado (UPDATE de `valor` ou `data_pop`), o stub é atualizado.
+- Se o lançamento for excluído, o stub `pending_schedule` correspondente é removido.
 
-#### 4. Reforçar matching no dashboard de presença
-`CheckinManagerDashboard` já tenta `schedule_id` primeiro, depois nome. Adicionar fallback intermediário por **CPF normalizado** entre `freelancer_profiles.cpf` e `employees.cpf`, eliminando 100% dos casos de "Aguardando" indevido.
+**Salvaguarda contra duplicidade:** se já existe um stub `pending_schedule` para o **mesmo CPF + mesma loja + mesma data** (vindo da escala), o trigger de manual **não cria outro** — apenas anexa o `entry_id` no stub existente, evitando "Aguardando" duplicado na aba Presença.
 
-### Resultado prático após implementação
+#### 3. Aba Presença passa a unir as duas fontes
+Atualizar `useScheduledFreelancers` (ou criar `usePendingFreelancers`) para puxar **2 fontes** para a data selecionada:
 
-Para usar a aba Presença de forma 100% funcional **hoje**:
+- **(A)** Escalas em `schedules` (já funciona) — vira card "Aguardando" com horário e função
+- **(B)** Lançamentos `freelancer_entries.origem='manual'` com CPF e `data_pop = data` — vira card "Aguardando" com etiqueta **"Lançamento manual — sem horário previsto"** e o valor
 
-1. **Gerente agenda freelancers** no Editor de Escalas (com CPF) → aparece como **"Previsto"** no Budget e como card **"Aguardando"** na aba Presença do dia.
-2. **Freelancer chega e faz check-in** em `/checkin?unidade=...` → o card vira **"Check-in realizado"** com selfie, GPS e valor.
-3. **Gerente abre Presença** → vê todos os agendados + os checkins reais lado a lado, aprova presença, confirma valor.
-4. **Aprovação em lote com senha** → roda `promote_approved_checkins` → entries provisórias `origem='escala'` somem do Budget e entram como **"Via Check-in"** definitivos.
-5. **Gerar Ordem de Pagamento** em PDF a partir do Budget Gerencial.
+Ambos casam com check-in real via:
+1. `schedule_id` (escala) ou `entry_id` (manual)
+2. CPF normalizado (fallback)
+3. Nome normalizado (último fallback)
 
-Para freelancer **não agendado** (chegou de surpresa): faz check-in normal, aparece direto na aba Presença sem o card "Aguardando" prévio. Fluxo de aprovação idêntico.
+#### 4. Quando o check-in real acontece
+- O fluxo `/checkin` continua igual: `findPendingScheduleCheckin` busca por CPF/data, encontra o stub (seja de escala ou de manual) e atualiza com selfie/GPS/valor.
+- **Após aprovação em lote**, `promote_approved_checkins` (já existente) precisa de um pequeno ajuste para **também limpar `freelancer_entries.origem='manual'`** quando o stub tinha `entry_id` preenchido — evita lançamento manual duplicado no Budget após o check-in virar definitivo.
 
-### Mudanças técnicas resumidas
+### Resultado para o usuário
+
+| Como o gerente lança | Vira no Budget | Vira na Presença | Quando freelancer faz check-in |
+|---|---|---|---|
+| Editor de Escalas (com CPF) | Previsto - Escala | Card "Aguardando" com horário | Card vira "Check-in realizado", aprova → "Via Check-in" |
+| Formulário Budget (com CPF, data hoje/futuro) | Lançamento manual | Card "Aguardando — sem horário" | Card vira "Check-in realizado", aprova → "Via Check-in" (substitui o manual) |
+| Formulário Budget (sem CPF ou data passada) | Lançamento manual | **Não aparece** (não há como casar) | N/A |
+| Freelancer avulso só faz check-in | — | Aparece direto após check-in | Aprova normal |
+
+### Mudanças técnicas
 
 | Arquivo / objeto | Mudança |
 |---|---|
-| Migração SQL | Recriar trigger `trg_sync_schedule_to_freelancer_entry` |
-| Migração SQL | Nova função `create_pending_schedule_checkin()` + trigger em `schedules` |
-| `useFreelancerCheckins.ts` | `createCheckin` aceita `schedule_id?` opcional |
-| `CheckinManagerDashboard.tsx` | Matching adicional por CPF normalizado |
+| Migração SQL | `CREATE TRIGGER trg_sync_schedule_to_freelancer_entry` |
+| Migração SQL | `CREATE TRIGGER trg_create_pending_schedule_checkin` |
+| Migração SQL | Nova coluna `freelancer_checkins.entry_id uuid NULL` + FK + índice |
+| Migração SQL | Nova função `create_pending_manual_checkin()` + trigger em `freelancer_entries` |
+| Migração SQL | Ajuste em `promote_approved_checkins` para limpar `freelancer_entries.origem='manual'` quando `entry_id` existe |
+| `useScheduledFreelancers.ts` | Unir entries manuais pendentes na lista |
+| `CheckinManagerDashboard.tsx` | Matching adicional por `entry_id` + label "sem horário" para origem manual |
 
 ### O que **não** entra agora
 
-- Mudanças visuais na aba Presença
-- Mudanças no fluxo `/checkin` real (UX intacto)
+- Mudanças visuais grandes na aba Presença (só o badge "sem horário" para lançamentos manuais)
+- Mudanças no `/checkin` real (o lookup por CPF já encontra qualquer stub)
 - Mudanças no `/checkin-demo`
-- Mudanças no Editor de Escalas
-- Mudanças no PDF de Ordem de Pagamento
+- Mudanças no formulário de lançamento manual em si (mantém os mesmos campos)
 
 ### Validação
 
-1. Agendar 1 freelancer (com CPF) na escala de hoje → conferir no Budget que aparece "Previsto" e na Presença que aparece "Aguardando".
-2. Fazer check-in real desse CPF → card vira "Check-in realizado", aparece também o `CheckinApprovalCard` para aprovar.
-3. Aprovar presença + valor + assinatura em lote → conferir que sumiu o "Previsto" e entrou "Via Check-in" no Budget.
-4. Cancelar uma escala futura → conferir que o stub `pending_schedule` foi removido.
-5. Freelancer sem agendamento prévio faz check-in → aparece só como `CheckinApprovalCard`, sem card "Aguardando".
+1. Lançar 1 freelancer pelo formulário do Budget com CPF e data = hoje → conferir "Aguardando" na Presença.
+2. Lançar 1 freelancer pelo formulário com data = ontem → confirmar que **não** aparece na Presença (correto).
+3. Editar o valor do lançamento manual → conferir que o stub atualizou `valor_informado`.
+4. Excluir o lançamento manual → conferir que o stub `pending_schedule` sumiu.
+5. Lançar pelo formulário um CPF que **já está agendado** na escala para o mesmo dia → conferir que aparece **um único** card "Aguardando" (sem duplicar).
+6. Freelancer faz check-in real do CPF lançado manualmente → card vira "Check-in realizado", aprovação em lote substitui o lançamento manual por "Via Check-in".
 

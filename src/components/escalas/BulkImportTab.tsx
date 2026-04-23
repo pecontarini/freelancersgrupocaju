@@ -72,11 +72,12 @@ function normalizePhone(raw: string): string {
 }
 
 function assessConfidence(emp: { name: string; job_title: string; phone: string }): ParsedEmployee["confidence"] {
-  const phoneDigits = (emp.phone || "").replace(/\D/g, "");
   return {
     name: emp.name.trim().length >= 3 && /\s/.test(emp.name.trim()),
     job_title: !!emp.job_title && emp.job_title !== "Staff",
-    phone: phoneDigits.length === 10 || phoneDigits.length === 11,
+    // Telefone é opcional na escala — confirmação ocorre no check-in.
+    // Sempre tratado como "ok" para não sinalizar falsa pendência.
+    phone: true,
   };
 }
 

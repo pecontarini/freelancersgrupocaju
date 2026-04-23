@@ -505,7 +505,7 @@ export function FreelancerAddModal({
               {!noCpfMode && (
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Telefone</Label>
+                    <Label className="text-xs">Telefone <span className="text-muted-foreground">(opcional — confirmado no check-in)</span></Label>
                     <Input
                       value={phone}
                       onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}

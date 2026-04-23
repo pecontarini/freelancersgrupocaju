@@ -421,6 +421,7 @@ export function FreelancerForm() {
                   placeholder="000.000.000-00"
                   value={cpfValue}
                   onChange={handleCPFChange}
+                  onBlur={handleCpfBlur}
                   className="input-focus-ring"
                 />
                 {isLookingUp && (

@@ -5,6 +5,7 @@ export interface ScheduledFreelancer {
   scheduleId: string;
   employeeId: string;
   employeeName: string;
+  cpf: string | null;
   jobTitle: string | null;
   startTime: string | null;
   endTime: string | null;
@@ -30,6 +31,7 @@ export function useScheduledFreelancers(unitId?: string, date?: string) {
           employees!inner (
             id,
             name,
+            cpf,
             job_title,
             worker_type
           )
@@ -45,6 +47,7 @@ export function useScheduledFreelancers(unitId?: string, date?: string) {
         scheduleId: s.id,
         employeeId: s.employee_id,
         employeeName: s.employees?.name || "Sem nome",
+        cpf: s.employees?.cpf || null,
         jobTitle: s.employees?.job_title || null,
         startTime: s.start_time,
         endTime: s.end_time,

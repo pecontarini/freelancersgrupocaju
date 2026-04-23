@@ -47,6 +47,14 @@ export function EstacaoSetup({ onReady }: Props) {
           toast.error("Erro ao carregar unidades");
         } else {
           setLojas(data || []);
+          // Auto-select unidade from URL ?unidade=
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const fromUrl = params.get("unidade");
+            if (fromUrl && (data || []).some((l) => l.id === fromUrl)) {
+              setLojaId(fromUrl);
+            }
+          } catch {}
         }
       });
   }, []);

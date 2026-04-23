@@ -20,6 +20,7 @@ import LiquidGlassDemo from "./pages/LiquidGlassDemo";
 import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 import ContagemUtensilios from "./pages/ContagemUtensilios";
 import Agenda from "./pages/Agenda";
+import EstacaoCheckin from "./pages/EstacaoCheckin";
 
 const queryClient = new QueryClient();
 

@@ -23,6 +23,7 @@ export interface FreelancerCheckin {
   valor_approved_at: string | null;
   rejection_reason: string | null;
   checkin_date: string;
+  schedule_id: string | null;
   created_at: string;
   freelancer_profiles?: {
     id: string;
@@ -90,6 +91,7 @@ export function useFreelancerCheckins(lojaId?: string, date?: string) {
       checkin_lat?: number;
       checkin_lng?: number;
       valor_informado?: number;
+      schedule_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("freelancer_checkins")

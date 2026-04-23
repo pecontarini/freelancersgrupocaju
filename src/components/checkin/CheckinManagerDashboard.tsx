@@ -23,6 +23,11 @@ function normalizeName(name: string) {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+function normalizeCpf(cpf: string | null | undefined) {
+  if (!cpf) return "";
+  return cpf.replace(/\D/g, "");
+}
+
 export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -38,7 +43,7 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
   );
 
   const pendingCount = checkins.filter(
-    (c) => c.status === "completed" || (c.status !== "approved" && c.status !== "rejected")
+    (c) => c.status === "completed" || (c.status !== "approved" && c.status !== "rejected" && c.status !== "pending_schedule")
   ).length;
 
   const pendingValueCount = checkins.filter(
@@ -49,14 +54,24 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
     (c) => c.status === "approved" && c.valor_status === "approved"
   );
 
-  // Match scheduled freelancers with checkins by schedule_id first, then by name
+  // Match scheduled freelancers with checkins: schedule_id → CPF → name
   const scheduledWithStatus = scheduledFreelancers.map((sf) => {
-    // Try schedule_id match first (new system)
+    // 1) schedule_id (most reliable — set by trigger or by /checkin)
     const matchedBySchedule = checkins.find((c) => (c as any).schedule_id === sf.scheduleId);
     if (matchedBySchedule) {
       return { ...sf, checkedIn: matchedBySchedule.status !== "pending_schedule", checkinStatus: matchedBySchedule.status };
     }
-    // Fallback: name normalization (legacy)
+    // 2) CPF normalization (robust against name variations)
+    const sfCpf = normalizeCpf(sf.cpf);
+    if (sfCpf.length === 11) {
+      const matchedByCpf = checkins.find(
+        (c) => normalizeCpf(c.freelancer_profiles?.cpf) === sfCpf
+      );
+      if (matchedByCpf) {
+        return { ...sf, checkedIn: matchedByCpf.status !== "pending_schedule", checkinStatus: matchedByCpf.status };
+      }
+    }
+    // 3) Fallback: name normalization (legacy)
     const normalizedScheduleName = normalizeName(sf.employeeName);
     const matchedCheckin = checkins.find((c) => {
       const checkinName = c.freelancer_profiles?.nome_completo;
@@ -168,20 +183,22 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
 
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : checkins.length === 0 && scheduledWithStatus.length === 0 ? (
+          ) : checkins.filter((c) => c.status !== "pending_schedule").length === 0 && scheduledWithStatus.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum registro de presença nesta data.</p>
           ) : (
             <div className="space-y-3">
-              {checkins.map((checkin) => (
-                <CheckinApprovalCard
-                  key={checkin.id}
-                  checkin={checkin}
-                  userId={user?.id || ""}
-                  onApprovePresence={(id) => approvePresence.mutate({ checkinId: id, userId: user?.id || "" })}
-                  onRejectPresence={(id, reason) => rejectPresence.mutate({ checkinId: id, userId: user?.id || "", reason })}
-                  onApproveValue={(id, valor) => approveValue.mutate({ checkinId: id, userId: user?.id || "", valorAprovado: valor })}
-                />
-              ))}
+              {checkins
+                .filter((c) => c.status !== "pending_schedule")
+                .map((checkin) => (
+                  <CheckinApprovalCard
+                    key={checkin.id}
+                    checkin={checkin}
+                    userId={user?.id || ""}
+                    onApprovePresence={(id) => approvePresence.mutate({ checkinId: id, userId: user?.id || "" })}
+                    onRejectPresence={(id, reason) => rejectPresence.mutate({ checkinId: id, userId: user?.id || "", reason })}
+                    onApproveValue={(id, valor) => approveValue.mutate({ checkinId: id, userId: user?.id || "", valorAprovado: valor })}
+                  />
+                ))}
 
               {readyToSign.length > 0 && (
                 <CheckinBatchApproval

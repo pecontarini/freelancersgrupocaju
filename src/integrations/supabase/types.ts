@@ -595,6 +595,47 @@ export type Database = {
           },
         ]
       }
+      checkin_stations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_seen_at: string | null
+          loja_id: string
+          pin_hash: string
+          station_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen_at?: string | null
+          loja_id: string
+          pin_hash: string
+          station_name?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_seen_at?: string | null
+          loja_id?: string
+          pin_hash?: string
+          station_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_stations_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_corrections: {
         Row: {
           corrected_at: string
@@ -1689,6 +1730,7 @@ export type Database = {
           loja_id: string
           rejection_reason: string | null
           schedule_id: string | null
+          station_id: string | null
           status: string
           valor_approved_at: string | null
           valor_approved_by: string | null
@@ -1715,6 +1757,7 @@ export type Database = {
           loja_id: string
           rejection_reason?: string | null
           schedule_id?: string | null
+          station_id?: string | null
           status?: string
           valor_approved_at?: string | null
           valor_approved_by?: string | null
@@ -1741,6 +1784,7 @@ export type Database = {
           loja_id?: string
           rejection_reason?: string | null
           schedule_id?: string | null
+          station_id?: string | null
           status?: string
           valor_approved_at?: string | null
           valor_approved_by?: string | null
@@ -1775,6 +1819,13 @@ export type Database = {
             columns: ["schedule_id"]
             isOneToOne: false
             referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freelancer_checkins_station_id_fkey"
+            columns: ["station_id"]
+            isOneToOne: false
+            referencedRelation: "checkin_stations"
             referencedColumns: ["id"]
           },
         ]

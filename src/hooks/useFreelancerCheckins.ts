@@ -90,6 +90,7 @@ export function useFreelancerCheckins(lojaId?: string, date?: string) {
       checkin_lat?: number;
       checkin_lng?: number;
       valor_informado?: number;
+      schedule_id?: string | null;
     }) => {
       const { data, error } = await supabase
         .from("freelancer_checkins")

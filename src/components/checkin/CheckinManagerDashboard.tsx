@@ -183,20 +183,22 @@ export function CheckinManagerDashboard({ selectedUnidadeId }: Props) {
 
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Carregando...</p>
-          ) : checkins.length === 0 && scheduledWithStatus.length === 0 ? (
+          ) : checkins.filter((c) => c.status !== "pending_schedule").length === 0 && scheduledWithStatus.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum registro de presença nesta data.</p>
           ) : (
             <div className="space-y-3">
-              {checkins.map((checkin) => (
-                <CheckinApprovalCard
-                  key={checkin.id}
-                  checkin={checkin}
-                  userId={user?.id || ""}
-                  onApprovePresence={(id) => approvePresence.mutate({ checkinId: id, userId: user?.id || "" })}
-                  onRejectPresence={(id, reason) => rejectPresence.mutate({ checkinId: id, userId: user?.id || "", reason })}
-                  onApproveValue={(id, valor) => approveValue.mutate({ checkinId: id, userId: user?.id || "", valorAprovado: valor })}
-                />
-              ))}
+              {checkins
+                .filter((c) => c.status !== "pending_schedule")
+                .map((checkin) => (
+                  <CheckinApprovalCard
+                    key={checkin.id}
+                    checkin={checkin}
+                    userId={user?.id || ""}
+                    onApprovePresence={(id) => approvePresence.mutate({ checkinId: id, userId: user?.id || "" })}
+                    onRejectPresence={(id, reason) => rejectPresence.mutate({ checkinId: id, userId: user?.id || "", reason })}
+                    onApproveValue={(id, valor) => approveValue.mutate({ checkinId: id, userId: user?.id || "", valorAprovado: valor })}
+                  />
+                ))}
 
               {readyToSign.length > 0 && (
                 <CheckinBatchApproval

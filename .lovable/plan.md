@@ -1,93 +1,95 @@
 
 
-## Plano: unificar lançamentos (Escala + Budget Manual) → mesma pendência de Check-in
+## Plano: Modo Tablet de Check-in fixo na unidade
 
-### Diagnóstico — respondendo direto à sua pergunta
+### Conceito
+Substituir o fluxo "QR Code → celular do freelancer" por uma **estação fixa em tablet**, montada na parede ao lado do relógio de ponto. O tablet abre travado em uma unidade específica e mostra todos os freelancers **previstos do dia** (escala + lançamentos manuais do Budget) como botões grandes prontos para check-in/check-out. Freelancer não previsto continua podendo se identificar pelo CPF.
 
-**Os dois lançamentos vão pro mesmo lugar?**
-- **SIM**, ambos terminam na **mesma tabela `freelancer_entries`** que abastece o **Budget Gerencial**.
-- Mas eles têm origens diferentes:
-  - Escala (Editor de Escalas) → `origem = 'escala'`, com `schedule_id` preenchido (195 entries hoje)
-  - Formulário manual (aba Budget) → `origem = 'manual'`, sem `schedule_id` (6.616 entries hoje)
+### Como será a experiência
 
-**Os dois ativam pendência de check-in?**
-- **NÃO. Hoje nenhum dos dois está ativando — descoberta crítica:**
-  - Os triggers que criariam o stub `pending_schedule` em `freelancer_checkins` **não existem no banco** (consultei `pg_trigger` agora — vazio para `schedules`, `freelancer_entries` e `freelancer_checkins`).
-  - A função `create_pending_schedule_checkin()` foi criada na migração anterior, mas o `CREATE TRIGGER` não foi efetivado.
-  - O lançamento **manual** (formulário do Budget) **nunca teve** essa ponte — só foi pensada para escala.
+**Tela inicial (Home do tablet)** — fica sempre aberta:
+- Topo: nome da unidade + relógio em tempo real + data
+- Grid grande de cards com **todos os freelancers previstos hoje** (vindos da escala e do Budget manual), ordenados por horário (escalas primeiro, manuais por nome no fim).
+- Cada card mostra: foto (se já tiver perfil), nome, função, horário previsto (ou "sem horário" para manual), valor combinado, e um **badge de status**:
+  - **Disponível** (azul) — ainda não fez check-in
+  - **Em serviço** (verde) — fez check-in, falta check-out
+  - **Concluído** (cinza) — já fez check-out hoje
+- Rodapé com 2 botões grandes:
+  - **"Não estou na lista"** → abre teclado de CPF (fluxo atual de cadastro/identificação)
+  - **"Trocar unidade"** → exige PIN do gerente (4 dígitos, configurado por loja) para evitar troca acidental
 
-**Resultado prático hoje:** o card "Aguardando" na aba Presença não aparece nem para freelancer agendado, nem para freelancer lançado direto no Budget. Só aparece check-in real quando o freelancer abre o `/checkin` no celular.
+**Tocar em um card "Disponível"** → abre fluxo direto:
+1. Foto da pessoa (já cadastrada) + nome em destaque, com pergunta "É você?"
+2. Botão grande **"Tirar selfie de check-in"** → abre câmera frontal do tablet
+3. Confirma valor (pré-preenchido com o `agreed_rate` da escala ou `valor` do lançamento manual; pode ajustar)
+4. Tela de sucesso por 5 segundos → volta pra Home
 
-### O que vou implementar
+**Tocar em um card "Em serviço"** → fluxo de check-out:
+1. Foto + nome + horário do check-in
+2. Botão **"Tirar selfie de check-out"**
+3. Tela de sucesso → volta pra Home
 
-#### 1. Reativar os triggers que sumiram do banco
-Recriar via migração:
-- `trg_sync_schedule_to_freelancer_entry` em `schedules` (sync escala → budget)
-- `trg_create_pending_schedule_checkin` em `schedules` (cria card "Aguardando" para escala)
+**"Não estou na lista" (freelancer avulso)**:
+- Teclado numérico em tela cheia para CPF
+- Reusa o fluxo atual: lookup → cadastro novo (se não existir) → selfie → valor → sucesso
+- Após o check-in, esse freelancer passa a aparecer como card "Em serviço" na Home
 
-Sem esses, nada do fluxo automático funciona.
+**Travamento da estação**:
+- Rota nova `/estacao-checkin` (ou `/checkin` adaptado) que **fixa a unidade em localStorage** após o gerente selecionar e digitar PIN.
+- Recarregar a página mantém a unidade travada.
+- Sem botão de "voltar" pra outras telas — modo quiosque puro.
+- Auto-refresh dos cards a cada 30s + Realtime do Supabase (`freelancer_checkins`, `schedules`, `freelancer_entries`) para ficar ao vivo se alguém atualizar a escala no portal.
 
-#### 2. **Nova ponte: lançamento manual também cria card "Aguardando"**
-Criar função SQL `create_pending_manual_checkin()` + trigger em `freelancer_entries`:
-
-- Quando alguém lança freelancer pelo formulário do Budget Gerencial **com CPF válido** e `data_pop >= hoje`, o trigger:
-  - Garante perfil em `freelancer_profiles` (lookup/insert por CPF)
-  - Insere stub em `freelancer_checkins` com `status = 'pending_schedule'`, `valor_informado = valor lançado`, `loja_id`, `checkin_date = data_pop`
-  - **Marca o stub com `entry_id`** (nova coluna nullable em `freelancer_checkins`) para amarrar de volta ao lançamento manual e permitir limpeza no DELETE
-- Se o lançamento for editado (UPDATE de `valor` ou `data_pop`), o stub é atualizado.
-- Se o lançamento for excluído, o stub `pending_schedule` correspondente é removido.
-
-**Salvaguarda contra duplicidade:** se já existe um stub `pending_schedule` para o **mesmo CPF + mesma loja + mesma data** (vindo da escala), o trigger de manual **não cria outro** — apenas anexa o `entry_id` no stub existente, evitando "Aguardando" duplicado na aba Presença.
-
-#### 3. Aba Presença passa a unir as duas fontes
-Atualizar `useScheduledFreelancers` (ou criar `usePendingFreelancers`) para puxar **2 fontes** para a data selecionada:
-
-- **(A)** Escalas em `schedules` (já funciona) — vira card "Aguardando" com horário e função
-- **(B)** Lançamentos `freelancer_entries.origem='manual'` com CPF e `data_pop = data` — vira card "Aguardando" com etiqueta **"Lançamento manual — sem horário previsto"** e o valor
-
-Ambos casam com check-in real via:
-1. `schedule_id` (escala) ou `entry_id` (manual)
-2. CPF normalizado (fallback)
-3. Nome normalizado (último fallback)
-
-#### 4. Quando o check-in real acontece
-- O fluxo `/checkin` continua igual: `findPendingScheduleCheckin` busca por CPF/data, encontra o stub (seja de escala ou de manual) e atualiza com selfie/GPS/valor.
-- **Após aprovação em lote**, `promote_approved_checkins` (já existente) precisa de um pequeno ajuste para **também limpar `freelancer_entries.origem='manual'`** quando o stub tinha `entry_id` preenchido — evita lançamento manual duplicado no Budget após o check-in virar definitivo.
-
-### Resultado para o usuário
-
-| Como o gerente lança | Vira no Budget | Vira na Presença | Quando freelancer faz check-in |
-|---|---|---|---|
-| Editor de Escalas (com CPF) | Previsto - Escala | Card "Aguardando" com horário | Card vira "Check-in realizado", aprova → "Via Check-in" |
-| Formulário Budget (com CPF, data hoje/futuro) | Lançamento manual | Card "Aguardando — sem horário" | Card vira "Check-in realizado", aprova → "Via Check-in" (substitui o manual) |
-| Formulário Budget (sem CPF ou data passada) | Lançamento manual | **Não aparece** (não há como casar) | N/A |
-| Freelancer avulso só faz check-in | — | Aparece direto após check-in | Aprova normal |
-
-### Mudanças técnicas
+### O que muda tecnicamente
 
 | Arquivo / objeto | Mudança |
 |---|---|
-| Migração SQL | `CREATE TRIGGER trg_sync_schedule_to_freelancer_entry` |
-| Migração SQL | `CREATE TRIGGER trg_create_pending_schedule_checkin` |
-| Migração SQL | Nova coluna `freelancer_checkins.entry_id uuid NULL` + FK + índice |
-| Migração SQL | Nova função `create_pending_manual_checkin()` + trigger em `freelancer_entries` |
-| Migração SQL | Ajuste em `promote_approved_checkins` para limpar `freelancer_entries.origem='manual'` quando `entry_id` existe |
-| `useScheduledFreelancers.ts` | Unir entries manuais pendentes na lista |
-| `CheckinManagerDashboard.tsx` | Matching adicional por `entry_id` + label "sem horário" para origem manual |
+| `src/pages/EstacaoCheckin.tsx` (novo) | Página completa do modo tablet: home com grid + sub-telas de check-in/check-out |
+| `src/components/checkin/EstacaoSetup.tsx` (novo) | Tela inicial de configuração: seleção de unidade + criação de PIN do gerente |
+| `src/components/checkin/EstacaoFreelancerCard.tsx` (novo) | Card grande de freelancer (foto, nome, horário, status) |
+| `src/components/checkin/EstacaoSelfieCapture.tsx` (novo) | Captura selfie usando `navigator.mediaDevices.getUserMedia` (câmera frontal do tablet, sem upload de arquivo) |
+| `src/components/checkin/EstacaoCpfKeypad.tsx` (novo) | Teclado numérico touch para entrada de CPF |
+| `src/hooks/useEstacaoStatus.ts` (novo) | Cruza `useScheduledFreelancers` + `useFreelancerCheckins` e calcula o status (Disponível / Em serviço / Concluído) por freelancer; assina Realtime |
+| `src/App.tsx` | Rota pública nova `/estacao-checkin` (sem `ProtectedRoute`) |
+| `src/components/checkin/QRCodeGenerator.tsx` | Adicionar segundo modo: gerar **link da estação** além do link do freelancer (para o gerente abrir no tablet) |
+| Migração SQL | Nova tabela `checkin_stations` (`id`, `loja_id`, `station_name`, `pin_hash`, `created_by`, `last_seen_at`) com RLS |
+| Migração SQL | Coluna `station_id uuid NULL` em `freelancer_checkins` para auditoria de qual tablet originou o check-in |
+| Edge function `verify-station-pin` (nova) | Recebe `loja_id + pin`, valida hash bcrypt, retorna token de sessão da estação (cookie ou localStorage) |
+
+### Fluxo unificado com o que já existe
+
+- A lista do tablet usa **a mesma fonte** que a aba Presença do gerente (`useScheduledFreelancers` + `useFreelancerCheckins`). Ou seja: tudo que aparece no Painel da Liderança como "Aguardando" aparece no tablet como "Disponível", e vice-versa.
+- Check-in feito no tablet **cai exatamente no mesmo lugar** que o feito por celular hoje: vira `freelancer_checkins` com `status='open'` (e amarra ao `pending_schedule` stub via CPF, igual ao fluxo atual).
+- Aprovação de presença, valor e ordem de pagamento continuam **100% iguais** no Portal da Liderança — sem mudança nenhuma na aba Presença.
+- Geolocalização do tablet é capturada uma vez no boot da estação (fixa) e reusada em todos os check-ins.
+
+### Resultado para o usuário
+
+| Quem | Onde | O que faz |
+|---|---|---|
+| Gerente da unidade | Portal Liderança | Cria/escala freelancers como hoje (escala ou lançamento manual no Budget) |
+| Gerente da unidade | Tablet (1ª vez) | Seleciona unidade, define PIN, deixa o tablet travado na parede |
+| Freelancer previsto | Tablet | Toca no próprio card → selfie → confirma valor → pronto |
+| Freelancer avulso | Tablet | "Não estou na lista" → digita CPF → cadastro/identificação → selfie → valor |
+| Freelancer | Tablet (saída) | Toca no próprio card "Em serviço" → selfie de check-out |
+| Gerente | Portal Liderança | Aprova presença + valor em lote, gera ordem de pagamento (idêntico a hoje) |
 
 ### O que **não** entra agora
 
-- Mudanças visuais grandes na aba Presença (só o badge "sem horário" para lançamentos manuais)
-- Mudanças no `/checkin` real (o lookup por CPF já encontra qualquer stub)
-- Mudanças no `/checkin-demo`
-- Mudanças no formulário de lançamento manual em si (mantém os mesmos campos)
+- App nativo / modo PWA instalável (web fica responsivo para qualquer tablet — Android, iPad)
+- Reconhecimento facial automático (mantém toque no card + selfie de evidência)
+- Substituição do fluxo `/checkin` por celular existente — fica disponível como alternativa
+- Mudanças visuais ou de regras na aba Presença / Ordem de Pagamento
 
 ### Validação
 
-1. Lançar 1 freelancer pelo formulário do Budget com CPF e data = hoje → conferir "Aguardando" na Presença.
-2. Lançar 1 freelancer pelo formulário com data = ontem → confirmar que **não** aparece na Presença (correto).
-3. Editar o valor do lançamento manual → conferir que o stub atualizou `valor_informado`.
-4. Excluir o lançamento manual → conferir que o stub `pending_schedule` sumiu.
-5. Lançar pelo formulário um CPF que **já está agendado** na escala para o mesmo dia → conferir que aparece **um único** card "Aguardando" (sem duplicar).
-6. Freelancer faz check-in real do CPF lançado manualmente → card vira "Check-in realizado", aprovação em lote substitui o lançamento manual por "Via Check-in".
+1. Em desktop em modo tablet (1024×768), abrir `/estacao-checkin` → ver tela de setup → escolher unidade + criar PIN → cair na Home.
+2. Recarregar a página → continua na Home travada na mesma unidade.
+3. Escalar 1 freelancer com CPF para hoje no Editor de Escalas → em <30s o card aparece como "Disponível" no tablet.
+4. Lançar 1 freelancer manual no Budget Gerencial para hoje → idem aparece como "Disponível, sem horário".
+5. Tocar no card → selfie pela câmera → confirmar valor → card vira "Em serviço" e some da lista de pendentes da Liderança como "Aguardando" (vira "Check-in realizado").
+6. Tocar no card "Em serviço" → selfie de check-out → card vira "Concluído".
+7. "Não estou na lista" → CPF novo → cadastro completo → check-in → vira card "Em serviço".
+8. "Trocar unidade" sem PIN correto → bloqueia. Com PIN correto → volta ao setup.
+9. Aprovar presença + valor em lote no Portal → gerar PDF de Ordem de Pagamento idêntico ao fluxo atual.
 

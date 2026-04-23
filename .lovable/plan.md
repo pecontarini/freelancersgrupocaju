@@ -1,196 +1,107 @@
 
-## Plano de correção 100% — Escalas via modelo e exportação Excel
 
-### Problema real
-Hoje existem **dois problemas ainda não encerrados**:
+## Plano: motor único de CPF como base do lançamento de freelancer
 
-1. **Importação continua falhando com `unique_active_schedule`**
-   - O código atual já tenta deduplicar e retry, mas o usuário ainda recebe o toast genérico de conflito.
-   - Isso indica uma destas situações:
-     - a versão publicada ainda não está refletindo integralmente o fix;
-     - o erro está vindo em um formato diferente do esperado pelo branch atual;
-     - ainda existe um caso de conflito não coberto antes do `insert`.
+### Causa raiz (confirmada no banco)
 
-2. **Exportação Excel ainda quebra**
-   - O ajuste de import do `xlsx-js-style` já foi feito, então o problema restante provavelmente está no **processo de geração do workbook** e não só no import do pacote.
-   - Em `scheduleMasterExport.ts` ainda há risco de erro por:
-     - **nome de aba inválido** para Excel (`[]:*?/\\`);
-     - **nomes duplicados/truncados** ao limitar a 31 caracteres;
-     - erro silencioso em alguma etapa de fetch/montagem/download sendo mascarado pelo toast genérico.
+CPF está armazenado em **3 formatos diferentes** entre as tabelas:
 
-### Objetivo
-Eliminar o erro na importação e na exportação com:
-- tratamento de conflito realmente idempotente;
-- mensagens acionáveis;
-- export robusto mesmo com nomes de setores problemáticos;
-- validação explícita no preview e no publicado.
+| Tabela | Formato | Exemplo |
+|---|---|---|
+| `freelancer_profiles` | misto (11 ou 14) | `00017675260` ou `714.197.601-90` |
+| `freelancer_entries` | sempre 14 (formatado) | `189.845.716-60` |
+| `employees` (freelancer) | sempre 11 (limpo) | `01116400162` |
 
----
+O hook `useCpfLookup` faz `.eq("cpf", X)` com **um único formato por tabela**. Resultado: para qualquer CPF salvo no formato "errado" da tabela consultada, a busca retorna `null` e **nada é auto-preenchido** — exatamente o problema relatado tanto no Budget Gerencial (`FreelancerForm.tsx`) quanto nas Escalas (`FreelancerAddModal.tsx`).
 
-## Frente 1 — Blindar a importação até ficar realmente idempotente
+Já confirmei o caso: um mesmo CPF `00017675260` existe em `freelancer_profiles` como `00017675260` e em `freelancer_entries` como `000.176.752-60`. Quem digita esse CPF hoje no formulário recebe a busca em `profiles` por 11 chars (ok) e em `entries` por 14 chars (ok individualmente), mas se só tiver registro em uma das tabelas no formato divergente, **falha**.
 
-### 1.1 Reforçar o filtro pré-insert
-Em `src/components/escalas/ScheduleExcelFlow.tsx`:
+### Solução: motor único de CPF + normalização persistente
 
-- manter a dedup atual por:
-  - `(employee_id, date, sector_id)`;
-  - `(employee_id, date)`;
-- adicionar uma etapa explícita de **detecção de conflitos restantes por lote**, construindo uma lista legível antes do `insert`;
-- separar em memória:
-  - `rowsToInsert`
-  - `rowsIgnoredExisting`
-  - `rowsBlockedConflict`
+#### 1) RPC `lookup_freelancer_unified(p_cpf text)` — fonte única de verdade
 
-Assim o import não depende só do erro do banco para explicar o problema.
+Criar uma função SECURITY DEFINER no banco que centraliza **toda** a busca em um único lugar, normalizando o CPF com `regexp_replace(cpf, '\D', '', 'g')` em **toda** comparação. Retorna o melhor registro consolidando dados das 3 tabelas:
 
-### 1.2 Tornar o branch de erro 23505 mais abrangente
-Hoje o código só reconhece alguns formatos do erro. Ajustar para capturar também:
-- `error.code === "23505"`
-- `error.message`
-- `error.details`
-- `error.hint`
-- `error.error_description`
-- qualquer texto contendo `unique_active_schedule`
+```text
+prioridade de campos:
+  nome_completo:  profiles → employees → entries
+  telefone:       profiles → employees
+  chave_pix:      profiles → entries (mais recente)
+  tipo_chave_pix: profiles
+  funcao:         employees.job_title → entries.funcao (mais recente)
+  gerencia:       entries.gerencia (mais recente)
+  foto_url:       profiles
+  found_in:       array das tabelas onde encontrou
+```
 
-Isso garante que o usuário nunca mais veja só o texto cru do banco.
+Vantagens:
+- ignora completamente o formato do CPF na DB;
+- bypassa RLS (cobre lookup cross-loja, inclui CPFs de outras unidades);
+- 1 round-trip só, sem encadeamento de queries no front;
+- mesmo motor para Budget e Escalas → comportamento idêntico.
 
-### 1.3 Retry realmente defensivo
-Depois do primeiro `insert` com falha:
-- recarregar schedules existentes;
-- recalcular os conflitos;
-- tentar novamente só com o subconjunto ainda inserível;
-- se persistir, mostrar a lista dos nomes/datas que bloquearam.
+#### 2) Reescrever `useCpfLookup.ts` para chamar só esse RPC
 
-### 1.4 Ação direta para resolver
-Aproveitar a lógica já existente de limpeza em massa e acoplar ao fluxo de import:
-- botão/ação “**Zerar semana e reimportar**” para a mesma unidade/semana;
-- reaproveitar o arquivo já em memória;
-- reexecutar o `handleConfirmImport` sem o usuário precisar começar tudo de novo.
+- Remove `lookupFreelancerByCpf` (legacy) e o `lookupUnifiedByCpf` antigo (que faz 4 queries em cascata).
+- Mantém a mesma assinatura pública `lookupUnifiedByCpf(cpf) → UnifiedLookupResult` para não quebrar os consumidores.
+- Loga toast de sucesso já dizendo de onde veio (ex: "dados do cadastro central", "dados do histórico").
+- Mantém `lookupSupplierByCpfCnpj` separado (manutenção).
 
----
+#### 3) Persistência sempre no formato canônico (CPF limpo, 11 dígitos)
 
-## Frente 2 — Melhorar a usabilidade do erro de importação
+Mudança de padrão para todas as **novas** inserções:
 
-### Em `src/components/escalas/ScheduleExcelFlow.tsx`
-Substituir o erro genérico por retorno operacional:
+- `FreelancerForm.tsx → onSubmit`: limpa o CPF antes do `createEntry` (envia 11 chars).
+- `useFreelancerEntries.createEntry`: normaliza CPF antes do insert e antes do upsert em `freelancer_profiles`.
+- `FreelancerAddModal.tsx`: já envia limpo para `employees` e `freelancer_profiles` — ok.
+- Trigger `sync_schedule_to_freelancer_entry`: já usa `regexp_replace(cpf, '\D', '', 'g')` para `freelancer_profiles`, mas insere `v_emp.cpf` cru em `freelancer_entries.cpf` — vou normalizar ali também.
 
-- mostrar até 5 conflitos com:
-  - nome do funcionário;
-  - data;
-  - setor, quando disponível;
-- sucesso com resumo:
-  - `X importados`
-  - `Y já existiam`
-  - `Z conflitos resolvidos`
-  - `W ignorados por conflito`
+Com isso, daqui pra frente **toda nova linha** entra com CPF limpo nas 3 tabelas. O lookup por RPC já cobre o legado em qualquer formato.
 
-Também manter os erros de parsing separados dos erros de banco, para não misturar:
-- “horário inválido”;
-- “conflito com escala já existente”.
+#### 4) Migração one-shot do legado
 
----
+Migration que normaliza CPF nas tabelas existentes, com cuidado para não violar unicidade:
 
-## Frente 3 — Corrigir a exportação Excel na geração do workbook
+- `freelancer_profiles`: `cpf` tem unique constraint. Para cada CPF formatado, se já existir a versão limpa, mesclar (manter o registro mais completo: foto_url + telefone + pix); senão, só normalizar.
+- `freelancer_entries`: sem unique, basta `UPDATE`.
+- `employees`: já está 100% limpo, nada a fazer.
 
-### 3.1 Sanitizar e deduplicar nomes de abas
-Em `src/lib/scheduleMasterExport.ts`:
+#### 5) Auto-disparo do lookup também em paste/colado e quando vier com 11 dígitos sem formatação
 
-Criar helper de nome seguro para abas:
-- remover caracteres inválidos de Excel: `: \ / ? * [ ]`
-- normalizar espaços
-- truncar para 31 chars
-- garantir unicidade com sufixo automático quando houver colisão:
-  - `ATENDIMENTO`
-  - `ATENDIMENTO (2)`
+`FreelancerForm.tsx` hoje só dispara o lookup quando `formatted.length === 14`. Se o usuário colar um CPF puro de 11 dígitos, a função `formatCPF` formata para 14 e dispara — ok. Mas se digitar parcialmente e clicar fora, não dispara. Ajustar:
 
-Isso elimina uma causa clássica de falha silenciosa em export.
+- Disparar onChange quando `cleanCpf.length === 11`.
+- Disparar onBlur como fallback adicional.
+- Mesmo padrão no `FreelancerAddModal.tsx` (já dispara em 11 dígitos — manter).
 
-### 3.2 Quebrar a exportação em etapas com erros específicos
-Ainda em `scheduleMasterExport.ts`, separar e nomear falhas:
-- erro ao buscar setores;
-- erro ao buscar escalas;
-- erro ao montar aba do setor X;
-- erro ao montar “Resumo Geral”;
-- erro ao gerar arquivo para download.
+#### 6) Mensagem visual consistente
 
-Assim o toast deixa de ser “Erro ao exportar escala” e passa a apontar exatamente o estágio quebrado.
+Quando o lookup encontrar dados:
+- toast verde com origem;
+- campos preenchidos ganham borda verde + texto "Preenchido automaticamente";
+- usuário pode editar livremente (já implementado).
 
-### 3.3 Validar a etapa de download
-Em `src/components/escalas/MasterExportButton.tsx`:
-- manter `console.error`;
-- melhorar o toast com mensagem vinda do estágio real;
-- se necessário, envolver `downloadWorkbook` com try/catch local para separar:
-  - geração do workbook;
-  - disparo do download.
+### Arquivos afetados
 
-### 3.4 Padronizar robustez do workbook
-Revisar `scheduleMasterExport.ts` para:
-- garantir `!merges`, `!ref`, `!cols`, `!rows` coerentes por aba;
-- evitar qualquer referência fora do range final;
-- garantir que “Resumo Geral” nunca colida com alguma aba de setor.
+- **Migration nova**: criar RPC `lookup_freelancer_unified` + normalizar CPFs legados em `freelancer_profiles` e `freelancer_entries`.
+- **Migration nova (trigger)**: ajustar `sync_schedule_to_freelancer_entry` para normalizar `cpf` antes do insert em `freelancer_entries`.
+- **`src/hooks/useCpfLookup.ts`**: reescrever `lookupUnifiedByCpf` para chamar só o novo RPC. Remover lookups encadeados.
+- **`src/hooks/useFreelancerEntries.ts`**: normalizar CPF (11 dígitos) antes de `insert` e `upsert(freelancer_profiles)`.
+- **`src/components/FreelancerForm.tsx`**: disparar lookup também em onBlur; normalizar CPF antes de submit.
+- **`src/components/escalas/FreelancerAddModal.tsx`**: nenhuma mudança funcional — já usa `lookupUnifiedByCpf` (vai herdar o motor novo automaticamente).
 
----
+### O que **não** muda
+- UI dos formulários permanece idêntica.
+- Validação de CPF (`isValidCPF`) permanece.
+- Fluxo "sem CPF" no modal de escala segue funcionando.
+- Trigger de pagamento e RLS intactos.
 
-## Frente 4 — Garantir que preview e publicado estão alinhados
+### Validação
 
-O print anexado é do domínio publicado. Então a correção precisa validar explicitamente:
+1. **CPF formato 14 chars salvo só em entries**: digitar no Budget → deve auto-preencher nome, função, gerência, PIX.
+2. **CPF limpo 11 chars salvo só em profiles**: digitar no Budget → deve auto-preencher nome + PIX + telefone.
+3. **CPF que existe em employees de outra unidade**: digitar no modal de escala → deve trazer o nome (cross-loja).
+4. **CPF novo (não cadastrado)**: digitar → sem toast, campos vazios para preenchimento manual.
+5. **CPF salvo em formatos diferentes em tabelas diferentes**: digitar em qualquer formato → mesmo resultado, sem perder dado.
+6. **Após salvar um novo lançamento via Budget**: conferir no banco que CPF entrou com 11 dígitos limpos em todas as tabelas.
 
-- **preview**
-- **publicado**
-
-Se o preview estiver correto e o publicado não:
-- revisar o caminho real usado na tela publicada;
-- confirmar que o fluxo chama os arquivos já corrigidos:
-  - `ScheduleExcelFlow.tsx`
-  - `MasterExportButton.tsx`
-  - `scheduleMasterExport.ts`
-
-Se houver divergência, ajustar o fluxo para que a mesma tela/mesmo botão usem a implementação corrigida em ambos os ambientes.
-
----
-
-## Arquivos principais
-- `src/components/escalas/ScheduleExcelFlow.tsx`
-- `src/lib/scheduleMasterExport.ts`
-- `src/components/escalas/MasterExportButton.tsx`
-
-### Arquivos de apoio para conferência
-- `src/lib/excelUtils.ts`
-- `src/lib/scheduleExcel.ts`
-- `src/components/escalas/ManualScheduleGrid.tsx`
-
----
-
-## Validação obrigatória
-
-### Importação
-1. Importar a mesma semana já existente na unidade que está falhando.
-   - Resultado esperado:
-     - sem toast cru do banco;
-     - resumo claro de importados/ignorados/conflitos.
-2. Reimportar imediatamente o mesmo arquivo.
-   - Resultado esperado:
-     - zero duplicação;
-     - comportamento idempotente.
-3. Forçar conflito real.
-   - Resultado esperado:
-     - nomes e datas listados;
-     - ação para limpar semana e reimportar.
-
-### Exportação Excel
-1. Exportar em unidade com vários setores.
-   - Arquivo deve baixar e abrir normalmente.
-2. Exportar em unidade com nomes de setores longos ou parecidos.
-   - Nenhuma falha por nome de aba.
-3. Conferir abas:
-   - todos os setores presentes;
-   - “Resumo Geral” presente;
-   - sem corrupção no Excel/LibreOffice.
-
-### Paridade
-- testar no preview e no publicado para confirmar que o usuário final não ficou preso numa versão antiga do fluxo.
-
-## Resultado esperado
-- Importação por modelo fica segura, repetível e explicável.
-- Exportação Excel deixa de falhar por workbook/aba.
-- O usuário deixa de ver erro técnico cru e passa a ter saída prática para resolver na hora.

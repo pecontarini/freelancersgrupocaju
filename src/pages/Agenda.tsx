@@ -565,6 +565,38 @@ export default function Agenda() {
             saving={saving}
             isEdit={!!editing}
           />
+
+          <Dialog open={reconnectOpen} onOpenChange={(v) => { setReconnectOpen(v); if (!v) setPendingForm(null); }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  Conexão com o Google expirou
+                </DialogTitle>
+                <DialogDescription>
+                  Sua sessão do Google Calendar expirou. Reconecte agora para que seu evento seja
+                  salvo e sincronizado normalmente.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setReconnectOpen(false); setPendingForm(null); }}
+                  disabled={connecting}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleDisconnectAndReconnect} disabled={connecting}>
+                  {connecting ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <GoogleIcon className="mr-1 h-4 w-4" />
+                  )}
+                  Reconectar e salvar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </SidebarInset>
       </div>
     </SidebarProvider>

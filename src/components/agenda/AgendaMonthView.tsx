@@ -163,9 +163,14 @@ export function AgendaMonthView({ eventos, onSelectEvent, onCreateForDate }: Pro
                     info.border
                   )}
                 >
-                  <div>
-                    <div className={cn("font-medium", e.concluido && "line-through opacity-60")}>
-                      {e.titulo}
+                  <div className="min-w-0 flex-1">
+                    <div className={cn("flex items-center gap-1.5 font-medium", e.concluido && "line-through opacity-60")}>
+                      <span className="truncate">{e.titulo}</span>
+                      {e.google_event_id ? (
+                        <Cloud className="h-3 w-3 flex-shrink-0 text-emerald-600" />
+                      ) : (
+                        <CloudOff className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(e.data_inicio).toLocaleTimeString("pt-BR", {

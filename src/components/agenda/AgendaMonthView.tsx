@@ -121,13 +121,18 @@ export function AgendaMonthView({ eventos, onSelectEvent, onCreateForDate }: Pro
                         onSelectEvent(e);
                       }}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        "flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
                         info.bg,
                         info.text,
                         e.concluido && "line-through opacity-60"
                       )}
                     >
-                      {e.titulo}
+                      {e.google_event_id ? (
+                        <Cloud className="h-2.5 w-2.5 flex-shrink-0 opacity-70" />
+                      ) : (
+                        <CloudOff className="h-2.5 w-2.5 flex-shrink-0 opacity-50" />
+                      )}
+                      <span className="truncate">{e.titulo}</span>
                     </div>
                   );
                 })}

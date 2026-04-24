@@ -32,6 +32,13 @@ declare global {
 
 let gisLoadPromise: Promise<void> | null = null;
 
+export class GoogleAuthExpiredError extends Error {
+  constructor(message = "Conexão com o Google expirou. Reconecte para sincronizar.") {
+    super(message);
+    this.name = "GoogleAuthExpiredError";
+  }
+}
+
 export function initGoogleAuth(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.google?.accounts?.oauth2) return Promise.resolve();

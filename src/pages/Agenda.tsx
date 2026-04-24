@@ -53,6 +53,7 @@ export default function Agenda() {
 
   const [view, setView] = useState<ViewMode>("mensal");
   const [hasGoogleToken, setHasGoogleToken] = useState<boolean | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AgendaEvento | null>(null);
@@ -60,10 +61,17 @@ export default function Agenda() {
   const [filterUserId, setFilterUserId] = useState<string>("all");
   const [profilesById, setProfilesById] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [pendingForm, setPendingForm] = useState<AgendaEventoForm | null>(null);
 
   const { data: eventos = [], create, update, remove, toggleConcluido, updateParticipantes } = useAgendaEventos({
     allUsers: canSeeAll,
   });
+
+  const tokenExpired = useMemo(() => {
+    if (!tokenExpiresAt) return false;
+    return new Date(tokenExpiresAt).getTime() - Date.now() < 60_000;
+  }, [tokenExpiresAt]);
 
   // Helper: converter participantes para formato Google
   const toGoogleParticipantes = (ps: AgendaParticipante[]) =>
@@ -85,11 +93,20 @@ export default function Agenda() {
     });
   };
 
+  const refreshTokenStatus = async () => {
+    try {
+      const t = await getTokenFromSupabase();
+      setHasGoogleToken(!!t?.access_token);
+      setTokenExpiresAt(t?.expires_at ?? null);
+    } catch {
+      setHasGoogleToken(false);
+      setTokenExpiresAt(null);
+    }
+  };
+
   useEffect(() => {
     initGoogleAuth().catch(() => {});
-    getTokenFromSupabase()
-      .then((t) => setHasGoogleToken(!!t?.access_token))
-      .catch(() => setHasGoogleToken(false));
+    refreshTokenStatus();
   }, []);
 
   // Carregar nomes dos donos quando admin

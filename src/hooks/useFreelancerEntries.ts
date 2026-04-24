@@ -27,9 +27,9 @@ export function useFreelancerEntries() {
         throw new Error("Usuário não autenticado");
       }
 
-      // Padrão canônico: CPF sempre limpo (11 dígitos) em todas as tabelas
-      const cleanCpf = formData.cpf.replace(/\D/g, "");
-      const cpfToStore = cleanCpf.length === 11 ? cleanCpf : formData.cpf;
+      // Padrão canônico: CPF sempre limpo (apenas dígitos) em todas as tabelas
+      const cleanCpf = (formData.cpf || "").replace(/\D/g, "");
+      const cpfToStore = cleanCpf;
 
       const { data, error } = await supabase
         .from("freelancer_entries")

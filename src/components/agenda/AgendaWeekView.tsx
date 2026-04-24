@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CATEGORIA_INFO, WEEK_DAYS_PT, sameDay, startOfWeek } from "./agendaUtils";
 import type { AgendaEvento } from "@/hooks/useAgendaEventos";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 

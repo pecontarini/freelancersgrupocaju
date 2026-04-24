@@ -101,18 +101,25 @@ export function AgendaWeekView({ eventos, onSelectEvent }: Props) {
                             key={e.id}
                             onClick={() => onSelectEvent(e)}
                             className={cn(
-                              "block w-full truncate rounded px-1.5 py-1 text-left text-[10px] font-medium transition-opacity hover:opacity-80",
+                              "flex w-full items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[10px] font-medium transition-opacity hover:opacity-80",
                               info.bg,
                               info.text,
                               e.concluido && "line-through opacity-60"
                             )}
-                            title={e.titulo}
+                            title={`${e.titulo} ${e.google_event_id ? "(Google)" : "(Local)"}`}
                           >
-                            {new Date(e.data_inicio).toLocaleTimeString("pt-BR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}{" "}
-                            {e.titulo}
+                            {e.google_event_id ? (
+                              <Cloud className="h-2.5 w-2.5 flex-shrink-0 opacity-70" />
+                            ) : (
+                              <CloudOff className="h-2.5 w-2.5 flex-shrink-0 opacity-50" />
+                            )}
+                            <span className="truncate">
+                              {new Date(e.data_inicio).toLocaleTimeString("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}{" "}
+                              {e.titulo}
+                            </span>
                           </button>
                         );
                       })}

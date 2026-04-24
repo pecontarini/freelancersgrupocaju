@@ -156,11 +156,34 @@ export default function Agenda() {
       setConnecting(true);
       const token = await requestGoogleToken();
       await saveTokenToSupabase(token);
-      setHasGoogleToken(true);
+      await refreshTokenStatus();
       toast.success("Google Calendar conectado!");
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message ?? "Falha ao conectar Google.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnectAndReconnect = async () => {
+    try {
+      setConnecting(true);
+      await clearTokenFromSupabase();
+      const token = await requestGoogleToken();
+      await saveTokenToSupabase(token);
+      await refreshTokenStatus();
+      toast.success("Google Calendar reconectado!");
+      setReconnectOpen(false);
+
+      if (pendingForm) {
+        const form = pendingForm;
+        setPendingForm(null);
+        await handleSubmit(form);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message ?? "Falha ao reconectar Google.");
     } finally {
       setConnecting(false);
     }
@@ -198,12 +221,10 @@ export default function Agenda() {
     });
     setModalOpen(true);
 
-    // Sincroniza status dos participantes com o Google em background
     if (e.google_event_id && (e.participantes ?? []).length > 0) {
       try {
-        const tokenRow = await getTokenFromSupabase();
-        if (!tokenRow?.access_token) return;
-        const attendees = await getCalendarEventAttendees(tokenRow.access_token, e.google_event_id);
+        const accessToken = await ensureValidGoogleToken();
+        const attendees = await getCalendarEventAttendees(accessToken, e.google_event_id);
         const merged = mergeGoogleStatus(e.participantes ?? [], attendees);
         const changed = merged.some((p, i) => p.status !== (e.participantes ?? [])[i]?.status);
         if (changed) {
@@ -211,12 +232,34 @@ export default function Agenda() {
           setInitialModal((prev) => (prev ? { ...prev, participantes: merged } : prev));
         }
       } catch (err) {
-        console.warn("[Agenda] Falha ao sincronizar status do Google:", err);
+        if (!(err instanceof GoogleAuthExpiredError)) {
+          console.warn("[Agenda] Falha ao sincronizar status do Google:", err);
+        }
       }
     }
   };
 
+  const validateForm = (form: AgendaEventoForm): string | null => {
+    if (!form.titulo.trim()) return "Informe o título do evento.";
+    if (!form.data_inicio_date || !form.data_inicio_time) return "Informe data e hora de início.";
+    if (form.data_fim_date && form.data_fim_time) {
+      const ini = new Date(combineDateTime(form.data_inicio_date, form.data_inicio_time)).getTime();
+      const fim = new Date(combineDateTime(form.data_fim_date, form.data_fim_time)).getTime();
+      if (Number.isNaN(ini) || Number.isNaN(fim)) return "Data ou hora inválida.";
+      if (fim < ini) return "A data/hora de fim deve ser posterior ao início.";
+    }
+    const invalid = form.participantes.find((p) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email));
+    if (invalid) return `E-mail inválido: ${invalid.email}`;
+    return null;
+  };
+
   const handleSubmit = async (form: AgendaEventoForm) => {
+    const validationError = validateForm(form);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     try {
       setSaving(true);
       const data_inicio = combineDateTime(form.data_inicio_date, form.data_inicio_time);
@@ -226,35 +269,48 @@ export default function Agenda() {
           : null;
 
       let googleEventId: string | null = form.google_event_id ?? null;
-      const tokenRow = form.syncGoogle ? await getTokenFromSupabase() : null;
+      let googleSynced = false;
+      let googleError: string | null = null;
+
+      if (form.syncGoogle) {
+        try {
+          const accessToken = await ensureValidGoogleToken();
+          if (googleEventId) {
+            await updateCalendarEvent(accessToken, googleEventId, {
+              titulo: form.titulo,
+              descricao: form.descricao,
+              data_inicio,
+              data_fim,
+              categoria: form.categoria,
+              participantes: toGoogleParticipantes(form.participantes),
+            });
+          } else {
+            const created = await createCalendarEvent(accessToken, {
+              titulo: form.titulo,
+              descricao: form.descricao,
+              data_inicio,
+              data_fim,
+              categoria: form.categoria,
+              participantes: toGoogleParticipantes(form.participantes),
+            });
+            googleEventId = created?.id ?? null;
+          }
+          googleSynced = true;
+        } catch (err: any) {
+          if (err instanceof GoogleAuthExpiredError) {
+            // Não persiste localmente ainda — abre modal de reconexão
+            setPendingForm(form);
+            setReconnectOpen(true);
+            await refreshTokenStatus();
+            setSaving(false);
+            return;
+          }
+          googleError = err?.message ?? "erro desconhecido";
+          console.error("[Agenda] Google sync error:", err);
+        }
+      }
 
       if (editing) {
-        if (form.syncGoogle && tokenRow?.access_token) {
-          try {
-            if (googleEventId) {
-              await updateCalendarEvent(tokenRow.access_token, googleEventId, {
-                titulo: form.titulo,
-                descricao: form.descricao,
-                data_inicio,
-                data_fim,
-                categoria: form.categoria,
-                participantes: toGoogleParticipantes(form.participantes),
-              });
-            } else {
-              const created = await createCalendarEvent(tokenRow.access_token, {
-                titulo: form.titulo,
-                descricao: form.descricao,
-                data_inicio,
-                data_fim,
-                categoria: form.categoria,
-                participantes: toGoogleParticipantes(form.participantes),
-              });
-              googleEventId = created?.id ?? null;
-            }
-          } catch (err: any) {
-            toast.warning(`Salvo localmente, mas falhou no Google: ${err?.message ?? "erro"}`);
-          }
-        }
         await update.mutateAsync({
           id: editing.id,
           titulo: form.titulo,
@@ -266,23 +322,7 @@ export default function Agenda() {
           google_event_id: googleEventId,
           participantes: form.participantes,
         });
-        toast.success("Evento atualizado.");
       } else {
-        if (form.syncGoogle && tokenRow?.access_token) {
-          try {
-            const created = await createCalendarEvent(tokenRow.access_token, {
-              titulo: form.titulo,
-              descricao: form.descricao,
-              data_inicio,
-              data_fim,
-              categoria: form.categoria,
-              participantes: toGoogleParticipantes(form.participantes),
-            });
-            googleEventId = created?.id ?? null;
-          } catch (err: any) {
-            toast.warning(`Salvo localmente, mas falhou no Google: ${err?.message ?? "erro"}`);
-          }
-        }
         await create.mutateAsync({
           titulo: form.titulo,
           descricao: form.descricao || null,
@@ -293,8 +333,16 @@ export default function Agenda() {
           google_event_id: googleEventId,
           participantes: form.participantes,
         });
-        toast.success("Evento criado.");
       }
+
+      if (form.syncGoogle && googleSynced) {
+        toast.success(editing ? "Evento atualizado e sincronizado com Google." : "Evento criado e sincronizado com Google.");
+      } else if (form.syncGoogle && googleError) {
+        toast.warning(`Salvo apenas localmente. Google: ${googleError}`);
+      } else {
+        toast.success(editing ? "Evento atualizado (somente local)." : "Evento criado (somente local).");
+      }
+
       setModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -309,11 +357,11 @@ export default function Agenda() {
     try {
       setSaving(true);
       if (editing.google_event_id) {
-        const tokenRow = await getTokenFromSupabase();
-        if (tokenRow?.access_token) {
-          try {
-            await deleteCalendarEvent(tokenRow.access_token, editing.google_event_id);
-          } catch (err) {
+        try {
+          const accessToken = await ensureValidGoogleToken();
+          await deleteCalendarEvent(accessToken, editing.google_event_id);
+        } catch (err) {
+          if (!(err instanceof GoogleAuthExpiredError)) {
             console.warn("Falha ao excluir no Google:", err);
           }
         }

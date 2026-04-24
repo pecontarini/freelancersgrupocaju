@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Loader2, Plus, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -28,10 +29,13 @@ import {
   mapGoogleStatus,
 } from "@/hooks/useAgendaEventos";
 import {
+  clearTokenFromSupabase,
   createCalendarEvent,
   deleteCalendarEvent,
+  ensureValidGoogleToken,
   getCalendarEventAttendees,
   getTokenFromSupabase,
+  GoogleAuthExpiredError,
   initGoogleAuth,
   requestGoogleToken,
   saveTokenToSupabase,

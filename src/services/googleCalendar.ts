@@ -32,6 +32,13 @@ declare global {
 
 let gisLoadPromise: Promise<void> | null = null;
 
+export class GoogleAuthExpiredError extends Error {
+  constructor(message = "Conexão com o Google expirou. Reconecte para sincronizar.") {
+    super(message);
+    this.name = "GoogleAuthExpiredError";
+  }
+}
+
 export function initGoogleAuth(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -57,7 +64,7 @@ export function initGoogleAuth(): Promise<void> {
   return gisLoadPromise;
 }
 
-export async function requestGoogleToken(): Promise<{ access_token: string; expires_in: number }> {
+export async function requestGoogleToken(silent = false): Promise<{ access_token: string; expires_in: number }> {
   await initGoogleAuth();
   if (!GOOGLE_CLIENT_ID) {
     throw new Error("VITE_GOOGLE_CLIENT_ID não configurado.");
@@ -67,7 +74,7 @@ export async function requestGoogleToken(): Promise<{ access_token: string; expi
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: SCOPES,
-        prompt: "consent",
+        prompt: silent ? "" : "consent",
         callback: (response: any) => {
           if (response.error) {
             reject(new Error(response.error_description || response.error));
@@ -81,6 +88,33 @@ export async function requestGoogleToken(): Promise<{ access_token: string; expi
       reject(err);
     }
   });
+}
+
+/**
+ * Garante que existe um token válido. Se o token armazenado está expirado (ou
+ * próximo de expirar), tenta renovação silenciosa via GIS. Se a renovação
+ * silenciosa falhar, lança GoogleAuthExpiredError para que a UI exiba o
+ * fluxo de reconexão.
+ */
+export async function ensureValidGoogleToken(): Promise<string> {
+  const tokenRow = await getTokenFromSupabase();
+  const now = Date.now();
+  const expiresAtMs = tokenRow?.expires_at ? new Date(tokenRow.expires_at).getTime() : 0;
+  const isValid = !!tokenRow?.access_token && expiresAtMs - now > 60_000; // 60s de margem
+
+  if (isValid && tokenRow?.access_token) {
+    return tokenRow.access_token;
+  }
+
+  // Tenta renovação silenciosa
+  try {
+    const fresh = await requestGoogleToken(true);
+    await saveTokenToSupabase(fresh);
+    return fresh.access_token;
+  } catch (err) {
+    console.warn("[googleCalendar] Silent renewal failed:", err);
+    throw new GoogleAuthExpiredError();
+  }
 }
 
 export async function saveTokenToSupabase(token: { access_token: string; expires_in: number }): Promise<void> {

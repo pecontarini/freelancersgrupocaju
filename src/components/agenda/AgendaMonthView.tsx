@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { CATEGORIA_INFO, MONTHS_PT, WEEK_DAYS_PT, sameDay, startOfMonth } from "./agendaUtils";
 import type { AgendaEvento } from "@/hooks/useAgendaEventos";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -121,13 +121,18 @@ export function AgendaMonthView({ eventos, onSelectEvent, onCreateForDate }: Pro
                         onSelectEvent(e);
                       }}
                       className={cn(
-                        "truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        "flex items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-medium",
                         info.bg,
                         info.text,
                         e.concluido && "line-through opacity-60"
                       )}
                     >
-                      {e.titulo}
+                      {e.google_event_id ? (
+                        <Cloud className="h-2.5 w-2.5 flex-shrink-0 opacity-70" />
+                      ) : (
+                        <CloudOff className="h-2.5 w-2.5 flex-shrink-0 opacity-50" />
+                      )}
+                      <span className="truncate">{e.titulo}</span>
                     </div>
                   );
                 })}
@@ -158,9 +163,14 @@ export function AgendaMonthView({ eventos, onSelectEvent, onCreateForDate }: Pro
                     info.border
                   )}
                 >
-                  <div>
-                    <div className={cn("font-medium", e.concluido && "line-through opacity-60")}>
-                      {e.titulo}
+                  <div className="min-w-0 flex-1">
+                    <div className={cn("flex items-center gap-1.5 font-medium", e.concluido && "line-through opacity-60")}>
+                      <span className="truncate">{e.titulo}</span>
+                      {e.google_event_id ? (
+                        <Cloud className="h-3 w-3 flex-shrink-0 text-emerald-600" />
+                      ) : (
+                        <CloudOff className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(e.data_inicio).toLocaleTimeString("pt-BR", {

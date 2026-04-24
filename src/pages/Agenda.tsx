@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Calendar, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Loader2, Plus, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -28,10 +29,13 @@ import {
   mapGoogleStatus,
 } from "@/hooks/useAgendaEventos";
 import {
+  clearTokenFromSupabase,
   createCalendarEvent,
   deleteCalendarEvent,
+  ensureValidGoogleToken,
   getCalendarEventAttendees,
   getTokenFromSupabase,
+  GoogleAuthExpiredError,
   initGoogleAuth,
   requestGoogleToken,
   saveTokenToSupabase,
@@ -49,6 +53,7 @@ export default function Agenda() {
 
   const [view, setView] = useState<ViewMode>("mensal");
   const [hasGoogleToken, setHasGoogleToken] = useState<boolean | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AgendaEvento | null>(null);
@@ -56,10 +61,17 @@ export default function Agenda() {
   const [filterUserId, setFilterUserId] = useState<string>("all");
   const [profilesById, setProfilesById] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [pendingForm, setPendingForm] = useState<AgendaEventoForm | null>(null);
 
   const { data: eventos = [], create, update, remove, toggleConcluido, updateParticipantes } = useAgendaEventos({
     allUsers: canSeeAll,
   });
+
+  const tokenExpired = useMemo(() => {
+    if (!tokenExpiresAt) return false;
+    return new Date(tokenExpiresAt).getTime() - Date.now() < 60_000;
+  }, [tokenExpiresAt]);
 
   // Helper: converter participantes para formato Google
   const toGoogleParticipantes = (ps: AgendaParticipante[]) =>
@@ -81,11 +93,20 @@ export default function Agenda() {
     });
   };
 
+  const refreshTokenStatus = async () => {
+    try {
+      const t = await getTokenFromSupabase();
+      setHasGoogleToken(!!t?.access_token);
+      setTokenExpiresAt(t?.expires_at ?? null);
+    } catch {
+      setHasGoogleToken(false);
+      setTokenExpiresAt(null);
+    }
+  };
+
   useEffect(() => {
     initGoogleAuth().catch(() => {});
-    getTokenFromSupabase()
-      .then((t) => setHasGoogleToken(!!t?.access_token))
-      .catch(() => setHasGoogleToken(false));
+    refreshTokenStatus();
   }, []);
 
   // Carregar nomes dos donos quando admin
@@ -135,11 +156,34 @@ export default function Agenda() {
       setConnecting(true);
       const token = await requestGoogleToken();
       await saveTokenToSupabase(token);
-      setHasGoogleToken(true);
+      await refreshTokenStatus();
       toast.success("Google Calendar conectado!");
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message ?? "Falha ao conectar Google.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnectAndReconnect = async () => {
+    try {
+      setConnecting(true);
+      await clearTokenFromSupabase();
+      const token = await requestGoogleToken();
+      await saveTokenToSupabase(token);
+      await refreshTokenStatus();
+      toast.success("Google Calendar reconectado!");
+      setReconnectOpen(false);
+
+      if (pendingForm) {
+        const form = pendingForm;
+        setPendingForm(null);
+        await handleSubmit(form);
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message ?? "Falha ao reconectar Google.");
     } finally {
       setConnecting(false);
     }
@@ -177,12 +221,10 @@ export default function Agenda() {
     });
     setModalOpen(true);
 
-    // Sincroniza status dos participantes com o Google em background
     if (e.google_event_id && (e.participantes ?? []).length > 0) {
       try {
-        const tokenRow = await getTokenFromSupabase();
-        if (!tokenRow?.access_token) return;
-        const attendees = await getCalendarEventAttendees(tokenRow.access_token, e.google_event_id);
+        const accessToken = await ensureValidGoogleToken();
+        const attendees = await getCalendarEventAttendees(accessToken, e.google_event_id);
         const merged = mergeGoogleStatus(e.participantes ?? [], attendees);
         const changed = merged.some((p, i) => p.status !== (e.participantes ?? [])[i]?.status);
         if (changed) {
@@ -190,12 +232,34 @@ export default function Agenda() {
           setInitialModal((prev) => (prev ? { ...prev, participantes: merged } : prev));
         }
       } catch (err) {
-        console.warn("[Agenda] Falha ao sincronizar status do Google:", err);
+        if (!(err instanceof GoogleAuthExpiredError)) {
+          console.warn("[Agenda] Falha ao sincronizar status do Google:", err);
+        }
       }
     }
   };
 
+  const validateForm = (form: AgendaEventoForm): string | null => {
+    if (!form.titulo.trim()) return "Informe o título do evento.";
+    if (!form.data_inicio_date || !form.data_inicio_time) return "Informe data e hora de início.";
+    if (form.data_fim_date && form.data_fim_time) {
+      const ini = new Date(combineDateTime(form.data_inicio_date, form.data_inicio_time)).getTime();
+      const fim = new Date(combineDateTime(form.data_fim_date, form.data_fim_time)).getTime();
+      if (Number.isNaN(ini) || Number.isNaN(fim)) return "Data ou hora inválida.";
+      if (fim < ini) return "A data/hora de fim deve ser posterior ao início.";
+    }
+    const invalid = form.participantes.find((p) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email));
+    if (invalid) return `E-mail inválido: ${invalid.email}`;
+    return null;
+  };
+
   const handleSubmit = async (form: AgendaEventoForm) => {
+    const validationError = validateForm(form);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     try {
       setSaving(true);
       const data_inicio = combineDateTime(form.data_inicio_date, form.data_inicio_time);
@@ -205,35 +269,48 @@ export default function Agenda() {
           : null;
 
       let googleEventId: string | null = form.google_event_id ?? null;
-      const tokenRow = form.syncGoogle ? await getTokenFromSupabase() : null;
+      let googleSynced = false;
+      let googleError: string | null = null;
+
+      if (form.syncGoogle) {
+        try {
+          const accessToken = await ensureValidGoogleToken();
+          if (googleEventId) {
+            await updateCalendarEvent(accessToken, googleEventId, {
+              titulo: form.titulo,
+              descricao: form.descricao,
+              data_inicio,
+              data_fim,
+              categoria: form.categoria,
+              participantes: toGoogleParticipantes(form.participantes),
+            });
+          } else {
+            const created = await createCalendarEvent(accessToken, {
+              titulo: form.titulo,
+              descricao: form.descricao,
+              data_inicio,
+              data_fim,
+              categoria: form.categoria,
+              participantes: toGoogleParticipantes(form.participantes),
+            });
+            googleEventId = created?.id ?? null;
+          }
+          googleSynced = true;
+        } catch (err: any) {
+          if (err instanceof GoogleAuthExpiredError) {
+            // Não persiste localmente ainda — abre modal de reconexão
+            setPendingForm(form);
+            setReconnectOpen(true);
+            await refreshTokenStatus();
+            setSaving(false);
+            return;
+          }
+          googleError = err?.message ?? "erro desconhecido";
+          console.error("[Agenda] Google sync error:", err);
+        }
+      }
 
       if (editing) {
-        if (form.syncGoogle && tokenRow?.access_token) {
-          try {
-            if (googleEventId) {
-              await updateCalendarEvent(tokenRow.access_token, googleEventId, {
-                titulo: form.titulo,
-                descricao: form.descricao,
-                data_inicio,
-                data_fim,
-                categoria: form.categoria,
-                participantes: toGoogleParticipantes(form.participantes),
-              });
-            } else {
-              const created = await createCalendarEvent(tokenRow.access_token, {
-                titulo: form.titulo,
-                descricao: form.descricao,
-                data_inicio,
-                data_fim,
-                categoria: form.categoria,
-                participantes: toGoogleParticipantes(form.participantes),
-              });
-              googleEventId = created?.id ?? null;
-            }
-          } catch (err: any) {
-            toast.warning(`Salvo localmente, mas falhou no Google: ${err?.message ?? "erro"}`);
-          }
-        }
         await update.mutateAsync({
           id: editing.id,
           titulo: form.titulo,
@@ -245,23 +322,7 @@ export default function Agenda() {
           google_event_id: googleEventId,
           participantes: form.participantes,
         });
-        toast.success("Evento atualizado.");
       } else {
-        if (form.syncGoogle && tokenRow?.access_token) {
-          try {
-            const created = await createCalendarEvent(tokenRow.access_token, {
-              titulo: form.titulo,
-              descricao: form.descricao,
-              data_inicio,
-              data_fim,
-              categoria: form.categoria,
-              participantes: toGoogleParticipantes(form.participantes),
-            });
-            googleEventId = created?.id ?? null;
-          } catch (err: any) {
-            toast.warning(`Salvo localmente, mas falhou no Google: ${err?.message ?? "erro"}`);
-          }
-        }
         await create.mutateAsync({
           titulo: form.titulo,
           descricao: form.descricao || null,
@@ -272,8 +333,16 @@ export default function Agenda() {
           google_event_id: googleEventId,
           participantes: form.participantes,
         });
-        toast.success("Evento criado.");
       }
+
+      if (form.syncGoogle && googleSynced) {
+        toast.success(editing ? "Evento atualizado e sincronizado com Google." : "Evento criado e sincronizado com Google.");
+      } else if (form.syncGoogle && googleError) {
+        toast.warning(`Salvo apenas localmente. Google: ${googleError}`);
+      } else {
+        toast.success(editing ? "Evento atualizado (somente local)." : "Evento criado (somente local).");
+      }
+
       setModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -288,11 +357,11 @@ export default function Agenda() {
     try {
       setSaving(true);
       if (editing.google_event_id) {
-        const tokenRow = await getTokenFromSupabase();
-        if (tokenRow?.access_token) {
-          try {
-            await deleteCalendarEvent(tokenRow.access_token, editing.google_event_id);
-          } catch (err) {
+        try {
+          const accessToken = await ensureValidGoogleToken();
+          await deleteCalendarEvent(accessToken, editing.google_event_id);
+        } catch (err) {
+          if (!(err instanceof GoogleAuthExpiredError)) {
             console.warn("Falha ao excluir no Google:", err);
           }
         }
@@ -366,6 +435,52 @@ export default function Agenda() {
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                {tokenExpired && (
+                  <Card className="flex flex-col gap-3 border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                          Conexão com o Google Calendar expirou
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Reconecte para voltar a sincronizar seus eventos automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleDisconnectAndReconnect}
+                      disabled={connecting}
+                      className="bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                      {connecting ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="mr-1 h-4 w-4" />
+                      )}
+                      Reconectar Google
+                    </Button>
+                  </Card>
+                )}
+
+                {!tokenExpired && hasGoogleToken && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Google Calendar conectado
+                    {tokenExpiresAt && (
+                      <span className="opacity-70">
+                        · expira em {new Date(tokenExpiresAt).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
                     <TabsList>
@@ -450,6 +565,38 @@ export default function Agenda() {
             saving={saving}
             isEdit={!!editing}
           />
+
+          <Dialog open={reconnectOpen} onOpenChange={(v) => { setReconnectOpen(v); if (!v) setPendingForm(null); }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                  Conexão com o Google expirou
+                </DialogTitle>
+                <DialogDescription>
+                  Sua sessão do Google Calendar expirou. Reconecte agora para que seu evento seja
+                  salvo e sincronizado normalmente.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setReconnectOpen(false); setPendingForm(null); }}
+                  disabled={connecting}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleDisconnectAndReconnect} disabled={connecting}>
+                  {connecting ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <GoogleIcon className="mr-1 h-4 w-4" />
+                  )}
+                  Reconectar e salvar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </SidebarInset>
       </div>
     </SidebarProvider>

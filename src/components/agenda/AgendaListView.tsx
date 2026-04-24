@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { CATEGORIA_INFO, formatDateTimeBR } from "./agendaUtils";
 import type { AgendaEvento, AgendaParticipante } from "@/hooks/useAgendaEventos";
-import { CheckCircle2, Clock, User } from "lucide-react";
+import { CheckCircle2, Clock, User, Cloud, CloudOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_DOT_COLOR } from "./ParticipanteStatusBadge";
 
@@ -69,6 +69,21 @@ export function AgendaListView({ eventos, onSelectEvent, showOwner, ownerNameByI
                 ) : (
                   <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600">
                     <Clock className="h-3 w-3" /> Pendente
+                  </span>
+                )}
+                {e.google_event_id ? (
+                  <span
+                    title="Sincronizado com Google Calendar"
+                    className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-600"
+                  >
+                    <Cloud className="h-3 w-3" /> Google
+                  </span>
+                ) : (
+                  <span
+                    title="Salvo apenas localmente"
+                    className="flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-muted-foreground"
+                  >
+                    <CloudOff className="h-3 w-3" /> Local
                   </span>
                 )}
               </div>

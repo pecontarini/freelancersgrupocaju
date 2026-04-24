@@ -435,6 +435,52 @@ export default function Agenda() {
               </motion.div>
             ) : (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                {tokenExpired && (
+                  <Card className="flex flex-col gap-3 border-amber-500/40 bg-amber-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
+                          Conexão com o Google Calendar expirou
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Reconecte para voltar a sincronizar seus eventos automaticamente.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={handleDisconnectAndReconnect}
+                      disabled={connecting}
+                      className="bg-amber-600 text-white hover:bg-amber-700"
+                    >
+                      {connecting ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="mr-1 h-4 w-4" />
+                      )}
+                      Reconectar Google
+                    </Button>
+                  </Card>
+                )}
+
+                {!tokenExpired && hasGoogleToken && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    Google Calendar conectado
+                    {tokenExpiresAt && (
+                      <span className="opacity-70">
+                        · expira em {new Date(tokenExpiresAt).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <Tabs value={view} onValueChange={(v) => setView(v as ViewMode)}>
                     <TabsList>

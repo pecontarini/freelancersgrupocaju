@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { CATEGORIA_INFO, formatDateTimeBR } from "./agendaUtils";
 import type { AgendaEvento, AgendaParticipante } from "@/hooks/useAgendaEventos";
-import { CheckCircle2, Clock, User } from "lucide-react";
+import { CheckCircle2, Clock, User, Cloud, CloudOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STATUS_DOT_COLOR } from "./ParticipanteStatusBadge";
 

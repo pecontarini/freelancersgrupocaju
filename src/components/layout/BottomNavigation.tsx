@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -26,6 +26,7 @@ const navItems = [
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "escalas", label: "Escalas", icon: CalendarClock },
   { id: "agenda", label: "Agenda", icon: Calendar },
+  { id: "painel", label: "Metas", icon: BarChart2 },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {

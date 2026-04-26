@@ -23,6 +23,7 @@ import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
+import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 
@@ -81,6 +82,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   estoque: {
     title: "Estoque Geral",
     subtitle: "Gestão de estoque por setor com inventários e movimentações",
+  },
+  painel: {
+    title: "Painel de Metas",
+    subtitle: "Resultados e metas operacionais da rede",
   },
 };
 
@@ -264,6 +269,8 @@ const Index = () => {
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":
         return isAdmin ? <RedeTab /> : null;
+      case "painel":
+        return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
       default:
         return (
           <BudgetsGerenciaisTab

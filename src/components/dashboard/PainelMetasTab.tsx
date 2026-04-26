@@ -916,6 +916,363 @@ function KpiUnitCard({ title, icon: Icon, loading, unitName, value, tone }: KpiU
 // Placeholder para sub-abas restantes
 // ──────────────────────────────────────────────────────────────
 
+// ──────────────────────────────────────────────────────────────
+// Conformidade
+// ──────────────────────────────────────────────────────────────
+
+type FaixaConf = "EXCELENTE" | "BOM" | "REGULAR" | "RED_FLAG";
+
+function classifyConformidade(score: number | null | undefined): FaixaConf | null {
+  if (typeof score !== "number" || isNaN(score)) return null;
+  if (score >= 95) return "EXCELENTE";
+  if (score >= 90) return "BOM";
+  if (score >= 80) return "REGULAR";
+  return "RED_FLAG";
+}
+
+// score_percentual em "tempo_prato" = % de pratos OK (quanto MAIOR melhor)
+// Faixas KDS espelhadas: EXCELENTE ≥95 | BOM ≥92 | REGULAR ≥90 | RED_FLAG <90
+function classifyKds(score: number | null | undefined): FaixaConf | null {
+  if (typeof score !== "number" || isNaN(score)) return null;
+  if (score >= 95) return "EXCELENTE";
+  if (score >= 92) return "BOM";
+  if (score >= 90) return "REGULAR";
+  return "RED_FLAG";
+}
+
+function faixaConfBadge(faixa: FaixaConf | null): {
+  variant: "default" | "secondary" | "outline" | "destructive";
+  label: string;
+} {
+  switch (faixa) {
+    case "EXCELENTE":
+      return { variant: "default", label: "Excelente" };
+    case "BOM":
+      return { variant: "secondary", label: "Bom" };
+    case "REGULAR":
+      return { variant: "outline", label: "Regular" };
+    case "RED_FLAG":
+      return { variant: "destructive", label: "Red Flag" };
+    default:
+      return { variant: "outline", label: "—" };
+  }
+}
+
+function sectorLabel(code: string | null | undefined): string {
+  if (!code) return "—";
+  const map: Record<string, string> = {
+    cozinha: "Cozinha",
+    bar: "Bar",
+    parrilla: "Parrilla",
+    sushi: "Sushi",
+    salao: "Salão",
+    delivery: "Delivery",
+    front: "Front",
+    back: "Back",
+  };
+  return map[code] ?? code.charAt(0).toUpperCase() + code.slice(1);
+}
+
+function ConformidadeView() {
+  const [mes, setMes] = useState<string>(currentMonth());
+
+  const scoresQ = useQuery({
+    queryKey: ["conf-scores", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("leadership_store_scores")
+        .select("*, config_lojas(nome)")
+        .eq("month_year", mes);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const setoresQ = useQuery({
+    queryKey: ["conf-setores", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("audit_sector_scores")
+        .select("*, config_lojas(nome)")
+        .eq("month_year", mes);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const kdsQ = useQuery({
+    queryKey: ["conf-kds", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("avaliacoes")
+        .select("*, cargos(nome, setor_back), config_lojas(nome)")
+        .eq("codigo_meta", "tempo_prato")
+        .eq("referencia_mes", mes);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Linhas SEÇÃO A
+  const scoreRows = useMemo(() => {
+    const rows = (scoresQ.data ?? []).map((r: any) => ({
+      loja_id: r.loja_id,
+      nome: r.config_lojas?.nome ?? "—",
+      front_score: typeof r.front_score === "number" ? r.front_score : null,
+      back_score: typeof r.back_score === "number" ? r.back_score : null,
+      general_score: typeof r.general_score === "number" ? r.general_score : null,
+      general_tier: r.general_tier ?? null,
+      total_audits: r.total_audits ?? 0,
+    }));
+    rows.sort((a, b) => (b.general_score ?? -1) - (a.general_score ?? -1));
+    return rows;
+  }, [scoresQ.data]);
+
+  // Agregação SEÇÃO B (média por sector_code)
+  const setorRows = useMemo(() => {
+    const map = new Map<string, { sum: number; n: number }>();
+    (setoresQ.data ?? []).forEach((r: any) => {
+      const code = r.sector_code as string | null;
+      const score = typeof r.score === "number" ? r.score : null;
+      if (!code || score === null) return;
+      const acc = map.get(code) ?? { sum: 0, n: 0 };
+      acc.sum += score;
+      acc.n += 1;
+      map.set(code, acc);
+    });
+    const rows = Array.from(map.entries()).map(([code, { sum, n }]) => ({
+      code,
+      avg: n > 0 ? sum / n : null,
+      n,
+    }));
+    rows.sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+    return rows;
+  }, [setoresQ.data]);
+
+  // Cards SEÇÃO C — KDS
+  const kdsRows = useMemo(() => {
+    return (kdsQ.data ?? []).map((r: any) => ({
+      id: r.id,
+      cargo: r.cargos?.nome ?? "—",
+      setor_back: r.cargos?.setor_back ?? null,
+      loja: r.config_lojas?.nome ?? "—",
+      score: typeof r.score_percentual === "number" ? r.score_percentual : null,
+    }));
+  }, [kdsQ.data]);
+
+  return (
+    <div className="space-y-4">
+      {/* Seletor de mês */}
+      <Card className="glass-card">
+        <CardContent className="flex items-center justify-center gap-3 p-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMes((m) => shiftMonth(m, -1))}
+            aria-label="Mês anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-[200px] text-center">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Período</div>
+            <div className="text-base font-semibold">{formatMonthPt(mes)}</div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMes((m) => shiftMonth(m, 1))}
+            aria-label="Próximo mês"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO A — Score por Unidade */}
+      <Card className="glass-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Building2 className="h-4 w-4 text-primary" />
+            Score por Unidade
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {scoresQ.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : scoreRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Sem dados de liderança para este mês.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Unidade</TableHead>
+                    <TableHead className="min-w-[180px]">Score Front</TableHead>
+                    <TableHead className="min-w-[180px]">Score Back</TableHead>
+                    <TableHead className="min-w-[180px]">Score Geral</TableHead>
+                    <TableHead>Tier</TableHead>
+                    <TableHead className="text-right">Auditorias</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scoreRows.map((r) => (
+                    <TableRow key={r.loja_id}>
+                      <TableCell className="font-medium">{r.nome}</TableCell>
+                      <TableCell>
+                        <ScoreCell score={r.front_score} />
+                      </TableCell>
+                      <TableCell>
+                        <ScoreCell score={r.back_score} />
+                      </TableCell>
+                      <TableCell>
+                        <ScoreCell score={r.general_score} />
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold",
+                            tierClasses(r.general_tier)
+                          )}
+                        >
+                          {tierLabel(r.general_tier)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{r.total_audits}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO B — Por Setor */}
+      <Card className="glass-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Utensils className="h-4 w-4 text-primary" />
+            Score Médio por Setor
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {setoresQ.isLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full" />
+              ))}
+            </div>
+          ) : setorRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Sem dados setoriais para este mês.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {setorRows.map((s) => {
+                const faixa = classifyConformidade(s.avg);
+                const badge = faixaConfBadge(faixa);
+                return (
+                  <div
+                    key={s.code}
+                    className="flex items-center justify-between gap-3 rounded-lg border bg-background/40 p-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold capitalize">{sectorLabel(s.code)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {s.n} avaliaç{s.n === 1 ? "ão" : "ões"}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-lg font-bold tabular-nums">
+                        {s.avg !== null ? s.avg.toFixed(1) : "—"}
+                      </span>
+                      <Badge variant={badge.variant} className="text-[10px]">
+                        {badge.label}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SEÇÃO C — KDS / Tempo de Prato */}
+      <Card className="glass-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Timer className="h-4 w-4 text-primary" />
+            KDS — Tempo de Prato
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {kdsQ.isLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : kdsRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Sem avaliações de Tempo de Prato neste mês.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {kdsRows.map((k) => {
+                const faixa = classifyKds(k.score);
+                const badge = faixaConfBadge(faixa);
+                return (
+                  <div
+                    key={k.id}
+                    className="flex flex-col gap-2 rounded-lg border bg-background/40 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{k.cargo}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {sectorLabel(k.setor_back)} · {k.loja}
+                        </div>
+                      </div>
+                      <Badge variant={badge.variant} className="shrink-0 text-[10px]">
+                        {badge.label}
+                      </Badge>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-xs text-muted-foreground">% pratos OK</span>
+                      <span className="text-xl font-bold tabular-nums">
+                        {k.score !== null ? `${k.score.toFixed(1)}%` : "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ScoreCell({ score }: { score: number | null }) {
+  const value = score ?? 0;
+  return (
+    <div className="flex items-center gap-2">
+      <Progress value={value} className={cn("h-2 flex-1", progressBarColor(score))} />
+      <span className="w-12 text-right text-xs font-semibold tabular-nums">
+        {score !== null ? score.toFixed(1) : "—"}
+      </span>
+    </div>
+  );
+}
+
 function PlaceholderCard({ name }: { name: string }) {
   return (
     <Card className="glass-card">

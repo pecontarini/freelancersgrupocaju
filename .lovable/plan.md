@@ -1,238 +1,221 @@
-# 🤖 Motor de IA para Importação de Dados — Central Holding
+
+# Integração n8n → Central de Reclamações
 
 ## Objetivo
-Criar um motor inteligente de ingestão que aceita **XLSX, CSV, PDF e imagens**, usa **Lovable AI (Gemini 2.5 Flash)** para mapear colunas e extrair dados, distribui para 3 tabelas-destino com **preview rápido**, executa **sincronização automática diária** via cron, e exibe uma nova sub-aba **"Diário"** com visualizações por dia.
+
+Criar um endpoint público e seguro para o n8n enviar reclamações automaticamente (1x ou 2x por dia, conforme a automação), com normalização de dados, deduplicação, rastreamento de execuções e visualização na Central Holding.
 
 ---
 
-## 1. Mudanças no Banco de Dados (migration)
+## Arquitetura proposta
 
-### Nova tabela `import_jobs`
-Rastreia cada importação (manual ou automática) com preview, status e auditoria:
-
-```sql
-CREATE TYPE import_origem AS ENUM ('upload_manual', 'cron_sheets', 'api');
-CREATE TYPE import_destino AS ENUM ('store_performance', 'store_performance_entries', 'reclamacoes', 'misto');
-CREATE TYPE import_status AS ENUM ('extracting', 'preview_ready', 'confirmed', 'error', 'cancelled');
-
-CREATE TABLE public.import_jobs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  origem import_origem NOT NULL,
-  tipo_destino import_destino,
-  file_name text,
-  file_mime text,
-  source_url text,             -- url do Google Sheet (cron)
-  ai_model text,               -- ex: google/gemini-2.5-flash
-  ai_confianca numeric,        -- 0..1
-  preview_data jsonb,          -- linhas extraídas (até 200)
-  total_linhas int DEFAULT 0,
-  linhas_validas int DEFAULT 0,
-  lojas_nao_mapeadas jsonb DEFAULT '[]'::jsonb,
-  mapeamento_colunas jsonb,    -- {coluna_origem: campo_destino}
-  status import_status DEFAULT 'extracting',
-  erro text,
-  linhas_importadas int DEFAULT 0,
-  created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz DEFAULT now(),
-  confirmed_at timestamptz
-);
-
-ALTER TABLE public.import_jobs ENABLE ROW LEVEL SECURITY;
-
--- RLS: admin/operator veem tudo; demais usuários só os próprios jobs
-CREATE POLICY "import_jobs_admin_all" ON public.import_jobs
-  FOR ALL TO authenticated
-  USING (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'operator'))
-  WITH CHECK (has_role(auth.uid(), 'admin') OR has_role(auth.uid(), 'operator'));
-
-CREATE POLICY "import_jobs_own" ON public.import_jobs
-  FOR SELECT TO authenticated USING (created_by = auth.uid());
+```
+┌─────────┐    HTTPS POST    ┌──────────────────────┐    INSERT    ┌──────────────┐
+│   n8n   │ ───────────────► │  Edge Function       │ ───────────► │ reclamacoes  │
+│         │  (webhook + key) │  ingest-reclamacoes  │              └──────────────┘
+└─────────┘                  │                      │    LOG       ┌──────────────┐
+                             └──────────────────────┘ ───────────► │ n8n_webhook_ │
+                                                                    │ executions   │
+                                                                    └──────────────┘
+                                                                          ▲
+                                                                          │
+                              ┌──────────────────────┐                    │
+                              │ HoldingCentralTab    │ ────── lê ─────────┘
+                              │  → aba "Webhooks"    │
+                              └──────────────────────┘
 ```
 
-### Adições em `sheets_sources`
-Marca quais fontes entram no cron diário e qual o tipo de dado esperado:
+**Por que webhook (push) e não polling?**
+- n8n já dispara automaticamente quando os dados estão prontos → menor latência, sem cron extra do nosso lado
+- Você já controla a frequência no n8n (1x ou 2x ao dia, ou quando quiser)
+- Simples de adicionar mais fontes (Google Reviews, iFood, TripAdvisor) — cada uma vira um workflow no n8n apontando para o mesmo endpoint
 
+---
+
+## 1. Banco de dados (1 migration)
+
+### Nova tabela `n8n_webhook_endpoints`
+Cada endpoint representa uma "automação" do n8n (ex: "Google Reviews diário", "iFood 2x por dia").
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | |
+| `nome` | text | Ex: "Google Reviews — Diário" |
+| `slug` | text unique | Identificador na URL (ex: `google-reviews-diario`) |
+| `secret_token` | text | Token bearer para autenticar (gerado uma vez) |
+| `tipo_dado` | text | `reclamacoes` (extensível futuramente) |
+| `ativo` | boolean | Liga/desliga sem deletar |
+| `loja_id_default` | uuid nullable | Se preenchido, força a loja (opcional) |
+| `ultima_execucao_at` | timestamptz | |
+| `total_recebido` | int default 0 | Contador acumulado |
+| `created_at`, `updated_at` | timestamptz | |
+
+RLS: apenas `admin` lê/escreve. O endpoint público bypassa RLS via service role.
+
+### Nova tabela `n8n_webhook_executions`
+Log de cada chamada vinda do n8n para auditoria/debug.
+
+| Coluna | Tipo |
+|---|---|
+| `id` | uuid PK |
+| `endpoint_id` | uuid FK |
+| `status` | text (`success`, `partial`, `error`) |
+| `payload_recebido` | jsonb |
+| `linhas_processadas` | int |
+| `linhas_inseridas` | int |
+| `linhas_duplicadas` | int |
+| `linhas_invalidas` | int |
+| `erros` | jsonb |
+| `created_at` | timestamptz |
+
+RLS: leitura apenas para `admin`.
+
+### Índice de deduplicação na `reclamacoes`
+Para evitar duplicação quando o n8n reenviar:
 ```sql
-ALTER TABLE public.sheets_sources
-  ADD COLUMN IF NOT EXISTS sync_diario boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS tipo_dado import_destino DEFAULT 'store_performance_entries',
-  ADD COLUMN IF NOT EXISTS ultima_execucao_cron timestamptz;
+CREATE UNIQUE INDEX idx_reclamacoes_dedupe
+  ON public.reclamacoes (loja_id, fonte, data_reclamacao, md5(coalesce(texto_original, '')))
+  WHERE fonte != 'manual';
+```
+Insert usará `ON CONFLICT DO NOTHING` para ser idempotente.
+
+---
+
+## 2. Edge Function: `ingest-reclamacoes`
+
+**Path:** `POST /functions/v1/ingest-reclamacoes/{slug}`
+
+### Autenticação
+- `verify_jwt = false` no `config.toml` (n8n não tem JWT)
+- Header obrigatório: `Authorization: Bearer <secret_token>`
+- Token comparado com `n8n_webhook_endpoints.secret_token` (lookup pelo slug da URL)
+
+### Payload aceito (JSON)
+Aceita 1 reclamação ou um array — flexível para o n8n:
+```json
+{
+  "reclamacoes": [
+    {
+      "loja": "Caju Limão Centro",        // nome → fuzzy match com config_lojas.nome
+      "loja_id": "uuid-opcional",          // se já souber, evita match
+      "fonte": "google",                   // google|ifood|tripadvisor|getin|sheets
+      "tipo_operacao": "salao",            // salao|delivery
+      "data_reclamacao": "2026-04-26",
+      "nota_reclamacao": 2,
+      "texto_original": "Demorou 40 min...",
+      "resumo_ia": "Demora no atendimento", // opcional
+      "temas": ["atendimento", "tempo"],    // opcional
+      "palavras_chave": ["lento"],          // opcional
+      "anexo_url": "https://..."            // opcional
+    }
+  ]
+}
 ```
 
-### Habilitar extensions para cron
-```sql
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
+### Lógica
+1. Valida bearer token → busca endpoint ativo pelo slug
+2. Para cada reclamação:
+   - Resolve `loja_id` (direto, ou via `loja_id_default`, ou fuzzy match no nome com `config_lojas`)
+   - Calcula `referencia_mes` a partir de `data_reclamacao` (`YYYY-MM`)
+   - Valida campos obrigatórios e enums (fonte, tipo_operacao, nota 1–5)
+   - `INSERT ... ON CONFLICT DO NOTHING` em `reclamacoes`
+3. Grava resumo em `n8n_webhook_executions` (sucesso/parcial/erro com detalhes por linha)
+4. Atualiza `ultima_execucao_at` e `total_recebido` no endpoint
+5. Retorna JSON: `{ success, processadas, inseridas, duplicadas, invalidas, erros }`
+
+### Códigos HTTP
+- `200` — processado (mesmo que algumas linhas falhem; detalhes no body)
+- `401` — token inválido
+- `404` — slug inexistente ou inativo
+- `400` — payload malformado
+- `500` — erro interno
+
+---
+
+## 3. UI — Nova aba "Webhooks n8n" no HoldingCentralTab
+
+Ao lado das abas existentes (Upload de Dados, Sincronizações, etc.):
+
+### Painel principal
+- **Lista de endpoints** (tabela): nome, slug, fonte, status (ativo/inativo), última execução, total recebido, ações (copiar URL, copiar token, ver logs, editar, excluir)
+- Botão **"+ Novo Endpoint Webhook"** abre modal com:
+  - Nome (ex: "Google Reviews — Diário")
+  - Slug (auto-gerado, editável)
+  - Loja padrão (opcional, dropdown de `config_lojas`)
+  - Switch ativo
+  - Ao salvar: gera `secret_token` aleatório (32 bytes hex) e mostra **uma única vez** com botão de copiar + URL completa pronta para colar no n8n
+
+### Card "Como configurar no n8n" (instruções inline)
 ```
+URL:  https://<projeto>.supabase.co/functions/v1/ingest-reclamacoes/<slug>
+Method: POST
+Headers:
+  Authorization: Bearer <token>
+  Content-Type: application/json
+Body: { "reclamacoes": [ {...} ] }
+```
+Com botão "Copiar exemplo de payload".
 
-### Cron job diário (executado às 06:00 BRT = 09:00 UTC)
-Será criado **via tool insert** (não migration), pois contém URL/anon key.
-
----
-
-## 2. Edge Functions (4 novas)
-
-Todas com `verify_jwt = false` em `supabase/config.toml`, validação Zod, CORS, e uso do `LOVABLE_API_KEY`.
-
-### 2.1 `ai-import-extract`
-**Input**: `{ fileBase64, fileName, mimeType, hintDestino? }`
-**Fluxo**:
-1. Detecta tipo do arquivo (xlsx/csv → texto via SheetJS; pdf/imagem → base64 multimodal).
-2. Chama Lovable AI Gateway (`google/gemini-2.5-flash`) com **tool calling** (`extract_dataset`) para retornar JSON estruturado:
-   - `tipo_destino` detectado (mensal/diario/reclamacoes)
-   - `mapeamento_colunas` (qual coluna corresponde a faturamento, nps, data, unidade…)
-   - `linhas` normalizadas (até 200 para preview)
-   - `confianca` (0..1)
-3. Faz fuzzy match de unidades contra `config_lojas` (usa `src/lib/fuzzyMatch.ts` lógica replicada).
-4. Cria registro em `import_jobs` com `status='preview_ready'` e retorna `{ jobId, preview, lojasNaoMapeadas, totalLinhas }`.
-5. Trata erros 429 (rate limit) e 402 (créditos).
-
-### 2.2 `ai-import-confirm`
-**Input**: `{ jobId, lojaOverrides?: { [originalName]: lojaId } }`
-**Fluxo**:
-1. Busca job em `import_jobs`.
-2. Aplica overrides do usuário para lojas não mapeadas.
-3. Distribui linhas conforme `tipo_destino`:
-   - `store_performance` → UPSERT por `(loja_id, month_year)`
-   - `store_performance_entries` → UPSERT por `(loja_id, entry_date)`
-   - `reclamacoes` → INSERT (com `referencia_mes` calculado)
-   - `misto` → distribui automaticamente por linha
-4. Atualiza `import_jobs.status='confirmed'`, `linhas_importadas`, `confirmed_at`.
-
-### 2.3 `cron-import-sheets`
-**Input**: nenhum (chamado pelo pg_cron)
-**Fluxo**:
-1. Lista `sheets_sources WHERE ativo=true AND sync_diario=true`.
-2. Para cada fonte: baixa CSV (via `export?format=csv&gid=`), envia ao mesmo pipeline do `ai-import-extract`.
-3. **Auto-confirma** se `confianca >= 0.85` E `lojas_nao_mapeadas.length = 0`.
-4. Caso contrário, deixa em `preview_ready` para revisão manual no painel.
-5. Atualiza `sheets_sources.ultima_execucao_cron`.
-
-### 2.4 `ai-import-cancel`
-**Input**: `{ jobId }`
-Marca job como `cancelled` (sem deletar — auditoria).
+### Drawer "Histórico de execuções"
+Ao clicar num endpoint, abre painel lateral com:
+- Últimas 50 execuções (status badge, data, linhas inseridas/duplicadas/inválidas)
+- Expandível: ver `payload_recebido` e `erros` (JSON formatado)
+- Útil para debugar quando o n8n manda algo errado
 
 ---
 
-## 3. Hook novo: `src/hooks/useImportJobs.ts`
+## 4. Visualização automática (já pronta!)
 
-Funções:
-- `useImportJobs()` — lista jobs (paginação `.range(0,49)`)
-- `useExtractFile(file, hint)` — chama `ai-import-extract`
-- `useConfirmImport(jobId, overrides)` — chama `ai-import-confirm`
-- `useCancelImport(jobId)` — chama `ai-import-cancel`
-- Invalidação automática de queries `['import_jobs']`, `['store_performance']`, `['reclamacoes']`, `['painel-*']` após confirmação.
+Como as reclamações entram na tabela `reclamacoes` que já alimenta:
+- `CentralReclamacoes` (lista detalhada)
+- `useReclamacoes` (agregações por loja)
+- `DiarioView` (gráfico diário de reclamações — recém criado)
+- `AdminCXDashboard` (dashboard executivo CX)
 
----
-
-## 4. Componentes novos
-
-### 4.1 `src/components/dashboard/AiImportSection.tsx`
-Nova seção dentro da aba **"Upload de Dados"** do `HoldingCentralTab`:
-- Drop zone (XLSX/CSV/PDF/PNG/JPG, até 20MB) — usa `<input type="file" capture="user">` para mobile.
-- Botão "Analisar com IA" → chama `extract`.
-- Loading state com skeleton (extração leva 3-8s).
-- Ao receber preview → abre `ImportPreviewModal`.
-- Lista de jobs recentes (últimos 20) com status Badge:
-  - `extracting` = azul (animado)
-  - `preview_ready` = âmbar (clicável → reabre modal)
-  - `confirmed` = verde
-  - `error` = vermelho
-  - `cancelled` = cinza
-
-### 4.2 `src/components/dashboard/ImportPreviewModal.tsx`
-shadcn `Dialog` (não `Sheet`, para suportar tabela larga):
-- **Header**: ícone do tipo detectado + nome do arquivo + Badge confiança IA (verde ≥85%, âmbar 60-84%, vermelho <60%).
-- **Resumo**: total de linhas, linhas válidas, totais agregados (faturamento total, nº reclamações).
-- **Tabela**: 10 primeiras linhas com `Table` shadcn, colunas conforme `tipo_destino`.
-- **Bloco "Lojas não mapeadas"** (se houver): cada nome desconhecido com `Select` para vincular a `config_lojas` ou marcar "ignorar".
-- **Mapeamento de colunas** (collapsible): permite usuário ajustar manualmente o mapeamento sugerido pela IA.
-- **Botões**: `Cancelar` | `Confirmar Importação` (disabled se houver lojas pendentes sem decisão).
-
-### 4.3 Sub-aba "Diário" — adicionada em `PainelMetasTab.tsx`
-Novo `value='diario'`, ícone `CalendarDays`, label "Diário":
-- Filtro de período: últimos 7 / 14 / 30 / 90 dias (Tabs ou Select).
-- 4 KPI cards: Faturamento Total, Ticket Médio Diário, Total Reclamações, Faturamento/Reclamação médio.
-- **LineChart** (recharts) — Faturamento Salão vs Delivery por dia.
-- **BarChart** (recharts) — Reclamações Salão vs iFood por dia.
-- **Tabela** — agrupada por loja, mostra dias com lançamento (ordem decrescente).
-- Query: `store_performance_entries` filtrada por `entry_date` no range, JOIN `config_lojas(nome)`.
-- Skeleton loading independente em cada bloco.
+…**a visualização aparece automaticamente** assim que o n8n envia. Sem trabalho extra de UI para os dashboards.
 
 ---
 
-## 5. Atualização do `HoldingCentralTab.tsx`
-Aba "Upload de Dados" passa a ter 4 seções (em vez de 3):
-1. **Importação com IA** (`AiImportSection`) ← **NOVO, no topo**
-2. Fontes do Google Sheets (existente, com novo toggle "Sync diário automático" e Select "Tipo de dado")
-3. Histórico de sincronizações (existente)
-4. Lançamento manual (existente)
+## 5. Arquivos a criar/alterar
+
+| Arquivo | Ação |
+|---|---|
+| `supabase/migrations/<novo>.sql` | Criar (2 tabelas + índice dedupe) |
+| `supabase/functions/ingest-reclamacoes/index.ts` | Criar |
+| `supabase/config.toml` | Adicionar `[functions.ingest-reclamacoes] verify_jwt = false` |
+| `src/hooks/useN8nWebhooks.ts` | Criar (CRUD endpoints + executions) |
+| `src/components/dashboard/N8nWebhooksSection.tsx` | Criar (UI completa da aba) |
+| `src/components/dashboard/HoldingCentralTab.tsx` | Adicionar aba "Webhooks n8n" |
+
+**Nada mais é tocado** — `useReclamacoes`, `CentralReclamacoes`, dashboards continuam intactos e ganham os dados automaticamente.
 
 ---
 
-## 6. Atualização do `PainelMetasTab.tsx`
-- Adiciona sub-aba `'diario'` (visível para todos os perfis com acesso ao painel).
-- Nenhuma quebra de compatibilidade com sub-abas atuais (visao/nps/conformidade/planos/holding).
+## 6. Segurança
+
+- ✅ Token bearer único por endpoint (rotacionável — botão "regenerar token")
+- ✅ Slug + token: dois fatores na URL, vazamento de um sozinho não autoriza
+- ✅ RLS bloqueia acesso à tabela de endpoints/logs (somente admin)
+- ✅ Edge function usa service role apenas internamente, nunca exposto
+- ✅ Validação rigorosa de payload (enums, ranges, datas)
+- ✅ Deduplicação no DB previne reenvios acidentais do n8n
+- ⚠️ Sem rate limiting (limitação conhecida do Lovable Cloud) — mitigado por token secreto
 
 ---
 
-## 7. Modelo de IA escolhido — `google/gemini-2.5-flash`
-**Justificativa**:
-- **Multimodal nativo** (lê PDF e imagem direto, sem OCR separado).
-- **Tool calling robusto** para extração estruturada.
-- **~3x mais barato e ~5x mais rápido** que GPT-5 e Gemini Pro.
-- Adequado ao caso de uso "mapear colunas + extrair tabelas", onde alta precisão semântica não é crítica (usuário sempre revisa preview).
+## 7. Extensibilidade futura (não implementado agora, mas a arquitetura suporta)
 
-Alternativas (configuráveis via env futuro): `gemini-2.5-pro` (PDFs complexos), `gpt-5-mini` (texto puro mais nuançado).
+- Adicionar `tipo_dado = 'store_performance'` ou `'auditoria'` no mesmo endpoint genérico
+- Adicionar webhook outbound (notificar n8n quando uma reclamação grave entra)
+- Filtrar execuções por status/data no histórico
 
 ---
 
-## 8. Segurança e Padrões do Projeto
-- ✅ RLS em `import_jobs` (admin/operator full, demais só próprios jobs)
-- ✅ `verify_jwt=false` nas edge functions + validação Zod do body
-- ✅ Sem segredos no client — `LOVABLE_API_KEY` só no edge
-- ✅ Preview obrigatório antes de gravar (padrão `data-import-confirmation-standard`)
-- ✅ Datas mantidas como `YYYY-MM-DD` puro (memória `date-handling-standard`)
-- ✅ Paginação `.range(0,49)` no listing de jobs
-- ✅ `useQueryClient().invalidateQueries` após cada mutation
-- ✅ Sem emojis na UI — apenas `lucide-react` (`Sparkles`, `FileSpreadsheet`, `Upload`, `Bot`, `CalendarDays`, `CheckCircle2`, `AlertTriangle`)
-- ✅ Estética Liquid Glass (cards `glass-card`, blur, coral CajuPAR)
+## Pronto para executar?
 
----
-
-## 9. Arquivos Afetados
-
-**Migration (schema)**:
-- nova migration: `import_jobs` + enums + colunas em `sheets_sources` + extensions
-
-**Insert SQL (cron — via tool insert, não migration)**:
-- `cron.schedule('cron-import-sheets-daily', '0 9 * * *', …)`
-
-**Edge Functions (criadas)**:
-- `supabase/functions/ai-import-extract/index.ts`
-- `supabase/functions/ai-import-confirm/index.ts`
-- `supabase/functions/ai-import-cancel/index.ts`
-- `supabase/functions/cron-import-sheets/index.ts`
-
-**Config**:
-- `supabase/config.toml` → adicionar `verify_jwt = false` para as 4 funções
-
-**Hook (criado)**:
-- `src/hooks/useImportJobs.ts`
-
-**Componentes (criados)**:
-- `src/components/dashboard/AiImportSection.tsx`
-- `src/components/dashboard/ImportPreviewModal.tsx`
-
-**Componentes (alterados)**:
-- `src/components/dashboard/HoldingCentralTab.tsx` (nova seção + toggles em sheets_sources)
-- `src/components/dashboard/PainelMetasTab.tsx` (nova sub-aba "Diário" com `DiarioView`)
-
----
-
-## 10. Entregáveis ao final
-1. Upload de planilha XLSX → preview em <8s → 1 clique para gravar.
-2. Upload de PDF/imagem de relatório → IA extrai dados → preview → grava.
-3. Cron diário às 06:00 BRT puxa todos os Google Sheets marcados como `sync_diario` automaticamente.
-4. Sub-aba "Diário" no Painel de Metas com gráficos por dia dos últimos 7-90 dias.
-5. Histórico completo de imports (com IA confidence score) auditável em `import_jobs`.
+Após aprovação, eu:
+1. Crio a migration (você aprova as alterações de schema)
+2. Crio a edge function e atualizo `config.toml`
+3. Crio o hook e o componente de UI
+4. Adiciono a aba no HoldingCentralTab
+5. Te entrego a URL/token de exemplo para você plugar no n8n

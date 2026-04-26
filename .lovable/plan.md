@@ -1,79 +1,110 @@
-## Plano: Scaffolding do "Painel de Metas"
+## Plano: Sub-aba "Visão Geral" do Painel de Metas
 
-Implementação **estritamente cirúrgica** — apenas estrutura visual e roteamento da nova tab. Zero lógica de dados, zero queries Supabase.
+**Escopo restrito**: alterações apenas em `src/components/dashboard/PainelMetasTab.tsx`. Nenhum outro arquivo será tocado. Nenhuma dependência nova.
 
-### 1. `src/components/dashboard/PainelMetasTab.tsx` (NOVO)
+### Verificações prévias (concluídas)
 
-Componente novo, isolado:
+- `leadership_store_scores`: contém `loja_id`, `month_year` (text, formato `YYYY-MM`), `front_score`, `back_score`, `general_score`, `front_tier`, `back_tier`, `general_tier`, `total_audits`, `total_failures` ✅
+- `reclamacoes.referencia_mes`: text no formato `YYYY-MM` ✅
+- `supervision_audits.audit_date`: date — usar filtro `gte/lte` no intervalo do mês (mais robusto que LIKE)
+- `config_lojas`: `id`, `nome` ✅
+- RLS já isola lojas por usuário automaticamente
 
-- Props: `{ selectedUnidadeId: string | null }` (recebida mas ainda não consumida).
-- shadcn `Tabs` com `defaultValue="visao-geral"` e 4 `TabsTrigger`:
-  - `visao-geral` — "Visão Geral" — ícone `LayoutDashboard`
-  - `nps` — "NPS" — ícone `MessageSquare`
-  - `conformidade` — "Conformidade" — ícone `ClipboardCheck`
-  - `planos` — "Planos de Ação" — ícone `ListChecks`
-- Cada `TabsContent` renderiza um `Card` com classe `glass-card` contendo o texto **"[Nome da aba] — em construção"**.
-- Sem imports de Supabase, sem hooks de dados.
+### Estrutura do componente refatorado
 
-### 2. `src/pages/Index.tsx` (3 alterações pontuais)
+**Novos imports** (mesmo arquivo):
+- `useState`, `useMemo` do React
+- `useQuery` do `@tanstack/react-query`
+- `supabase` de `@/integrations/supabase/client`
+- `Table, TableBody, TableCell, TableHead, TableHeader, TableRow` de `@/components/ui/table`
+- `Skeleton` de `@/components/ui/skeleton`
+- `Progress` de `@/components/ui/progress`
+- `Badge` de `@/components/ui/badge`
+- `Alert, AlertDescription` de `@/components/ui/alert`
+- Ícones extras: `ChevronLeft`, `ChevronRight`, `TrendingUp`, `TrendingDown`, `AlertTriangle`, `Trophy`, `MessageCircle`
+- `Button` de `@/components/ui/button`
 
-- **Import** (após o import do `EstoqueTab`, linha 25):  
-  `import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";`
-- **`tabConfig`** (adicionar entrada antes do fechamento `};` na linha 85):
-  ```ts
-  painel: {
-    title: "Painel de Metas",
-    subtitle: "Resultados e metas operacionais da rede",
-  },
-  ```
-- **`renderTabContent` switch** (adicionar novo `case` antes do `default`, perto da linha 266):
-  ```ts
-  case "painel":
-    return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
-  ```
+### BLOCO 1 — Seletor de mês
 
-Nada mais é alterado em `Index.tsx`.
+- State `mes: string` (formato `YYYY-MM`), inicializado com mês atual via `new Date().toISOString().slice(0,7)`
+- Botões `ChevronLeft` / `ChevronRight` para navegar prev/next mês (manipulação por Date local, sem timezone shift)
+- Label central exibe mês formatado em PT-BR (`new Date(`${mes}-01T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })`)
+- Layout: flex centralizado dentro de `glass-card` compacto
 
-### 3. `src/components/layout/AppSidebar.tsx`
+### BLOCO 2 — 4 KPI Cards
 
-- Adicionar import de `BarChart2` no bloco de ícones do `lucide-react`.
-- Em `adminMenuItems`, inserir **antes** do item `configuracoes`:
-  ```ts
-  {
-    title: "PAINEL DE METAS",
-    id: "painel",
-    icon: BarChart2,
-    description: "Resultados e metas da rede",
-  },
-  ```
-- **Visibilidade** (`admin`, `operator`, `gerente_unidade`; ocultar para `chefe_setor` e `employee`):  
-  Como `adminMenuItems` hoje só renderiza dentro de `{isAdmin && ...}`, isolaremos o item `painel` em uma renderização adicional para que `operator` e `gerente_unidade` também o vejam:
-  - Manter `adminMenuItems` apenas com `cx`, `configuracoes`, `rede`.
-  - Criar uma constante separada `painelItem` e renderizar um `SidebarGroup` extra (com label "Gestão") visível quando `isAdmin || isOperator || isGerenteUnidade`, **antes** do bloco de admin.
-  - `chefe_setor` continua caindo no filtro existente que limita o menu a "escalas" — nada a alterar nessa lógica.
-  - `employee` não verá pois não é admin/operator/gerente.
+Uma única query agregada via `useQuery(['painel-overview', mes])` que dispara 3 queries em paralelo:
 
-Os itens existentes (`menuItems`, `adminMenuItems` restantes) permanecem **intactos**.
+1. `leadership_store_scores` filtrado por `month_year = mes` → calcular AVG de `back_score`, `front_score`, `general_score` no client (com base nos rows retornados)
+2. `reclamacoes` filtrado por `referencia_mes = mes` → `count: 'exact', head: true`
+3. `supervision_audits` filtrado por `audit_date >= ${mes}-01` AND `audit_date <= ${mes}-31` → AVG de `global_score`
 
-### 4. `src/components/layout/BottomNavigation.tsx`
+Cards (grid `grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4`):
 
-- Adicionar `BarChart2` ao import do `lucide-react`.
-- Adicionar ao final de `navItems`:
-  ```ts
-  { id: "painel", label: "Metas", icon: BarChart2 },
-  ```
-- Nenhuma tab existente é removida ou reordenada.
-- A regra existente para `chefe_setor` (filtro para apenas "escalas") já oculta automaticamente o novo item para esse perfil.
+- **Card 1 — Back Score Médio** (ícone `TrendingDown` neutro): valor grande (`text-3xl font-bold`), `Progress` value=score%, cor por faixa (≥90 verde, ≥75 amber, <75 red via `[&>div]:bg-*`)
+- **Card 2 — Front Score Médio** (`TrendingUp`): mesma estrutura
+- **Card 3 — Reclamações no Mês** (`MessageCircle`): valor inteiro, sem progress bar (texto auxiliar "registradas")
+- **Card 4 — Auditoria Supervisão** (`Trophy`): AVG global_score com Progress bar mesma escala
 
-### Restrições respeitadas
+Loading: `Skeleton h-24` dentro de cada Card
 
-- `App.tsx`, `useUserProfile`, `useUnidade`, `AuthContext` — **não tocados**.
-- Nenhum componente fora de `src/components/dashboard/` (exceto os 3 arquivos explicitamente listados) é modificado.
-- Zero queries Supabase neste passo.
-- Design system existente (`glass-card`, primary coral, radius 1rem) é reutilizado tal qual.
+### BLOCO 3 — Mapa de Calor (tabela)
 
-### Resultado visual esperado
+Query `useQuery(['painel-heatmap', mes])`:
 
-- Sidebar (desktop) mostra novo item "PAINEL DE METAS" com ícone de gráfico de barras para admin/operator/gerente, posicionado antes de "CONFIGURAÇÕES".
-- Bottom nav (mobile) ganha um 6º ícone "Metas".
-- Ao clicar, header muda para "Painel de Metas / Resultados e metas operacionais da rede" e o conteúdo exibe 4 sub-abas com cards placeholder "em construção".
+```ts
+const { data: lojas } = await supabase.from('config_lojas').select('id, nome').order('nome');
+const { data: scores } = await supabase
+  .from('leadership_store_scores')
+  .select('loja_id, front_score, back_score, general_score, general_tier, front_tier, back_tier')
+  .eq('month_year', mes);
+const { data: reclamCounts } = await supabase
+  .from('reclamacoes')
+  .select('loja_id')
+  .eq('referencia_mes', mes);
+```
+
+Combinar no client em `useMemo`: para cada `loja`, achar score correspondente e contar reclamações por `loja_id`.
+
+Tabela shadcn dentro de `Card glass-card`:
+| Unidade | Front Score | Back Score | Score Geral | Reclamações | Tier |
+
+- Cada célula de score: badge colorido pelo tier do respectivo campo (`front_tier`, `back_tier`, `general_tier`)
+- Coluna Tier: badge do `general_tier`
+- Mapa de cores (helper `getTierClasses(tier: string | null)`):
+  - `ouro` → `bg-amber-100 text-amber-800`
+  - `prata` → `bg-gray-100 text-gray-700`
+  - `bronze` → `bg-orange-100 text-orange-800`
+  - `aceitavel` → `bg-red-100 text-red-700`
+  - `null/undefined` → `bg-muted text-muted-foreground` + texto "—"
+- Loading: 5 linhas de `Skeleton` na tabela
+- Empty state: "Nenhuma unidade disponível para este mês"
+
+### BLOCO 4 — Banner de Alerta
+
+- Renderizado **acima dos KPIs** se algum row de scores tiver `general_tier === 'aceitavel'`
+- Componente `Alert` com `variant="destructive"`, ícone `AlertTriangle`
+- Texto: `"Atenção: {N} unidade(s) com performance crítica este mês: {nomes separados por vírgula}"`
+
+### BLOCO 5 — Sub-abas restantes
+
+- `nps`, `conformidade`, `planos`: continuam com `<PlaceholderCard />` (sem alteração)
+- Estrutura `Tabs` mantida intacta
+
+### Padrões respeitados
+
+- ✅ Nenhum cálculo de tier no frontend — todos lidos diretamente da tabela
+- ✅ Datas tratadas como string `YYYY-MM` (memory: date-handling-standard)
+- ✅ Sem novas libs
+- ✅ `glass-card` em todos os wrappers
+- ✅ Coral primary herdado pelo design system
+- ✅ Sem emojis (lucide-react)
+- ✅ RLS faz o filtro automático por loja
+- ✅ Mobile-first: grid responsivo nos KPIs, tabela com `overflow-auto` herdado de `Table`
+
+### Validação pós-implementação
+
+1. Trocar mês → todas as queries reagem (queryKey inclui `mes`)
+2. Mês sem dados → KPIs mostram "0" / "—", tabela mostra "—" nos badges
+3. RLS: gerente_unidade vê só sua loja; admin vê todas
+4. Banner aparece somente se houver `aceitavel`

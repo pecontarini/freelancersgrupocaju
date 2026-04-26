@@ -205,6 +205,24 @@ const STYLE = {
     alignment: { horizontal: "center", vertical: "center" },
     border: BORDERS_ALL,
   },
+  atestado: {
+    font: { bold: true, sz: 9, color: { rgb: "B91C1C" } },
+    fill: { fgColor: { rgb: "FEE2E2" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: BORDERS_ALL,
+  },
+  bancoHoras: {
+    font: { bold: true, sz: 9, color: { rgb: "1D4ED8" } },
+    fill: { fgColor: { rgb: "DBEAFE" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: BORDERS_ALL,
+  },
+  ausenciaGenerica: {
+    font: { bold: true, sz: 9, color: { rgb: "374151" } },
+    fill: { fgColor: { rgb: "E5E7EB" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: BORDERS_ALL,
+  },
   resumo: {
     font: { bold: true, sz: 9 },
     fill: { fgColor: { rgb: "FEF9C3" } },
@@ -249,11 +267,19 @@ const STYLE = {
   },
 };
 
-function getCellValue(entry: any): { text: string; type: "folga" | "ferias" | "atestado" | "horario" | "empty" } {
+function getCellValue(entry: any): { text: string; type: "folga" | "ferias" | "atestado" | "banco_horas" | "ausencia" | "horario" | "empty" } {
   if (!entry) return { text: "", type: "empty" };
   if (entry.schedule_type === "off") return { text: "FOLGA", type: "folga" };
   if (entry.schedule_type === "vacation") return { text: "FÉRIAS", type: "ferias" };
   if (entry.schedule_type === "sick_leave") return { text: "ATESTADO", type: "atestado" };
+  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  // Fallback: any non-working type without explicit mapping → label by enum value
+  if (entry.schedule_type && entry.schedule_type !== "working") {
+    return {
+      text: String(entry.schedule_type).toUpperCase().replace(/_/g, " "),
+      type: "ausencia",
+    };
+  }
 
   const start = entry.start_time ? entry.start_time.slice(0, 5) : "";
   const end = entry.end_time ? entry.end_time.slice(0, 5) : "";
@@ -266,8 +292,11 @@ function getCellValue(entry: any): { text: string; type: "folga" | "ferias" | "a
 }
 
 function getCellStyle(type: string, isExtra: boolean, rowIndex: number) {
-  if (type === "folga" || type === "atestado") return STYLE.folga;
+  if (type === "folga") return STYLE.folga;
+  if (type === "atestado") return STYLE.atestado;
   if (type === "ferias") return STYLE.ferias;
+  if (type === "banco_horas") return STYLE.bancoHoras;
+  if (type === "ausencia") return STYLE.ausenciaGenerica;
   if (isExtra) return { ...STYLE.cellCenter("FFF7ED"), font: { sz: 10, color: { rgb: "92400E" } } };
   return STYLE.cellCenter(rowIndex % 2 === 0 ? "FFFFFF" : "F3F4F6");
 }

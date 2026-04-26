@@ -27,6 +27,14 @@ function getCellText(entry: any): { text: string; type: string } {
   if (entry.schedule_type === "off") return { text: "FOLGA", type: "folga" };
   if (entry.schedule_type === "vacation") return { text: "FÉRIAS", type: "ferias" };
   if (entry.schedule_type === "sick_leave") return { text: "ATESTADO", type: "atestado" };
+  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  // Fallback: any non-working type without explicit mapping → label by enum value
+  if (entry.schedule_type && entry.schedule_type !== "working") {
+    return {
+      text: String(entry.schedule_type).toUpperCase().replace(/_/g, " "),
+      type: "ausencia",
+    };
+  }
   const start = entry.start_time ? entry.start_time.slice(0, 5) : "";
   const end = entry.end_time ? entry.end_time.slice(0, 5) : "";
   if (!start || !end) return { text: "Turno", type: "horario" };
@@ -242,6 +250,27 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
             hookData.cell.styles.fillColor = [254, 226, 226];
             hookData.cell.styles.textColor = [185, 28, 28];
             hookData.cell.styles.fontStyle = "bold";
+          } else if (cellText === "BANCO DE HORAS") {
+            hookData.cell.styles.fillColor = [219, 234, 254];
+            hookData.cell.styles.textColor = [29, 78, 216];
+            hookData.cell.styles.fontStyle = "bold";
+            hookData.cell.styles.fontSize = 7;
+          } else if (
+            cellText &&
+            cellText !== "FOLGA" &&
+            cellText !== "FÉRIAS" &&
+            cellText !== "ATESTADO" &&
+            cellText !== "BANCO DE HORAS" &&
+            cellText !== "Turno" &&
+            !/^\d/.test(cellText) &&
+            cellText !== "── EXTRAS ──" &&
+            colIdx > 0
+          ) {
+            // Generic non-working absence (future enum values like LICENCA, SUSPENSAO)
+            hookData.cell.styles.fillColor = [229, 231, 235];
+            hookData.cell.styles.textColor = [55, 65, 81];
+            hookData.cell.styles.fontStyle = "bold";
+            hookData.cell.styles.fontSize = 7;
           }
         }
       },

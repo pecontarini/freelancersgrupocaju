@@ -30,6 +30,9 @@ import {
   MessageCircle,
   Store,
   Truck,
+  Utensils,
+  Timer,
+  Building2,
 } from "lucide-react";
 import {
   ResponsiveContainer,

@@ -1,69 +1,79 @@
-## Plano: corrigir motivo de ausência ("Banco de Horas" e outros) no PDF/Excel da Escala
+## Plano: Scaffolding do "Painel de Metas"
 
-### Diagnóstico (confirmado no código + banco)
+Implementação **estritamente cirúrgica** — apenas estrutura visual e roteamento da nova tab. Zero lógica de dados, zero queries Supabase.
 
-O enum `schedule_type` no banco aceita **5 valores**:
-```
-working | off | vacation | sick_leave | banco_horas
-```
+### 1. `src/components/dashboard/PainelMetasTab.tsx` (NOVO)
 
-A grid (`ManualScheduleGrid.tsx`) e o modal de edição (`ScheduleEditModal.tsx`) tratam todos os 5, mas os dois exportadores **só conhecem 4**:
+Componente novo, isolado:
 
-| Arquivo | Função | O que falta |
-|---|---|---|
-| `src/lib/scheduleMasterPdf.ts` linha 25-36 (`getCellText`) | Mapeia tipos → texto | Não trata `banco_horas` → cai no fallback `"Turno"` (start/end vazios) ou exibe horários antigos zerados |
-| `src/lib/scheduleMasterExport.ts` linha 252-266 (`getCellValue`) | Mesmo bug | Idem — exporta célula vazia/"Turno" em vez de "BANCO DE HORAS" |
+- Props: `{ selectedUnidadeId: string | null }` (recebida mas ainda não consumida).
+- shadcn `Tabs` com `defaultValue="visao-geral"` e 4 `TabsTrigger`:
+  - `visao-geral` — "Visão Geral" — ícone `LayoutDashboard`
+  - `nps` — "NPS" — ícone `MessageSquare`
+  - `conformidade` — "Conformidade" — ícone `ClipboardCheck`
+  - `planos` — "Planos de Ação" — ícone `ListChecks`
+- Cada `TabsContent` renderiza um `Card` com classe `glass-card` contendo o texto **"[Nome da aba] — em construção"**.
+- Sem imports de Supabase, sem hooks de dados.
 
-Quando o usuário marca "Banco de Horas" no modal, `start_time` e `end_time` ficam `NULL` na tabela, então no PDF aparece a string genérica "Turno" (ou string vazia no Excel) — exatamente o sintoma reportado.
+### 2. `src/pages/Index.tsx` (3 alterações pontuais)
 
-Além disso, o styling condicional do PDF (linhas 232-246) só pinta células cujo texto seja exatamente `"FOLGA"`, `"FÉRIAS"` ou `"ATESTADO"` — vou estender para `"BANCO DE HORAS"` com cor própria (azul, igual a grid).
-
-### O que vou implementar
-
-#### 1. `src/lib/scheduleMasterPdf.ts`
-- Adicionar em `getCellText`:
+- **Import** (após o import do `EstoqueTab`, linha 25):  
+  `import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";`
+- **`tabConfig`** (adicionar entrada antes do fechamento `};` na linha 85):
   ```ts
-  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  painel: {
+    title: "Painel de Metas",
+    subtitle: "Resultados e metas operacionais da rede",
+  },
   ```
-- Adicionar bloco de styling em `didParseCell` para `"BANCO DE HORAS"`:
-  - fundo azul claro `[219, 234, 254]`
-  - texto azul escuro `[29, 78, 216]`
-  - bold
-
-#### 2. `src/lib/scheduleMasterExport.ts`
-- Estender o tipo de retorno de `getCellValue` para incluir `"banco_horas"`:
+- **`renderTabContent` switch** (adicionar novo `case` antes do `default`, perto da linha 266):
   ```ts
-  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  case "painel":
+    return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
   ```
-- Criar novo estilo `STYLE.bancoHoras` com fundo azul claro (`DBEAFE`) e texto azul escuro (`1D4ED8`).
-- Ajustar `getCellStyle` para retornar `STYLE.bancoHoras` quando `type === "banco_horas"`.
 
-#### 3. Defesa em profundidade — fallback para schedule_type desconhecido
-Hoje, se um dia surgir um tipo novo no enum (ex: `licenca`, `suspensao`), os dois exportadores caem no fallback genérico "Turno"/vazio. Vou ajustar para que, quando `schedule_type !== 'working'` mas o tipo não for nenhum dos 4 mapeados, o texto seja `schedule_type.toUpperCase().replace('_', ' ')` em vez de "Turno". Isso garante que **qualquer ausência futura aparece corretamente sem precisar atualizar o exportador**.
+Nada mais é alterado em `Index.tsx`.
 
-#### 4. Validação visual obrigatória (QA)
-Após a mudança, vou:
-1. Gerar um PDF e um Excel de teste com uma escala que contenha `working`, `off`, `vacation`, `sick_leave` e `banco_horas` lado a lado.
-2. Converter cada página do PDF em imagem e inspecionar para confirmar que "BANCO DE HORAS" aparece com a cor azul correta, sem clipping nem sobreposição.
-3. Confirmar que o Excel também renderiza com cor azul.
+### 3. `src/components/layout/AppSidebar.tsx`
 
-### Mudanças técnicas
+- Adicionar import de `BarChart2` no bloco de ícones do `lucide-react`.
+- Em `adminMenuItems`, inserir **antes** do item `configuracoes`:
+  ```ts
+  {
+    title: "PAINEL DE METAS",
+    id: "painel",
+    icon: BarChart2,
+    description: "Resultados e metas da rede",
+  },
+  ```
+- **Visibilidade** (`admin`, `operator`, `gerente_unidade`; ocultar para `chefe_setor` e `employee`):  
+  Como `adminMenuItems` hoje só renderiza dentro de `{isAdmin && ...}`, isolaremos o item `painel` em uma renderização adicional para que `operator` e `gerente_unidade` também o vejam:
+  - Manter `adminMenuItems` apenas com `cx`, `configuracoes`, `rede`.
+  - Criar uma constante separada `painelItem` e renderizar um `SidebarGroup` extra (com label "Gestão") visível quando `isAdmin || isOperator || isGerenteUnidade`, **antes** do bloco de admin.
+  - `chefe_setor` continua caindo no filtro existente que limita o menu a "escalas" — nada a alterar nessa lógica.
+  - `employee` não verá pois não é admin/operator/gerente.
 
-| Arquivo | Mudança |
-|---|---|
-| `src/lib/scheduleMasterPdf.ts` | `getCellText` trata `banco_horas` + fallback genérico para tipos desconhecidos; `didParseCell` pinta célula azul |
-| `src/lib/scheduleMasterExport.ts` | `getCellValue` trata `banco_horas` + fallback genérico; novo `STYLE.bancoHoras`; `getCellStyle` retorna estilo correto |
+Os itens existentes (`menuItems`, `adminMenuItems` restantes) permanecem **intactos**.
 
-### Resultado esperado
+### 4. `src/components/layout/BottomNavigation.tsx`
 
-- Marcar "Banco de Horas" no editor de escalas → exportar PDF/Excel → célula aparece como `BANCO DE HORAS` em azul, idêntico à grid.
-- Mesma coisa para FOLGA, FÉRIAS e ATESTADO (já funcionavam, continuam OK).
-- Qualquer novo tipo de ausência adicionado no enum no futuro aparece automaticamente em vez de virar célula vazia.
+- Adicionar `BarChart2` ao import do `lucide-react`.
+- Adicionar ao final de `navItems`:
+  ```ts
+  { id: "painel", label: "Metas", icon: BarChart2 },
+  ```
+- Nenhuma tab existente é removida ou reordenada.
+- A regra existente para `chefe_setor` (filtro para apenas "escalas") já oculta automaticamente o novo item para esse perfil.
 
-### Validação pós-implementação
+### Restrições respeitadas
 
-1. Editor de Escalas → marcar um colaborador como "Banco de Horas" em um dia.
-2. Marcar outro como "Atestado", outro como "Férias", outro como "Folga", outro com turno normal.
-3. Clicar em "Exportar Escala" → "Baixar PDF": conferir as 5 células com cores e textos corretos.
-4. Mesma escala → "Baixar Excel": abrir e conferir as cores e textos.
-5. Conferir que o resumo de almoço/jantar/POP no rodapé continua igual (não conta `banco_horas` como working — já está correto, pois filtra `schedule_type === "working"`).
+- `App.tsx`, `useUserProfile`, `useUnidade`, `AuthContext` — **não tocados**.
+- Nenhum componente fora de `src/components/dashboard/` (exceto os 3 arquivos explicitamente listados) é modificado.
+- Zero queries Supabase neste passo.
+- Design system existente (`glass-card`, primary coral, radius 1rem) é reutilizado tal qual.
+
+### Resultado visual esperado
+
+- Sidebar (desktop) mostra novo item "PAINEL DE METAS" com ícone de gráfico de barras para admin/operator/gerente, posicionado antes de "CONFIGURAÇÕES".
+- Bottom nav (mobile) ganha um 6º ícone "Metas".
+- Ao clicar, header muda para "Painel de Metas / Resultados e metas operacionais da rede" e o conteúdo exibe 4 sub-abas com cards placeholder "em construção".

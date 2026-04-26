@@ -146,7 +146,8 @@ const gestaoMenuItems = [
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isChefeSetor, unidades, profile } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade, isChefeSetor, unidades, profile } = useUserProfile();
+  const canSeeGestao = (isAdmin || isOperator || isGerenteUnidade) && !isChefeSetor;
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
   const logoSrc = resolvedTheme === "dark" ? cajuparLogoLight : cajuparLogoDark;
@@ -214,6 +215,34 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {canSeeGestao && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="uppercase text-xs tracking-wider">
+                Gestão
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {gestaoMenuItems.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton
+                        onClick={() => handleTabClick(item.id)}
+                        isActive={activeTab === item.id}
+                        tooltip={item.title}
+                        className="group transition-all duration-200"
+                      >
+                        <item.icon className="h-4 w-4 transition-colors group-hover:text-primary" />
+                        <span className="font-medium">{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
 
         {isAdmin && (
           <>

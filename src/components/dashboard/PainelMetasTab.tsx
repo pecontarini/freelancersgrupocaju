@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +15,28 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   Table,
   TableBody,
@@ -33,6 +62,14 @@ import {
   Utensils,
   Timer,
   Building2,
+  Plus,
+  Calendar as CalendarIcon,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  ChevronDown,
+  Loader2,
+  Send,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -1273,6 +1310,671 @@ function ScoreCell({ score }: { score: number | null }) {
   );
 }
 
+// ──────────────────────────────────────────────────────────────
+// Planos de Ação
+// ──────────────────────────────────────────────────────────────
+
+type PlanoStatus = "pending" | "in_analysis" | "resolved";
+
+const planoSchema = z.object({
+  loja_id: z.string().uuid({ message: "Selecione uma unidade." }),
+  referencia_mes: z.string().regex(/^\d{4}-\d{2}$/, "Mês inválido (YYYY-MM)."),
+  pain_tag: z.string().min(2, "Informe a dor / categoria."),
+  causa_raiz: z.string().optional(),
+  medida_tomada: z.string().optional(),
+  acao_preventiva: z.string().optional(),
+  deadline_at: z.date({ required_error: "Defina um prazo." }),
+});
+type PlanoFormValues = z.infer<typeof planoSchema>;
+
+function statusBadge(status: PlanoStatus): { label: string; className: string; Icon: typeof Clock } {
+  switch (status) {
+    case "pending":
+      return {
+        label: "Pendente",
+        className: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+        Icon: Clock,
+      };
+    case "in_analysis":
+      return {
+        label: "Em Análise",
+        className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
+        Icon: AlertCircle,
+      };
+    case "resolved":
+      return {
+        label: "Resolvido",
+        className: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
+        Icon: CheckCircle2,
+      };
+  }
+}
+
+function PlanosView() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [mes, setMes] = useState<string>(currentMonth());
+  const [statusFilter, setStatusFilter] = useState<"all" | PlanoStatus>("all");
+  const [unitFilter, setUnitFilter] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const lojasQ = useQuery({
+    queryKey: ["planos-lojas"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("config_lojas")
+        .select("id, nome")
+        .order("nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const planosQ = useQuery({
+    queryKey: ["planos", mes],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("action_plans")
+        .select("*, config_lojas(nome)")
+        .eq("referencia_mes", mes)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: PlanoStatus }) => {
+      const { error } = await supabase.from("action_plans").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["planos"] });
+      toast.success("Status atualizado.");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao atualizar status."),
+  });
+
+  // KPI
+  const kpis = useMemo(() => {
+    const list = planosQ.data ?? [];
+    const now = new Date();
+    return {
+      pending: list.filter((p: any) => p.status === "pending").length,
+      in_analysis: list.filter((p: any) => p.status === "in_analysis").length,
+      resolved: list.filter((p: any) => p.status === "resolved").length,
+      overdue: list.filter(
+        (p: any) => p.status !== "resolved" && p.deadline_at && new Date(p.deadline_at) < now
+      ).length,
+    };
+  }, [planosQ.data]);
+
+  const filteredPlanos = useMemo(() => {
+    return (planosQ.data ?? []).filter((p: any) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (unitFilter !== "all" && p.loja_id !== unitFilter) return false;
+      return true;
+    });
+  }, [planosQ.data, statusFilter, unitFilter]);
+
+  return (
+    <div className="space-y-4">
+      {/* Seletor de mês + ação */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="glass-card flex-1">
+          <CardContent className="flex items-center justify-center gap-3 p-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMes((m) => shiftMonth(m, -1))}
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-[200px] text-center">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Período</div>
+              <div className="text-base font-semibold">{formatMonthPt(mes)}</div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMes((m) => shiftMonth(m, 1))}
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Novo Plano
+            </Button>
+          </SheetTrigger>
+          <NovoPlanoSheet
+            open={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            lojas={lojasQ.data ?? []}
+            defaultMes={mes}
+            userId={user?.id ?? null}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ["planos"] });
+              setSheetOpen(false);
+            }}
+          />
+        </Sheet>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PlanoKpiCard
+          title="Pendentes"
+          value={kpis.pending}
+          icon={Clock}
+          tone="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
+          loading={planosQ.isLoading}
+        />
+        <PlanoKpiCard
+          title="Em Análise"
+          value={kpis.in_analysis}
+          icon={AlertCircle}
+          tone="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+          loading={planosQ.isLoading}
+        />
+        <PlanoKpiCard
+          title="Resolvidos"
+          value={kpis.resolved}
+          icon={CheckCircle2}
+          tone="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200"
+          loading={planosQ.isLoading}
+        />
+        <PlanoKpiCard
+          title="Vencidos"
+          value={kpis.overdue}
+          icon={AlertTriangle}
+          tone="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+          loading={planosQ.isLoading}
+        />
+      </div>
+
+      {/* Filtros */}
+      <Card className="glass-card">
+        <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">Status</span>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="pending">Pendentes</SelectItem>
+                <SelectItem value="in_analysis">Em Análise</SelectItem>
+                <SelectItem value="resolved">Resolvidos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">Unidade</span>
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="h-9 w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {(lojasQ.data ?? []).map((l: any) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="ml-auto text-xs text-muted-foreground">
+            {filteredPlanos.length} plano{filteredPlanos.length === 1 ? "" : "s"}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lista de Planos */}
+      <div className="space-y-3">
+        {planosQ.isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
+        ) : filteredPlanos.length === 0 ? (
+          <Card className="glass-card">
+            <CardContent className="flex min-h-[160px] items-center justify-center p-10">
+              <p className="text-center text-sm text-muted-foreground">
+                Nenhum plano de ação encontrado para este período.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredPlanos.map((p: any) => (
+            <PlanoCard
+              key={p.id}
+              plano={p}
+              expanded={expandedId === p.id}
+              onToggle={() => setExpandedId((cur) => (cur === p.id ? null : p.id))}
+              onUpdateStatus={(status) => updateStatus.mutate({ id: p.id, status })}
+              updating={updateStatus.isPending}
+              userId={user?.id ?? null}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanoKpiCard({
+  title,
+  value,
+  icon: Icon,
+  tone,
+  loading,
+}: {
+  title: string;
+  value: number;
+  icon: typeof Clock;
+  tone: string;
+  loading: boolean;
+}) {
+  return (
+    <Card className="glass-card">
+      <CardContent className="flex items-center justify-between p-4">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">{title}</div>
+          {loading ? (
+            <Skeleton className="mt-2 h-8 w-12" />
+          ) : (
+            <div className="mt-1 text-3xl font-bold tabular-nums">{value}</div>
+          )}
+        </div>
+        <span className={cn("flex h-10 w-10 items-center justify-center rounded-full", tone)}>
+          <Icon className="h-5 w-5" />
+        </span>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlanoCard({
+  plano,
+  expanded,
+  onToggle,
+  onUpdateStatus,
+  updating,
+  userId,
+}: {
+  plano: any;
+  expanded: boolean;
+  onToggle: () => void;
+  onUpdateStatus: (s: PlanoStatus) => void;
+  updating: boolean;
+  userId: string | null;
+}) {
+  const badge = statusBadge(plano.status as PlanoStatus);
+  const StatusIcon = badge.Icon;
+  const deadline = plano.deadline_at ? new Date(plano.deadline_at) : null;
+  const isOverdue =
+    deadline && plano.status !== "resolved" && deadline.getTime() < Date.now();
+
+  return (
+    <Card className="glass-card overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full flex-col gap-2 p-4 text-left transition-colors hover:bg-muted/30 sm:flex-row sm:items-center sm:gap-4"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-semibold">{plano.pain_tag}</span>
+            {isOverdue && (
+              <Badge variant="destructive" className="text-[10px]">
+                Vencido
+              </Badge>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              {plano.config_lojas?.nome ?? "—"}
+            </span>
+            {deadline && (
+              <span className="inline-flex items-center gap-1">
+                <CalendarIcon className="h-3 w-3" />
+                Prazo: {format(deadline, "dd/MM/yyyy", { locale: ptBR })}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold",
+              badge.className
+            )}
+          >
+            <StatusIcon className="h-3 w-3" />
+            {badge.label}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+          />
+        </div>
+      </button>
+
+      <Collapsible open={expanded}>
+        <CollapsibleContent>
+          <div className="space-y-4 border-t bg-muted/10 p-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <DetailBlock label="Causa raiz" value={plano.causa_raiz} />
+              <DetailBlock label="Medida tomada" value={plano.medida_tomada} />
+              <DetailBlock label="Ação preventiva" value={plano.acao_preventiva} />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={updating || plano.status === "in_analysis"}
+                onClick={() => onUpdateStatus("in_analysis")}
+              >
+                <AlertCircle className="mr-1 h-3.5 w-3.5" /> Em Análise
+              </Button>
+              <Button
+                size="sm"
+                disabled={updating || plano.status === "resolved"}
+                onClick={() => onUpdateStatus("resolved")}
+              >
+                <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Resolvido
+              </Button>
+            </div>
+
+            <ComentariosSection planoId={plano.id} userId={userId} />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+function DetailBlock({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div className="rounded-lg border bg-background/40 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <p className="mt-1 whitespace-pre-wrap text-sm">{value?.trim() ? value : "—"}</p>
+    </div>
+  );
+}
+
+function ComentariosSection({ planoId, userId }: { planoId: string; userId: string | null }) {
+  const queryClient = useQueryClient();
+  const [text, setText] = useState("");
+
+  const commentsQ = useQuery({
+    queryKey: ["plano-comments", planoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("action_plan_comments")
+        .select("*")
+        .eq("action_plan_id", planoId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const addComment = useMutation({
+    mutationFn: async (message: string) => {
+      if (!userId) throw new Error("Usuário não autenticado.");
+      const { error } = await supabase
+        .from("action_plan_comments")
+        .insert({ action_plan_id: planoId, message, user_id: userId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setText("");
+      queryClient.invalidateQueries({ queryKey: ["plano-comments", planoId] });
+      toast.success("Comentário enviado.");
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao enviar comentário."),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Comentários
+      </div>
+      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+        {commentsQ.isLoading ? (
+          <Skeleton className="h-12 w-full" />
+        ) : (commentsQ.data ?? []).length === 0 ? (
+          <p className="text-xs italic text-muted-foreground">Sem comentários ainda.</p>
+        ) : (
+          (commentsQ.data ?? []).map((c: any) => (
+            <div key={c.id} className="rounded-md border bg-background/40 p-2 text-sm">
+              <p className="whitespace-pre-wrap">{c.message}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {format(new Date(c.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+      <div className="flex items-end gap-2">
+        <Textarea
+          rows={2}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Escreva um comentário..."
+          className="text-sm"
+        />
+        <Button
+          size="icon"
+          disabled={!text.trim() || addComment.isPending || !userId}
+          onClick={() => addComment.mutate(text.trim())}
+          aria-label="Enviar comentário"
+        >
+          {addComment.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NovoPlanoSheet({
+  open,
+  onClose,
+  lojas,
+  defaultMes,
+  userId,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  lojas: Array<{ id: string; nome: string }>;
+  defaultMes: string;
+  userId: string | null;
+  onSaved: () => void;
+}) {
+  const form = useForm<PlanoFormValues>({
+    resolver: zodResolver(planoSchema),
+    defaultValues: {
+      loja_id: "",
+      referencia_mes: defaultMes,
+      pain_tag: "",
+      causa_raiz: "",
+      medida_tomada: "",
+      acao_preventiva: "",
+      deadline_at: undefined as unknown as Date,
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: async (values: PlanoFormValues) => {
+      if (!userId) throw new Error("Usuário não autenticado.");
+      const { error } = await supabase.from("action_plans").insert({
+        loja_id: values.loja_id,
+        referencia_mes: values.referencia_mes,
+        pain_tag: values.pain_tag,
+        causa_raiz: values.causa_raiz || null,
+        medida_tomada: values.medida_tomada || null,
+        acao_preventiva: values.acao_preventiva || null,
+        deadline_at: values.deadline_at.toISOString(),
+        created_by: userId,
+        status: "pending",
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Plano de ação criado.");
+      form.reset();
+      onSaved();
+    },
+    onError: (err: any) => toast.error(err?.message ?? "Erro ao criar plano."),
+  });
+
+  // Reset values whenever sheet opens
+  if (!open) {
+    // no-op (controlled outside)
+  }
+
+  return (
+    <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetHeader>
+        <SheetTitle>Novo Plano de Ação</SheetTitle>
+        <SheetDescription>
+          Registre uma dor, sua causa raiz e o plano para resolvê-la.
+        </SheetDescription>
+      </SheetHeader>
+
+      <form
+        onSubmit={form.handleSubmit((v) => create.mutate(v))}
+        className="mt-4 space-y-4"
+      >
+        <div className="space-y-1.5">
+          <Label>Unidade</Label>
+          <Select
+            value={form.watch("loja_id")}
+            onValueChange={(v) => form.setValue("loja_id", v, { shouldValidate: true })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione a unidade" />
+            </SelectTrigger>
+            <SelectContent>
+              {lojas.map((l) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {form.formState.errors.loja_id && (
+            <p className="text-xs text-destructive">{form.formState.errors.loja_id.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="ref-mes">Mês de referência</Label>
+          <Input
+            id="ref-mes"
+            type="month"
+            {...form.register("referencia_mes")}
+          />
+          {form.formState.errors.referencia_mes && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.referencia_mes.message}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="pain-tag">Dor / Categoria</Label>
+          <Input id="pain-tag" placeholder="Ex.: Demora no atendimento" {...form.register("pain_tag")} />
+          {form.formState.errors.pain_tag && (
+            <p className="text-xs text-destructive">{form.formState.errors.pain_tag.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="causa">Causa raiz</Label>
+          <Textarea id="causa" rows={3} {...form.register("causa_raiz")} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="medida">Medida tomada</Label>
+          <Textarea id="medida" rows={3} {...form.register("medida_tomada")} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="prev">Ação preventiva</Label>
+          <Textarea id="prev" rows={3} {...form.register("acao_preventiva")} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Prazo</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !form.watch("deadline_at") && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {form.watch("deadline_at")
+                  ? format(form.watch("deadline_at"), "PPP", { locale: ptBR })
+                  : "Escolha uma data"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={form.watch("deadline_at")}
+                onSelect={(d) =>
+                  d && form.setValue("deadline_at", d, { shouldValidate: true })
+                }
+                initialFocus
+                className={cn("p-3 pointer-events-auto")}
+              />
+            </PopoverContent>
+          </Popover>
+          {form.formState.errors.deadline_at && (
+            <p className="text-xs text-destructive">
+              {form.formState.errors.deadline_at.message as string}
+            </p>
+          )}
+        </div>
+
+        <SheetFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={create.isPending}>
+            {create.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
+        </SheetFooter>
+      </form>
+    </SheetContent>
+  );
+}
+
 function PlaceholderCard({ name }: { name: string }) {
   return (
     <Card className="glass-card">
@@ -1315,7 +2017,7 @@ export function PainelMetasTab(_props: PainelMetasTabProps) {
         <ConformidadeView />
       </TabsContent>
       <TabsContent value="planos" className="mt-4">
-        <PlaceholderCard name="Planos de Ação" />
+        <PlanosView />
       </TabsContent>
     </Tabs>
   );

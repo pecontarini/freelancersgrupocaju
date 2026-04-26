@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   AlertTriangle,
   BarChart3,
+  BarChart2,
   CalendarClock,
   ScanFace,
   UtensilsCrossed,
@@ -131,6 +132,15 @@ const adminMenuItems = [
     id: "rede",
     icon: Building2,
     description: "Consolidado da rede",
+  },
+];
+
+const gestaoMenuItems = [
+  {
+    title: "PAINEL DE METAS",
+    id: "painel",
+    icon: BarChart2,
+    description: "Resultados e metas da rede",
   },
 ];
 

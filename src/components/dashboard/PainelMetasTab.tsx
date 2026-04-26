@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { HoldingCentralTab } from "./HoldingCentralTab";
+import { DiarioView } from "./DiarioView";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,6 +96,7 @@ interface PainelMetasTabProps {
 
 const BASE_SUBTABS = [
   { value: "visao-geral", label: "Visão Geral", icon: LayoutDashboard },
+  { value: "diario", label: "Diário", icon: TrendingUp },
   { value: "nps", label: "NPS", icon: MessageSquare },
   { value: "conformidade", label: "Conformidade", icon: ClipboardCheck },
   { value: "planos", label: "Planos de Ação", icon: ListChecks },
@@ -2022,6 +2024,9 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
 
       <TabsContent value="visao-geral" className="mt-4">
         <VisaoGeral />
+      </TabsContent>
+      <TabsContent value="diario" className="mt-4">
+        <DiarioView selectedUnidadeId={selectedUnidadeId} />
       </TabsContent>
       <TabsContent value="nps" className="mt-4">
         <NpsView />

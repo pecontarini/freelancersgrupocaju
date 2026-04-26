@@ -1312,7 +1312,7 @@ export function PainelMetasTab(_props: PainelMetasTabProps) {
         <NpsView />
       </TabsContent>
       <TabsContent value="conformidade" className="mt-4">
-        <PlaceholderCard name="Conformidade" />
+        <ConformidadeView />
       </TabsContent>
       <TabsContent value="planos" className="mt-4">
         <PlaceholderCard name="Planos de Ação" />

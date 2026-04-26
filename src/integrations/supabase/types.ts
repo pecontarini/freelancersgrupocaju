@@ -2605,6 +2605,106 @@ export type Database = {
           },
         ]
       }
+      n8n_webhook_endpoints: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          loja_id_default: string | null
+          nome: string
+          secret_token: string
+          slug: string
+          tipo_dado: string
+          total_recebido: number
+          ultima_execucao_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loja_id_default?: string | null
+          nome: string
+          secret_token: string
+          slug: string
+          tipo_dado?: string
+          total_recebido?: number
+          ultima_execucao_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          loja_id_default?: string | null
+          nome?: string
+          secret_token?: string
+          slug?: string
+          tipo_dado?: string
+          total_recebido?: number
+          ultima_execucao_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "n8n_webhook_endpoints_loja_id_default_fkey"
+            columns: ["loja_id_default"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      n8n_webhook_executions: {
+        Row: {
+          created_at: string
+          endpoint_id: string
+          erros: Json | null
+          id: string
+          linhas_duplicadas: number
+          linhas_inseridas: number
+          linhas_invalidas: number
+          linhas_processadas: number
+          payload_recebido: Json | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint_id: string
+          erros?: Json | null
+          id?: string
+          linhas_duplicadas?: number
+          linhas_inseridas?: number
+          linhas_invalidas?: number
+          linhas_processadas?: number
+          payload_recebido?: Json | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          endpoint_id?: string
+          erros?: Json | null
+          id?: string
+          linhas_duplicadas?: number
+          linhas_inseridas?: number
+          linhas_invalidas?: number
+          linhas_processadas?: number
+          payload_recebido?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "n8n_webhook_executions_endpoint_id_fkey"
+            columns: ["endpoint_id"]
+            isOneToOne: false
+            referencedRelation: "n8n_webhook_endpoints"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           channel: string

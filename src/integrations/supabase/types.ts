@@ -1929,6 +1929,72 @@ export type Database = {
         }
         Relationships: []
       }
+      import_jobs: {
+        Row: {
+          ai_confianca: number | null
+          ai_model: string | null
+          confirmed_at: string | null
+          created_at: string
+          created_by: string | null
+          erro: string | null
+          file_mime: string | null
+          file_name: string | null
+          id: string
+          linhas_importadas: number
+          linhas_validas: number
+          lojas_nao_mapeadas: Json
+          mapeamento_colunas: Json | null
+          origem: Database["public"]["Enums"]["import_origem"]
+          preview_data: Json | null
+          source_url: string | null
+          status: Database["public"]["Enums"]["import_status"]
+          tipo_destino: Database["public"]["Enums"]["import_destino"] | null
+          total_linhas: number
+        }
+        Insert: {
+          ai_confianca?: number | null
+          ai_model?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          erro?: string | null
+          file_mime?: string | null
+          file_name?: string | null
+          id?: string
+          linhas_importadas?: number
+          linhas_validas?: number
+          lojas_nao_mapeadas?: Json
+          mapeamento_colunas?: Json | null
+          origem: Database["public"]["Enums"]["import_origem"]
+          preview_data?: Json | null
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["import_status"]
+          tipo_destino?: Database["public"]["Enums"]["import_destino"] | null
+          total_linhas?: number
+        }
+        Update: {
+          ai_confianca?: number | null
+          ai_model?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          erro?: string | null
+          file_mime?: string | null
+          file_name?: string | null
+          id?: string
+          linhas_importadas?: number
+          linhas_validas?: number
+          lojas_nao_mapeadas?: Json
+          mapeamento_colunas?: Json | null
+          origem?: Database["public"]["Enums"]["import_origem"]
+          preview_data?: Json | null
+          source_url?: string | null
+          status?: Database["public"]["Enums"]["import_status"]
+          tipo_destino?: Database["public"]["Enums"]["import_destino"] | null
+          total_linhas?: number
+        }
+        Relationships: []
+      }
       inventario_items: {
         Row: {
           created_at: string
@@ -3242,6 +3308,9 @@ export type Database = {
           gid: string | null
           id: string
           nome: string
+          sync_diario: boolean
+          tipo_dado: Database["public"]["Enums"]["import_destino"]
+          ultima_execucao_cron: string | null
           ultima_sincronizacao: string | null
           updated_at: string
           url: string
@@ -3252,6 +3321,9 @@ export type Database = {
           gid?: string | null
           id?: string
           nome: string
+          sync_diario?: boolean
+          tipo_dado?: Database["public"]["Enums"]["import_destino"]
+          ultima_execucao_cron?: string | null
           ultima_sincronizacao?: string | null
           updated_at?: string
           url: string
@@ -3262,6 +3334,9 @@ export type Database = {
           gid?: string | null
           id?: string
           nome?: string
+          sync_diario?: boolean
+          tipo_dado?: Database["public"]["Enums"]["import_destino"]
+          ultima_execucao_cron?: string | null
           ultima_sincronizacao?: string | null
           updated_at?: string
           url?: string
@@ -4188,6 +4263,18 @@ export type Database = {
         | "conformidade_setor"
         | "tempo_prato"
       familia_operacional: "front" | "back"
+      import_destino:
+        | "store_performance"
+        | "store_performance_entries"
+        | "reclamacoes"
+        | "misto"
+      import_origem: "upload_manual" | "cron_sheets" | "api"
+      import_status:
+        | "extracting"
+        | "preview_ready"
+        | "confirmed"
+        | "error"
+        | "cancelled"
       inventory_transaction_type:
         | "purchase"
         | "sale_deduction"
@@ -4357,6 +4444,20 @@ export const Constants = {
         "tempo_prato",
       ],
       familia_operacional: ["front", "back"],
+      import_destino: [
+        "store_performance",
+        "store_performance_entries",
+        "reclamacoes",
+        "misto",
+      ],
+      import_origem: ["upload_manual", "cron_sheets", "api"],
+      import_status: [
+        "extracting",
+        "preview_ready",
+        "confirmed",
+        "error",
+        "cancelled",
+      ],
       inventory_transaction_type: [
         "purchase",
         "sale_deduction",

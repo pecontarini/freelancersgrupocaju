@@ -1,66 +1,69 @@
+## Plano: corrigir motivo de ausência ("Banco de Horas" e outros) no PDF/Excel da Escala
 
+### Diagnóstico (confirmado no código + banco)
 
-## Plano: corrigir lançamento de freelancer no Budget Gerencial
+O enum `schedule_type` no banco aceita **5 valores**:
+```
+working | off | vacation | sick_leave | banco_horas
+```
 
-### Diagnóstico (confirmado no banco)
+A grid (`ManualScheduleGrid.tsx`) e o modal de edição (`ScheduleEditModal.tsx`) tratam todos os 5, mas os dois exportadores **só conhecem 4**:
 
-- **Último lançamento manual bem-sucedido**: 23/04 às 15:09. Hoje (24/04): **zero entries** apesar das tentativas dos usuários.
-- O trigger novo `trg_create_pending_manual_checkin` (criado ontem) está **ativo** mas **nunca produziu nenhum stub** (`entry_id` em `freelancer_checkins` = 0 registros).
-- Como o trigger é `AFTER INSERT` e dispara dentro da transação, **qualquer exception não capturada nele aborta o INSERT em `freelancer_entries`** — é exatamente isso que está bloqueando os usuários.
+| Arquivo | Função | O que falta |
+|---|---|---|
+| `src/lib/scheduleMasterPdf.ts` linha 25-36 (`getCellText`) | Mapeia tipos → texto | Não trata `banco_horas` → cai no fallback `"Turno"` (start/end vazios) ou exibe horários antigos zerados |
+| `src/lib/scheduleMasterExport.ts` linha 252-266 (`getCellValue`) | Mesmo bug | Idem — exporta célula vazia/"Turno" em vez de "BANCO DE HORAS" |
 
-### Causas técnicas dentro da função `create_pending_manual_checkin()`
+Quando o usuário marca "Banco de Horas" no modal, `start_time` e `end_time` ficam `NULL` na tabela, então no PDF aparece a string genérica "Turno" (ou string vazia no Excel) — exatamente o sintoma reportado.
 
-1. **INSERT em `freelancer_profiles` sem proteção**: a função busca por CPF normalizado (`regexp_replace`), mas insere com o CPF cru. Se já existir um profile com o mesmo CPF em formato diferente (com pontos vs sem), o UNIQUE `freelancer_profiles_cpf_key` viola → exception → INSERT principal abortado.
-2. **Race condition** entre 2 usuários cadastrando o mesmo freelancer simultaneamente: ambos não acham o profile, ambos tentam INSERT, um quebra com unique violation.
-3. **Comparação `NEW.data_pop < CURRENT_DATE`** usa `CURRENT_DATE` em UTC do servidor. Lançamentos feitos no fim do dia em São Paulo podem ser interpretados como passado e nem deveriam quebrar (caem no `RETURN NEW` silencioso), mas se algo na lógica anterior quebrar antes, perde-se.
-4. **CPF armazenado em `freelancer_entries` ainda vem com pontos** em alguns casos (visto `105.231.131-88` no banco). O frontend já normaliza, mas entries antigos / outros caminhos não.
+Além disso, o styling condicional do PDF (linhas 232-246) só pinta células cujo texto seja exatamente `"FOLGA"`, `"FÉRIAS"` ou `"ATESTADO"` — vou estender para `"BANCO DE HORAS"` com cor própria (azul, igual a grid).
 
 ### O que vou implementar
 
-#### 1. Tornar o trigger 100% à prova de falha (nunca bloquear o INSERT principal)
+#### 1. `src/lib/scheduleMasterPdf.ts`
+- Adicionar em `getCellText`:
+  ```ts
+  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  ```
+- Adicionar bloco de styling em `didParseCell` para `"BANCO DE HORAS"`:
+  - fundo azul claro `[219, 234, 254]`
+  - texto azul escuro `[29, 78, 216]`
+  - bold
 
-Reescrever `create_pending_manual_checkin()` envolvendo **todo** o corpo em `BEGIN ... EXCEPTION WHEN others THEN RAISE WARNING ... RETURN NEW; END;`. Assim, se qualquer coisa der errado na criação do stub de check-in, o lançamento manual no Budget continua funcionando normalmente — o stub é "best effort".
+#### 2. `src/lib/scheduleMasterExport.ts`
+- Estender o tipo de retorno de `getCellValue` para incluir `"banco_horas"`:
+  ```ts
+  if (entry.schedule_type === "banco_horas") return { text: "BANCO DE HORAS", type: "banco_horas" };
+  ```
+- Criar novo estilo `STYLE.bancoHoras` com fundo azul claro (`DBEAFE`) e texto azul escuro (`1D4ED8`).
+- Ajustar `getCellStyle` para retornar `STYLE.bancoHoras` quando `type === "banco_horas"`.
 
-#### 2. Corrigir o INSERT em `freelancer_profiles`
+#### 3. Defesa em profundidade — fallback para schedule_type desconhecido
+Hoje, se um dia surgir um tipo novo no enum (ex: `licenca`, `suspensao`), os dois exportadores caem no fallback genérico "Turno"/vazio. Vou ajustar para que, quando `schedule_type !== 'working'` mas o tipo não for nenhum dos 4 mapeados, o texto seja `schedule_type.toUpperCase().replace('_', ' ')` em vez de "Turno". Isso garante que **qualquer ausência futura aparece corretamente sem precisar atualizar o exportador**.
 
-- Sempre usar **CPF normalizado** (apenas dígitos) no INSERT, igual ao que já é usado na busca.
-- Trocar o INSERT por `INSERT ... ON CONFLICT (cpf) DO UPDATE SET nome_completo = COALESCE(freelancer_profiles.nome_completo, EXCLUDED.nome_completo) RETURNING id` para eliminar race condition e conflito de formato.
-
-#### 3. Mesma blindagem em `create_pending_schedule_checkin()` e `sync_schedule_to_freelancer_entry()`
-
-Aplicar o mesmo padrão (BEGIN/EXCEPTION cobrindo a função inteira) nas outras 2 funções que escrevem em tabelas dependentes a partir de `schedules`. Hoje elas já têm EXCEPTION em alguns trechos, mas não em todos — vou padronizar para que **nenhum trigger acessório possa derrubar uma operação principal**.
-
-#### 4. Normalizar CPF no `useFreelancerEntries.ts` (defesa em profundidade)
-
-Hoje o hook já tenta limpar o CPF antes de gravar, mas só se tiver exatamente 11 dígitos. Vou ajustar para **sempre** salvar apenas dígitos em `freelancer_entries.cpf`, mesmo se vier mascarado, garantindo consistência com `freelancer_profiles.cpf` e com o matching do check-in.
-
-#### 5. Verificação final no `FreelancerForm.tsx`
-
-Conferir se o submit não está bloqueando por algum erro de validação silencioso (Zod / loading state preso). Pelo que vi no código, está OK, mas vou validar e ajustar só se preciso.
+#### 4. Validação visual obrigatória (QA)
+Após a mudança, vou:
+1. Gerar um PDF e um Excel de teste com uma escala que contenha `working`, `off`, `vacation`, `sick_leave` e `banco_horas` lado a lado.
+2. Converter cada página do PDF em imagem e inspecionar para confirmar que "BANCO DE HORAS" aparece com a cor azul correta, sem clipping nem sobreposição.
+3. Confirmar que o Excel também renderiza com cor azul.
 
 ### Mudanças técnicas
 
-| Arquivo / objeto | Mudança |
+| Arquivo | Mudança |
 |---|---|
-| Migração SQL | `CREATE OR REPLACE FUNCTION create_pending_manual_checkin()` blindada (BEGIN/EXCEPTION envolve tudo, INSERT em profiles com `ON CONFLICT (cpf) DO UPDATE`, CPF normalizado) |
-| Migração SQL | `CREATE OR REPLACE FUNCTION create_pending_schedule_checkin()` com mesma blindagem total |
-| Migração SQL | `CREATE OR REPLACE FUNCTION sync_schedule_to_freelancer_entry()` com mesma blindagem total |
-| Migração SQL (data fix) | `UPDATE freelancer_entries SET cpf = regexp_replace(cpf, '\D', '', 'g') WHERE cpf ~ '\D'` para padronizar histórico |
-| `src/hooks/useFreelancerEntries.ts` | Sempre gravar CPF apenas com dígitos (independente do tamanho) |
+| `src/lib/scheduleMasterPdf.ts` | `getCellText` trata `banco_horas` + fallback genérico para tipos desconhecidos; `didParseCell` pinta célula azul |
+| `src/lib/scheduleMasterExport.ts` | `getCellValue` trata `banco_horas` + fallback genérico; novo `STYLE.bancoHoras`; `getCellStyle` retorna estilo correto |
 
 ### Resultado esperado
 
-- Lançamento manual no Budget Gerencial volta a funcionar 100%, mesmo em casos de conflito de profile, CPF duplicado ou outras edge cases dos triggers.
-- Editor de Escalas continua criando entries provisórios e cards "Aguardando" como hoje.
-- Estação de check-in (tablet) continua enxergando os mesmos stubs.
-- Histórico de CPFs fica padronizado (só dígitos), facilitando matching futuro.
+- Marcar "Banco de Horas" no editor de escalas → exportar PDF/Excel → célula aparece como `BANCO DE HORAS` em azul, idêntico à grid.
+- Mesma coisa para FOLGA, FÉRIAS e ATESTADO (já funcionavam, continuam OK).
+- Qualquer novo tipo de ausência adicionado no enum no futuro aparece automaticamente em vez de virar célula vazia.
 
-### Validação
+### Validação pós-implementação
 
-1. Abrir formulário de Budget Gerencial → lançar freelancer com CPF novo → ver entry salva e card "Aguardando" aparecer no tablet/Presença.
-2. Lançar 2x o mesmo CPF para o mesmo dia → segundo não duplica stub, primeiro segue funcional.
-3. Lançar entry com data passada → entry salva normal, **sem** criar stub (correto).
-4. Editar valor de uma entry manual → stub atualiza `valor_informado`.
-5. Excluir entry manual → stub de check-in correspondente some.
-6. Conferir no banco que `freelancer_entries.cpf` agora só tem dígitos.
-
+1. Editor de Escalas → marcar um colaborador como "Banco de Horas" em um dia.
+2. Marcar outro como "Atestado", outro como "Férias", outro como "Folga", outro com turno normal.
+3. Clicar em "Exportar Escala" → "Baixar PDF": conferir as 5 células com cores e textos corretos.
+4. Mesma escala → "Baixar Excel": abrir e conferir as cores e textos.
+5. Conferir que o resumo de almoço/jantar/POP no rodapé continua igual (não conta `banco_horas` como working — já está correto, pois filtra `schedule_type === "working"`).

@@ -8,6 +8,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { HoldingCentralTab } from "./HoldingCentralTab";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,12 +93,18 @@ interface PainelMetasTabProps {
   selectedUnidadeId: string | null;
 }
 
-const SUBTABS = [
+const BASE_SUBTABS = [
   { value: "visao-geral", label: "Visão Geral", icon: LayoutDashboard },
   { value: "nps", label: "NPS", icon: MessageSquare },
   { value: "conformidade", label: "Conformidade", icon: ClipboardCheck },
   { value: "planos", label: "Planos de Ação", icon: ListChecks },
 ] as const;
+
+const HOLDING_SUBTAB = {
+  value: "holding",
+  label: "Central Holding",
+  icon: Building2,
+} as const;
 
 // ──────────────────────────────────────────────────────────────
 // Helpers
@@ -1991,11 +1999,16 @@ function PlaceholderCard({ name }: { name: string }) {
 // Root
 // ──────────────────────────────────────────────────────────────
 
-export function PainelMetasTab(_props: PainelMetasTabProps) {
+export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
+  const { isAdmin, isOperator } = useUserProfile();
+  const showHolding = isAdmin || isOperator;
+
+  const subtabs = showHolding ? [...BASE_SUBTABS, HOLDING_SUBTAB] : BASE_SUBTABS;
+
   return (
     <Tabs defaultValue="visao-geral" className="space-y-4">
       <TabsList className="h-auto w-full justify-start gap-1 bg-muted/40 p-1 flex-wrap">
-        {SUBTABS.map(({ value, label, icon: Icon }) => (
+        {subtabs.map(({ value, label, icon: Icon }) => (
           <TabsTrigger
             key={value}
             value={value}
@@ -2019,6 +2032,11 @@ export function PainelMetasTab(_props: PainelMetasTabProps) {
       <TabsContent value="planos" className="mt-4">
         <PlanosView />
       </TabsContent>
+      {showHolding && (
+        <TabsContent value="holding" className="mt-4">
+          <HoldingCentralTab selectedUnidadeId={selectedUnidadeId} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }

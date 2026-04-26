@@ -1,110 +1,107 @@
-## Plano: Sub-aba "Visão Geral" do Painel de Metas
+## Escopo
 
-**Escopo restrito**: alterações apenas em `src/components/dashboard/PainelMetasTab.tsx`. Nenhum outro arquivo será tocado. Nenhuma dependência nova.
+Arquivo único: `src/components/dashboard/PainelMetasTab.tsx`. Substituir o `<PlaceholderCard name="NPS" />` por um novo componente `NpsView`. Nenhum outro arquivo será tocado.
 
-### Verificações prévias (concluídas)
+## Validação prévia de schema (via supabase--read_query)
 
-- `leadership_store_scores`: contém `loja_id`, `month_year` (text, formato `YYYY-MM`), `front_score`, `back_score`, `general_score`, `front_tier`, `back_tier`, `general_tier`, `total_audits`, `total_failures` ✅
-- `reclamacoes.referencia_mes`: text no formato `YYYY-MM` ✅
-- `supervision_audits.audit_date`: date — usar filtro `gte/lte` no intervalo do mês (mais robusto que LIKE)
-- `config_lojas`: `id`, `nome` ✅
-- RLS já isola lojas por usuário automaticamente
+- `reclamacoes`: possui `loja_id`, `fonte`, `tipo_operacao`, `referencia_mes`, `nota_reclamacao`, `is_grave`, `data_reclamacao`. **Não possui `faturamento`** — portanto o R$/reclamação será derivado de `store_performance_entries`.
+- `store_performance_entries`: possui `loja_id`, `entry_date`, `faturamento_salao`, `faturamento_delivery`, `reclamacoes_salao`, `reclamacoes_ifood`. Faturamentos serão **somados** no mês por loja.
 
-### Estrutura do componente refatorado
+## BLOCO 1 — 4 KPI Cards (reutilizando `KpiCard` existente)
 
-**Novos imports** (mesmo arquivo):
-- `useState`, `useMemo` do React
-- `useQuery` do `@tanstack/react-query`
-- `supabase` de `@/integrations/supabase/client`
-- `Table, TableBody, TableCell, TableHead, TableHeader, TableRow` de `@/components/ui/table`
-- `Skeleton` de `@/components/ui/skeleton`
-- `Progress` de `@/components/ui/progress`
-- `Badge` de `@/components/ui/badge`
-- `Alert, AlertDescription` de `@/components/ui/alert`
-- Ícones extras: `ChevronLeft`, `ChevronRight`, `TrendingUp`, `TrendingDown`, `AlertTriangle`, `Trophy`, `MessageCircle`
-- `Button` de `@/components/ui/button`
+1. **Reclamações Salão** — `count(reclamacoes WHERE tipo_operacao='salao')` no mês selecionado, ícone `Store`.
+2. **Reclamações Delivery** — `count(reclamacoes WHERE tipo_operacao='delivery')`, ícone `Truck`.
+3. **Pior R$/Reclamação** — unidade com menor valor de `SUM(faturamento_salao) / count(reclamacoes salão)` (apenas unidades com pelo menos 1 reclamação salão), exibe nome + valor formatado em R$ (mil/k), ícone `TrendingDown`.
+4. **Melhor R$/Reclamação** — unidade com maior valor (mesma regra), ícone `Trophy`.
 
-### BLOCO 1 — Seletor de mês
+Cards 3 e 4 usarão uma variante leve (texto principal = nome curto da unidade, helper = R$ formatado), porque `KpiCard` atual aceita só number. Plano: criar um pequeno wrapper inline `KpiUnitCard` no mesmo arquivo, mantendo o visual `glass-card` consistente.
 
-- State `mes: string` (formato `YYYY-MM`), inicializado com mês atual via `new Date().toISOString().slice(0,7)`
-- Botões `ChevronLeft` / `ChevronRight` para navegar prev/next mês (manipulação por Date local, sem timezone shift)
-- Label central exibe mês formatado em PT-BR (`new Date(`${mes}-01T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })`)
-- Layout: flex centralizado dentro de `glass-card` compacto
+## BLOCO 2 — Ranking por Unidade (shadcn Table dentro de glass-card)
 
-### BLOCO 2 — 4 KPI Cards
+Colunas: `#` | `Unidade` | `Fat. Salão` | `Reclamações` | `R$/Reclamação` | `Faixa`.
 
-Uma única query agregada via `useQuery(['painel-overview', mes])` que dispara 3 queries em paralelo:
+- Construção: agregação no frontend cruzando `store_performance_entries` (soma de `faturamento_salao` por `loja_id` no mês) com `reclamacoes` filtradas por `tipo_operacao='salao'` (count por `loja_id`).
+- Ordenação: `faturamento_por_reclamacao DESC` (unidades sem reclamações ficam no fim com indicador `—`).
+- Faixas via `Badge` (shadcn), faixas exatamente como no briefing:
+  - `≥120000` → `EXCELENTE` (variant `default`)
+  - `≥95000` → `BOM` (variant `secondary`)
+  - `≥70000` → `REGULAR` (variant `outline`)
+  - `<70000` → `RED_FLAG` (variant `destructive`)
+- Skeleton em loading; mensagem amigável em estado vazio.
 
-1. `leadership_store_scores` filtrado por `month_year = mes` → calcular AVG de `back_score`, `front_score`, `general_score` no client (com base nos rows retornados)
-2. `reclamacoes` filtrado por `referencia_mes = mes` → `count: 'exact', head: true`
-3. `supervision_audits` filtrado por `audit_date >= ${mes}-01` AND `audit_date <= ${mes}-31` → AVG de `global_score`
+## BLOCO 3 — Reclamações por Canal (recharts PieChart)
 
-Cards (grid `grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4`):
+- Agrupar `reclam` por `fonte` (google/ifood/tripadvisor/getin/manual/sheets), contar.
+- `ResponsiveContainer` (h=260) com `PieChart` + `Pie` (paleta consistente com tier colors do arquivo: amber/orange/red/emerald/sky/violet) + `Tooltip` + `Legend` (verticalAlign bottom).
+- Wrapper `Card` com `glass-card`.
+- Estado vazio: texto "Sem reclamações no mês".
 
-- **Card 1 — Back Score Médio** (ícone `TrendingDown` neutro): valor grande (`text-3xl font-bold`), `Progress` value=score%, cor por faixa (≥90 verde, ≥75 amber, <75 red via `[&>div]:bg-*`)
-- **Card 2 — Front Score Médio** (`TrendingUp`): mesma estrutura
-- **Card 3 — Reclamações no Mês** (`MessageCircle`): valor inteiro, sem progress bar (texto auxiliar "registradas")
-- **Card 4 — Auditoria Supervisão** (`Trophy`): AVG global_score com Progress bar mesma escala
+## BLOCO 4 — Evolução Mensal (recharts LineChart)
 
-Loading: `Skeleton h-24` dentro de cada Card
+- Eixo X: últimos 6 meses incluindo o mês selecionado (`shiftMonth(mes, -5)` … `mes`), labels formatadas via `formatMonthPt` (curto: "Mai/25").
+- Query única: `supabase.from('reclamacoes').select('referencia_mes, tipo_operacao').in('referencia_mes', last6)`.
+- Duas séries: `salao` e `delivery` (counts por mês).
+- `LineChart` em `ResponsiveContainer` (h=260), `XAxis`, `YAxis`, `CartesianGrid`, `Tooltip`, `Legend`, duas `<Line>` (cores: salão = primary coral, delivery = sky-500).
 
-### BLOCO 3 — Mapa de Calor (tabela)
-
-Query `useQuery(['painel-heatmap', mes])`:
+## Queries (React Query, queryKey reativo ao mês)
 
 ```ts
-const { data: lojas } = await supabase.from('config_lojas').select('id, nome').order('nome');
-const { data: scores } = await supabase
-  .from('leadership_store_scores')
-  .select('loja_id, front_score, back_score, general_score, general_tier, front_tier, back_tier')
-  .eq('month_year', mes);
-const { data: reclamCounts } = await supabase
-  .from('reclamacoes')
-  .select('loja_id')
-  .eq('referencia_mes', mes);
+// reclam (mês selecionado, com nome da loja para o ranking/KPIs)
+useQuery({
+  queryKey: ['painel-nps', mes],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('reclamacoes')
+      .select('id, loja_id, fonte, tipo_operacao, config_lojas(nome)')
+      .eq('referencia_mes', mes);
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+// performance entries do mês
+useQuery({
+  queryKey: ['painel-nps-perf', mes],
+  queryFn: async () => {
+    const { start, end } = monthRange(mes);
+    const { data, error } = await supabase
+      .from('store_performance_entries')
+      .select('loja_id, faturamento_salao, faturamento_delivery, config_lojas(nome)')
+      .gte('entry_date', start).lte('entry_date', end);
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+// histórico 6 meses para o LineChart
+useQuery({
+  queryKey: ['painel-nps-hist', mes],
+  queryFn: async () => {
+    const last6 = Array.from({length:6}, (_,i) => shiftMonth(mes, -(5-i)));
+    const { data, error } = await supabase
+      .from('reclamacoes')
+      .select('referencia_mes, tipo_operacao')
+      .in('referencia_mes', last6);
+    if (error) throw error;
+    return { last6, rows: data ?? [] };
+  },
+});
 ```
 
-Combinar no client em `useMemo`: para cada `loja`, achar score correspondente e contar reclamações por `loja_id`.
+## Estado e seletor de mês
 
-Tabela shadcn dentro de `Card glass-card`:
-| Unidade | Front Score | Back Score | Score Geral | Reclamações | Tier |
+- O `NpsView` terá seu **próprio** `useState<string>(currentMonth())` + seletor de mês (mesmo card de navegação do `VisaoGeral`), garantindo isolamento entre as sub-abas e zero alteração no `VisaoGeral`.
 
-- Cada célula de score: badge colorido pelo tier do respectivo campo (`front_tier`, `back_tier`, `general_tier`)
-- Coluna Tier: badge do `general_tier`
-- Mapa de cores (helper `getTierClasses(tier: string | null)`):
-  - `ouro` → `bg-amber-100 text-amber-800`
-  - `prata` → `bg-gray-100 text-gray-700`
-  - `bronze` → `bg-orange-100 text-orange-800`
-  - `aceitavel` → `bg-red-100 text-red-700`
-  - `null/undefined` → `bg-muted text-muted-foreground` + texto "—"
-- Loading: 5 linhas de `Skeleton` na tabela
-- Empty state: "Nenhuma unidade disponível para este mês"
+## Imports adicionais (no topo do arquivo)
 
-### BLOCO 4 — Banner de Alerta
+- `recharts`: `PieChart`, `Pie`, `Cell`, `Tooltip`, `Legend`, `ResponsiveContainer`, `LineChart`, `Line`, `XAxis`, `YAxis`, `CartesianGrid`.
+- `@/components/ui/badge`: `Badge`.
+- `lucide-react`: adicionar `Store`, `Truck` (já temos `Trophy`, `TrendingDown`, `MessageCircle`, `ChevronLeft`, `ChevronRight`).
 
-- Renderizado **acima dos KPIs** se algum row de scores tiver `general_tier === 'aceitavel'`
-- Componente `Alert` com `variant="destructive"`, ícone `AlertTriangle`
-- Texto: `"Atenção: {N} unidade(s) com performance crítica este mês: {nomes separados por vírgula}"`
+Recharts já é usado em outros arquivos do projeto (`FinancialCharts`, `CostEvolutionChart`, etc.), nenhuma instalação nova é necessária.
 
-### BLOCO 5 — Sub-abas restantes
+## Não alterar
 
-- `nps`, `conformidade`, `planos`: continuam com `<PlaceholderCard />` (sem alteração)
-- Estrutura `Tabs` mantida intacta
-
-### Padrões respeitados
-
-- ✅ Nenhum cálculo de tier no frontend — todos lidos diretamente da tabela
-- ✅ Datas tratadas como string `YYYY-MM` (memory: date-handling-standard)
-- ✅ Sem novas libs
-- ✅ `glass-card` em todos os wrappers
-- ✅ Coral primary herdado pelo design system
-- ✅ Sem emojis (lucide-react)
-- ✅ RLS faz o filtro automático por loja
-- ✅ Mobile-first: grid responsivo nos KPIs, tabela com `overflow-auto` herdado de `Table`
-
-### Validação pós-implementação
-
-1. Trocar mês → todas as queries reagem (queryKey inclui `mes`)
-2. Mês sem dados → KPIs mostram "0" / "—", tabela mostra "—" nos badges
-3. RLS: gerente_unidade vê só sua loja; admin vê todas
-4. Banner aparece somente se houver `aceitavel`
+- `VisaoGeral`, `KpiCard`, `PlaceholderCard`, helpers (`monthRange`, `shiftMonth`, `formatMonthPt`, `tierClasses`, etc.) — apenas reutilizar.
+- Estrutura do `PainelMetasTab` root e dos `TabsContent` — apenas o conteúdo do `TabsContent value="nps"` muda de `<PlaceholderCard …/>` para `<NpsView />`.
+- Nenhum outro arquivo do projeto.

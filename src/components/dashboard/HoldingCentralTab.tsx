@@ -15,8 +15,10 @@ import {
   Loader2,
   ChevronDown,
   Link2,
+  Webhook,
 } from "lucide-react";
 import { AiImportSection } from "./AiImportSection";
+import { N8nWebhooksSection } from "./N8nWebhooksSection";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,6 +111,13 @@ export function HoldingCentralTab({ selectedUnidadeId }: HoldingCentralTabProps)
           <Users className="h-4 w-4" />
           <span>Escalas Mínimas</span>
         </TabsTrigger>
+        <TabsTrigger
+          value="webhooks"
+          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
+        >
+          <Webhook className="h-4 w-4" />
+          <span>Webhooks n8n</span>
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="upload" className="mt-4 space-y-4">
@@ -119,6 +128,9 @@ export function HoldingCentralTab({ selectedUnidadeId }: HoldingCentralTabProps)
       </TabsContent>
       <TabsContent value="escalas" className="mt-4 space-y-4">
         <EscalasView selectedUnidadeId={selectedUnidadeId} />
+      </TabsContent>
+      <TabsContent value="webhooks" className="mt-4 space-y-4">
+        <N8nWebhooksSection />
       </TabsContent>
     </Tabs>
   );

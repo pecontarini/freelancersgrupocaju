@@ -130,6 +130,7 @@ export function HoldingCentralTab({ selectedUnidadeId }: HoldingCentralTabProps)
 function UploadDadosView() {
   return (
     <div className="space-y-4">
+      <AiImportSection />
       <SheetsSourcesSection />
       <SincronizacoesHistorySection />
       <LancamentoManualSection />

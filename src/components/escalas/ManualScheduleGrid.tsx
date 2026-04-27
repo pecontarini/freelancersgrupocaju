@@ -80,6 +80,7 @@ import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
+import { ScheduleAIGenerator, type AIProposalShift } from "./ScheduleAIGenerator";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";
@@ -542,6 +543,32 @@ export function ManualScheduleGrid() {
   async function deleteSelection() {
     const cells = cellsInRect(selectionRect);
     await applyPatchToCells(cells, () => null);
+  }
+
+  // Aplica proposta da IA no grid (sem salvar — usa upserts já existentes)
+  async function applyAIProposal(turnos: AIProposalShift[]) {
+    const cells: Cell[] = [];
+    const patches: any[] = [];
+    for (const t of turnos) {
+      const row = empRowIndex.get(t.employee_id);
+      if (row === undefined) continue;
+      const col = weekDays.findIndex((d) => format(d, "yyyy-MM-dd") === t.date);
+      if (col < 0) continue;
+      cells.push({ row, col });
+      if (t.schedule_type === "off" || t.schedule_type === "vacation" || t.schedule_type === "sick_leave") {
+        patches.push({ schedule_type: "off", start_time: null, end_time: null, break_duration: 0 });
+      } else {
+        patches.push({
+          schedule_type: "working",
+          shift_type: t.shift_type,
+          start_time: t.start_time,
+          end_time: t.end_time,
+          break_duration: t.break_min ?? 0,
+        });
+      }
+    }
+    let i = 0;
+    await applyPatchToCells(cells, () => patches[i++]);
   }
 
   // Inferir shift_type a partir de horários (para preservar a "cor" do turno no paste)
@@ -1202,7 +1229,14 @@ export function ManualScheduleGrid() {
                   onKeyDown={handleGridKeyDown}
                   onMouseDown={() => focusGrid()}
                 >
-                  <div className="px-3 pb-2 flex justify-end">
+                  <div className="px-3 pb-2 flex justify-end gap-2">
+                    <ScheduleAIGenerator
+                      unitId={selectedUnit}
+                      sectorId={activeSectorId}
+                      sectorName={sectors.find((s) => s.id === activeSectorId)?.name ?? "Setor"}
+                      weekStart={weekStart}
+                      onApplyProposal={applyAIProposal}
+                    />
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">

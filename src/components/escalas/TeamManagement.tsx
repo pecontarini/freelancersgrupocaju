@@ -147,6 +147,28 @@ export function TeamManagement() {
       jobTitle === "__custom__" ? customJobTitle : jobTitle || undefined;
     const cleanPhone = phone.replace(/\D/g, "") || undefined;
 
+    // Pré-check defensivo: evita round-trip ao banco quando já há um
+    // funcionário ativo sem CPF com mesmo nome+cargo nesta unidade.
+    if (!editingEmployee) {
+      const normalizedName = name.trim().toLowerCase();
+      const normalizedTitle = (resolvedTitle || "").trim().toLowerCase();
+      const duplicate = employees.find((e) => {
+        const hasNoCpf = !e.cpf || e.cpf === "";
+        return (
+          hasNoCpf &&
+          e.name.trim().toLowerCase() === normalizedName &&
+          (e.job_title || "").trim().toLowerCase() === normalizedTitle
+        );
+      });
+      if (duplicate) {
+        toast.error(
+          `Já existe um funcionário "${duplicate.name}" com o cargo "${duplicate.job_title || "—"}" nesta unidade. Adicione um sobrenome ou informe o CPF para diferenciar.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+    }
+
     try {
       // Upsert job title to get ID
       let resolvedJobTitleId: string | undefined;
@@ -182,8 +204,8 @@ export function TeamManagement() {
       setDialogOpen(false);
       resetForm();
     } catch (err: any) {
+      // Hooks já mostram toast amigável via friendlyEmployeeError; nada a fazer aqui.
       console.error("Erro ao salvar funcionário:", err);
-      toast.error("Erro ao salvar: " + (err?.message || "Tente novamente."));
     }
   }
 

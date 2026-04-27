@@ -2,6 +2,29 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+/**
+ * Traduz erros conhecidos da tabela employees em mensagens claras para o usuário.
+ * Mantém o `err.message` como fallback para erros não mapeados.
+ */
+export function friendlyEmployeeError(err: any): string {
+  const msg = String(err?.message || err || "");
+  const code = err?.code;
+
+  // Constraint: dois funcionários ativos com o mesmo nome+cargo sem CPF na mesma unidade
+  if (msg.includes("unique_active_employee_no_cpf")) {
+    return "Já existe um funcionário com este nome e cargo nesta unidade. Adicione um sobrenome ou informe o CPF para diferenciar.";
+  }
+  // Constraint: mesmo CPF de freelancer já cadastrado nesta unidade
+  if (msg.includes("unique_freelancer_cpf_unit")) {
+    return "Este CPF já está cadastrado como freelancer nesta unidade.";
+  }
+  // Erros genéricos de duplicidade
+  if (code === "23505") {
+    return "Já existe um cadastro com estes dados. Verifique nome, cargo ou CPF.";
+  }
+  return msg || "Erro desconhecido. Tente novamente.";
+}
+
 export interface Employee {
   id: string;
   unit_id: string;
@@ -83,7 +106,7 @@ export function useAddEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Funcionário adicionado!");
     },
-    onError: (err: Error) => toast.error("Erro: " + err.message),
+    onError: (err: any) => toast.error(friendlyEmployeeError(err)),
   });
 }
 
@@ -106,7 +129,7 @@ export function useUpdateEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Funcionário atualizado!");
     },
-    onError: (err: Error) => toast.error("Erro: " + err.message),
+    onError: (err: any) => toast.error(friendlyEmployeeError(err)),
   });
 }
 
@@ -121,6 +144,6 @@ export function useDeleteEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Funcionário desativado!");
     },
-    onError: (err: Error) => toast.error("Erro: " + err.message),
+    onError: (err: any) => toast.error(friendlyEmployeeError(err)),
   });
 }

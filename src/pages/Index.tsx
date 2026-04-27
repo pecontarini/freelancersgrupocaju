@@ -15,7 +15,6 @@ import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTa
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
-import { LeadershipPerformanceDashboard } from "@/components/leadership";
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
@@ -27,6 +26,8 @@ import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
+import { UnitariosGerentesTab } from "@/components/dashboard/UnitariosGerentesTab";
+import { GestaoPessoasTab } from "@/components/dashboard/GestaoPessoasTab";
 
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
@@ -36,6 +37,14 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 
 const tabConfig: Record<string, { title: string; subtitle: string }> = {
+  "unitarios-gerentes": {
+    title: "Unitários Gerentes",
+    subtitle: "Budgets Gerenciais, CMV Unitário e Utensílios em um só lugar",
+  },
+  "gestao-pessoas": {
+    title: "Gestão de Pessoas",
+    subtitle: "Escalas e presença de freelancers",
+  },
   budgets: {
     title: "Budgets Gerenciais",
     subtitle: "Controle diário de gastos operacionais",
@@ -47,10 +56,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
-  },
-  performance: {
-    title: "Performance Liderança",
-    subtitle: "Diagnóstico hierárquico por responsável",
   },
   cx: {
     title: "Dores da Operação",
@@ -85,8 +90,8 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Gestão de estoque por setor com inventários e movimentações",
   },
   painel: {
-    title: "Painel de Metas",
-    subtitle: "Resultados e metas operacionais da rede",
+    title: "Painel de Indicadores",
+    subtitle: "Resultados e indicadores operacionais da rede",
   },
   "agenda-lider": {
     title: "Agenda do Líder",

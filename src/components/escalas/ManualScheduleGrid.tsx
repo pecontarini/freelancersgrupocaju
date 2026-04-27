@@ -460,6 +460,7 @@ export function ManualScheduleGrid() {
     const before: (ManualSchedule | null)[] = [];
     const after: (any | null)[] = [];
     const tasks: Promise<any>[] = [];
+    let skipped = 0;
 
     for (const { row, col } of cells) {
       const emp = flatEmployees[row];
@@ -471,14 +472,18 @@ export function ManualScheduleGrid() {
       after.push(patch);
 
       if (patch === null) {
+        // Apagar célula
         if (existing) tasks.push(cancelSchedule.mutateAsync(existing.id));
-      } else if (patch.schedule_type === "off" && existing && existing.schedule_type !== "off") {
+      } else if (patch.schedule_type === "off") {
+        // Folga: cria ou atualiza
+        const sectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
+        if (!sectorId) { skipped++; continue; }
         tasks.push(
           upsertSchedule.mutateAsync({
-            id: existing.id,
+            id: existing?.id,
             employee_id: emp.id,
             schedule_date: dateStr,
-            sector_id: existing.sector_id || resolveSectorForEmployee(emp.id),
+            sector_id: sectorId,
             schedule_type: "off",
             start_time: null,
             end_time: null,
@@ -487,8 +492,9 @@ export function ManualScheduleGrid() {
           })
         );
       } else {
+        // Working: cria ou atualiza
         const sectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
-        if (!sectorId) continue;
+        if (!sectorId) { skipped++; continue; }
         tasks.push(
           upsertSchedule.mutateAsync({
             id: existing?.id,
@@ -496,12 +502,12 @@ export function ManualScheduleGrid() {
             schedule_date: dateStr,
             sector_id: sectorId,
             schedule_type: patch.schedule_type,
-            shift_type: patch.shift_type,
+            shift_type: patch.shift_type ?? existing?.shift_type ?? undefined,
             start_time: patch.start_time,
             end_time: patch.end_time,
-            break_duration: patch.break_duration,
+            break_duration: patch.break_duration ?? 0,
             agreed_rate: patch.agreed_rate ?? existing?.agreed_rate ?? 0,
-            praca_id: patch.praca_id ?? existing?.praca_id ?? null,
+            praca_id: patch.praca_id !== undefined ? patch.praca_id : (existing?.praca_id ?? null),
           })
         );
       }
@@ -510,6 +516,9 @@ export function ManualScheduleGrid() {
     try {
       await Promise.all(tasks);
       grid.pushHistory({ affected: cells, before, after });
+      if (skipped > 0) {
+        toast.warning(`${skipped} célula(s) ignorada(s) — funcionário sem setor`);
+      }
     } catch (err) {
       // Erros individuais já mostram toast pelo hook
     }

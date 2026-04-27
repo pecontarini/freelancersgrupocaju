@@ -1,47 +1,55 @@
-## Diagnóstico
+## Por que não apareceu
 
-A boa notícia: **a integração funcionou**. O screenshot mostra a resposta do `google-oauth-callback` com `?google_oauth=success`, ou seja:
+Naquele plano anterior eu **construí toda a Agenda do Líder** (o componente, as sub-abas Chat IA / Board / Meu Painel / Diretoria, os hooks, as tabelas no banco e a edge function de IA), mas **esqueci de plugar no menu**. O componente `AgendaLiderTab.tsx` está pronto e funcional, só está órfão — nenhuma página o renderiza, nenhum item de menu navega até ele.
 
-- O Google aceitou a autorização
-- Os tokens foram trocados com sucesso
-- O `access_token` + `refresh_token` foram salvos no banco (`user_google_tokens`)
+Em outras palavras: faltou o **último passo de 5 minutos** — adicionar um item no sidebar e um `case` no switch da página principal.
 
-O problema é só **visual**: o navegador parou na página HTML intermediária do Supabase em vez de seguir o redirect para `https://freelancersgrupocaju.lovable.app/agenda?google_oauth=success`.
+## O que vou fazer (3 edições pequenas)
 
-### Por que ficou parado
+### 1. Adicionar "AGENDA DO LÍDER" no menu lateral
+Arquivo: `src/components/layout/AppSidebar.tsx`
 
-Hoje a edge function `google-oauth-callback` devolve uma página HTML que tenta redirecionar de três formas (meta refresh, link e `window.location.replace`). Em algumas situações o Safari bloqueia essa navegação cross-origin (de `supabase.co` para `lovable.app`) — o usuário vê o HTML cru e precisaria clicar manualmente em "Continuar".
-
-## O que vou mudar
-
-Apenas **um arquivo**: `supabase/functions/google-oauth-callback/index.ts`.
-
-Vou substituir a resposta HTML por um **HTTP 302 (redirect verdadeiro)** com header `Location`. Isso faz o navegador seguir imediatamente, sem janela intermediária e sem depender de JavaScript, sem importar o navegador usado.
+Novo item no `menuItems`, logo abaixo de "AGENDA":
 
 ```text
-Antes:  Google → callback → HTML "Redirecionando..." → (às vezes para aqui)
-Depois: Google → callback → 302 Location: /agenda?google_oauth=success → app
+title: "AGENDA DO LÍDER"
+id: "agenda-lider"
+icon: ShieldCheck
+description: "Chat IA, missões e planos de ação"
 ```
 
-Mantenho um pequeno fallback HTML somente se o `Location` falhar por algum motivo de proxy.
+### 2. Renderizar a aba na página principal
+Arquivo: `src/pages/Index.tsx`
 
-## Como validar depois
+- Importar `AgendaLiderTab`
+- Adicionar `case "agenda-lider": return <AgendaLiderTab />;` no switch
+- Adicionar entrada em `tabConfig` para o título/breadcrumb
 
-1. Você abre `/agenda` no app publicado.
-2. Clica em "Conectar Google Calendar".
-3. Autoriza no Google.
-4. Volta direto para `/agenda` com o toast "Google Calendar conectado!".
-5. A conexão fica persistente (refresh_token salvo) — não precisa reconectar a cada 7 dias.
+### 3. Adicionar também na navegação inferior mobile (se houver espaço)
+Arquivo: `src/components/layout/BottomNavigation.tsx`
 
-## Importante: você já está conectado agora
+Verificar se cabe — se não couber, fica só no sidebar (acessível pelo menu mobile expandido).
 
-Como o callback chegou a salvar os tokens com sucesso antes de travar no HTML, basta voltar manualmente para `https://freelancersgrupocaju.lovable.app/agenda` e a conexão já deve aparecer ativa. Pode testar criar um evento.
+## Como vou validar
 
-## Detalhes técnicos
+Depois de aplicar:
+1. Abro `/` no app
+2. Clico em **"AGENDA DO LÍDER"** no menu
+3. Confirmo que renderiza as 4 sub-abas: **Chat IA**, **Board**, **Meu Painel**, **Diretoria**
+4. Testo o Chat IA: digito "Crie uma missão de limpeza geral para amanhã" e confirmo que a IA responde via `agenda-lider-chat`
+5. Confirmo no Board que a missão aparece como card
 
-- Mudar `htmlRedirect()` para `httpRedirect()` retornando `Response` com status `302` e header `Location`.
-- Manter `corsHeaders` no response para evitar problemas de CORS no fluxo de redirect.
-- Manter o tratamento de erro (param `?google_oauth=error&reason=...`) que o `Agenda.tsx` já lê via `useEffect`.
-- Sem mudanças no frontend, na tabela `user_google_tokens`, no Google Cloud Console ou em outras edge functions.
+## O que NÃO precisa ser refeito
 
-Após aprovar, eu aplico a mudança e faço deploy da função.
+Tudo isso já existe e está deployado, não vou tocar:
+- Tabelas `missoes`, `missao_membros`, `missao_atualizacoes`, `missao_anexos`
+- RLS policies (`is_missao_member`, `user_can_see_missao`, etc.)
+- Edge function `agenda-lider-chat` (Lovable AI Gateway)
+- Hooks (`useMissoes`, `useMissaoDetalhe`, `useUnidadeMembros`)
+- Sub-componentes (board, cards, chat view, diretoria, meu-painel)
+
+## Tempo estimado
+
+Funcional em poucos minutos após você aprovar — são apenas 2 a 3 arquivos pequenos para conectar peças que já existem.
+
+Aprova que eu já aplico?

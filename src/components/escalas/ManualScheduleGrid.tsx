@@ -1482,6 +1482,7 @@ export function ManualScheduleGrid() {
                                         } else {
                                           grid.setActive({ row: rowIdx, col: i });
                                         }
+                                        focusGrid();
                                       }}
                                       onDoubleClick={(e) => {
                                         if (copyMode) return;

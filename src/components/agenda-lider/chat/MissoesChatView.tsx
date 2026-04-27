@@ -404,18 +404,69 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                     <p className="whitespace-pre-wrap">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}
                     </p>
-                    {m.missoes && m.missoes.length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        {m.missoes.map((mi, idx) => (
-                          <MissoesPreviewCard
-                            key={idx}
-                            missao={mi}
-                            membros={membros}
-                            onConfirm={() => confirmMissao(mi)}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    {m.missoes && m.missoes.length > 0 && (() => {
+                      // Agrupa missões por tópico, preservando ordem de aparição
+                      const order: string[] = [];
+                      const groups = new Map<string, { mi: MissaoSugerida; idx: number }[]>();
+                      m.missoes.forEach((mi, idx) => {
+                        const t = (mi.topico ?? "Outros").trim() || "Outros";
+                        if (!groups.has(t)) {
+                          groups.set(t, []);
+                          order.push(t);
+                        }
+                        groups.get(t)!.push({ mi, idx });
+                      });
+                      return (
+                        <div className="space-y-3 pt-2">
+                          {order.map((topico) => {
+                            const items = groups.get(topico)!;
+                            const pending = items.filter(
+                              (it) => !confirmedSet.has(`${m.id}:${it.idx}`),
+                            );
+                            return (
+                              <div
+                                key={topico}
+                                className="rounded-xl border border-border/40 bg-background/50 p-2"
+                              >
+                                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                                    {topico} · {items.length} {items.length === 1 ? "missão" : "missões"}
+                                  </p>
+                                  {pending.length > 1 && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => confirmAllInTopic(m, topico)}
+                                    >
+                                      Confirmar {pending.length}
+                                    </Button>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  {items.map(({ mi, idx }) => {
+                                    const total = (mi.plano_acao ?? []).length;
+                                    return (
+                                      <MissoesPreviewCard
+                                        key={idx}
+                                        missao={mi}
+                                        membros={membros}
+                                        doneState={getDoneArr(m.id, idx, total)}
+                                        onToggleTask={(taskIdx, v) =>
+                                          toggleTask(m.id, idx, taskIdx, v, total)
+                                        }
+                                        onConfirm={() => confirmMissao(mi, m.id, idx)}
+                                        confirmed={confirmedSet.has(`${m.id}:${idx}`)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </motion.div>
               ))}

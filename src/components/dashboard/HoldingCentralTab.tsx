@@ -105,13 +105,6 @@ export function HoldingCentralTab({ selectedUnidadeId }: HoldingCentralTabProps)
           <span>Config de Metas</span>
         </TabsTrigger>
         <TabsTrigger
-          value="escalas"
-          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
-        >
-          <Users className="h-4 w-4" />
-          <span>Escalas Mínimas</span>
-        </TabsTrigger>
-        <TabsTrigger
           value="webhooks"
           className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
         >

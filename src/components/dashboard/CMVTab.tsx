@@ -326,6 +326,8 @@ export function CMVTab() {
                   <CMVPriceHistory />
                 </TabsContent>
               </Tabs>
+
+              <CMVResetZone />
             </div>
           ) : (
             <Card>

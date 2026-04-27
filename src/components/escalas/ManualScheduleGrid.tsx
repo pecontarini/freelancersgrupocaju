@@ -80,6 +80,7 @@ import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
+import { ScheduleAIGenerator, type AIProposalShift } from "./ScheduleAIGenerator";
 import { MasterExportButton } from "./MasterExportButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";

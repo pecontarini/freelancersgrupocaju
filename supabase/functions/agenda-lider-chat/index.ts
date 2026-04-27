@@ -8,9 +8,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string;
+  content: string | ContentPart[];
   tool_calls?: any;
   tool_call_id?: string;
 }
@@ -52,6 +56,7 @@ COMO RESPONDER:
 4. SEMPRE use a ferramenta criar_missoes para devolver as missões — nunca devolva apenas em texto.
 5. No texto da resposta, faça um resumo curto antes do tool_call (ex: "Identifiquei 3 missões: ...").
 6. Se a fala for vaga, faça UMA pergunta curta ao invés de inventar missões.
+7. Se o usuário anexar arquivos (PDF de auditoria, prints de reclamação, relatórios em texto, fotos de problemas), LEIA o conteúdo com atenção e priorize extrair os pontos mais críticos como missões. Cite trechos curtos do anexo na descrição quando ajudar a contextualizar.
 
 Hoje é ${new Date().toISOString().slice(0, 10)}.`;
 

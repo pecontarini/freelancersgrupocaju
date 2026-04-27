@@ -1,110 +1,159 @@
-# Gerador Automático de Escalas (IA + POP + CLT)
 
-## É possível? Sim — com escopo realista
+# IA CMV Carnes — Diagnóstico de Desvio + Plano de Ação na Agenda
 
-Sim, dá para construir. A chave é **não deixar a IA "criar escala do nada"**: ela deve trabalhar como um **copiloto restrito** que recebe as regras do POP + CLT como contrato e devolve uma sugestão estruturada que passa por **validador determinístico** antes de virar opção para o usuário aplicar no grid de escalas.
+## Visão Geral
 
-Em uma frase: a IA propõe, o validador (código) aprova, o usuário confirma, o grid aplica.
+Adicionar uma aba **"IA CMV"** dentro de `CMVTab.tsx` com um copiloto focado em **três coisas, e só essas três**:
 
-## Como vai funcionar (visão do usuário)
+1. **Análise de desvio** — explicar em PT-BR onde, quando e por quê o real ≠ teórico, cruzando contagens diárias e por turno (Câmara / Praça).
+2. **Diagnóstico de contagens** — apontar contagens suspeitas (turno X turno, dia X média histórica), turnos/dias com maior desvio recorrente, itens críticos.
+3. **Plano de ação automático na Agenda do Líder** — gerar uma **Missão** (com tarefas, responsável, prazo e prioridade) já vinculada ao gerente da unidade, sem sair da tela.
 
-Dentro do módulo Escalas, novo botão **"Gerador IA"** abre um chat lateral parecido com o da Agenda do Líder. O fluxo é:
+Sem sugestão de compras (envio é automático). Sem chat genérico — escopo travado em desvio + contagens + ação.
 
-1. Usuário escolhe semana e setor (ex: Cozinha, semana 04-10/05).
-2. Chat mostra automaticamente o que já tem na base: funcionários ativos do setor, Tabela Mínima POP do setor, férias/atestados marcados, banco de horas atual.
-3. Usuário descreve a necessidade em linguagem natural: *"Preciso montar a escala da cozinha. João está de férias. Maria pediu folga sábado. Não quero estourar 44h de ninguém."*
-4. IA responde com:
-  - **Resumo** do que entendeu (em texto curto).
-  - **Sugestão de escala completa** (tabela funcionário × dia × turno).
-  - **Selo de validação CLT/POP** ao lado de cada linha (verde / amarelo / vermelho com motivo).
-  - **Avisos** ("não foi possível cobrir o jantar de quinta — falta 1 cozinheiro, sugiro freelancer").
-5. Botões: **"Aplicar no grid"** (preenche as células do ManualScheduleGrid existente, sem salvar — usuário ainda revisa e confirma) ou **"Refinar"** (continua o chat).
+---
 
-A IA **só responde sobre escalas** e **só sugere combinações que passam no validador**. Se o usuário pedir algo proibido ("escale fulano 12h"), ela explica o que o POP/CLT diz e oferece a alternativa válida mais próxima.
+## Onde a IA agrega valor
 
-## Regras que a IA será obrigada a respeitar
+| Frente | O que a IA faz | Resultado prático |
+|---|---|---|
+| **Resumo da semana** | Sintetiza top 5 itens com maior desvio (kg + R$), turno predominante, comparativo com semana anterior | Gerente vê o "raio-X" em 1 clique |
+| **Por que desviou?** | Cruza desvio do item com contagens por turno (Câmara entrada/saída + Praça abertura/fechamento), entradas e vendas teóricas | Aponta o turno/dia/etapa onde a perda começou |
+| **Contagens suspeitas** | Marca contagens com variação >X% vs média 14d, ou onde Câmara saída ≠ Praça entrada do mesmo dia | Detecta erro de contagem antes da auditoria |
+| **Padrões recorrentes** | "Picanha desvia toda SEX no turno noite há 3 semanas" | Direciona ação corretiva ao alvo certo |
+| **Plano de ação** | Gera Missão com tarefas específicas (ex: "Refazer treinamento de porcionamento de Picanha — Chefe Parrilla — prazo 7d") | Vai direto para a Agenda do Líder com responsável e prazo |
 
-Extraídas do POP de Escalas + CLT (codificadas no validador, não só no prompt):
+---
 
-**CLT / Jornada (POP item 4.2.5 e 5):**
+## Arquitetura
 
-- Máximo 44h/semana por colaborador.
-- Máximo 10h/dia (8 normais + 2 extras).
-- Mínimo 11h de interjornada entre dois turnos.
-- Em dia de dobra, intervalo entre turnos não pode ser maior que 4h.
-- Mínimo 1 folga semanal + pelo menos 1 domingo de folga no mês (ou compra/troca prevista no acordo coletivo).
+```text
+┌──────────────────────────────────────────────┐
+│  CMVTab.tsx  → nova aba "IA CMV"             │
+│   └─ CMVAIAssistant.tsx                      │
+│       ├─ Cards de quick actions              │
+│       ├─ Chat (markdown, streaming)          │
+│       └─ Card "Plano de Ação Sugerido"       │
+│           → botão "Criar Missão na Agenda"   │
+└────────────────┬─────────────────────────────┘
+                 │ supabase.functions.invoke
+                 ▼
+┌──────────────────────────────────────────────┐
+│ Edge Function: cmv-ai-assistant (SSE)        │
+│  1. Valida JWT + acesso à unit_id            │
+│  2. Monta CONTEXTO da unidade (compacto):    │
+│     - 18 itens carnes + custo                │
+│     - cmv_contagens (últimos 14 dias)        │
+│     - cmv_camara + cmv_praca (turnos)        │
+│     - calculate_audit_period(7d e 30d)       │
+│     - cmv_vendas_desvio (resumo)             │
+│  3. System prompt restritivo (escopo CMV)    │
+│  4. Stream → Lovable AI Gateway              │
+│     model: google/gemini-3-flash-preview     │
+│  5. Tools:                                   │
+│     - flag_contagem_suspeita(item, data,...) │
+│     - propor_plano_acao({titulo, tarefas,    │
+│           prazo, prioridade, responsavel})   │
+└──────────────────────────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────────┐
+│  Ao clicar "Criar Missão na Agenda":         │
+│  useMissoes.create({                         │
+│    titulo, descricao, prioridade, prazo,     │
+│    unidade_id: effectiveUnidadeId,           │
+│    tarefas: [...],                           │
+│    membros: [{user_id: gerente, papel:       │
+│              'responsavel'}]                 │
+│  })  → aparece na Agenda do Líder            │
+└──────────────────────────────────────────────┘
+```
 
-**POP de Escalas (item 4.1 + 4.2):**
+---
 
-- Tabela Mínima por setor/turno/dia da semana é **piso obrigatório** (já existe na tabela `staffing_matrix`).
-- Não pode reduzir o quantitativo total de contratados por setor.
-- Aviso prévio, férias e atestados bloqueiam escalação no período.
-- Considerar competência: não concentrar todos os experientes em um turno só (sinalizar como "warning", não bloqueio).
-- Critérios de presença válida no turno: mínimo 2h consecutivas entre 12-15h (almoço) ou 19-22h (jantar).
+## Quick Actions (botões prontos)
 
-**Banco de horas (POP 3.3.4 + 3.4.4):**
+1. **"Resumo do desvio da semana"** — 7 dias, top 5 itens, turno crítico, R$ perdido.
+2. **"Onde está o desvio da [item]?"** — seleciona 1 item, IA disseca turno a turno.
+3. **"Contagens suspeitas (últimos 14 dias)"** — lista contagens fora da curva.
+4. **"Gerar plano de ação para [item / problema]"** — produz Missão pronta para a Agenda.
 
-- Priorizar quem tem banco positivo para folga e quem tem banco negativo para convocação.
-- Evitar criar novo desequilíbrio.
+---
 
-**Custo (POP 3.3.2 + 5.1.3):**
+## Fluxo de uma análise (exemplo real)
 
-- Só sugerir freelancer depois de tentar realocação interna e banco de horas.
+1. Gerente em **Caju Limão** clica **"Resumo do desvio da semana"**
+2. Edge function coleta: contagens diárias + turnos câmara/praça + audit period 7d
+3. IA responde via stream:
+   > "Top desvio: **Picanha** −2,8 kg (≈ R$ 392). Padrão: ocorre na **saída da Câmara para Praça** nos turnos da **noite (QUI/SEX/SAB)**. Praça abre coerente (4,1 kg) e fecha 1,3 kg (esperado 2,9 kg). Sugiro investigar porcionamento e descarte de aparas no turno noite."
+4. Junto, aparece card **"Plano de Ação Sugerido"** com:
+   - Título: *Auditoria de porcionamento Picanha — turno noite*
+   - Prioridade: Alta
+   - Prazo: 7 dias
+   - Tarefas: (1) Pesar 5 peças aleatórias no recebimento da câmara → praça; (2) Treinar equipe noite no POP de aparas; (3) Registrar descarte em ficha específica por 7 dias
+   - Responsável sugerido: Gerente da unidade (editável)
+5. Botão **"Criar Missão na Agenda"** → grava em `missoes` + `missao_tarefas` + `missao_membros` → aparece na Agenda do Líder.
 
-## Como construirei (técnico)
+---
 
-### 1. Edge Function `gerar-escala-ia`
+## Estrutura de arquivos
 
-Novo arquivo em `supabase/functions/gerar-escala-ia/index.ts` no mesmo padrão de `agenda-lider-chat`:
+**Criar:**
+- `src/components/cmv/CMVAIAssistant.tsx` — UI: chat, quick actions, card de plano de ação, botão de criar missão
+- `src/components/cmv/CMVActionPlanCard.tsx` — card que renderiza o plano sugerido com edição inline antes de salvar
+- `src/hooks/useCMVAIContext.ts` — coleta contexto compacto da unidade (carnes + contagens + turnos + auditoria 7d/30d)
+- `supabase/functions/cmv-ai-assistant/index.ts` — edge function streaming SSE com tool calling
 
-- Lovable AI Gateway, modelo `google/gemini-2.5-pro` (precisa de raciocínio sobre tabela grande).
-- System prompt **carrega o POP completo** + glossário CLT em texto fixo (≈3k tokens, cabe sem problema).
-- Recebe contexto operacional já filtrado: funcionários do setor, tabela mínima, ausências, banco de horas, escala atual da semana.
-- Tool calling com função `propor_escala(turnos[])` retornando array de `{ employee_id, date, shift_type, start, end, break_min }`.
+**Editar:**
+- `src/components/dashboard/CMVTab.tsx` — adicionar 9ª aba "IA" (ícone `Sparkles`)
 
-### 2. Validador determinístico (`src/lib/escalas/popValidator.ts`)
+**Reutilizar (sem alterar):**
+- `useCMVItems`, `useCMVContagens`, `useCMVVendasDesvio`, `useCMVAnalytics`
+- `useMissoes.create()` — para gravar o plano de ação na Agenda
+- `useUnidadeMembros` — para sugerir responsável (gerente da unidade)
+- RPCs existentes: `calculate_audit_period`, `compute_kardex_daily`, `get_realtime_stock_positions`
 
-Função pura que recebe a proposta da IA e devolve `{ valid, violations[], warnings[] }`. Roda **antes** de mostrar para o usuário. Se houver violação dura (CLT ou POP mínimo), o chat pede que a IA refaça automaticamente (1 retry) com a violação explicada. Reaproveita lógica que já existe em `useStaffingMatrix`, `usePopCompliance`, `WeeklyHoursSummary`, `peakHours.ts`.
+---
 
-### 3. UI — `ScheduleAIGenerator.tsx` (novo)
+## Restrições e segurança
 
-- Acessível por botão dentro de `ManualScheduleGrid.tsx` (ao lado do botão "Atalhos" existente).
-- Abre painel lateral / Sheet com chat (mesmo visual da Agenda do Líder — `MissoesChatView` como referência).
-- Renderiza markdown + tabela de proposta + badges de validação.
-- Botão "Aplicar no grid" usa o mesmo path de `applyPatchToCells` que já criamos para copiar/colar — então as células vão para estado *dirty*, não vão direto pro banco. Usuário ainda salva manualmente.
+- **Escopo travado**: system prompt instrui a IA a **só** falar sobre desvio/contagens de carnes da unidade enviada. Pergunta fora de escopo recebe resposta padrão de recusa.
+- **Sem invenção de números**: prompt exige que toda métrica citada venha do contexto enviado; se não tiver dado, responder "sem dados suficientes".
+- **Sem escrita automática**: a IA propõe o plano, mas a gravação na Agenda só ocorre após clique explícito do usuário (padrão `architecture/data-import-confirmation-standard`).
+- **Unidade isolada**: edge valida que `unit_id` enviado pertence ao usuário (`user_has_access_to_loja`).
+- **RLS Missões**: o plano é criado com `unidade_id = effectiveUnidadeId` e `criado_por = auth.uid()`, respeitando policies já existentes.
+- **Sem emojis na UI** — `Sparkles`, `Lightbulb`, `AlertTriangle`, `ListChecks` (lucide-react).
+- **Mobile-first**: chat ocupa altura total no mobile; desktop usa duas colunas.
+- **Datas YYYY-MM-DD** (mem `technical/date-handling-standard`).
+- **Tratamento 429/402** do Lovable AI Gateway com toast amigável.
 
-### 4. Hook `useScheduleAIContext.ts`
+---
 
-Junta num único objeto tudo que a IA precisa: funcionários ativos da unidade/setor, `staffing_matrix` da semana, férias/atestados via `useManualSchedules`, banco de horas resumido por colaborador, praças.
+## Detalhes técnicos
 
-### 5. Limitação de escopo do chat
+- **Modelo**: `google/gemini-3-flash-preview` (default) — bom para tabelas pequenas e respostas rápidas.
+- **Streaming**: SSE line-by-line (padrão já usado em `agenda-lider-chat` e `gerar-escala-ia`).
+- **Contexto**: ~5–8 KB de JSON compacto enviado por requisição (14 dias × 18 itens × campos essenciais).
+- **Tool calling** para saídas estruturadas:
+  - `propor_plano_acao` retorna `{titulo, descricao, prioridade, prazo_dias, tarefas: string[], item_relacionado, turno_critico}` → renderizado no `CMVActionPlanCard`.
+  - `flag_contagem_suspeita` retorna `{item_id, data, turno, valor_observado, valor_esperado, motivo}` → exibido como lista de alertas.
+- **Histórico** de chat: mantido em estado React durante a sessão (sem persistência, alinha com diretriz "não persistir sem pedido explícito"). Pode virar persistente em iteração futura.
 
-System prompt fecha a IA no domínio: se o usuário perguntar qualquer coisa fora de escalas (ex: "escreva um email", "qual a capital da França"), responde *"Sou o assistente de escalas — só consigo ajudar com montagem de escala respeitando o POP e a CLT"*. Sem tool calling = sem proposta = nada é aplicado.
+---
 
-## Limitações honestas
+## Entregáveis desta iteração
 
-- **Não vai gerar escala de mês inteiro com 100% de cobertura no primeiro clique** se a unidade tiver muitas faltas/férias e quadro apertado. Vai dizer claramente onde sobra furo e sugerir freelancer ou banco de horas.
-- **Banco de horas** entra na decisão, mas o saldo exato vem do que existir hoje no sistema; se não houver fonte estruturada, a IA usa apenas as horas já lançadas no grid da semana.
-- **Acordo coletivo de troca de domingo** será tratado como flag opcional no chat ("posso usar troca de domingo? sim/não") — não vou inferir sozinho.
-- IA é sugestão. Decisão e responsabilidade legal continuam com o Proprietário/Gerente, como o POP exige.
+1. Aba **"IA CMV"** dentro do CMV Unitário com chat e 4 quick actions focadas em desvio.
+2. Edge function `cmv-ai-assistant` com streaming + tool calling para plano de ação e flags de contagem.
+3. Card **"Plano de Ação Sugerido"** editável + botão **"Criar Missão na Agenda do Líder"** que grava em `missoes` com tarefas e responsável.
+4. Lista de **contagens suspeitas** quando a IA detectar variação anormal.
 
-## Arquivos que serão criados/alterados
+**Fora do escopo desta iteração** (futuras melhorias):
+- Validação inline durante a digitação da contagem
+- Histórico persistente de conversas
+- Notificação automática (push/WhatsApp) quando IA detectar desvio crítico
+- Acompanhamento do efeito do plano de ação (antes/depois)
 
-**Novos:**
+---
 
-- `supabase/functions/gerar-escala-ia/index.ts` — chat IA + tool `propor_escala`
-- `src/lib/escalas/popValidator.ts` — validador CLT + POP determinístico
-- `src/lib/escalas/popRulesText.ts` — POP em texto, alimenta o system prompt
-- `src/hooks/useScheduleAIContext.ts` — junta contexto operacional
-- `src/components/escalas/ScheduleAIGenerator.tsx` — painel lateral com chat e proposta
-
-**Alterados:**
-
-- `src/components/escalas/ManualScheduleGrid.tsx` — botão "Gerador IA" no header (junto ao "Atalhos") + handler `applyAIProposal` reusando `applyPatchToCells`
-
-Sem mudanças de schema, sem novas dependências, sem alteração visual do grid.
-
-## Pergunta antes de implementar
-
-Quer que a sugestão da IA, ao ser aplicada, **já salve no banco** ou apenas **preencha o grid em modo rascunho** (usuário ainda confirma com Salvar, igual hoje quando edita manual)? A segunda é mais segura e é meu padrão recomendado — só confirmo se concorda.  
-Ao gerar em grid, modo rascunho, o painel pede a senha de assinatura do responsável da escala, salva e gera automaticamente. Mas com confirmação antes 
+Posso seguir com a implementação?

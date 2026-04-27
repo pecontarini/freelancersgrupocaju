@@ -185,6 +185,21 @@ export function MissaoDetailDialog({
               )}
             </div>
 
+            {missao.google_event_id && missao.google_calendar_synced_at && (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                <CalendarCheck2 className="h-3.5 w-3.5" />
+                <span>
+                  Sincronizada com o Google Agenda em{" "}
+                  {new Date(missao.google_calendar_synced_at).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            )}
+
             {editing && (
               <div className="grid grid-cols-3 gap-3">
                 <div>

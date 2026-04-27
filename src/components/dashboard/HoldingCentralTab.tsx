@@ -119,9 +119,6 @@ export function HoldingCentralTab({ selectedUnidadeId }: HoldingCentralTabProps)
       <TabsContent value="metas" className="mt-4 space-y-4">
         <MetasView />
       </TabsContent>
-      <TabsContent value="escalas" className="mt-4 space-y-4">
-        <EscalasView selectedUnidadeId={selectedUnidadeId} />
-      </TabsContent>
       <TabsContent value="webhooks" className="mt-4 space-y-4">
         <N8nWebhooksSection />
       </TabsContent>

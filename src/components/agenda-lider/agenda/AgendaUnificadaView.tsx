@@ -536,10 +536,10 @@ function CalendarChip({
   onClick?: () => void;
 }) {
   const isMissao = item.type === "missao";
+  const accent = isMissao && item.missao ? prioridadeAccent(item.missao.prioridade) : null;
   const baseColor = isMissao
-    ? "bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground"
+    ? "bg-primary/10 hover:bg-primary/20 border-primary/30"
     : "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30";
-  const dotColor = isMissao ? "bg-primary" : "bg-blue-500";
 
   if (compact) {
     return (
@@ -547,13 +547,17 @@ function CalendarChip({
         type="button"
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[10.5px] font-medium leading-tight transition",
+          "relative flex w-full items-center gap-1 truncate rounded border px-1.5 py-0.5 pl-2 text-left text-[10.5px] font-medium leading-tight backdrop-blur transition",
           baseColor,
           isMissao ? "text-primary" : "text-blue-700 dark:text-blue-300",
         )}
         title={item.title}
       >
-        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)} />
+        {accent ? (
+          <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px] rounded-l", accent)} />
+        ) : (
+          <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] rounded-l bg-blue-500" />
+        )}
         <span className="truncate uppercase tracking-wide">{item.title}</span>
       </button>
     );
@@ -564,10 +568,15 @@ function CalendarChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full flex-col gap-1 rounded-md border p-2 text-left transition",
+        "group relative flex w-full flex-col gap-1 overflow-hidden rounded-md border p-2 pl-3 text-left backdrop-blur transition",
         baseColor,
       )}
     >
+      {accent ? (
+        <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", accent)} />
+      ) : (
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-blue-500" />
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
           {isMissao ? (

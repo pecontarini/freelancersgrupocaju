@@ -175,7 +175,7 @@ export function AgendaUnificadaView() {
   return (
     <div className="space-y-4">
       {/* Header / Controles */}
-      <Card className="p-3 sm:p-4">
+      <div className="glass-card-strong p-3 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
@@ -259,13 +259,13 @@ export function AgendaUnificadaView() {
             </Button>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Conteúdo */}
       {(loadingMissoes || loadingGoogle) && items.length === 0 ? (
-        <Card className="flex items-center justify-center p-10 text-sm text-muted-foreground">
+        <div className="glass-card flex items-center justify-center p-10 text-sm text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando agenda…
-        </Card>
+        </div>
       ) : modo === "mes" ? (
         <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
       ) : modo === "semana" ? (
@@ -320,7 +320,7 @@ function MesView({
   const weekDayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   return (
-    <Card className="overflow-hidden p-0">
+    <div className="glass-card overflow-hidden p-0">
       <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {weekDayLabels.map((w) => (
           <div key={w} className="py-2">
@@ -376,7 +376,7 @@ function MesView({
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -398,7 +398,7 @@ function SemanaView({
   }, [refDate]);
 
   return (
-    <Card className="overflow-hidden p-0">
+    <div className="glass-card overflow-hidden p-0">
       <div className="grid grid-cols-7 border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {days.map((d) => {
           const isToday = isSameDay(d, new Date());
@@ -448,7 +448,7 @@ function SemanaView({
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -475,14 +475,14 @@ function ListaView({
 
   if (grouped.length === 0) {
     return (
-      <Card className="p-10 text-center text-sm text-muted-foreground">
+      <div className="glass-card p-10 text-center text-sm text-muted-foreground">
         Nada agendado nos próximos 30 dias.
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="p-0">
+    <div className="glass-card p-0">
       <ScrollArea className="max-h-[640px]">
         <div className="divide-y">
           {grouped.map(([dateKey, dayItems]) => {
@@ -519,7 +519,7 @@ function ListaView({
           })}
         </div>
       </ScrollArea>
-    </Card>
+    </div>
   );
 }
 

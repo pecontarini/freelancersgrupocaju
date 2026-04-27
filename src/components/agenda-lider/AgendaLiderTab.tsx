@@ -44,7 +44,7 @@ export function AgendaLiderTab() {
         />
         <div className="relative flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 backdrop-blur">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+            <Calendar className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
             <h2 className="font-display text-lg font-semibold">Agenda do Líder</h2>

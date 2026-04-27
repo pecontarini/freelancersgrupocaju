@@ -38,7 +38,7 @@ const RESULT_LABELS: Record<string, string> = {
 
 export function CMVResetZone() {
   const { isAdmin } = useUserProfile();
-  const { data: lojas = [] } = useLojas();
+  const { data: lojas = [] } = useConfigLojas();
   const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);

@@ -9,16 +9,27 @@ export interface UnidadeMembro {
   unidade_nome: string | null;
 }
 
+interface Options {
+  /**
+   * Quando true, inclui usuários com role 'admin' mesmo sem vínculo direto à unidade.
+   * Default: false — para evitar que IA/forms atribuam tarefas a admins de outras lojas.
+   */
+  includeAdmins?: boolean;
+}
+
 /**
  * Lista usuários candidatos a serem responsáveis/co-responsáveis de uma missão.
- * - Se unidadeId for fornecido, prioriza usuários daquela unidade.
- * - Caso contrário, retorna todos os usuários do tenant (limite razoável).
+ * - Se unidadeId for fornecido, retorna ESTRITAMENTE quem está vinculado à loja
+ *   (via profiles.unidade_id OU user_stores). Sem fallback "todos os usuários" —
+ *   isso evita que líderes/IA marquem funcionários de outras unidades.
+ * - Sem unidadeId, retorna todos.
  */
-export function useUnidadeMembros(unidadeId: string | null) {
+export function useUnidadeMembros(unidadeId: string | null, opts?: Options) {
+  const includeAdmins = !!opts?.includeAdmins;
+
   return useQuery({
-    queryKey: ["unidade-membros", unidadeId],
+    queryKey: ["unidade-membros", unidadeId, includeAdmins],
     queryFn: async (): Promise<UnidadeMembro[]> => {
-      // Lista de profiles + cargos via user_roles e config_lojas
       const { data: profiles, error } = await supabase
         .from("profiles")
         .select("user_id, full_name, unidade_id")
@@ -62,13 +73,20 @@ export function useUnidadeMembros(unidadeId: string | null) {
 
       if (!unidadeId) return all;
 
-      // Se unidade selecionada, prioriza membros daquela unidade
+      // Filtro estrito: só quem está vinculado à unidade selecionada.
+      // Sem fallback — uma loja sem membros vinculados deve mostrar lista vazia,
+      // forçando o admin a vincular pessoas em vez de a IA inventar responsáveis.
       const filtered = all.filter((m) => {
         if (m.unidade_id === unidadeId) return true;
-        const stores = storesByUser.get(m.user_id) ?? [];
-        return stores.includes(unidadeId);
+        const userStores = storesByUser.get(m.user_id) ?? [];
+        if (userStores.includes(unidadeId)) return true;
+        if (includeAdmins) {
+          const userRoles = rolesByUser.get(m.user_id) ?? [];
+          if (userRoles.includes("admin")) return true;
+        }
+        return false;
       });
-      return filtered.length > 0 ? filtered : all;
+      return filtered;
     },
   });
 }

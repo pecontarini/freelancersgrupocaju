@@ -41,8 +41,10 @@ CONTEXTO DA OPERAÇÃO:
 - Cargos típicos: Proprietário, Gerente de Back, Gerente de Front, Chefe de Cozinha, Chefe de Parrilla, Chefe de Sushi, Chefe de Bar, Chefe de Salão, Supervisor Regional.
 - Tópicos canônicos (use SEMPRE um destes em "topico"): "CMV", "Atendimento/NPS", "Manutenção", "Equipe/Escala", "Auditoria", "Treinamento", "Financeiro", "Outros".
 
-USUÁRIOS DISPONÍVEIS PARA DELEGAÇÃO:
-${users.length === 0 ? "(nenhum usuário cadastrado nesta unidade)" : users.map((u) => `- user_id=${u.user_id} | ${u.nome}${u.cargo ? ` (${u.cargo})` : ""}`).join("\n")}
+USUÁRIOS DISPONÍVEIS PARA DELEGAÇÃO (somente desta unidade):
+${users.length === 0 ? "(NENHUM usuário vinculado a esta unidade — neste caso, deixe responsavel_user_id como string vazia em todas as missões)" : users.map((u) => `- user_id=${u.user_id} | ${u.nome}${u.cargo ? ` (${u.cargo})` : ""}`).join("\n")}
+
+REGRA CRÍTICA DE DELEGAÇÃO: NUNCA invente um user_id ou use um user_id que não esteja LITERALMENTE na lista acima. Se nenhum cargo da lista for adequado para a missão, deixe responsavel_user_id como string vazia ("") — é melhor deixar vazio do que atribuir errado para alguém de outra loja.
 
 COMO RESPONDER:
 1. Acolha em português, tom direto e operacional (sem floreios).

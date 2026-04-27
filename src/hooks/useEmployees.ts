@@ -129,7 +129,7 @@ export function useUpdateEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Funcionário atualizado!");
     },
-    onError: (err: Error) => toast.error("Erro: " + err.message),
+    onError: (err: any) => toast.error(friendlyEmployeeError(err)),
   });
 }
 
@@ -144,6 +144,6 @@ export function useDeleteEmployee() {
       qc.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Funcionário desativado!");
     },
-    onError: (err: Error) => toast.error("Erro: " + err.message),
+    onError: (err: any) => toast.error(friendlyEmployeeError(err)),
   });
 }

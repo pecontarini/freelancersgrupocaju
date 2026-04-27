@@ -2722,6 +2722,9 @@ export type Database = {
           created_at: string
           criado_por: string
           descricao: string | null
+          google_calendar_synced_at: string | null
+          google_calendar_user_id: string | null
+          google_event_id: string | null
           id: string
           prazo: string | null
           prioridade: Database["public"]["Enums"]["missao_prioridade"]
@@ -2735,6 +2738,9 @@ export type Database = {
           created_at?: string
           criado_por: string
           descricao?: string | null
+          google_calendar_synced_at?: string | null
+          google_calendar_user_id?: string | null
+          google_event_id?: string | null
           id?: string
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["missao_prioridade"]
@@ -2748,6 +2754,9 @@ export type Database = {
           created_at?: string
           criado_por?: string
           descricao?: string | null
+          google_calendar_synced_at?: string | null
+          google_calendar_user_id?: string | null
+          google_event_id?: string | null
           id?: string
           prazo?: string | null
           prioridade?: Database["public"]["Enums"]["missao_prioridade"]

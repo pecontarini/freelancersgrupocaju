@@ -2,7 +2,7 @@
 // IA propõe → validador determinístico checa → usuário aplica no grid.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Send, Sparkles, ShieldCheck, AlertTriangle, CheckCircle2, Wand2 } from "lucide-react";
+import { Loader2, Send, Sparkles, ShieldCheck, AlertTriangle, CheckCircle2, Wand2, Eye, Info } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -251,6 +251,51 @@ export function ScheduleAIGenerator({ unitId, sectorId, sectorName, weekStart, o
                   {proposta.turnos.filter((t) => t.schedule_type === "off").length} folgas
                 </div>
 
+                {/* Modo teste: tabela com a proposta detalhada (não toca no grid) */}
+                <details className="rounded-md border bg-background/50">
+                  <summary className="cursor-pointer text-xs font-medium px-2 py-1.5 flex items-center gap-1.5 hover:bg-muted/30">
+                    <Eye className="h-3 w-3" />
+                    Pré-visualizar todos os turnos ({proposta.turnos.length})
+                  </summary>
+                  <div className="max-h-64 overflow-auto border-t">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-muted/40 sticky top-0">
+                        <tr>
+                          <th className="text-left px-2 py-1 font-medium">Funcionário</th>
+                          <th className="text-left px-2 py-1 font-medium">Data</th>
+                          <th className="text-left px-2 py-1 font-medium">Tipo</th>
+                          <th className="text-left px-2 py-1 font-medium">Horário</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {proposta.turnos.map((t, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="px-2 py-1">{t.employee_name}</td>
+                            <td className="px-2 py-1 font-mono">{t.date}</td>
+                            <td className="px-2 py-1">
+                              {t.schedule_type === "working" ? (t.shift_type ?? "—") : t.schedule_type}
+                            </td>
+                            <td className="px-2 py-1 font-mono">
+                              {t.schedule_type === "working"
+                                ? `${t.start_time ?? "?"}–${t.end_time ?? "?"}${t.break_min ? ` (${t.break_min}m)` : ""}`
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+
+                <div className="rounded-md border border-blue-300/40 bg-blue-50 dark:bg-blue-950/20 p-2 flex gap-1.5 text-[11px] text-blue-800 dark:text-blue-300">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>
+                    <strong>Modo teste:</strong> aplicar só preenche o grid visualmente. Nada é salvo
+                    no banco até você clicar em <strong>Salvar</strong> no editor. Para descartar,
+                    feche este painel ou recarregue a página.
+                  </span>
+                </div>
+
                 <Button
                   size="sm"
                   className="w-full gap-1.5"
@@ -258,7 +303,7 @@ export function ScheduleAIGenerator({ unitId, sectorId, sectorName, weekStart, o
                   disabled={!validation?.valid}
                 >
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  Aplicar no grid (revise antes de salvar)
+                  Aplicar no grid (não salva — só preenche)
                 </Button>
               </Card>
             )}

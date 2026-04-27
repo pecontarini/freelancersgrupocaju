@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { CalendarPlus, CalendarCheck2, CalendarX2, Loader2, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useMissaoDetalhe } from "@/hooks/useMissaoDetalhe";
 import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSyncMissaoCalendar } from "@/hooks/useSyncMissaoCalendar";
 import { PrioridadeBadge, StatusBadge, STATUS_ORDER } from "../shared/Badges";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -32,6 +33,7 @@ export function MissaoDetailDialog({
 
   const detalhe = useMissaoDetalhe(missaoId);
   const { data: membros = [] } = useUnidadeMembros(effectiveUnidadeId);
+  const sync = useSyncMissaoCalendar();
   const profilesById = useMemo(
     () => new Map(membros.map((m) => [m.user_id, m])),
     [membros],
@@ -109,7 +111,36 @@ export function MissaoDetailDialog({
               <PrioridadeBadge prioridade={missao.prioridade} />
               <StatusBadge status={missao.status} />
             </div>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => sync.mutate({ missao_id: missao.id })}
+                disabled={sync.isPending || !missao.prazo}
+                title={!missao.prazo ? "Defina um prazo antes de sincronizar" : undefined}
+              >
+                {sync.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : missao.google_event_id ? (
+                  <CalendarCheck2 className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                )}
+                {missao.google_event_id ? "Atualizar agenda" : "Google Agenda"}
+              </Button>
+              {missao.google_event_id && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => sync.mutate({ missao_id: missao.id, remove: true })}
+                  disabled={sync.isPending}
+                  title="Remover do Google Agenda"
+                >
+                  <CalendarX2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -153,6 +184,21 @@ export function MissaoDetailDialog({
                 </p>
               )}
             </div>
+
+            {missao.google_event_id && missao.google_calendar_synced_at && (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                <CalendarCheck2 className="h-3.5 w-3.5" />
+                <span>
+                  Sincronizada com o Google Agenda em{" "}
+                  {new Date(missao.google_calendar_synced_at).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            )}
 
             {editing && (
               <div className="grid grid-cols-3 gap-3">

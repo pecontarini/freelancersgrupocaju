@@ -19,6 +19,9 @@ export interface Missao {
   semana_referencia: string | null;
   created_at: string;
   updated_at: string;
+  google_event_id?: string | null;
+  google_calendar_synced_at?: string | null;
+  google_calendar_user_id?: string | null;
 }
 
 export interface MissaoMembro {

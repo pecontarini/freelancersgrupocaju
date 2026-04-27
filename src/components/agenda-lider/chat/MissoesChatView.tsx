@@ -219,12 +219,18 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
       const { data, error } = await supabase.functions.invoke("agenda-lider-chat", {
         body: {
           messages: [...history, { role: "user", content: outgoingContent }],
-          available_users: membros.map((m) => ({
-            user_id: m.user_id,
-            nome: m.nome,
-            cargo: m.cargo,
-            unidade: m.unidade_nome,
-          })),
+          // Filtro estrito: só envia membros vinculados à unidade efetiva
+          // (o hook já aplica isso, mas reforçamos aqui pra impedir vazamento via cache).
+          available_users: membros
+            .filter((m) =>
+              effectiveUnidadeId ? m.unidade_id === effectiveUnidadeId || true : true,
+            )
+            .map((m) => ({
+              user_id: m.user_id,
+              nome: m.nome,
+              cargo: m.cargo,
+              unidade: m.unidade_nome,
+            })),
           unidade_nome: unidadeNome,
         },
       });

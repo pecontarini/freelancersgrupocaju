@@ -9,10 +9,10 @@ const PRIORIDADE_MAP: Record<MissaoPrioridade, { label: string; cls: string; emo
 };
 
 const STATUS_MAP: Record<MissaoStatus, { label: string; cls: string }> = {
-  a_fazer: { label: "A Fazer", cls: "bg-muted text-muted-foreground border-border" },
-  em_andamento: { label: "Em Andamento", cls: "bg-primary/15 text-primary border-primary/30" },
-  aguardando: { label: "Aguardando", cls: "bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-400" },
-  concluido: { label: "Concluído", cls: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400" },
+  a_fazer: { label: "A FAZER", cls: "bg-muted text-muted-foreground border-border" },
+  em_andamento: { label: "EM ANDAMENTO", cls: "bg-primary/15 text-primary border-primary/30" },
+  aguardando: { label: "AGUARDANDO", cls: "bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-400" },
+  concluido: { label: "CONCLUÍDO", cls: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400" },
 };
 
 export function PrioridadeBadge({ prioridade, className }: { prioridade: MissaoPrioridade; className?: string }) {
@@ -28,7 +28,7 @@ export function PrioridadeBadge({ prioridade, className }: { prioridade: MissaoP
 export function StatusBadge({ status, className }: { status: MissaoStatus; className?: string }) {
   const info = STATUS_MAP[status];
   return (
-    <Badge variant="outline" className={cn("font-medium", info.cls, className)}>
+    <Badge variant="outline" className={cn("font-semibold uppercase tracking-wide", info.cls, className)}>
       {info.label}
     </Badge>
   );

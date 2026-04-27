@@ -401,11 +401,12 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm ${
+                    className={cn(
+                      "max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm",
                       m.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
+                        ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
+                        : "glass-card text-foreground",
+                    )}
                   >
                     <p className="whitespace-pre-wrap">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}

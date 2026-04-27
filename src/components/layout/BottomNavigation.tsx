@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2 } from "lucide-react";
+import { TrendingUp, ClipboardCheck, User, Menu, Package, CalendarClock, Sun, Moon, Calendar, BarChart2, LayoutGrid, Users } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -21,12 +21,12 @@ interface BottomNavigationProps {
 }
 
 const navItems = [
-  { id: "budgets", label: "Budgets", icon: Wallet },
+  { id: "unitarios-gerentes", label: "Unitários", icon: LayoutGrid },
+  { id: "gestao-pessoas", label: "Pessoas", icon: Users },
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
-  { id: "escalas", label: "Escalas", icon: CalendarClock },
   { id: "agenda-lider", label: "Agenda", icon: Calendar },
-  { id: "painel", label: "Metas", icon: BarChart2 },
+  { id: "painel", label: "Indicadores", icon: BarChart2 },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
@@ -37,7 +37,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
   const visibleNavItems = isChefeSetor
-    ? navItems.filter((i) => i.id === "escalas")
+    ? navItems.filter((i) => i.id === "gestao-pessoas")
     : navItems;
 
   return (
@@ -155,7 +155,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
               >
                 <div className="relative">
                   <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                  {item.id === "escalas" && escalaPending > 0 && (
+                  {item.id === "gestao-pessoas" && escalaPending > 0 && (
                     <span className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground px-0.5">
                       {escalaPending}
                     </span>

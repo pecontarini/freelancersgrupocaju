@@ -15,7 +15,6 @@ import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTa
 import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
-import { LeadershipPerformanceDashboard } from "@/components/leadership";
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
@@ -27,6 +26,8 @@ import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
+import { UnitariosGerentesTab } from "@/components/dashboard/UnitariosGerentesTab";
+import { GestaoPessoasTab } from "@/components/dashboard/GestaoPessoasTab";
 
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
@@ -36,6 +37,14 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
 
 const tabConfig: Record<string, { title: string; subtitle: string }> = {
+  "unitarios-gerentes": {
+    title: "Unitários Gerentes",
+    subtitle: "Budgets Gerenciais, CMV Unitário e Utensílios em um só lugar",
+  },
+  "gestao-pessoas": {
+    title: "Gestão de Pessoas",
+    subtitle: "Escalas e presença de freelancers",
+  },
   budgets: {
     title: "Budgets Gerenciais",
     subtitle: "Controle diário de gastos operacionais",
@@ -47,10 +56,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
-  },
-  performance: {
-    title: "Performance Liderança",
-    subtitle: "Diagnóstico hierárquico por responsável",
   },
   cx: {
     title: "Dores da Operação",
@@ -85,8 +90,8 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     subtitle: "Gestão de estoque por setor com inventários e movimentações",
   },
   painel: {
-    title: "Painel de Metas",
-    subtitle: "Resultados e metas operacionais da rede",
+    title: "Painel de Indicadores",
+    subtitle: "Resultados e indicadores operacionais da rede",
   },
   "agenda-lider": {
     title: "Agenda do Líder",
@@ -121,7 +126,7 @@ const Index = () => {
   // Use global context as single source of truth
   const { selectedUnidadeId, setSelectedUnidadeId, effectiveUnidadeId } = useUnidade();
 
-  const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "escalas" : "budgets");
+  const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "gestao-pessoas" : "unitarios-gerentes");
   const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
@@ -140,7 +145,7 @@ const Index = () => {
   useEffect(() => {
     if (!isLoadingProfile && !isInitialized) {
       if (isChefeSetor) {
-        setActiveTab("escalas");
+        setActiveTab("gestao-pessoas");
       }
       setIsInitialized(true);
     }
@@ -222,22 +227,35 @@ const Index = () => {
   const currentTabConfig = tabConfig[activeTab] || tabConfig.budgets;
 
   const renderTabContent = () => {
-    // Chefe de setor only sees escalas
-    if (isChefeSetor && activeTab !== "escalas") {
-      return <EscalasTab />;
+    const budgetsProps = {
+      freelancerEntries: filteredEntries,
+      operationalExpenses: filteredOperationalExpenses,
+      maintenanceEntries: filteredMaintenanceEntries,
+      selectedUnidadeId:
+        effectiveUnidadeId ||
+        ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : ""),
+    };
+
+    // Chefe de setor only sees Gestão de Pessoas (Escalas + Presença)
+    if (isChefeSetor && activeTab !== "gestao-pessoas") {
+      return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
     }
 
     switch (activeTab) {
+      case "unitarios-gerentes":
+        return (
+          <div className="space-y-4">
+            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
+            <UnitariosGerentesTab budgetsProps={budgetsProps} />
+          </div>
+        );
+      case "gestao-pessoas":
+        return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
       case "budgets":
         return (
           <div className="space-y-4">
-            <TeamReadinessCard onNavigate={() => setActiveTab("escalas")} />
-            <BudgetsGerenciaisTab
-              freelancerEntries={filteredEntries}
-              operationalExpenses={filteredOperationalExpenses}
-              maintenanceEntries={filteredMaintenanceEntries}
-              selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
-            />
+            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
+            <BudgetsGerenciaisTab {...budgetsProps} />
           </div>
         );
       case "remuneracao":
@@ -246,14 +264,7 @@ const Index = () => {
         );
       case "diagnostico":
         return (
-          <AuditDiagnosticDashboard 
-            selectedUnidadeId={selectedUnidadeId} 
-            isAdmin={isAdmin} 
-          />
-        );
-      case "performance":
-        return (
-          <LeadershipPerformanceDashboard 
+          <AuditDiagnosticDashboard
             selectedUnidadeId={selectedUnidadeId}
             isAdmin={isAdmin}
           />
@@ -279,14 +290,7 @@ const Index = () => {
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:
-        return (
-          <BudgetsGerenciaisTab
-            freelancerEntries={filteredEntries}
-            operationalExpenses={filteredOperationalExpenses}
-            maintenanceEntries={filteredMaintenanceEntries}
-            selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
-          />
-        );
+        return <UnitariosGerentesTab budgetsProps={budgetsProps} />;
     }
   };
 

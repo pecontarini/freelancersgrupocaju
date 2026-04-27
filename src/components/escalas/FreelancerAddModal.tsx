@@ -66,6 +66,10 @@ export function FreelancerAddModal({
   const { data: allJobTitles = [] } = useJobTitles(targetUnitId);
   const upsertSchedule = useUpsertSchedule();
   const { lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
+  const { data: userProfile } = useUserProfile();
+  const canManageJobTitles = !!(userProfile?.isAdmin || userProfile?.isOperator || userProfile?.isGerenteUnidade);
+
+  const [quickJobTitleOpen, setQuickJobTitleOpen] = useState(false);
 
   const allowedJobTitleIds = useMemo(
     () => new Set(sectorJobTitles.map((sjt) => sjt.job_title_id)),

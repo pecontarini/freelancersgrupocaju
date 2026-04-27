@@ -1150,6 +1150,16 @@ export function ManualScheduleGrid() {
                   tabIndex={0}
                   onKeyDown={handleGridKeyDown}
                 >
+                  <div className="px-3 pb-2 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 uppercase tracking-wide">
+                    <span><kbd className="px-1 rounded bg-muted">1</kbd>/<kbd className="px-1 rounded bg-muted">2</kbd>/<kbd className="px-1 rounded bg-muted">3</kbd> turno</span>
+                    <span><kbd className="px-1 rounded bg-muted">M</kbd> meia</span>
+                    <span><kbd className="px-1 rounded bg-muted">F</kbd> folga</span>
+                    <span><kbd className="px-1 rounded bg-muted">Del</kbd> apagar</span>
+                    <span><kbd className="px-1 rounded bg-muted">Enter</kbd>/dbl-clk editar</span>
+                    <span><kbd className="px-1 rounded bg-muted">Ctrl+C/X/V</kbd></span>
+                    <span><kbd className="px-1 rounded bg-muted">Ctrl+Z/Y</kbd></span>
+                    <span><kbd className="px-1 rounded bg-muted">Ctrl+←/→</kbd> semana</span>
+                  </div>
                   <Table>
                     <TableHeader>
                       <TableRow>

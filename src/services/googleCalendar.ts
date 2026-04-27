@@ -1,8 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
-const SCOPES = "https://www.googleapis.com/auth/calendar";
-const GIS_SRC = "https://accounts.google.com/gsi/client";
+// =====================================================================
+// Google Calendar — Fluxo OAuth server-side com refresh_token persistente
+// =====================================================================
+//
+// Esta camada substituiu o antigo fluxo via Google Identity Services (GIS)
+// no navegador, que entregava apenas access_tokens efêmeros e exigia
+// reautenticação constante. Agora o consent acontece em redirect,
+// o callback é processado pela Edge Function `google-oauth-callback`
+// (que troca o code por access_token + refresh_token e grava em
+// `user_google_tokens`), e a Edge Function `google-oauth-refresh`
+// renova o access_token automaticamente em background.
+// =====================================================================
 
 export interface AgendaParticipanteInput {
   email: string;
@@ -24,14 +33,6 @@ export interface GoogleAttendee {
   responseStatus?: "accepted" | "declined" | "tentative" | "needsAction";
 }
 
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
-
-let gisLoadPromise: Promise<void> | null = null;
-
 export class GoogleAuthExpiredError extends Error {
   constructor(message = "Conexão com o Google expirou. Reconecte para sincronizar.") {
     super(message);
@@ -39,102 +40,100 @@ export class GoogleAuthExpiredError extends Error {
   }
 }
 
+// Mantida para compatibilidade com chamadas existentes (no-op no novo fluxo)
 export function initGoogleAuth(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window.google?.accounts?.oauth2) return Promise.resolve();
-  if (gisLoadPromise) return gisLoadPromise;
-
-  gisLoadPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${GIS_SRC}"]`) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Falha ao carregar Google Identity Services.")));
-      if ((window as any).google?.accounts?.oauth2) resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = GIS_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Falha ao carregar Google Identity Services."));
-    document.head.appendChild(script);
-  });
-
-  return gisLoadPromise;
-}
-
-export async function requestGoogleToken(silent = false): Promise<{ access_token: string; expires_in: number }> {
-  await initGoogleAuth();
-  if (!GOOGLE_CLIENT_ID) {
-    throw new Error("VITE_GOOGLE_CLIENT_ID não configurado.");
-  }
-  return new Promise((resolve, reject) => {
-    try {
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: SCOPES,
-        prompt: silent ? "" : "consent",
-        callback: (response: any) => {
-          if (response.error) {
-            reject(new Error(response.error_description || response.error));
-            return;
-          }
-          resolve({ access_token: response.access_token, expires_in: Number(response.expires_in ?? 3600) });
-        },
-      });
-      tokenClient.requestAccessToken();
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return Promise.resolve();
 }
 
 /**
- * Garante que existe um token válido. Se o token armazenado está expirado (ou
- * próximo de expirar), tenta renovação silenciosa via GIS. Se a renovação
- * silenciosa falhar, lança GoogleAuthExpiredError para que a UI exiba o
- * fluxo de reconexão.
+ * Inicia o fluxo de conexão. Pede à edge function `google-oauth-start` a URL
+ * de consent assinada e redireciona o navegador. Após autorização, o usuário
+ * volta para `/agenda?google_oauth=success`.
+ */
+export async function startGoogleOAuth(returnTo = "/agenda"): Promise<void> {
+  const { data, error } = await supabase.functions.invoke("google-oauth-start", {
+    body: {},
+    method: "POST",
+    // O Supabase Functions client suporta querystring via headers? Não — usamos query manual via fetch.
+  });
+
+  // Fallback: se invoke não trouxer URL, chama via fetch direto para preservar query
+  let consentUrl: string | undefined = (data as any)?.url;
+  if (!consentUrl) {
+    const { data: sessionRes } = await supabase.auth.getSession();
+    const accessToken = sessionRes.session?.access_token;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const url = `https://${projectId}.supabase.co/functions/v1/google-oauth-start?return_to=${encodeURIComponent(returnTo)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken ?? ""}` },
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json?.error || `Falha ao iniciar OAuth (${res.status})`);
+    consentUrl = json.url;
+  }
+
+  if (error) throw new Error(error.message ?? "Falha ao iniciar conexão com Google.");
+  if (!consentUrl) throw new Error("URL de consent não recebida do servidor.");
+
+  window.location.assign(consentUrl);
+}
+
+/**
+ * Mantida para compatibilidade com Agenda.tsx — agora apenas redireciona.
+ * Note: como o fluxo é por redirect, esta promise nunca resolve.
+ */
+export async function requestGoogleToken(_silent = false): Promise<{ access_token: string; expires_in: number }> {
+  await startGoogleOAuth();
+  // Redirect em andamento; promise pendente até a navegação acontecer
+  return new Promise(() => {});
+}
+
+/**
+ * Garante um access_token válido. Lê do banco; se expirado/ausente, chama
+ * `google-oauth-refresh` que usa o refresh_token armazenado para renovar.
+ * Lança GoogleAuthExpiredError se o usuário precisar reconectar.
  */
 export async function ensureValidGoogleToken(): Promise<string> {
   const tokenRow = await getTokenFromSupabase();
   const now = Date.now();
   const expiresAtMs = tokenRow?.expires_at ? new Date(tokenRow.expires_at).getTime() : 0;
-  const isValid = !!tokenRow?.access_token && expiresAtMs - now > 60_000; // 60s de margem
+  const isValid = !!tokenRow?.access_token && expiresAtMs - now > 60_000;
 
   if (isValid && tokenRow?.access_token) {
     return tokenRow.access_token;
   }
 
-  // Tenta renovação silenciosa
+  // Tenta renovar via edge function
   try {
-    const fresh = await requestGoogleToken(true);
-    await saveTokenToSupabase(fresh);
-    return fresh.access_token;
+    const { data, error } = await supabase.functions.invoke("google-oauth-refresh", {
+      body: {},
+    });
+
+    if (error) {
+      // Status 410 = reconnect_required (no_refresh_token / invalid_grant)
+      const status = (error as any)?.context?.response?.status;
+      if (status === 410) throw new GoogleAuthExpiredError();
+      throw new Error(error.message ?? "Falha ao renovar token Google.");
+    }
+
+    const newToken = (data as any)?.access_token as string | undefined;
+    if (!newToken) throw new GoogleAuthExpiredError();
+    return newToken;
   } catch (err) {
-    console.warn("[googleCalendar] Silent renewal failed:", err);
+    if (err instanceof GoogleAuthExpiredError) throw err;
+    console.warn("[googleCalendar] refresh failed:", err);
     throw new GoogleAuthExpiredError();
   }
 }
 
-export async function saveTokenToSupabase(token: { access_token: string; expires_in: number }): Promise<void> {
-  const { data: userRes } = await supabase.auth.getUser();
-  const userId = userRes.user?.id;
-  if (!userId) throw new Error("Usuário não autenticado.");
-
-  const expiresAt = new Date(Date.now() + token.expires_in * 1000).toISOString();
-
-  const { error } = await supabase
-    .from("user_google_tokens")
-    .upsert(
-      {
-        user_id: userId,
-        access_token: token.access_token,
-        expires_at: expiresAt,
-      },
-      { onConflict: "user_id" }
-    );
-  if (error) throw error;
+/**
+ * Mantida apenas para compatibilidade — o callback do servidor é quem grava.
+ * Não precisa mais ser chamada pelo frontend.
+ */
+export async function saveTokenToSupabase(_token: { access_token: string; expires_in: number }): Promise<void> {
+  // No-op: persistência agora é feita server-side pelo google-oauth-callback
+  return;
 }
 
 export async function getTokenFromSupabase(): Promise<{ access_token: string; expires_at: string | null } | null> {
@@ -200,6 +199,9 @@ async function googleFetch(token: string, path: string, init?: RequestInit) {
     },
   });
   if (!res.ok) {
+    if (res.status === 401) {
+      throw new GoogleAuthExpiredError();
+    }
     const text = await res.text().catch(() => "");
     throw new Error(`Google Calendar API ${res.status}: ${text || res.statusText}`);
   }
@@ -242,7 +244,6 @@ export async function deleteCalendarEvent(token: string, googleEventId: string) 
   });
 }
 
-// Busca detalhes do evento e retorna attendees com responseStatus
 export async function getCalendarEventAttendees(
   token: string,
   googleEventId: string

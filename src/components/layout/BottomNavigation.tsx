@@ -37,7 +37,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
   const visibleNavItems = isChefeSetor
-    ? navItems.filter((i) => i.id === "escalas")
+    ? navItems.filter((i) => i.id === "gestao-pessoas")
     : navItems;
 
   return (
@@ -155,7 +155,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
               >
                 <div className="relative">
                   <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                  {item.id === "escalas" && escalaPending > 0 && (
+                  {item.id === "gestao-pessoas" && escalaPending > 0 && (
                     <span className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground px-0.5">
                       {escalaPending}
                     </span>

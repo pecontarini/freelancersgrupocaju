@@ -202,19 +202,25 @@ export function NovaMissaoDialog({
 
           <div>
             <label className="text-xs font-medium text-muted-foreground">Responsável</label>
-            <Select value={responsavelId} onValueChange={setResponsavelId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecionar responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                {membros.map((m) => (
-                  <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.nome}
-                    {m.cargo ? ` · ${m.cargo}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {membros.length === 0 ? (
+              <div className="mt-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                Nenhum membro vinculado a esta unidade. Vincule pessoas no painel admin antes de criar missões.
+              </div>
+            ) : (
+              <Select value={responsavelId} onValueChange={setResponsavelId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Selecionar responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {membros.map((m) => (
+                    <SelectItem key={m.user_id} value={m.user_id}>
+                      {m.nome}
+                      {m.cargo ? ` · ${m.cargo}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div>

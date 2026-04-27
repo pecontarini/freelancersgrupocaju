@@ -491,22 +491,50 @@ export function FreelancerAddModal({
               <div className="space-y-1.5">
                 <Label>Cargo *</Label>
                 {allowedJobTitles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum cargo vinculado a este setor.</p>
+                  canManageJobTitles ? (
+                    <Button
+                      type="button"
+                      variant="default"
+                      className="w-full"
+                      onClick={() => setQuickJobTitleOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Criar e vincular cargo
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum cargo vinculado a este setor. Peça ao gerente para configurar.
+                    </p>
+                  )
                 ) : (
-                  <Select value={selectedJobTitleId} onValueChange={setSelectedJobTitleId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o cargo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allowedJobTitles.map((jt) => (
-                        <SelectItem key={jt.id} value={jt.id}>
-                          {jt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={selectedJobTitleId} onValueChange={setSelectedJobTitleId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione o cargo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedJobTitles.map((jt) => (
+                          <SelectItem key={jt.id} value={jt.id}>
+                            {jt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {canManageJobTitles && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="Criar/vincular novo cargo"
+                        onClick={() => setQuickJobTitleOpen(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
+
 
               {!noCpfMode && (
                 <div className="grid grid-cols-2 gap-3">

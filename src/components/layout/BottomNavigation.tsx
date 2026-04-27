@@ -70,17 +70,9 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 <Button
                   variant="ghost"
                   className="w-full justify-start"
-                  onClick={() => onTabChange("agenda")}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Agenda
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
                   onClick={() => onTabChange("agenda-lider")}
                 >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  <Calendar className="h-4 w-4 mr-2" />
                   Agenda do Líder
                 </Button>
                 <Button

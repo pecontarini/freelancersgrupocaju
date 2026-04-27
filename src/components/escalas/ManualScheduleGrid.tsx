@@ -1430,11 +1430,25 @@ export function ManualScheduleGrid() {
                                   const pracaName = schedule?.praca_id
                                     ? pracasOfUnit.find((p) => p.id === schedule.praca_id)?.nome_praca
                                     : null;
+                                  const rowIdx = empRowIndex.get(emp.id) ?? -1;
+                                  const inSelection = isInRect(selectionRect, rowIdx, i);
+                                  const isActive = grid.state.active?.row === rowIdx && grid.state.active?.col === i;
                                   return (
                                     <TableCell
                                       key={i}
-                                      className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"}`}
+                                      data-row={rowIdx}
+                                      data-col={i}
+                                      className={`text-center p-1 transition-colors ${copyMode ? "" : "cursor-pointer hover:bg-muted/50"} ${inSelection ? "bg-primary/10" : ""} ${isActive ? "ring-2 ring-primary ring-inset" : ""}`}
                                       onClick={(e) => {
+                                        if (copyMode) return;
+                                        e.stopPropagation();
+                                        if (e.shiftKey && grid.state.active) {
+                                          grid.extendSelection({ row: rowIdx, col: i });
+                                        } else {
+                                          grid.setActive({ row: rowIdx, col: i });
+                                        }
+                                      }}
+                                      onDoubleClick={(e) => {
                                         if (copyMode) return;
                                         e.stopPropagation();
                                         handleCellClick(emp, dateStr);

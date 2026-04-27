@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import { useMissoes, type Missao } from "@/hooks/useMissoes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { PrioridadeBadge, StatusBadge } from "../shared/Badges";
+import { PrioridadeBadge, StatusBadge, PrioridadeAccentBar } from "../shared/Badges";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 
 interface TarefaCompacta {

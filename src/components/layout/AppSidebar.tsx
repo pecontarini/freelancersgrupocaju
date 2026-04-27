@@ -82,12 +82,6 @@ const menuItems = [
 
 const adminMenuItems = [
   {
-    title: "DORES DA OPERAÇÃO",
-    id: "cx",
-    icon: AlertTriangle,
-    description: "Gestão centralizada de CX",
-  },
-  {
     title: "CONFIGURAÇÕES",
     id: "configuracoes",
     icon: Settings,

@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, CheckCircle2, XCircle, Clock, MapPin, User, AlertTriangle, PartyPopper } from "lucide-react";
-import cajuparLogo from "@/assets/cajupar-logo-dark.png";
+import cajuparLogo from "@/assets/logo.png";
 
 interface ScheduleInfo {
   id: string;

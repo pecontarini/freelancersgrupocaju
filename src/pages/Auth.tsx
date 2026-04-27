@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import cajuparLogo from "@/assets/cc98afa7-a70b-4603-9079-2b37d438a7fd.png";
+import cajuparLogo from "@/assets/logo.png";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

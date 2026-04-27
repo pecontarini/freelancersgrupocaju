@@ -1,0 +1,290 @@
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Plus, Send, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUnidade } from "@/contexts/UnidadeContext";
+import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
+import { useMissoes, type MissaoPrioridade } from "@/hooks/useMissoes";
+import { MissoesPreviewCard, type MissaoSugerida } from "./MissoesPreviewCard";
+
+interface ChatMsg {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  missoes?: MissaoSugerida[];
+}
+
+function getSemanaRef(d = new Date()): string {
+  const date = new Date(d);
+  const day = date.getDay();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - day);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null }) {
+  const { user } = useAuth();
+  const { effectiveUnidadeId } = useUnidade();
+  const { data: membros = [] } = useUnidadeMembros(effectiveUnidadeId);
+  const { create } = useMissoes({ unidadeId: effectiveUnidadeId });
+
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const semana = useMemo(() => getSemanaRef(), []);
+
+  // Carrega histórico da semana
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("missao_chat" as any)
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("semana_referencia", semana)
+        .order("created_at", { ascending: true });
+      if (data) {
+        setMessages(
+          (data as any[]).map((r) => ({
+            id: r.id,
+            role: r.role,
+            content: r.content,
+            missoes: r.role === "assistant" ? tryParseMissoes(r.content) : undefined,
+          })),
+        );
+      }
+    })();
+  }, [user, semana]);
+
+  function tryParseMissoes(txt: string): MissaoSugerida[] | undefined {
+    const m = txt.match(/<missoes-json>([\s\S]+?)<\/missoes-json>/);
+    if (!m) return undefined;
+    try {
+      const parsed = JSON.parse(m[1]);
+      return Array.isArray(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function persistMsg(role: "user" | "assistant", content: string) {
+    if (!user) return;
+    await supabase.from("missao_chat" as any).insert({
+      user_id: user.id,
+      semana_referencia: semana,
+      role,
+      content,
+    } as any);
+  }
+
+  async function send() {
+    const txt = input.trim();
+    if (!txt || loading) return;
+    setInput("");
+    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: "user", content: txt };
+    setMessages((p) => [...p, userMsg]);
+    persistMsg("user", txt);
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("agenda-lider-chat", {
+        body: {
+          messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+          available_users: membros.map((m) => ({
+            user_id: m.user_id,
+            nome: m.nome,
+            cargo: m.cargo,
+            unidade: m.unidade_nome,
+          })),
+          unidade_nome: unidadeNome,
+        },
+      });
+      if (error) throw error;
+      const text: string = data?.text ?? "";
+      const missoes: MissaoSugerida[] = data?.missoes ?? [];
+      const stored = missoes.length > 0
+        ? `${text}\n\n<missoes-json>${JSON.stringify(missoes)}</missoes-json>`
+        : text;
+
+      setMessages((p) => [
+        ...p,
+        { id: crypto.randomUUID(), role: "assistant", content: text || "Pronto.", missoes },
+      ]);
+      persistMsg("assistant", stored);
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err?.context?.text || err?.message || "Falha na IA.";
+      toast.error(errMsg);
+      setMessages((p) => [
+        ...p,
+        { id: crypto.randomUUID(), role: "assistant", content: `⚠️ ${errMsg}` },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmMissao(m: MissaoSugerida) {
+    try {
+      const membrosArr: { user_id: string; papel: "responsavel" | "co_responsavel" }[] = [];
+      if (m.responsavel_user_id && m.responsavel_user_id.trim()) {
+        membrosArr.push({ user_id: m.responsavel_user_id, papel: "responsavel" });
+      }
+      (m.co_responsaveis ?? []).filter(Boolean).forEach((uid) => {
+        membrosArr.push({ user_id: uid, papel: "co_responsavel" });
+      });
+
+      await create.mutateAsync({
+        titulo: m.titulo,
+        descricao: m.descricao,
+        prioridade: (m.prioridade as MissaoPrioridade) ?? "media",
+        unidade_id: effectiveUnidadeId,
+        prazo: m.prazo && m.prazo.trim() ? m.prazo : null,
+        semana_referencia: semana,
+        membros: membrosArr,
+        tarefas: (m.plano_acao ?? []).map((t, i) => ({
+          descricao: t.descricao,
+          dia_semana: t.dia_semana && t.dia_semana.trim() ? t.dia_semana : null,
+          ordem: i,
+        })),
+      });
+      toast.success(`Missão criada: ${m.titulo}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao criar missão.");
+    }
+  }
+
+  function clearChat() {
+    if (!user) return;
+    if (!confirm("Limpar conversa desta semana?")) return;
+    supabase
+      .from("missao_chat" as any)
+      .delete()
+      .eq("user_id", user.id)
+      .eq("semana_referencia", semana)
+      .then(() => setMessages([]));
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-220px)] min-h-[500px] flex-col gap-3">
+      <Card className="flex flex-1 flex-col overflow-hidden border-primary/20 bg-card/60 backdrop-blur">
+        <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">
+              <Sparkles className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Brain Dump com IA</p>
+              <p className="text-xs text-muted-foreground">
+                Descreva o que precisa — a IA estrutura em missões delegáveis
+              </p>
+            </div>
+          </div>
+          {messages.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearChat}>
+              Limpar
+            </Button>
+          )}
+        </div>
+
+        <ScrollArea className="flex-1 px-4 py-4">
+          <div className="mx-auto max-w-3xl space-y-4">
+            {messages.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Comece descrevendo a semana. Exemplos:
+                </p>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {[
+                    "CMV do Caminito está estourando esta semana",
+                    "Preciso contratar Chefe de Cozinha pro Nazo",
+                    "Plano de ação da auditoria de ontem",
+                  ].map((s) => (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                      onClick={() => setInput(s)}
+                    >
+                      {s}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <AnimatePresence initial={false}>
+              {messages.map((m) => (
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm ${
+                      m.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap">
+                      {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}
+                    </p>
+                    {m.missoes && m.missoes.length > 0 && (
+                      <div className="space-y-2 pt-2">
+                        {m.missoes.map((mi, idx) => (
+                          <MissoesPreviewCard
+                            key={idx}
+                            missao={mi}
+                            membros={membros}
+                            onConfirm={() => confirmMissao(mi)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {loading && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                IA estruturando missões...
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="border-t border-border/40 bg-card/80 p-3">
+          <div className="mx-auto flex max-w-3xl items-end gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Descreva o que precisa fazer essa semana..."
+              className="min-h-[60px] resize-none"
+            />
+            <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-[60px] w-[60px]">
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}

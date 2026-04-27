@@ -2544,6 +2544,229 @@ export type Database = {
           },
         ]
       }
+      missao_anexos: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          mime_type: string | null
+          missao_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          missao_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          missao_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missao_anexos_missao_id_fkey"
+            columns: ["missao_id"]
+            isOneToOne: false
+            referencedRelation: "missoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missao_chat: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["missao_chat_role"]
+          semana_referencia: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["missao_chat_role"]
+          semana_referencia: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["missao_chat_role"]
+          semana_referencia?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      missao_comentarios: {
+        Row: {
+          created_at: string
+          id: string
+          missao_id: string
+          texto: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          missao_id: string
+          texto: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          missao_id?: string
+          texto?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missao_comentarios_missao_id_fkey"
+            columns: ["missao_id"]
+            isOneToOne: false
+            referencedRelation: "missoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missao_membros: {
+        Row: {
+          created_at: string
+          missao_id: string
+          papel: Database["public"]["Enums"]["missao_papel"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          missao_id: string
+          papel?: Database["public"]["Enums"]["missao_papel"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          missao_id?: string
+          papel?: Database["public"]["Enums"]["missao_papel"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missao_membros_missao_id_fkey"
+            columns: ["missao_id"]
+            isOneToOne: false
+            referencedRelation: "missoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missao_tarefas: {
+        Row: {
+          concluido: boolean
+          concluido_em: string | null
+          concluido_por: string | null
+          created_at: string
+          descricao: string
+          dia_semana: string | null
+          id: string
+          missao_id: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          concluido?: boolean
+          concluido_em?: string | null
+          concluido_por?: string | null
+          created_at?: string
+          descricao: string
+          dia_semana?: string | null
+          id?: string
+          missao_id: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          concluido?: boolean
+          concluido_em?: string | null
+          concluido_por?: string | null
+          created_at?: string
+          descricao?: string
+          dia_semana?: string | null
+          id?: string
+          missao_id?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missao_tarefas_missao_id_fkey"
+            columns: ["missao_id"]
+            isOneToOne: false
+            referencedRelation: "missoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      missoes: {
+        Row: {
+          created_at: string
+          criado_por: string
+          descricao: string | null
+          id: string
+          prazo: string | null
+          prioridade: Database["public"]["Enums"]["missao_prioridade"]
+          semana_referencia: string | null
+          status: Database["public"]["Enums"]["missao_status"]
+          titulo: string
+          unidade_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          descricao?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade?: Database["public"]["Enums"]["missao_prioridade"]
+          semana_referencia?: string | null
+          status?: Database["public"]["Enums"]["missao_status"]
+          titulo: string
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          descricao?: string | null
+          id?: string
+          prazo?: string | null
+          prioridade?: Database["public"]["Enums"]["missao_prioridade"]
+          semana_referencia?: string | null
+          status?: Database["public"]["Enums"]["missao_status"]
+          titulo?: string
+          unidade_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "missoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       movimentacoes_estoque: {
         Row: {
           created_at: string
@@ -4302,6 +4525,14 @@ export type Database = {
         Returns: boolean
       }
       is_first_user: { Args: never; Returns: boolean }
+      is_missao_creator: {
+        Args: { _missao_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_missao_member: {
+        Args: { _missao_id: string; _user_id: string }
+        Returns: boolean
+      }
       lookup_freelancer_by_cpf: {
         Args: { p_cpf: string }
         Returns: {
@@ -4331,6 +4562,10 @@ export type Database = {
         Returns: number
       }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
+      user_can_see_missao: {
+        Args: { _missao_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
         Returns: boolean
@@ -4383,6 +4618,10 @@ export type Database = {
         | "transfer_in"
         | "transfer_out"
       kpi_type: "nps" | "supervisao" | "tempo_prato" | "tempo_comanda"
+      missao_chat_role: "user" | "assistant"
+      missao_papel: "responsavel" | "co_responsavel"
+      missao_prioridade: "alta" | "media" | "baixa"
+      missao_status: "a_fazer" | "em_andamento" | "aguardando" | "concluido"
       origem_dado: "sheets" | "pdf" | "kds" | "manual"
       position_type:
         | "gerente_front"
@@ -4567,6 +4806,10 @@ export const Constants = {
         "transfer_out",
       ],
       kpi_type: ["nps", "supervisao", "tempo_prato", "tempo_comanda"],
+      missao_chat_role: ["user", "assistant"],
+      missao_papel: ["responsavel", "co_responsavel"],
+      missao_prioridade: ["alta", "media", "baixa"],
+      missao_status: ["a_fazer", "em_andamento", "aguardando", "concluido"],
       origem_dado: ["sheets", "pdf", "kds", "manual"],
       position_type: [
         "gerente_front",

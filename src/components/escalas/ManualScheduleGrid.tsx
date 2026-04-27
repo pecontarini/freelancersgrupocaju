@@ -569,32 +569,6 @@ export function ManualScheduleGrid() {
     }
   }
 
-  async function pasteAtActive() {
-    const clip = grid.state.clipboard;
-    const active = grid.state.active;
-    if (!clip || !active) return;
-    const cells: Cell[] = [];
-    const patchByCell = new Map<string, any>();
-    for (let dr = 0; dr < clip.rows; dr++) {
-      for (let dc = 0; dc < clip.cols; dc++) {
-        const r = active.row + dr;
-        const c = active.col + dc;
-        if (r >= maxRows || c >= maxCols) continue;
-        const src = clip.cells[dr][dc];
-        cells.push({ row: r, col: c });
-        patchByCell.set(`${r}:${c}`, src ? src.patch : null);
-      }
-    }
-    await applyPatchToCells(cells, (_emp, _date, _before) => {
-      // resolve via map (sector_id virá da linha de destino dentro de applyPatchToCells)
-      // o "key" aqui é via row/col; reconstruímos a partir da posição:
-      return null; // placeholder — substituído abaixo
-    });
-    // O closure acima não tem acesso a row/col. Refazemos usando patchByCell:
-    // (chamada acima é descartável; reaplicamos corretamente:)
-  }
-
-  // Versão correta de pasteAtActive (sem o bug do closure):
   async function pasteAtActiveReal() {
     const clip = grid.state.clipboard;
     const active = grid.state.active;

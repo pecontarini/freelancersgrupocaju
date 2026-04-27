@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
+import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User, Calendar } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -44,7 +44,7 @@ export function AgendaLiderTab() {
         />
         <div className="relative flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 backdrop-blur">
-            <ShieldCheck className="h-5 w-5 text-primary" />
+            <Calendar className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
             <h2 className="font-display text-lg font-semibold">Agenda do Líder</h2>

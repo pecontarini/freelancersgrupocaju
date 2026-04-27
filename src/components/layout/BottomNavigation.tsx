@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2, ShieldCheck } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -25,7 +25,7 @@ const navItems = [
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "escalas", label: "Escalas", icon: CalendarClock },
-  { id: "agenda", label: "Agenda", icon: Calendar },
+  { id: "agenda-lider", label: "Agenda", icon: Calendar },
   { id: "painel", label: "Metas", icon: BarChart2 },
 ];
 
@@ -70,17 +70,9 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 <Button
                   variant="ghost"
                   className="w-full justify-start"
-                  onClick={() => onTabChange("agenda")}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Agenda
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
                   onClick={() => onTabChange("agenda-lider")}
                 >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  <Calendar className="h-4 w-4 mr-2" />
                   Agenda do Líder
                 </Button>
                 <Button
@@ -210,17 +202,9 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 <Button
                   variant="outline"
                   className="w-full justify-start h-12"
-                  onClick={() => onTabChange("agenda")}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Agenda
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-12"
                   onClick={() => onTabChange("agenda-lider")}
                 >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  <Calendar className="h-4 w-4 mr-2" />
                   Agenda do Líder
                 </Button>
                 <Button

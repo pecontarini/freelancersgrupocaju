@@ -29,19 +29,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useMissoes, type Missao } from "@/hooks/useMissoes";
 import { useGoogleCalendarEvents, type GoogleEvent } from "@/hooks/useGoogleCalendarEvents";
 import { startGoogleOAuth } from "@/services/googleCalendar";
-import { PrioridadeBadge, StatusBadge } from "../shared/Badges";
+import { PrioridadeBadge, StatusBadge, prioridadeAccent } from "../shared/Badges";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 
 type ModoVisualizacao = "mes" | "semana" | "lista";

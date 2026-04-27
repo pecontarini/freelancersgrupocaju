@@ -502,7 +502,7 @@ export function ManualScheduleGrid() {
             schedule_date: dateStr,
             sector_id: sectorId,
             schedule_type: patch.schedule_type,
-            shift_type: patch.shift_type ?? existing?.shift_type ?? undefined,
+            shift_type: patch.shift_type,
             start_time: patch.start_time,
             end_time: patch.end_time,
             break_duration: patch.break_duration ?? 0,

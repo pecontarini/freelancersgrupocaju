@@ -1,124 +1,148 @@
-## Objetivo
+## Plano: Grade de Escalas estilo Excel
 
-Reformular o **Painel de Metas** para se aproximar do mockup HTML enviado: navegação lateral por indicador (uma "página" por meta), dashboard executivo com mapa de calor + ranking entre lojas, KPIs por unidade e — quando o usuário acessa uma meta específica — uma seção comparativa dos **últimos 6 meses limitada à loja do usuário** (mês atual vs. melhor mês vs. pior mês).
+### Decisões confirmadas (defaults assumidos)
 
-Mantém-se intacto todo o motor de importação (Sheets, NFe, manual, etc.) — só muda a camada de visualização.
+1. **Atalhos 1/2/3 → defaults de horário**: consultar `shifts` por `type` (T1/T2/T3) na unidade ativa; se não houver, usar fallback fixo: T1 = 11:00–15:20, T2 = 18:00–23:00, T3 = 11:00–23:00 (1h pausa). Sem abrir modal.
+2. **Atalho `m` (Meia)**: criado em código como `shift_type = 'meia'` mapeando `schedule_type = 'working'`, jornada de 4h (11:00–15:00, sem pausa). Não altera schema.
+3. **Paste cross-row/cross-unit**: o `sector_id` da célula colada é **sempre resolvido pela linha de destino** (cargo/setor do funcionário daquela row). Demais campos (`shift_type`, `start_time`, `end_time`, `break_duration`, `agreed_rate`, `praca_id`) vêm da origem.
 
-## Arquitetura nova
+---
 
-```text
-PainelMetasTab
-├─ Sidebar interna (lista de "metas" — atual: tabs no topo)
-│   ├─ Visão Geral (Dashboard Executivo)
-│   ├─ NPS & Reclamações
-│   ├─ CMV Salmão
-│   ├─ CMV Carnes
-│   ├─ KDS · Tempo de Prato
-│   ├─ Conformidade
-│   ├─ Red Flag
-│   └─ Planos de Ação
-│   (Holding/Diário só p/ admin)
-│
-├─ Header de página (título + período + ação IA opcional)
-│
-└─ Conteúdo da meta selecionada
-     ├─ Bloco A: KPIs por loja (rede inteira, 4 cards)
-     ├─ Bloco B: Ranking comparativo entre lojas (sortable)
-     ├─ Bloco C: Gráficos interativos do mês (recharts)
-     └─ Bloco D — NOVO: "Sua Loja · Últimos 6 meses"
-            • aparece SOMENTE em páginas de meta individual
-            • limitado à `useUnidade().effectiveUnidadeId`
-            • mostra: valor mês atual + melhor mês + pior mês + sparkline
+### Arquitetura — onde vive cada coisa
+
+Todo o trabalho fica dentro de `src/components/escalas/ManualScheduleGrid.tsx` + um pequeno hook auxiliar. **Nenhum componente de célula novo, nenhum schema alterado, nenhuma lib externa.**
+
+Novos arquivos:
+- `src/components/escalas/grid/useGridSelection.ts` — estado puro de seleção/clipboard/undo (React `useReducer`).
+- `src/components/escalas/grid/gridShortcuts.ts` — mapa de atalhos → patches de schedule (defaults T1/T2/T3/m/f).
+
+Modificações:
+- `src/components/escalas/ManualScheduleGrid.tsx` — integra o hook, adiciona `tabIndex`, `onKeyDown`, classes de seleção, e overlay de "modo edição".
+
+---
+
+### Os 7 itens, em sequência
+
+#### 1. Foco e célula ativa
+- Container raiz do grid recebe `tabIndex={0}` + `ref` para foco programático.
+- Cada célula `<td>` recebe `data-row={empIdx}` e `data-col={dayIdx}`; ao clicar, `setActiveCell({ row, col })`.
+- Visual: célula ativa ganha ring `ring-2 ring-primary` (sem mudar cor de turno).
+
+#### 2. Navegação por teclado
+- `ArrowUp/Down/Left/Right`: move `activeCell` (clamp nos limites).
+- `Tab` / `Shift+Tab`: avança/retrocede coluna; ao passar do último dia, vai para a próxima linha.
+- `Enter`: abre o `ScheduleEditModal` da célula ativa (comportamento existente).
+- `Esc`: limpa seleção/range.
+
+#### 3. Seleção por range
+- `Shift+Click` ou `Shift+Arrows`: define `selection.anchor` + `selection.head` formando retângulo.
+- `Ctrl/Cmd+A`: seleciona linha do funcionário ativo; segundo `Ctrl+A` seleciona toda a grade.
+- Classes: células dentro do retângulo recebem `bg-primary/10` (overlay, mantém a cor do turno).
+
+#### 4. Atalhos de turno (apply rápido sem modal)
+Sobre a célula ativa (ou todo o range selecionado), as teclas aplicam patches via `useUpsertSchedule`:
+
+| Tecla | Patch resultante |
+|---|---|
+| `1` | `schedule_type='working'`, `shift_type='T1'`, horários T1 |
+| `2` | `schedule_type='working'`, `shift_type='T2'`, horários T2 |
+| `3` | `schedule_type='working'`, `shift_type='T3'`, horários T3 |
+| `m` | `schedule_type='working'`, `shift_type='meia'`, 11:00–15:00 |
+| `f` | `schedule_type='off'` (folga), limpa horários |
+| `Delete`/`Backspace` | `useCancelSchedule` na(s) célula(s) |
+
+Resolução de horário T1/T2/T3: query única `shifts WHERE unit_id = X AND type IN ('T1','T2','T3')` em cache (React Query, `staleTime: 5min`). Se faltar, usa fallback.
+
+`sector_id` para cada célula é resolvido pela função existente `resolveSectorForEmployee` (já usada no modal).
+
+#### 5. Copiar / Colar / Recortar
+- `Ctrl/Cmd+C`: serializa o range selecionado num objeto `{ rows: number, cols: number, cells: Patch[][] }` em `clipboard` (state local — sem API do SO).
+- `Ctrl/Cmd+X`: copia + cancela as células de origem.
+- `Ctrl/Cmd+V`: a partir da `activeCell` como canto superior-esquerdo, repete o bloco. Para cada célula colada:
+  - Mantém: `shift_type`, `start_time`, `end_time`, `break_duration`, `agreed_rate`, `praca_id`.
+  - Recalcula: `sector_id` via `resolveSectorForEmployee(targetEmployee)`.
+  - Recalcula: `employee_id` e `schedule_date` pelo destino.
+- Se o destino estende além do grid, clipa silenciosamente.
+- Toast curto: "12 turnos colados".
+
+#### 6. Undo / Redo
+- Stack em memória (`history: Action[]`, `cursor: number`) dentro do reducer.
+- Cada operação (apply atalho, paste, cut, delete) empurra um `Action` com `before/after` por célula afetada.
+- `Ctrl/Cmd+Z`: aplica `before` em batch via `useUpsertSchedule`/`useCancelSchedule`.
+- `Ctrl/Cmd+Shift+Z` ou `Ctrl+Y`: re-aplica `after`.
+- Limite: 50 ações. Limpa ao trocar de semana ou unidade.
+
+#### 7. Navegação entre semanas
+- `Ctrl/Cmd+ArrowLeft` / `Ctrl/Cmd+ArrowRight`: chama os handlers já existentes de "semana anterior / próxima semana" no `ManualScheduleGrid`.
+- `Ctrl/Cmd+Home`: volta à semana atual (hoje).
+- Foco da célula ativa é preservado por `(row, col)` na nova semana.
+
+---
+
+### Tratamento de borda
+
+- **Modo edição inativo**: se foco está num `<input>` ou modal aberto, todos os atalhos são ignorados (`e.target` check).
+- **Funcionário sem cargo/setor**: atalho exibe toast "Funcionário sem setor — abra o modal" e cancela a operação para aquela célula (não bloqueia o restante do range).
+- **Conflitos de unique constraint** (já existente em `schedules`): erro do upsert exibe toast e o `Action` correspondente é revertido do histórico.
+- **Mobile**: tudo é progressivo — em telas <768px o `MobileScheduler` continua o caminho principal e nada muda lá.
+
+---
+
+### Detalhes técnicos (resumo)
+
+**Estado do hook `useGridSelection`:**
+```ts
+type Cell = { row: number; col: number };
+type Patch = Partial<ManualSchedule>;
+type Action = { affected: Cell[]; before: (ManualSchedule|null)[]; after: (Patch|null)[] };
+
+interface State {
+  active: Cell | null;
+  selection: { anchor: Cell; head: Cell } | null;
+  clipboard: { rows: number; cols: number; cells: (Patch|null)[][] } | null;
+  history: Action[];
+  cursor: number; // -1 = nada para desfazer
+}
 ```
 
-## Mudanças por arquivo
+**Integração na grade**: o `ManualScheduleGrid` já mapeia `employees x days`. Adicionar:
+- `useGridSelection(employees.length, days.length)` no topo.
+- `onKeyDown` no container raiz fazendo dispatch para o reducer + chamadas `upsert.mutateAsync` em batch.
+- `data-*` attributes em cada `<td>` para permitir `Shift+Click` sem prop drilling.
 
-### 1. `src/components/dashboard/PainelMetasTab.tsx` — refatorar root
-- Substituir `<Tabs>` horizontal por layout 2 colunas: **sidebar interna** (esquerda, ~220px desktop / drawer no mobile) + **conteúdo** (direita).
-- Sidebar usa `glass-card` com lista vertical agrupada ("Visão Geral", "Indicadores", "Gestão"), cada item com ícone `lucide-react` colorido (sem emoji), label, e um dot de status quando há red flag ativa.
-- No mobile, sidebar vira `Sheet` aberto via botão "Metas ▾" no topo do header.
-- Estado da meta atual via `useState<MetaKey>("visao-geral")`; query string opcional `?meta=cmv-salmao` para deep-link.
-
-### 2. `src/components/dashboard/painel-metas/` — extrair subviews (novo diretório)
-Quebrar o arquivo de 2047 linhas em módulos enxutos:
-- `PainelSidebar.tsx` — navegação interna
-- `MetaPageHeader.tsx` — título + seletor de mês + botão IA
-- `views/VisaoGeralView.tsx` (atual, refinada com gráficos)
-- `views/NpsView.tsx` (atual, refinada)
-- `views/CmvSalmaoView.tsx` **NOVO**
-- `views/CmvCarnesView.tsx` **NOVO**
-- `views/KdsView.tsx` **NOVO** (extrai bloco KDS de Conformidade hoje)
-- `views/ConformidadeView.tsx` (existe, refinada)
-- `views/RedFlagView.tsx` **NOVO**
-- `views/PlanosView.tsx` (existe, mantida)
-- `shared/Sixmonths.tsx` **NOVO** — componente reutilizável "Sua Loja · 6 meses"
-- `shared/RankingCard.tsx` **NOVO** — ranking comparativo entre lojas com medalhas 1/2/3
-- `shared/KpiByStoreGrid.tsx` **NOVO** — grid de 4 KPIs por unidade (estilo do mockup)
-- `shared/MetaInteractiveChart.tsx` **NOVO** — wrapper recharts com tooltip touch-friendly + responsive
-
-### 3. Componente `Sixmonths` — comparativo da loja do usuário
-Props: `metaCode`, `unidadeId` (vem de `useUnidade().effectiveUnidadeId`), `mes` (atual).
-
-Faz uma única query agregando os 6 meses retroativos para a unidade. Calcula:
-- Valor do mês atual
-- Melhor mês (maior/menor conforme polaridade da meta)
-- Pior mês (oposto)
-- Variação % atual vs. melhor / vs. pior
-
-Renderiza:
+**Defaults de turno** (`gridShortcuts.ts`):
+```ts
+export const SHIFT_FALLBACKS = {
+  T1: { start_time: '11:00', end_time: '15:20', break_duration: 0 },
+  T2: { start_time: '18:00', end_time: '23:00', break_duration: 0 },
+  T3: { start_time: '11:00', end_time: '23:00', break_duration: 60 },
+  meia: { start_time: '11:00', end_time: '15:00', break_duration: 0 },
+};
+export function resolveShiftDefaults(type, shiftsFromDb) { /* db first, fallback second */ }
 ```
-┌──────────────────────────────────────────────────┐
-│ Sua loja · Últimos 6 meses · CMV Salmão          │
-├──────────────┬───────────────┬───────────────────┤
-│ ATUAL Abr/26 │ MELHOR Fev/26 │ PIOR Dez/25       │
-│  1.71kg      │  1.52kg ✓     │  1.94kg ✗         │
-│              │  -11% vs atual│  +13% vs atual    │
-├──────────────┴───────────────┴───────────────────┤
-│ [sparkline interativo 6 meses com pontos clicáveis] │
-└──────────────────────────────────────────────────┘
-```
-Usa `recharts.AreaChart` com gradiente coral, dot ativo destacando mês atual, tooltip touch-friendly.
 
-### 4. Fonte de dados por meta
-Cada `view` usa as tabelas já existentes — nada novo no banco:
+---
 
-| Meta | Tabela principal | Polaridade |
-|---|---|---|
-| NPS Salão / Delivery | `reclamacoes` + `store_performance_entries` | maior R$/reclam = melhor |
-| CMV Salmão | `cmv_contagens` + `store_performance_entries` (kg/R$1k) | menor = melhor |
-| CMV Carnes | `cmv_camara` / `cmv_movements` (% desvio) | menor = melhor |
-| KDS · Tempo Prato | `avaliacoes` (codigo_meta=`tempo_prato`) | maior % OK = melhor |
-| Conformidade | `leadership_store_scores` + `audit_sector_scores` | maior = melhor |
-| Red Flag | `leadership_calculation_log` + `leadership_performance_scores` | menos = melhor |
+### O que NÃO será feito (escopo travado)
 
-Helper `metaPolarity[code]: 'higher' | 'lower'` decide qual extremo é "melhor" no ranking e no comparativo 6M.
+- Não recria células nem componentes visuais.
+- Não altera schema, RLS, ou cria novas tabelas.
+- Não muda cores de turno, layout ou tipografia.
+- Não adiciona libs externas.
+- Não toca em `MobileScheduler` nem em outras abas.
 
-### 5. Visual interativo & responsivo (touch)
-- **Recharts** já está no projeto — adicionar `BarChart`, `AreaChart`, `RadialBarChart` onde fizer sentido.
-- Tooltips: `<Tooltip wrapperStyle={{ touchAction: 'none' }} />` + `cursor={{ stroke }}` para dedo grosso.
-- Cards com `hover-lift` + `glass-card` (já existem). Ranking rows com medalhas (ouro/prata/bronze) reaproveitando classes do mockup mas em tokens semânticos.
-- Mobile-first: sidebar interna vira drawer, KPIs em 2 colunas, gráficos em 1 coluna full-width, swipe horizontal para tabela de heatmap.
-- Banner "Red Flag ativa" no topo do Visão Geral, igual ao mockup, lendo `leadership_calculation_log` do mês.
+---
 
-### 6. Motores de importação — preservados
-Nada se mexe em:
-- `AiImportSection`, `MultiLinkSheetsSync`, `LegacySyncPanel`
-- Edge functions `cron-import-sheets`, `sync-google-sheets`, `extract-*`
-- `HoldingCentralTab`, `DiarioView` continuam acessíveis (sidebar group "Admin" só visível para admin/operator).
+### Entrega
 
-## Detalhes técnicos
+Ao fim, ficará disponível na grade existente:
+- Edição estilo planilha com teclado.
+- Aplicação de turnos em massa via 1/2/3/m/f.
+- Copy/paste/cut com geometria preservada.
+- Undo/Redo (50 níveis).
+- Navegação Ctrl+← / Ctrl+→ entre semanas.
 
-- Sem mudanças de schema. Tudo já existe em `leadership_store_scores`, `reclamacoes`, `cmv_*`, `avaliacoes`, `supervision_audits`.
-- `useUnidade()` continua sendo SSOT da loja do usuário; admin sem unidade vê o bloco "Sua Loja · 6 meses" com seletor local de loja.
-- Query keys versionadas: `["painel", metaCode, mes, unidadeId]` para evitar cache cross-meta.
-- `Date handling`: continuar `YYYY-MM` puro (memoria já registrada).
-- Acessibilidade: `aria-current="page"` na meta ativa, `aria-label` em ranking medalhas, foco visível em cards interativos.
-- Performance: cada view é code-split via `React.lazy` para o root carregar leve.
-
-## Resultado esperado
-
-Ao abrir o Painel de Metas:
-1. Sidebar interna lista cada indicador como "página" individual (estilo mockup HTML).
-2. Cada meta tem KPIs por loja, ranking comparativo entre lojas e gráficos interativos do mês selecionado.
-3. Quando o usuário (não-admin) entra numa meta, vê **abaixo do conteúdo de rede** um bloco "Sua Loja · Últimos 6 meses" comparando seu mês atual com o melhor e o pior dos últimos 6 meses **da própria loja**.
-4. Visual coerente com o restante do portal (Liquid Glass, coral, sem emojis), gráficos responsivos a toque e sem perder nenhum recurso atual de importação.
+Arquivos finais modificados:
+- `src/components/escalas/ManualScheduleGrid.tsx` (integração)
+- `src/components/escalas/grid/useGridSelection.ts` (novo)
+- `src/components/escalas/grid/gridShortcuts.ts` (novo)

@@ -1229,7 +1229,14 @@ export function ManualScheduleGrid() {
                   onKeyDown={handleGridKeyDown}
                   onMouseDown={() => focusGrid()}
                 >
-                  <div className="px-3 pb-2 flex justify-end">
+                  <div className="px-3 pb-2 flex justify-end gap-2">
+                    <ScheduleAIGenerator
+                      unitId={selectedUnit}
+                      sectorId={activeSectorId}
+                      sectorName={sectors.find((s) => s.id === activeSectorId)?.name ?? "Setor"}
+                      weekStart={weekStart}
+                      onApplyProposal={applyAIProposal}
+                    />
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">

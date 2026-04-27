@@ -299,6 +299,118 @@
   .hover-lift { @apply transition-all duration-300; }
   .hover-lift:hover { @apply -translate-y-0.5; box-shadow: var(--shadow-md); }
 
+  /* ─── DRAG & DROP — Liquid Glass ─── */
+
+  /* Card "fantasma" deixado na origem enquanto arrasta */
+  .drag-ghost {
+    opacity: 0.35;
+    transform: scale(0.97);
+    filter: blur(0.5px) saturate(0.7);
+    border-style: dashed !important;
+    border-color: hsl(var(--primary) / 0.4) !important;
+    box-shadow: none !important;
+    transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Card flutuante renderizado dentro do DragOverlay */
+  .drag-overlay-card {
+    cursor: grabbing !important;
+    transform: rotate(-2deg) scale(1.04);
+    box-shadow:
+      0 24px 48px -12px hsl(var(--primary) / 0.35),
+      0 8px 24px -8px rgba(0, 0, 0, 0.18),
+      0 0 0 1px hsl(var(--primary) / 0.25),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    animation: overlayPickup 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes overlayPickup {
+    from { transform: rotate(0deg) scale(1); box-shadow: var(--shadow-card); }
+    to   { transform: rotate(-2deg) scale(1.04); }
+  }
+
+  /* Coluna alvo em estado de drop */
+  .drop-zone-active {
+    background: hsl(var(--primary) / 0.04) !important;
+    box-shadow:
+      inset 0 0 0 1.5px hsl(var(--primary) / 0.45),
+      inset 0 0 32px hsl(var(--primary) / 0.06),
+      var(--shadow-md);
+    animation: dropZonePulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes dropZonePulse {
+    0%, 100% { box-shadow:
+      inset 0 0 0 1.5px hsl(var(--primary) / 0.45),
+      inset 0 0 32px hsl(var(--primary) / 0.06),
+      var(--shadow-md);
+    }
+    50% { box-shadow:
+      inset 0 0 0 1.5px hsl(var(--primary) / 0.65),
+      inset 0 0 40px hsl(var(--primary) / 0.10),
+      var(--shadow-lg);
+    }
+  }
+
+  /* Placeholder ghost (slot reservado) */
+  .drop-placeholder {
+    border: 1.5px dashed hsl(var(--primary) / 0.5);
+    background: linear-gradient(
+      90deg,
+      hsl(var(--primary) / 0.04) 0%,
+      hsl(var(--primary) / 0.10) 50%,
+      hsl(var(--primary) / 0.04) 100%
+    );
+    background-size: 200% 100%;
+    border-radius: calc(var(--radius));
+    animation:
+      placeholderExpand 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards,
+      ghostShimmer 1.8s ease-in-out infinite;
+  }
+
+  @keyframes placeholderExpand {
+    from { height: 0; opacity: 0; margin-top: 0; }
+    to   { height: 84px; opacity: 1; margin-top: 0; }
+  }
+
+  @keyframes ghostShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  /* Card aterrissando após drop */
+  .drag-landing {
+    animation: landingPulse 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes landingPulse {
+    0%   { transform: scale(1.06); box-shadow: 0 12px 24px -8px hsl(var(--primary) / 0.4); }
+    60%  { transform: scale(0.98); }
+    100% { transform: scale(1); box-shadow: var(--shadow-card); }
+  }
+
+  /* Estado global durante drag */
+  body.is-dragging,
+  body.is-dragging * {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+  body.is-dragging .drag-column-dim {
+    opacity: 0.78;
+    transition: opacity 200ms ease-out;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .drop-zone-active,
+    .drop-placeholder,
+    .drag-overlay-card,
+    .drag-landing {
+      animation: none !important;
+    }
+  }
+
   /* Scrollbar hide */
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   .scrollbar-hide::-webkit-scrollbar { display: none; }

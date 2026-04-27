@@ -1,87 +1,60 @@
-# Plano: etiqueta de prioridade + glassmorphism na Agenda do Líder
+## Problema
 
-Dois ajustes visuais coordenados, mantendo o sistema de design Apple Liquid Glass que já existe no projeto (`.glass-card`, `.glass-card-strong`, tokens `--glass-*`).
+Hoje o drag & drop do board (Kanban) usa apenas `opacity-50` no card sendo arrastado e um `ring` simples na coluna alvo. Não há `DragOverlay` (o card "voa" sem peso visual), nem feedback de drop, nem reordenação suave. Visual fraco para um portal com identidade Liquid Glass.
 
----
+## Objetivo
 
-## 1. Etiqueta lateral colorida por prioridade
+Transformar o arrasto numa interação fluida estilo Apple/Linear: o card "destaca" do board, ganha sombra/glow coral, gira levemente, a coluna de destino "respira" e os outros cards "abrem espaço". Ao soltar, animação de encaixe satisfatória.
 
-Hoje, o único indicador de prioridade nos cards é a tag `[ALTA]` no canto superior direito. Pouco visível à distância.
+## O que será feito
 
-**Ideia:** adicionar uma **barra vertical colorida** (4px) na borda esquerda do card, na cor da prioridade — exatamente como Notion / Things / Linear marcam itens. A tag textual continua existindo, mas a leitura primária passa a ser a etiqueta lateral.
+### 1. `DragOverlay` (dnd-kit) no `MissoesBoardView`
+Substituir o transform local do card original por um `<DragOverlay>` que renderiza uma cópia "flutuante" do card durante o arrasto:
+- Card original fica como "fantasma" (opacidade 0.35, escala 0.97, blur leve, borda tracejada coral) — marca o lugar de origem.
+- Overlay renderiza o card em escala 1.05, com `rotate(-2deg)`, sombra coral forte (`--shadow-primary`), glass-card-strong, cursor grabbing.
+- Animação suave de entrada/saída do overlay (`scale-in` 200ms easing Apple).
 
-```text
-┌──┬───────────────────────────────┐
-│██│ TÍTULO DA MISSÃO       [ALTA] │   ← faixa vermelha = alta
-│██│ descrição curta…              │
-│██│ 👤 Responsável        📅 27/04│
-└──┴───────────────────────────────┘
+### 2. Coluna alvo (`MissaoColumn`) com feedback "respiração"
+Quando `isOver = true`:
+- Background ganha tint coral suave (`bg-primary/[0.04]`), borda coral pulsante.
+- Barra de status lateral expande de 3px para 5px com transição.
+- Aparece um **placeholder ghost** (linha tracejada animada) onde o card será inserido — usando um div que se expande de altura 0 → ~92px com `cubic-bezier(0.16, 1, 0.3, 1)`.
+- Sutil shadow inset coral para indicar "zona de drop".
 
-┌──┬───────────────────────────────┐
-│██│ outra missão          [MÉDIA] │   ← faixa âmbar = média
-└──┴───────────────────────────────┘
+### 3. Cards vizinhos cedem espaço
+Adicionar transição `transition-transform duration-200` em cada card da coluna. Como a placeholder ghost ocupa altura ao entrar, os cards abaixo deslizam naturalmente para baixo (efeito gratuito do layout flex + transição).
 
-┌──┬───────────────────────────────┐
-│██│ tarefa simples        [BAIXA] │   ← faixa verde = baixa
-└──┴───────────────────────────────┘
-```
+### 4. Animação de "drop / encaixe"
+Ao soltar (`onDragEnd`), o card aterrissa na nova coluna com:
+- Animação `landingPulse`: scale 1.06 → 1.0 com bounce suave (250ms), borda coral piscando uma vez.
+- Pequeno destaque do priority accent bar (largura 4px → 6px → 4px).
 
-**Cores (já usadas no `PRIORIDADE_MAP`):**
-- Alta → `bg-destructive` (vermelho coral)
-- Média → `bg-amber-500`
-- Baixa → `bg-emerald-500`
+### 5. Ajustes visuais durante drag global
+- `body` ganha classe `is-dragging` (cursor grabbing forçado, `user-select: none`).
+- Demais colunas reduzem opacidade levemente para 0.85 (foca atenção na coluna alvo).
+- Sensor com `activationConstraint: { distance: 8 }` para não disparar em clicks acidentais.
 
-**Onde aplicar a faixa:**
-- `MissaoCardCompact.tsx` (board Kanban) — principal
-- `MissoesPreviewCard.tsx` (chat IA) — espelha o board
-- Cartões da `MeuPainelView.tsx` e `DiretoriaView.tsx` (se exibirem missão como card)
-- Chips da agenda unificada (`CalendarChip`) — versão ultra-fina (2px) para não poluir o calendário
-
-**Implementação técnica:**
-- Novo helper em `shared/Badges.tsx`: `prioridadeAccent(prioridade)` que devolve a classe da cor (ex: `bg-destructive`, `bg-amber-500`, `bg-emerald-500`).
-- No card: wrapper `relative overflow-hidden` + `<span className="absolute inset-y-0 left-0 w-1 {accent}" />` com padding-left ajustado.
-
----
-
-## 2. Glassmorphism / Liquid Glass nos componentes da Agenda do Líder
-
-O projeto já tem o sistema pronto em `index.css` (`.glass-card`, `.glass-card-strong`, `.glass-header`). Hoje a Agenda do Líder usa `Card` padrão sólido. Vou trocar pelos utilitários glass para alinhar com o resto da plataforma.
-
-**Substituições:**
-
-| Componente | Antes | Depois |
-|---|---|---|
-| Hero header da aba (`AgendaLiderTab`) | `Card border-primary/20 bg-gradient-to-r from-primary/5 ...` | `glass-card-strong` + leve gradient overlay coral |
-| Cards do Kanban (`MissaoCardCompact`) | `bg-card/80` | `glass-card` + faixa de prioridade lateral + hover-lift |
-| Colunas do board (`MissaoColumn`) | `border-2 border-dashed bg-...` | `glass-card` sutil (blur menor, border-subtle), drop-zone destacada com `ring-primary/40` |
-| Header/controles da Agenda Unificada | `Card p-3` sólido | `glass-card-strong` |
-| Grid Mês / Semana | `Card overflow-hidden p-0` | `glass-card` + cabeçalho dos dias com `bg-white/40 backdrop-blur` |
-| Lista da agenda | `Card p-0` | `glass-card` |
-| Chat IA (`MissoesChatView`) — bolhas de mensagem do assistente | sólidas | `glass-card` com blur sutil |
-
-**Refinamentos visuais alinhados ao Apple LG:**
-- Bordas com `border-top-color` mais claro (efeito de luz vinda de cima) — já está no `.glass-card`.
-- `hover-lift` (utility já existente) nos cards do board para resposta de toque.
-- Animação `fade-in` ao abrir cada aba (já existente).
-- Manter `font-feature-settings` e `tabular-nums` para números (já no `body`).
-
----
+### 6. Novos keyframes em `src/index.css`
+- `@keyframes landingPulse` — bounce de aterrissagem.
+- `@keyframes dropZonePulse` — borda coral pulsante na coluna alvo.
+- `@keyframes ghostShimmer` — placeholder com shimmer suave.
+- Utilities: `.drag-ghost`, `.drop-zone-active`, `.drag-overlay-card`, `.is-dragging`.
 
 ## Arquivos a modificar
 
-- `src/components/agenda-lider/shared/Badges.tsx` — exportar helper `prioridadeAccent()`
-- `src/components/agenda-lider/board/MissaoCardCompact.tsx` — faixa lateral + `glass-card`
-- `src/components/agenda-lider/board/MissaoColumn.tsx` — `glass-card` sutil
-- `src/components/agenda-lider/board/MissoesBoardView.tsx` — espaçamentos
-- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` — faixa lateral + `glass-card`
-- `src/components/agenda-lider/chat/MissoesChatView.tsx` — bolhas glass
-- `src/components/agenda-lider/agenda/AgendaUnificadaView.tsx` — header, grid e chips em glass + faixa fina nos chips de missão
-- `src/components/agenda-lider/AgendaLiderTab.tsx` — hero `glass-card-strong`
-- `src/components/agenda-lider/meu-painel/MeuPainelView.tsx` — cards em glass + faixa
-- `src/components/agenda-lider/diretoria/DiretoriaView.tsx` — cards em glass + faixa
+- `src/components/agenda-lider/board/MissoesBoardView.tsx` — adicionar `DragOverlay`, estado `activeMissao`, listeners `onDragStart` / `onDragCancel`, classe `is-dragging` no body.
+- `src/components/agenda-lider/board/MissaoCardCompact.tsx` — modo `ghost` (origem) vs `overlay` (flutuante) vs normal; aplicar landing pulse via key remount após drop.
+- `src/components/agenda-lider/board/MissaoColumn.tsx` — placeholder ghost animado, expansão da barra lateral, tint coral, shadow inset.
+- `src/index.css` — novos keyframes e utilities listados acima.
 
-Sem mudanças de schema, sem novas dependências — apenas CSS/utilitários já existentes.
+## Notas técnicas
 
----
+- `DragOverlay` do dnd-kit já posiciona automaticamente seguindo o cursor — não precisamos calcular `transform` manual no card original.
+- Placeholder ghost é renderizado **só quando** `isOver && activeMissao && activeMissao.status !== status` (não mostra na coluna de origem).
+- Todas as transições usam `cubic-bezier(0.16, 1, 0.3, 1)` (easing Apple já presente no projeto) para coerência.
+- Respeitar `prefers-reduced-motion`: animações de pulse/shimmer ficam estáticas se o usuário preferir.
+- Sem mudanças em hooks, dados ou RLS — puramente visual/UX.
 
-Posso aplicar?
+## Resultado esperado
+
+Arrastar um card vai parecer "destacar uma etiqueta de papel encerada": o card sobe com sombra coral e leve rotação, as outras colunas recuam de foco, a coluna alvo "respira" e abre uma fenda tracejada, e ao soltar o card "aterrissa" com um pulse satisfatório. Coerente com o restante do Liquid Glass do portal.

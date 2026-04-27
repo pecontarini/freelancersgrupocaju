@@ -180,6 +180,11 @@ export function CMVTab() {
           )}
         </TabsContent>
 
+        {/* ====== ABA: IA CMV (Análise de desvio + plano de ação) ====== */}
+        <TabsContent value="ia" className="space-y-6">
+          <CMVAIAssistant />
+        </TabsContent>
+
         {/* ====== ABA: KARDEX (Timeline de Movimentação) ====== */}
         <TabsContent value="kardex" className="space-y-6">
           {!effectiveUnidadeId ? (

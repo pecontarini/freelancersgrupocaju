@@ -21,6 +21,7 @@ import {
   Link2,
   ArrowRight,
   Briefcase,
+  Keyboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -1201,16 +1202,72 @@ export function ManualScheduleGrid() {
                   onKeyDown={handleGridKeyDown}
                   onMouseDown={() => focusGrid()}
                 >
-                  <div className="px-3 pb-2 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 uppercase tracking-wide">
-                    <span><kbd className="px-1 rounded bg-muted">1</kbd>/<kbd className="px-1 rounded bg-muted">2</kbd>/<kbd className="px-1 rounded bg-muted">3</kbd> turno</span>
-                    <span><kbd className="px-1 rounded bg-muted">M</kbd> meia</span>
-                    <span><kbd className="px-1 rounded bg-muted">F</kbd> folga</span>
-                    <span><kbd className="px-1 rounded bg-muted">Del</kbd> apagar</span>
-                    <span><kbd className="px-1 rounded bg-muted">Enter</kbd>/dbl-clk editar</span>
-                    <span><kbd className="px-1 rounded bg-muted">Ctrl+C/X/V</kbd></span>
-                    <span><kbd className="px-1 rounded bg-muted">Ctrl+Z/Y</kbd></span>
-                    <span><kbd className="px-1 rounded bg-muted">Ctrl+←/→</kbd> semana</span>
+                  <div className="px-3 pb-2 flex justify-end">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                          <Keyboard className="h-3.5 w-3.5" />
+                          Atalhos
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-72 p-3">
+                        <div className="text-xs font-semibold mb-2 uppercase tracking-wide text-muted-foreground">
+                          Dicionário de atalhos
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Aplicar turno</span>
+                            <span className="flex gap-1">
+                              <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">1</kbd>
+                              <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">2</kbd>
+                              <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">3</kbd>
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Meia jornada</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">M</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Folga</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">F</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Apagar célula</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Del</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Editar célula</span>
+                            <span className="flex gap-1">
+                              <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Enter</kbd>
+                              <span className="text-muted-foreground">/ duplo-clique</span>
+                            </span>
+                          </div>
+                          <div className="my-2 border-t" />
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Copiar / Recortar / Colar</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Ctrl+C/X/V</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Desfazer / Refazer</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Ctrl+Z/Y</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Trocar semana</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Ctrl+←/→</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Selecionar tudo</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Ctrl+A</kbd>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Selecionar área</span>
+                            <kbd className="px-1.5 py-0.5 rounded bg-muted font-mono">Shift+Setas</kbd>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
                   <Table>
                     <TableHeader>
                       <TableRow>

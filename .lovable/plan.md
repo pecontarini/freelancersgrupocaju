@@ -1,60 +1,124 @@
-## Problema
-
-Hoje o drag & drop do board (Kanban) usa apenas `opacity-50` no card sendo arrastado e um `ring` simples na coluna alvo. Não há `DragOverlay` (o card "voa" sem peso visual), nem feedback de drop, nem reordenação suave. Visual fraco para um portal com identidade Liquid Glass.
-
 ## Objetivo
 
-Transformar o arrasto numa interação fluida estilo Apple/Linear: o card "destaca" do board, ganha sombra/glow coral, gira levemente, a coluna de destino "respira" e os outros cards "abrem espaço". Ao soltar, animação de encaixe satisfatória.
+Reformular o **Painel de Metas** para se aproximar do mockup HTML enviado: navegação lateral por indicador (uma "página" por meta), dashboard executivo com mapa de calor + ranking entre lojas, KPIs por unidade e — quando o usuário acessa uma meta específica — uma seção comparativa dos **últimos 6 meses limitada à loja do usuário** (mês atual vs. melhor mês vs. pior mês).
 
-## O que será feito
+Mantém-se intacto todo o motor de importação (Sheets, NFe, manual, etc.) — só muda a camada de visualização.
 
-### 1. `DragOverlay` (dnd-kit) no `MissoesBoardView`
-Substituir o transform local do card original por um `<DragOverlay>` que renderiza uma cópia "flutuante" do card durante o arrasto:
-- Card original fica como "fantasma" (opacidade 0.35, escala 0.97, blur leve, borda tracejada coral) — marca o lugar de origem.
-- Overlay renderiza o card em escala 1.05, com `rotate(-2deg)`, sombra coral forte (`--shadow-primary`), glass-card-strong, cursor grabbing.
-- Animação suave de entrada/saída do overlay (`scale-in` 200ms easing Apple).
+## Arquitetura nova
 
-### 2. Coluna alvo (`MissaoColumn`) com feedback "respiração"
-Quando `isOver = true`:
-- Background ganha tint coral suave (`bg-primary/[0.04]`), borda coral pulsante.
-- Barra de status lateral expande de 3px para 5px com transição.
-- Aparece um **placeholder ghost** (linha tracejada animada) onde o card será inserido — usando um div que se expande de altura 0 → ~92px com `cubic-bezier(0.16, 1, 0.3, 1)`.
-- Sutil shadow inset coral para indicar "zona de drop".
+```text
+PainelMetasTab
+├─ Sidebar interna (lista de "metas" — atual: tabs no topo)
+│   ├─ Visão Geral (Dashboard Executivo)
+│   ├─ NPS & Reclamações
+│   ├─ CMV Salmão
+│   ├─ CMV Carnes
+│   ├─ KDS · Tempo de Prato
+│   ├─ Conformidade
+│   ├─ Red Flag
+│   └─ Planos de Ação
+│   (Holding/Diário só p/ admin)
+│
+├─ Header de página (título + período + ação IA opcional)
+│
+└─ Conteúdo da meta selecionada
+     ├─ Bloco A: KPIs por loja (rede inteira, 4 cards)
+     ├─ Bloco B: Ranking comparativo entre lojas (sortable)
+     ├─ Bloco C: Gráficos interativos do mês (recharts)
+     └─ Bloco D — NOVO: "Sua Loja · Últimos 6 meses"
+            • aparece SOMENTE em páginas de meta individual
+            • limitado à `useUnidade().effectiveUnidadeId`
+            • mostra: valor mês atual + melhor mês + pior mês + sparkline
+```
 
-### 3. Cards vizinhos cedem espaço
-Adicionar transição `transition-transform duration-200` em cada card da coluna. Como a placeholder ghost ocupa altura ao entrar, os cards abaixo deslizam naturalmente para baixo (efeito gratuito do layout flex + transição).
+## Mudanças por arquivo
 
-### 4. Animação de "drop / encaixe"
-Ao soltar (`onDragEnd`), o card aterrissa na nova coluna com:
-- Animação `landingPulse`: scale 1.06 → 1.0 com bounce suave (250ms), borda coral piscando uma vez.
-- Pequeno destaque do priority accent bar (largura 4px → 6px → 4px).
+### 1. `src/components/dashboard/PainelMetasTab.tsx` — refatorar root
+- Substituir `<Tabs>` horizontal por layout 2 colunas: **sidebar interna** (esquerda, ~220px desktop / drawer no mobile) + **conteúdo** (direita).
+- Sidebar usa `glass-card` com lista vertical agrupada ("Visão Geral", "Indicadores", "Gestão"), cada item com ícone `lucide-react` colorido (sem emoji), label, e um dot de status quando há red flag ativa.
+- No mobile, sidebar vira `Sheet` aberto via botão "Metas ▾" no topo do header.
+- Estado da meta atual via `useState<MetaKey>("visao-geral")`; query string opcional `?meta=cmv-salmao` para deep-link.
 
-### 5. Ajustes visuais durante drag global
-- `body` ganha classe `is-dragging` (cursor grabbing forçado, `user-select: none`).
-- Demais colunas reduzem opacidade levemente para 0.85 (foca atenção na coluna alvo).
-- Sensor com `activationConstraint: { distance: 8 }` para não disparar em clicks acidentais.
+### 2. `src/components/dashboard/painel-metas/` — extrair subviews (novo diretório)
+Quebrar o arquivo de 2047 linhas em módulos enxutos:
+- `PainelSidebar.tsx` — navegação interna
+- `MetaPageHeader.tsx` — título + seletor de mês + botão IA
+- `views/VisaoGeralView.tsx` (atual, refinada com gráficos)
+- `views/NpsView.tsx` (atual, refinada)
+- `views/CmvSalmaoView.tsx` **NOVO**
+- `views/CmvCarnesView.tsx` **NOVO**
+- `views/KdsView.tsx` **NOVO** (extrai bloco KDS de Conformidade hoje)
+- `views/ConformidadeView.tsx` (existe, refinada)
+- `views/RedFlagView.tsx` **NOVO**
+- `views/PlanosView.tsx` (existe, mantida)
+- `shared/Sixmonths.tsx` **NOVO** — componente reutilizável "Sua Loja · 6 meses"
+- `shared/RankingCard.tsx` **NOVO** — ranking comparativo entre lojas com medalhas 1/2/3
+- `shared/KpiByStoreGrid.tsx` **NOVO** — grid de 4 KPIs por unidade (estilo do mockup)
+- `shared/MetaInteractiveChart.tsx` **NOVO** — wrapper recharts com tooltip touch-friendly + responsive
 
-### 6. Novos keyframes em `src/index.css`
-- `@keyframes landingPulse` — bounce de aterrissagem.
-- `@keyframes dropZonePulse` — borda coral pulsante na coluna alvo.
-- `@keyframes ghostShimmer` — placeholder com shimmer suave.
-- Utilities: `.drag-ghost`, `.drop-zone-active`, `.drag-overlay-card`, `.is-dragging`.
+### 3. Componente `Sixmonths` — comparativo da loja do usuário
+Props: `metaCode`, `unidadeId` (vem de `useUnidade().effectiveUnidadeId`), `mes` (atual).
 
-## Arquivos a modificar
+Faz uma única query agregando os 6 meses retroativos para a unidade. Calcula:
+- Valor do mês atual
+- Melhor mês (maior/menor conforme polaridade da meta)
+- Pior mês (oposto)
+- Variação % atual vs. melhor / vs. pior
 
-- `src/components/agenda-lider/board/MissoesBoardView.tsx` — adicionar `DragOverlay`, estado `activeMissao`, listeners `onDragStart` / `onDragCancel`, classe `is-dragging` no body.
-- `src/components/agenda-lider/board/MissaoCardCompact.tsx` — modo `ghost` (origem) vs `overlay` (flutuante) vs normal; aplicar landing pulse via key remount após drop.
-- `src/components/agenda-lider/board/MissaoColumn.tsx` — placeholder ghost animado, expansão da barra lateral, tint coral, shadow inset.
-- `src/index.css` — novos keyframes e utilities listados acima.
+Renderiza:
+```
+┌──────────────────────────────────────────────────┐
+│ Sua loja · Últimos 6 meses · CMV Salmão          │
+├──────────────┬───────────────┬───────────────────┤
+│ ATUAL Abr/26 │ MELHOR Fev/26 │ PIOR Dez/25       │
+│  1.71kg      │  1.52kg ✓     │  1.94kg ✗         │
+│              │  -11% vs atual│  +13% vs atual    │
+├──────────────┴───────────────┴───────────────────┤
+│ [sparkline interativo 6 meses com pontos clicáveis] │
+└──────────────────────────────────────────────────┘
+```
+Usa `recharts.AreaChart` com gradiente coral, dot ativo destacando mês atual, tooltip touch-friendly.
 
-## Notas técnicas
+### 4. Fonte de dados por meta
+Cada `view` usa as tabelas já existentes — nada novo no banco:
 
-- `DragOverlay` do dnd-kit já posiciona automaticamente seguindo o cursor — não precisamos calcular `transform` manual no card original.
-- Placeholder ghost é renderizado **só quando** `isOver && activeMissao && activeMissao.status !== status` (não mostra na coluna de origem).
-- Todas as transições usam `cubic-bezier(0.16, 1, 0.3, 1)` (easing Apple já presente no projeto) para coerência.
-- Respeitar `prefers-reduced-motion`: animações de pulse/shimmer ficam estáticas se o usuário preferir.
-- Sem mudanças em hooks, dados ou RLS — puramente visual/UX.
+| Meta | Tabela principal | Polaridade |
+|---|---|---|
+| NPS Salão / Delivery | `reclamacoes` + `store_performance_entries` | maior R$/reclam = melhor |
+| CMV Salmão | `cmv_contagens` + `store_performance_entries` (kg/R$1k) | menor = melhor |
+| CMV Carnes | `cmv_camara` / `cmv_movements` (% desvio) | menor = melhor |
+| KDS · Tempo Prato | `avaliacoes` (codigo_meta=`tempo_prato`) | maior % OK = melhor |
+| Conformidade | `leadership_store_scores` + `audit_sector_scores` | maior = melhor |
+| Red Flag | `leadership_calculation_log` + `leadership_performance_scores` | menos = melhor |
+
+Helper `metaPolarity[code]: 'higher' | 'lower'` decide qual extremo é "melhor" no ranking e no comparativo 6M.
+
+### 5. Visual interativo & responsivo (touch)
+- **Recharts** já está no projeto — adicionar `BarChart`, `AreaChart`, `RadialBarChart` onde fizer sentido.
+- Tooltips: `<Tooltip wrapperStyle={{ touchAction: 'none' }} />` + `cursor={{ stroke }}` para dedo grosso.
+- Cards com `hover-lift` + `glass-card` (já existem). Ranking rows com medalhas (ouro/prata/bronze) reaproveitando classes do mockup mas em tokens semânticos.
+- Mobile-first: sidebar interna vira drawer, KPIs em 2 colunas, gráficos em 1 coluna full-width, swipe horizontal para tabela de heatmap.
+- Banner "Red Flag ativa" no topo do Visão Geral, igual ao mockup, lendo `leadership_calculation_log` do mês.
+
+### 6. Motores de importação — preservados
+Nada se mexe em:
+- `AiImportSection`, `MultiLinkSheetsSync`, `LegacySyncPanel`
+- Edge functions `cron-import-sheets`, `sync-google-sheets`, `extract-*`
+- `HoldingCentralTab`, `DiarioView` continuam acessíveis (sidebar group "Admin" só visível para admin/operator).
+
+## Detalhes técnicos
+
+- Sem mudanças de schema. Tudo já existe em `leadership_store_scores`, `reclamacoes`, `cmv_*`, `avaliacoes`, `supervision_audits`.
+- `useUnidade()` continua sendo SSOT da loja do usuário; admin sem unidade vê o bloco "Sua Loja · 6 meses" com seletor local de loja.
+- Query keys versionadas: `["painel", metaCode, mes, unidadeId]` para evitar cache cross-meta.
+- `Date handling`: continuar `YYYY-MM` puro (memoria já registrada).
+- Acessibilidade: `aria-current="page"` na meta ativa, `aria-label` em ranking medalhas, foco visível em cards interativos.
+- Performance: cada view é code-split via `React.lazy` para o root carregar leve.
 
 ## Resultado esperado
 
-Arrastar um card vai parecer "destacar uma etiqueta de papel encerada": o card sobe com sombra coral e leve rotação, as outras colunas recuam de foco, a coluna alvo "respira" e abre uma fenda tracejada, e ao soltar o card "aterrissa" com um pulse satisfatório. Coerente com o restante do Liquid Glass do portal.
+Ao abrir o Painel de Metas:
+1. Sidebar interna lista cada indicador como "página" individual (estilo mockup HTML).
+2. Cada meta tem KPIs por loja, ranking comparativo entre lojas e gráficos interativos do mês selecionado.
+3. Quando o usuário (não-admin) entra numa meta, vê **abaixo do conteúdo de rede** um bloco "Sua Loja · Últimos 6 meses" comparando seu mês atual com o melhor e o pior dos últimos 6 meses **da própria loja**.
+4. Visual coerente com o restante do portal (Liquid Glass, coral, sem emojis), gráficos responsivos a toque e sem perder nenhum recurso atual de importação.

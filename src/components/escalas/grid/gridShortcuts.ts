@@ -6,6 +6,8 @@ export type ShortcutPatch = {
   start_time?: string | null;
   end_time?: string | null;
   break_duration?: number;
+  agreed_rate?: number;
+  praca_id?: string | null;
 };
 
 // Fallback fixos quando não há registro em `shifts` para a unidade

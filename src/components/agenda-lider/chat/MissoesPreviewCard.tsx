@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Check, User } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrioridadeBadge } from "../shared/Badges";
+import { PrioridadeBadge, PrioridadeAccentBar } from "../shared/Badges";
 import type { UnidadeMembro } from "@/hooks/useUnidadeMembros";
 import type { MissaoPrioridade } from "@/hooks/useMissoes";
 import { cn } from "@/lib/utils";
@@ -133,6 +132,6 @@ export function MissoesPreviewCard({
           })}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

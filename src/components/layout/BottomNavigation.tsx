@@ -88,13 +88,6 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                     <Button
                       variant="ghost"
                       className="w-full justify-start"
-                      onClick={() => onTabChange("cx")}
-                    >
-                      Dores da Operação
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
                       onClick={() => onTabChange("configuracoes")}
                     >
                       Configurações
@@ -217,13 +210,6 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 </Button>
                 {isAdmin && (
                   <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-12"
-                      onClick={() => onTabChange("cx")}
-                    >
-                      Dores da Operação
-                    </Button>
                     <Button
                       variant="outline"
                       className="w-full justify-start h-12"

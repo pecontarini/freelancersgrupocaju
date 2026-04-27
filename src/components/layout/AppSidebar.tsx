@@ -10,7 +10,7 @@ import {
   User,
   ChevronRight,
   ClipboardCheck,
-  AlertTriangle,
+  
   BarChart2,
   Users,
   LayoutGrid,
@@ -81,12 +81,6 @@ const menuItems = [
 ];
 
 const adminMenuItems = [
-  {
-    title: "DORES DA OPERAÇÃO",
-    id: "cx",
-    icon: AlertTriangle,
-    description: "Gestão centralizada de CX",
-  },
   {
     title: "CONFIGURAÇÕES",
     id: "configuracoes",

@@ -18,7 +18,7 @@ import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnostic
 import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
-import { AdminCXDashboard } from "@/components/dashboard/AdminCXDashboard";
+
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
@@ -52,10 +52,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
-  },
-  cx: {
-    title: "Dores da Operação",
-    subtitle: "Gestão centralizada de reclamações por unidade",
   },
   cmv: {
     title: "CMV (Unitários)",
@@ -261,8 +257,6 @@ const Index = () => {
             isAdmin={isAdmin}
           />
         );
-      case "cx":
-        return isAdmin ? <AdminCXDashboard /> : null;
       case "cmv":
         return <CMVTab />;
       case "escalas":

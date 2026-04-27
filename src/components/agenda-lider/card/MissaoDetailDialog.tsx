@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Trash2, UserPlus, X } from "lucide-react";
+import { CalendarPlus, CalendarCheck2, CalendarX2, Loader2, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useMissaoDetalhe } from "@/hooks/useMissaoDetalhe";
 import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSyncMissaoCalendar } from "@/hooks/useSyncMissaoCalendar";
 import { PrioridadeBadge, StatusBadge, STATUS_ORDER } from "../shared/Badges";
 import { supabase } from "@/integrations/supabase/client";
 

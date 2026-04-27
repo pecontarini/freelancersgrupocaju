@@ -118,60 +118,12 @@ export function useSixMonthsSeries({
           });
         }
 
-        // ───────────────────────── CMV Salmão (kg / R$1k faturado) ─────────────
-        case "cmv-salmao": {
-          // simplificação: usa avaliacoes.codigo_meta='cmv_salmao' se existir,
-          // senão usa leadership_performance_scores.score (placeholder).
-          const { data, error } = await supabase
-            .from("avaliacoes")
-            .select("referencia_mes, score_percentual")
-            .eq("loja_id", unidadeId)
-            .eq("codigo_meta", "cmv_salmao")
-            .in("referencia_mes", months);
-          if (error) throw error;
-
-          const acc = new Map<string, { sum: number; n: number }>();
-          (data ?? []).forEach((r: any) => {
-            if (typeof r.score_percentual !== "number") return;
-            const cur = acc.get(r.referencia_mes) ?? { sum: 0, n: 0 };
-            cur.sum += r.score_percentual;
-            cur.n += 1;
-            acc.set(r.referencia_mes, cur);
-          });
-
-          return months.map((m) => {
-            const cur = acc.get(m);
-            const value = cur && cur.n > 0 ? cur.sum / cur.n : null;
-            return { mes: m, label: shortMonthLabel(m), value };
-          });
-        }
-
-        // ───────────────────────── CMV Carnes (% desvio) ────────────────────────
-        case "cmv-carnes": {
-          const { data, error } = await supabase
-            .from("avaliacoes")
-            .select("referencia_mes, score_percentual")
-            .eq("loja_id", unidadeId)
-            .eq("codigo_meta", "cmv_carnes")
-            .in("referencia_mes", months);
-          if (error) throw error;
-
-          const acc = new Map<string, { sum: number; n: number }>();
-          (data ?? []).forEach((r: any) => {
-            if (typeof r.score_percentual !== "number") return;
-            const cur = acc.get(r.referencia_mes) ?? { sum: 0, n: 0 };
-            cur.sum += r.score_percentual;
-            cur.n += 1;
-            acc.set(r.referencia_mes, cur);
-          });
-
-          return months.map((m) => {
-            const cur = acc.get(m);
-            const value = cur && cur.n > 0 ? cur.sum / cur.n : null;
-            return { mes: m, label: shortMonthLabel(m), value };
-          });
-        }
-
+        // ─────────────── CMV Salmão / CMV Carnes ───────────────
+        // Ainda não há agregação mensal canônica nas tabelas cmv_*.
+        // O componente exibirá "Sem dados suficientes" até que a
+        // série mensal seja consolidada.
+        case "cmv-salmao":
+        case "cmv-carnes":
         default:
           return months.map((m) => ({ mes: m, label: shortMonthLabel(m), value: null }));
       }

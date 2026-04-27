@@ -1,4 +1,4 @@
-import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2, Activity, FileText } from "lucide-react";
+import { Package, FileUp, ShoppingCart, History, BarChart3, Settings, ClipboardCheck, Calendar, Link2, Activity, FileText, Sparkles } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,6 +24,7 @@ import {
   CMVLiveStockCard,
   CMVContagemCarnes,
 } from "@/components/cmv";
+import { CMVAIAssistant } from "@/components/cmv/CMVAIAssistant";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -68,10 +69,14 @@ export function CMVTab() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="operacional" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8 max-w-5xl">
+        <TabsList className="grid w-full grid-cols-9 max-w-5xl">
           <TabsTrigger value="operacional" className="flex items-center gap-1.5">
             <ClipboardCheck className="h-4 w-4" />
             <span className="hidden sm:inline">Operacional</span>
+          </TabsTrigger>
+          <TabsTrigger value="ia" className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4" />
+            <span className="hidden sm:inline">IA</span>
           </TabsTrigger>
           <TabsTrigger value="kardex" className="flex items-center gap-1.5">
             <Activity className="h-4 w-4" />
@@ -173,6 +178,11 @@ export function CMVTab() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ====== ABA: IA CMV (Análise de desvio + plano de ação) ====== */}
+        <TabsContent value="ia" className="space-y-6">
+          <CMVAIAssistant />
         </TabsContent>
 
         {/* ====== ABA: KARDEX (Timeline de Movimentação) ====== */}

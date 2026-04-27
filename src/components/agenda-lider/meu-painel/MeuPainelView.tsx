@@ -116,7 +116,7 @@ export function MeuPainelView() {
                         onClick={() => setOpenId(m.id)}
                         className="text-[10px] text-muted-foreground hover:text-primary hover:underline"
                       >
-                        ↳ {m.titulo}
+                        <span className="uppercase tracking-wide">↳ {m.titulo}</span>
                       </button>
                     )}
                   </div>
@@ -171,7 +171,7 @@ function MissaoCardMeuPainel({ missao, onClick }: { missao: Missao; onClick: () 
         <PrioridadeBadge prioridade={missao.prioridade} className="px-1.5 py-0 text-[10px]" />
         <StatusBadge status={missao.status} className="px-1.5 py-0 text-[10px]" />
       </div>
-      <h4 className="line-clamp-2 text-sm font-semibold">{missao.titulo}</h4>
+      <h4 className="line-clamp-2 text-sm font-semibold uppercase tracking-wide">{missao.titulo}</h4>
       {missao.descricao && (
         <p className="line-clamp-2 text-xs text-muted-foreground">{missao.descricao}</p>
       )}

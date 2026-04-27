@@ -1,54 +1,58 @@
-# Organizar respostas da IA por tópicos com prazo, responsável e to-dos marcáveis
 
-## O que muda na prática para o líder
+# Botão "+ Nova missão" funcional + Padronização CAPS LOCK
 
-Hoje o líder pode colar texto vindo de qualquer LLM (ChatGPT, Gemini, Claude…) ou anexar relatório, e a IA da Agenda devolve missões — mas tudo fica numa lista plana, sem agrupamento, e o "plano de ação" aparece só como leitura.
+## 1. Modal de criação manual de missão
 
-Depois deste ajuste, ao colar/anexar conteúdo o líder vai ver:
+Hoje o botão "+ Nova missão" em `MissoesBoardView.tsx` abre apenas um `prompt()` nativo do navegador pedindo só o título. Vou substituir por um modal completo, no mesmo padrão visual do `MissaoDetailDialog`.
 
-1. **Tópicos (categorias)** agrupando as missões — ex.: `CMV`, `Atendimento/NPS`, `Manutenção`, `Equipe/Escala`, `Auditoria`, `Outros`. Cada tópico vira uma seção colapsável no chat.
-2. Dentro de cada tópico, **um card por missão** mostrando:
-   - Título + prioridade (alta/média/baixa)
-   - Responsável principal + co-responsáveis (chips)
-   - Prazo formatado (dd/mm/aaaa)
-   - **Checklist de to-dos** com caixinhas marcáveis (em vez de só uma lista de leitura)
-   - Botão "Confirmar e criar missão" (cria no Quadro como hoje)
-3. Um botão extra no topo de cada tópico: **"Confirmar todas deste tópico"** — para o líder não precisar clicar 1 a 1.
+**Novo componente: `src/components/agenda-lider/card/NovaMissaoDialog.tsx`**
 
-## Como o sistema vai garantir essa estrutura
+Campos do formulário:
+- **Título** (obrigatório) — Input
+- **Descrição** — Textarea
+- **Tópico** — Input livre (ex: CMV, Manutenção, NPS) para alinhar com o agrupamento já usado pelo Chat IA
+- **Prioridade** — Select (Alta / Média / Baixa, default Média)
+- **Status inicial** — Select (A fazer / Em andamento / Aguardando, default A fazer)
+- **Prazo** — Input date (com cálculo automático sugerido se vazio: Alta +3d, Média +7d, Baixa +14d, igual à lógica do edge function)
+- **Responsável** — Select com membros da unidade (`useUnidadeMembros`); default = usuário logado
+- **Co-responsáveis** — Multi-select (chips com X) dos demais membros
+- **Plano de ação (tarefas)** — Lista editável: input + botão "Adicionar tarefa", cada item com X para remover
 
-### 1. Edge Function `agenda-lider-chat`
-- Adicionar campo `topico` (string curta, max 30 chars, vinda de uma lista sugerida no prompt) na ferramenta `criar_missoes`.
-- Reforçar o system prompt para:
-  - Quando o usuário **colar texto longo de outra LLM** (detectar por tamanho > 800 chars ou estrutura tipo "1. … 2. …"), tratar como briefing já estruturado: extrair TODOS os itens acionáveis, não resumir.
-  - SEMPRE preencher `prazo` (calculando a partir da prioridade: alta = +3 dias úteis, média = +7, baixa = +14) quando o usuário não informar.
-  - SEMPRE escolher um `responsavel_user_id` da lista — só deixar vazio se realmente não houver cargo compatível.
-  - SEMPRE devolver pelo menos 2 itens em `plano_acao` por missão (passos verificáveis, no formato "verbo + objeto").
+Ao confirmar:
+- Chama `create.mutateAsync()` do `useMissoes` passando `titulo`, `descricao`, `prioridade`, `status`, `prazo`, `unidade_id`, `membros[]` e `tarefas[]` (o hook já suporta tudo isso).
+- Toast de sucesso e fecha o modal.
 
-### 2. Frontend — `MissoesPreviewCard.tsx`
-- Adicionar estado local de checkboxes para cada item do `plano_acao` (visual no preview; ao confirmar, viram tarefas reais com `concluida = true/false` no banco).
-- Trocar `<li>` por `<Checkbox>` shadcn + label.
-- Mostrar prazo com destaque (badge âmbar se < 3 dias, vermelho se vencido).
+**Edição em `MissoesBoardView.tsx`:**
+- Remover a função `quickCreate()` baseada em `prompt()`.
+- Adicionar `const [openNew, setOpenNew] = useState(false)` e abrir o novo dialog ao clicar em "+ Nova missão".
 
-### 3. Frontend — `MissoesChatView.tsx`
-- Agrupar `m.missoes` por `topico` antes de renderizar.
-- Cada grupo vira um bloco com:
-  - Header do tópico + contador (ex.: "CMV · 3 missões")
-  - Lista dos `MissoesPreviewCard` do grupo
-  - Botão "Confirmar tudo deste tópico" → chama `confirmMissao` em sequência
+## 2. Padronização CAPS LOCK nos títulos das missões
 
-### 4. Tipo `MissaoSugerida`
-- Adicionar `topico?: string` (opcional, default "Outros").
-- Tarefas no preview ganham estado `done: boolean` que é passado para `useMissoes.create` no array `tarefas`.
+**Estratégia:** aplicar uppercase via CSS (`uppercase` do Tailwind) nos pontos de exibição, sem alterar os dados do banco. Assim:
+- Funciona retroativamente para missões já criadas.
+- Preserva o texto original caso queiramos reverter.
+- Cobre tanto missões criadas pelo Chat IA quanto manualmente.
+
+**Arquivos a ajustar (apenas a classe do título):**
+- `src/components/agenda-lider/board/MissaoCardCompact.tsx` — `<h4>` do título → adicionar `uppercase tracking-wide`
+- `src/components/agenda-lider/card/MissaoDetailDialog.tsx` — `<span className="text-lg">` do título → adicionar `uppercase tracking-wide`
+- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` — `<h4>` da prévia → adicionar `uppercase tracking-wide`
+- `src/components/agenda-lider/meu-painel/*` (cards de "Minhas missões", se existirem) — aplicar mesma classe nos títulos
+
+Vou inspecionar `meu-painel/` na implementação para garantir que todos os pontos de exibição do título recebam o tratamento.
+
+**Observação:** descrições, tópicos e tarefas continuam em case normal — apenas o **título** vai em CAPS, conforme solicitado para destacar nos cards.
 
 ## Arquivos afetados
-- `supabase/functions/agenda-lider-chat/index.ts` — schema da tool + prompt
-- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` — checkboxes + badge de prazo
-- `src/components/agenda-lider/chat/MissoesChatView.tsx` — agrupamento por tópico + confirmar em lote
-- (sem mudanças de schema no banco — `tarefas_missao` já tem `concluida` e `dia_semana`)
 
-## Fora de escopo
-- Editar manualmente missão antes de confirmar (continua sendo "confirmar como veio" — pode ser próximo passo se você quiser).
-- Reagrupar missões já criadas no Quadro por tópico (focado só na etapa de sugestão da IA agora).
+- **Criar:** `src/components/agenda-lider/card/NovaMissaoDialog.tsx`
+- **Editar:**
+  - `src/components/agenda-lider/board/MissoesBoardView.tsx` (botão + dialog state, remover prompt)
+  - `src/components/agenda-lider/board/MissaoCardCompact.tsx` (uppercase no título)
+  - `src/components/agenda-lider/card/MissaoDetailDialog.tsx` (uppercase no título)
+  - `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` (uppercase no título)
+  - Arquivos de `meu-painel/` que renderizam título de missão (uppercase)
+
+Sem mudanças no banco, edge function ou hooks.
 
 Posso aplicar?

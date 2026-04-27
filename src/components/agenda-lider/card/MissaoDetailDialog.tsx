@@ -122,9 +122,9 @@ export function MissaoDetailDialog({
           </div>
           <DialogTitle className="mt-2">
             {editing ? (
-              <Input value={formTitulo} onChange={(e) => setFormTitulo(e.target.value)} className="text-base font-semibold" />
+              <Input value={formTitulo} onChange={(e) => setFormTitulo(e.target.value)} className="text-base font-semibold uppercase" />
             ) : (
-              <span className="text-lg">{missao.titulo}</span>
+              <span className="text-lg uppercase tracking-wide">{missao.titulo}</span>
             )}
           </DialogTitle>
         </DialogHeader>

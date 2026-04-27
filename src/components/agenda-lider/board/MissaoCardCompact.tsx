@@ -38,7 +38,7 @@ export function MissaoCardCompact({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 text-sm font-semibold leading-tight text-foreground">
+        <h4 className="line-clamp-2 text-sm font-semibold uppercase tracking-wide leading-tight text-foreground">
           {missao.titulo}
         </h4>
         <PrioridadeBadge prioridade={missao.prioridade} className="shrink-0 px-1.5 py-0 text-[10px]" />

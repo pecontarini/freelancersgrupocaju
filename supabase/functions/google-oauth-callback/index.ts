@@ -49,19 +49,18 @@ async function verifyState(token: string, secret: string): Promise<{ uid: string
 }
 
 function htmlRedirect(targetUrl: string, message: string): Response {
-  const safe = targetUrl.replace(/"/g, "&quot;");
-  const html = `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Redirecionando...</title>
-<meta http-equiv="refresh" content="0; url=${safe}" />
-<style>body{font-family:system-ui;margin:0;padding:2rem;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#fff;text-align:center}</style>
-</head><body><div><p>${message}</p><p><a style="color:#fb923c" href="${safe}">Continuar</a></p></div>
-<script>window.location.replace(${JSON.stringify(targetUrl)})</script>
-</body></html>`;
-  return new Response(html, {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+  // Redirect HTTP 302 verdadeiro: o navegador segue imediatamente o header
+  // Location, sem renderizar HTML intermediário e sem depender de JavaScript.
+  // Isso evita o caso em que Safari/Chrome param na página do Supabase.
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      Location: targetUrl,
+      "Cache-Control": "no-store",
+      // Mantém um corpo mínimo de fallback caso algum proxy ignore o Location
+      "Content-Type": "text/plain; charset=utf-8",
+    },
   });
 }
 

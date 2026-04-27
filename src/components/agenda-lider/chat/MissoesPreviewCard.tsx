@@ -58,7 +58,7 @@ export function MissoesPreviewCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <PrioridadeBadge prioridade={missao.prioridade} />
-            <h4 className="truncate text-sm font-semibold text-foreground">{missao.titulo}</h4>
+            <h4 className="truncate text-sm font-semibold uppercase tracking-wide text-foreground">{missao.titulo}</h4>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{missao.descricao}</p>
         </div>

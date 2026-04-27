@@ -10,16 +10,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { MissaoColumn } from "./MissaoColumn";
 import { MissaoCardCompact } from "./MissaoCardCompact";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
+import { NovaMissaoDialog } from "../card/NovaMissaoDialog";
 import { STATUS_ORDER } from "../shared/Badges";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function MissoesBoardView() {
   const { user } = useAuth();
   const { effectiveUnidadeId } = useUnidade();
-  const { data: missoes = [], update, create } = useMissoes({ unidadeId: effectiveUnidadeId });
+  const { data: missoes = [], update } = useMissoes({ unidadeId: effectiveUnidadeId });
   const { data: membros = [] } = useUnidadeMembros(effectiveUnidadeId);
 
   const [openId, setOpenId] = useState<string | null>(null);
+  const [openNew, setOpenNew] = useState(false);
   const [responsaveis, setResponsaveis] = useState<Record<string, { nome: string; total: number }>>(
     {},
   );
@@ -81,27 +83,13 @@ export function MissoesBoardView() {
     );
   }
 
-  async function quickCreate() {
-    const titulo = prompt("Título da missão:");
-    if (!titulo?.trim()) return;
-    try {
-      await create.mutateAsync({
-        titulo: titulo.trim(),
-        unidade_id: effectiveUnidadeId,
-      });
-      toast.success("Missão criada.");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao criar missão.");
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Arraste cards entre colunas para mudar o status. Clique para abrir detalhes.
         </p>
-        <Button size="sm" onClick={quickCreate}>
+        <Button size="sm" onClick={() => setOpenNew(true)}>
           <Plus className="mr-1 h-4 w-4" /> Nova missão
         </Button>
       </div>
@@ -130,6 +118,7 @@ export function MissoesBoardView() {
       </DndContext>
 
       <MissaoDetailDialog missaoId={openId} open={!!openId} onClose={() => setOpenId(null)} />
+      <NovaMissaoDialog open={openNew} onClose={() => setOpenNew(false)} />
     </div>
   );
 }

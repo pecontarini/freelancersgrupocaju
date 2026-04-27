@@ -3,7 +3,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
-  TrendingUp,
+  
   Settings,
   Building2,
   LogOut,
@@ -65,12 +65,6 @@ const menuItems = [
     id: "gestao-pessoas",
     icon: Users,
     description: "Escalas e Presença Freelancers",
-  },
-  {
-    title: "REMUNERAÇÃO VARIÁVEL",
-    id: "remuneracao",
-    icon: TrendingUp,
-    description: "Performance e metas",
   },
   {
     title: "DIAGNÓSTICO AUDITORIA",

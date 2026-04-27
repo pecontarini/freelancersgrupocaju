@@ -12,7 +12,7 @@ import { PortalHeader } from "@/components/layout/PortalHeader";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
-import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
+
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
 import { CMVTab } from "@/components/dashboard/CMVTab";
@@ -48,10 +48,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   budgets: {
     title: "Budgets Gerenciais",
     subtitle: "Controle diário de gastos operacionais",
-  },
-  remuneracao: {
-    title: "Remuneração Variável",
-    subtitle: "Performance mensal e metas de bônus",
   },
   diagnostico: {
     title: "Diagnóstico de Auditoria",
@@ -257,10 +253,6 @@ const Index = () => {
             <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
             <BudgetsGerenciaisTab {...budgetsProps} />
           </div>
-        );
-      case "remuneracao":
-        return (
-          <RemuneracaoVariavelTab selectedUnidadeId={selectedUnidadeId} />
         );
       case "diagnostico":
         return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3 } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2 } from "lucide-react";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";
@@ -9,6 +9,7 @@ import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
 import { PracasConfig } from "./PracasConfig";
+import { MinimumStaffingTab } from "./MinimumStaffingTab";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -65,6 +66,13 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Cargos e Setores</span>
           <span className="sm:hidden">Cargos</span>
         </TabsTrigger>
+        {isAdmin && (
+          <TabsTrigger value="escalas-minimas" className="gap-1.5">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Escalas Mínimas</span>
+            <span className="sm:hidden">Mínimas</span>
+          </TabsTrigger>
+        )}
         <TabsTrigger value="matrix" className="gap-1.5">
           <Settings2 className="h-4 w-4" />
           <span className="hidden sm:inline">Configurações</span>
@@ -95,6 +103,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <PracasConfig />
         </div>
       </TabsContent>
+      {isAdmin && (
+        <TabsContent value="escalas-minimas">
+          <MinimumStaffingTab />
+        </TabsContent>
+      )}
       <TabsContent value="matrix">
         <StaffingMatrixConfig />
       </TabsContent>

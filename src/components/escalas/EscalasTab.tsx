@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3 } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2 } from "lucide-react";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";
@@ -9,6 +9,7 @@ import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
 import { PracasConfig } from "./PracasConfig";
+import { MinimumStaffingTab } from "./MinimumStaffingTab";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";

@@ -110,7 +110,36 @@ export function MissaoDetailDialog({
               <PrioridadeBadge prioridade={missao.prioridade} />
               <StatusBadge status={missao.status} />
             </div>
-            <div className="flex gap-1">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={() => sync.mutate({ missao_id: missao.id })}
+                disabled={sync.isPending || !missao.prazo}
+                title={!missao.prazo ? "Defina um prazo antes de sincronizar" : undefined}
+              >
+                {sync.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : missao.google_event_id ? (
+                  <CalendarCheck2 className="h-3.5 w-3.5 text-emerald-600" />
+                ) : (
+                  <CalendarPlus className="h-3.5 w-3.5" />
+                )}
+                {missao.google_event_id ? "Atualizar agenda" : "Google Agenda"}
+              </Button>
+              {missao.google_event_id && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => sync.mutate({ missao_id: missao.id, remove: true })}
+                  disabled={sync.isPending}
+                  title="Remover do Google Agenda"
+                >
+                  <CalendarX2 className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"

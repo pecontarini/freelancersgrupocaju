@@ -410,6 +410,353 @@ export function ManualScheduleGrid() {
     return activeSectorId || "";
   }
 
+  // ====================================================================
+  // EXCEL-LIKE GRID: selection, keyboard shortcuts, copy/paste, undo/redo
+  // ====================================================================
+  const upsertSchedule = useUpsertSchedule();
+  const cancelSchedule = useCancelSchedule();
+  const grid = useGridSelection();
+
+  // Lista plana de funcionários (linha do grid → emp). Acompanha groupedScheduled.
+  const flatEmployees = useMemo(() => {
+    const arr: typeof sortedScheduled = [] as any;
+    for (const g of groupedScheduled) for (const e of g.employees) arr.push(e);
+    return arr;
+  }, [groupedScheduled]);
+
+  const maxRows = flatEmployees.length;
+  const maxCols = weekDays.length;
+
+  // Reset histórico ao trocar semana ou unidade
+  useEffect(() => {
+    grid.resetHistory();
+  }, [selectedUnit, weekStart]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectionRect = getSelectionRect(grid.state.selection, grid.state.active);
+
+  function cellsInRect(rect: ReturnType<typeof getSelectionRect>): Cell[] {
+    if (!rect) return [];
+    const out: Cell[] = [];
+    for (let r = rect.r0; r <= rect.r1; r++) {
+      for (let c = rect.c0; c <= rect.c1; c++) {
+        if (r < maxRows && c < maxCols) out.push({ row: r, col: c });
+      }
+    }
+    return out;
+  }
+
+  async function applyPatchToCells(
+    cells: Cell[],
+    buildPatch: (emp: any, dateStr: string, before: ManualSchedule | undefined) => any | null
+  ) {
+    if (cells.length === 0) return;
+    const before: (ManualSchedule | null)[] = [];
+    const after: (any | null)[] = [];
+    const tasks: Promise<any>[] = [];
+
+    for (const { row, col } of cells) {
+      const emp = flatEmployees[row];
+      if (!emp) continue;
+      const dateStr = format(weekDays[col], "yyyy-MM-dd");
+      const existing = getScheduleForCell(emp.id, dateStr);
+      const patch = buildPatch(emp, dateStr, existing);
+      before.push(existing ?? null);
+      after.push(patch);
+
+      if (patch === null) {
+        if (existing) tasks.push(cancelSchedule.mutateAsync(existing.id));
+      } else if (patch.schedule_type === "off" && existing && existing.schedule_type !== "off") {
+        tasks.push(
+          upsertSchedule.mutateAsync({
+            id: existing.id,
+            employee_id: emp.id,
+            schedule_date: dateStr,
+            sector_id: existing.sector_id || resolveSectorForEmployee(emp.id),
+            schedule_type: "off",
+            start_time: null,
+            end_time: null,
+            break_duration: 0,
+            agreed_rate: 0,
+          })
+        );
+      } else {
+        const sectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
+        if (!sectorId) continue;
+        tasks.push(
+          upsertSchedule.mutateAsync({
+            id: existing?.id,
+            employee_id: emp.id,
+            schedule_date: dateStr,
+            sector_id: sectorId,
+            schedule_type: patch.schedule_type,
+            shift_type: patch.shift_type,
+            start_time: patch.start_time,
+            end_time: patch.end_time,
+            break_duration: patch.break_duration,
+            agreed_rate: patch.agreed_rate ?? existing?.agreed_rate ?? 0,
+            praca_id: patch.praca_id ?? existing?.praca_id ?? null,
+          })
+        );
+      }
+    }
+
+    try {
+      await Promise.all(tasks);
+      grid.pushHistory({ affected: cells, before, after });
+    } catch (err) {
+      // Erros individuais já mostram toast pelo hook
+    }
+  }
+
+  async function applyShortcutToSelection(key: string) {
+    const patch = await resolveShortcutPatch(key, selectedUnit);
+    if (!patch) return;
+    const cells = cellsInRect(selectionRect);
+    await applyPatchToCells(cells, () => ({ ...patch }));
+  }
+
+  async function deleteSelection() {
+    const cells = cellsInRect(selectionRect);
+    await applyPatchToCells(cells, () => null);
+  }
+
+  function copySelection(cut: boolean) {
+    if (!selectionRect) return;
+    const rows = selectionRect.r1 - selectionRect.r0 + 1;
+    const cols = selectionRect.c1 - selectionRect.c0 + 1;
+    const cells: any[][] = [];
+    for (let r = selectionRect.r0; r <= selectionRect.r1; r++) {
+      const rowArr: any[] = [];
+      for (let c = selectionRect.c0; c <= selectionRect.c1; c++) {
+        const emp = flatEmployees[r];
+        if (!emp) {
+          rowArr.push(null);
+          continue;
+        }
+        const dateStr = format(weekDays[c], "yyyy-MM-dd");
+        const sch = getScheduleForCell(emp.id, dateStr);
+        if (!sch) {
+          rowArr.push(null);
+        } else {
+          rowArr.push({
+            patch: {
+              schedule_type: sch.schedule_type === "off" ? "off" : "working",
+              shift_type: undefined,
+              start_time: sch.start_time,
+              end_time: sch.end_time,
+              break_duration: sch.break_duration,
+              agreed_rate: sch.agreed_rate,
+              praca_id: sch.praca_id,
+            },
+          });
+        }
+      }
+      cells.push(rowArr);
+    }
+    grid.setClipboard({ rows, cols, cells });
+    if (cut) {
+      void deleteSelection();
+      toast.success(`${rows * cols} célula(s) recortada(s)`);
+    } else {
+      toast.success(`${rows * cols} célula(s) copiada(s)`);
+    }
+  }
+
+  async function pasteAtActive() {
+    const clip = grid.state.clipboard;
+    const active = grid.state.active;
+    if (!clip || !active) return;
+    const cells: Cell[] = [];
+    const patchByCell = new Map<string, any>();
+    for (let dr = 0; dr < clip.rows; dr++) {
+      for (let dc = 0; dc < clip.cols; dc++) {
+        const r = active.row + dr;
+        const c = active.col + dc;
+        if (r >= maxRows || c >= maxCols) continue;
+        const src = clip.cells[dr][dc];
+        cells.push({ row: r, col: c });
+        patchByCell.set(`${r}:${c}`, src ? src.patch : null);
+      }
+    }
+    await applyPatchToCells(cells, (_emp, _date, _before) => {
+      // resolve via map (sector_id virá da linha de destino dentro de applyPatchToCells)
+      // o "key" aqui é via row/col; reconstruímos a partir da posição:
+      return null; // placeholder — substituído abaixo
+    });
+    // O closure acima não tem acesso a row/col. Refazemos usando patchByCell:
+    // (chamada acima é descartável; reaplicamos corretamente:)
+  }
+
+  // Versão correta de pasteAtActive (sem o bug do closure):
+  async function pasteAtActiveReal() {
+    const clip = grid.state.clipboard;
+    const active = grid.state.active;
+    if (!clip || !active) return;
+    const cells: Cell[] = [];
+    const patches: (any | null)[] = [];
+    for (let dr = 0; dr < clip.rows; dr++) {
+      for (let dc = 0; dc < clip.cols; dc++) {
+        const r = active.row + dr;
+        const c = active.col + dc;
+        if (r >= maxRows || c >= maxCols) continue;
+        const src = clip.cells[dr][dc];
+        cells.push({ row: r, col: c });
+        patches.push(src ? src.patch : null);
+      }
+    }
+    let i = 0;
+    await applyPatchToCells(cells, () => {
+      const p = patches[i++];
+      return p;
+    });
+    toast.success(`${cells.length} turno(s) colado(s)`);
+  }
+
+  async function undoLast() {
+    const { history, cursor } = grid.state;
+    if (cursor < 0) return;
+    const action = history[cursor];
+    // Aplica os "before" de cada célula afetada
+    for (let i = 0; i < action.affected.length; i++) {
+      const { row, col } = action.affected[i];
+      const emp = flatEmployees[row];
+      if (!emp) continue;
+      const dateStr = format(weekDays[col], "yyyy-MM-dd");
+      const before = action.before[i];
+      const current = getScheduleForCell(emp.id, dateStr);
+      if (!before) {
+        if (current) await cancelSchedule.mutateAsync(current.id);
+      } else {
+        await upsertSchedule.mutateAsync({
+          id: current?.id,
+          employee_id: emp.id,
+          schedule_date: dateStr,
+          sector_id: before.sector_id || resolveSectorForEmployee(emp.id),
+          schedule_type: before.schedule_type,
+          start_time: before.start_time,
+          end_time: before.end_time,
+          break_duration: before.break_duration,
+          agreed_rate: before.agreed_rate,
+          praca_id: before.praca_id,
+        });
+      }
+    }
+    grid.undo();
+  }
+
+  async function redoLast() {
+    const { history, cursor } = grid.state;
+    if (cursor + 1 >= history.length) return;
+    const action = history[cursor + 1];
+    for (let i = 0; i < action.affected.length; i++) {
+      const { row, col } = action.affected[i];
+      const emp = flatEmployees[row];
+      if (!emp) continue;
+      const dateStr = format(weekDays[col], "yyyy-MM-dd");
+      const after = action.after[i];
+      const current = getScheduleForCell(emp.id, dateStr);
+      if (after === null) {
+        if (current) await cancelSchedule.mutateAsync(current.id);
+      } else {
+        const sectorId = current?.sector_id || resolveSectorForEmployee(emp.id);
+        await upsertSchedule.mutateAsync({
+          id: current?.id,
+          employee_id: emp.id,
+          schedule_date: dateStr,
+          sector_id: sectorId,
+          schedule_type: after.schedule_type,
+          shift_type: after.shift_type,
+          start_time: after.start_time,
+          end_time: after.end_time,
+          break_duration: after.break_duration,
+          agreed_rate: after.agreed_rate ?? 0,
+          praca_id: after.praca_id ?? null,
+        });
+      }
+    }
+    grid.redo();
+  }
+
+  // Handler unificado de teclado
+  function handleGridKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+    if (editModal?.open || freelancerModal?.open || editEmployeeModal) return;
+
+    const meta = e.ctrlKey || e.metaKey;
+    const k = e.key;
+
+    // Navegação entre semanas
+    if (meta && k === "ArrowLeft") { e.preventDefault(); navigateWeek(-1); return; }
+    if (meta && k === "ArrowRight") { e.preventDefault(); navigateWeek(1); return; }
+    if (meta && k === "Home") { e.preventDefault(); setCurrentWeekBase(new Date()); return; }
+
+    // Undo / Redo
+    if (meta && (k === "z" || k === "Z") && !e.shiftKey) { e.preventDefault(); void undoLast(); return; }
+    if ((meta && (k === "y" || k === "Y")) || (meta && e.shiftKey && (k === "z" || k === "Z"))) {
+      e.preventDefault(); void redoLast(); return;
+    }
+
+    // Select all
+    if (meta && (k === "a" || k === "A")) {
+      e.preventDefault();
+      if (grid.state.active && (!grid.state.selection || grid.state.selection.anchor.row !== grid.state.selection.head.row || grid.state.selection.anchor.col !== 0 || grid.state.selection.head.col !== maxCols - 1)) {
+        grid.selectRow(grid.state.active.row, maxCols);
+      } else {
+        grid.selectAll(maxRows, maxCols);
+      }
+      return;
+    }
+
+    // Copy / Cut / Paste
+    if (meta && (k === "c" || k === "C")) { e.preventDefault(); copySelection(false); return; }
+    if (meta && (k === "x" || k === "X")) { e.preventDefault(); copySelection(true); return; }
+    if (meta && (k === "v" || k === "V")) { e.preventDefault(); void pasteAtActiveReal(); return; }
+
+    // Esc
+    if (k === "Escape") { grid.clearSelection(); return; }
+
+    // Enter → abre modal da célula ativa
+    if (k === "Enter" && grid.state.active) {
+      e.preventDefault();
+      const emp = flatEmployees[grid.state.active.row];
+      const dateStr = format(weekDays[grid.state.active.col], "yyyy-MM-dd");
+      if (emp) handleCellClick(emp, dateStr);
+      return;
+    }
+
+    // Delete / Backspace
+    if (k === "Delete" || k === "Backspace") { e.preventDefault(); void deleteSelection(); return; }
+
+    // Setas (com Shift = estende seleção)
+    const arrow = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] } as Record<string, [number, number]>;
+    if (arrow[k]) {
+      e.preventDefault();
+      const [dr, dc] = arrow[k];
+      grid.moveActive(dr, dc, maxRows, maxCols, e.shiftKey);
+      return;
+    }
+
+    // Tab
+    if (k === "Tab" && grid.state.active) {
+      e.preventDefault();
+      const dir = e.shiftKey ? -1 : 1;
+      let { row, col } = grid.state.active;
+      col += dir;
+      if (col >= maxCols) { col = 0; row = Math.min(row + 1, maxRows - 1); }
+      else if (col < 0) { col = maxCols - 1; row = Math.max(row - 1, 0); }
+      grid.setActive({ row, col });
+      return;
+    }
+
+    // Atalhos de turno
+    if (!meta && isShortcutKey(k)) {
+      e.preventDefault();
+      void applyShortcutToSelection(k);
+      return;
+    }
+  }
+
   // POP quota of extras per day (from staffing matrix)
   const extrasQuotaPerDay = useMemo(() => {
     const map = new Map<string, number>();

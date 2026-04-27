@@ -1,4 +1,4 @@
-import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2 } from "lucide-react";
+import { Wallet, TrendingUp, ClipboardCheck, User, Menu, Package, FileCheck, CalendarClock, Sun, Moon, Calendar, BarChart2, ShieldCheck } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +74,14 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Agenda
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => onTabChange("agenda-lider")}
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Agenda do Líder
                 </Button>
                 <Button
                   variant="ghost"
@@ -206,6 +214,14 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Agenda
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-12"
+                  onClick={() => onTabChange("agenda-lider")}
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Agenda do Líder
                 </Button>
                 <Button
                   variant="outline"

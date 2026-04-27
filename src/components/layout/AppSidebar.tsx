@@ -19,6 +19,7 @@ import {
   UtensilsCrossed,
   Warehouse,
   Calendar,
+  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -111,6 +112,12 @@ const menuItems = [
     id: "agenda",
     icon: Calendar,
     description: "Agenda integrada ao Google Calendar",
+  },
+  {
+    title: "AGENDA DO LÍDER",
+    id: "agenda-lider",
+    icon: ShieldCheck,
+    description: "Chat IA, missões e planos de ação",
   },
 ];
 

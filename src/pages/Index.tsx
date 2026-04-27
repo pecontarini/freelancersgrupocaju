@@ -26,6 +26,7 @@ import { EstoqueTab } from "@/components/estoque";
 import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
+import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
 
 import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
@@ -86,6 +87,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   painel: {
     title: "Painel de Metas",
     subtitle: "Resultados e metas operacionais da rede",
+  },
+  "agenda-lider": {
+    title: "Agenda do Líder",
+    subtitle: "Chat IA, missões e planos de ação para a liderança",
   },
 };
 
@@ -271,6 +276,8 @@ const Index = () => {
         return isAdmin ? <RedeTab /> : null;
       case "painel":
         return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
+      case "agenda-lider":
+        return <AgendaLiderTab />;
       default:
         return (
           <BudgetsGerenciaisTab

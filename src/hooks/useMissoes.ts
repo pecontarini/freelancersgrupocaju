@@ -40,7 +40,7 @@ export interface MissaoTarefa {
 
 export interface MissaoUpsert {
   id?: string;
-  titulo: string;
+  titulo?: string;
   descricao?: string | null;
   status?: MissaoStatus;
   prioridade?: MissaoPrioridade;
@@ -81,6 +81,7 @@ export function useMissoes(opts?: { unidadeId?: string | null; onlyMine?: boolea
   const create = useMutation({
     mutationFn: async (input: MissaoUpsert & { membros?: { user_id: string; papel: MissaoPapel }[]; tarefas?: { descricao: string; dia_semana?: string | null; ordem?: number }[] }) => {
       if (!user) throw new Error("Sem usuário.");
+      if (!input.titulo) throw new Error("Título obrigatório.");
       const { data: created, error } = await supabase
         .from("missoes" as any)
         .insert({

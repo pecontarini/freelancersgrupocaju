@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useQuery } from "@tanstack/react-query";

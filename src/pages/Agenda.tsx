@@ -118,6 +118,19 @@ export default function Agenda() {
       url.searchParams.delete("reason");
       window.history.replaceState({}, "", url.toString());
       refreshTokenStatus();
+
+      // Retomar formulário pendente, se houver
+      const stored = sessionStorage.getItem("agenda_pending_form");
+      if (stored) {
+        sessionStorage.removeItem("agenda_pending_form");
+        try {
+          const form = JSON.parse(stored);
+          // Aguarda token aparecer no estado antes de submeter
+          setTimeout(() => handleSubmit(form), 500);
+        } catch {
+          /* ignore */
+        }
+      }
     } else if (oauthStatus === "error") {
       const reason = params.get("reason") || "desconhecido";
       toast.error(`Falha ao conectar Google: ${reason}`);

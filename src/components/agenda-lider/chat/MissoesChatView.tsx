@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Send, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Paperclip, Send, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,26 @@ import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
 import { useMissoes, type MissaoPrioridade } from "@/hooks/useMissoes";
 import { MissoesPreviewCard, type MissaoSugerida } from "./MissoesPreviewCard";
+import { AttachmentChip } from "./AttachmentChip";
+import {
+  extractAttachment,
+  MAX_FILES,
+  MAX_FILE_SIZE,
+  type ExtractedAttachment,
+} from "@/lib/extract-attachment-text";
 
 interface ChatMsg {
   id: string;
   role: "user" | "assistant";
   content: string;
   missoes?: MissaoSugerida[];
+}
+
+interface AttachmentDraft extends Partial<ExtractedAttachment> {
+  id: string;
+  name: string;
+  loading: boolean;
+  error?: string;
 }
 
 function getSemanaRef(d = new Date()): string {
@@ -38,6 +52,8 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const semana = useMemo(() => getSemanaRef(), []);
 
   // Carrega histórico da semana
@@ -84,19 +100,125 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
     } as any);
   }
 
+  function handlePickFiles() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ""; // permite reanexar o mesmo arquivo depois
+    if (!files.length) return;
+
+    const slotsLeft = MAX_FILES - attachments.length;
+    if (slotsLeft <= 0) {
+      toast.error(`Máximo de ${MAX_FILES} anexos por mensagem.`);
+      return;
+    }
+    const accepted = files.slice(0, slotsLeft);
+    if (files.length > slotsLeft) {
+      toast.warning(`Só ${slotsLeft} anexo(s) restante(s) — alguns ignorados.`);
+    }
+
+    for (const file of accepted) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} excede ${MAX_FILE_SIZE / 1024 / 1024} MB.`);
+        continue;
+      }
+      const draftId = crypto.randomUUID();
+      setAttachments((p) => [
+        ...p,
+        { id: draftId, name: file.name, loading: true },
+      ]);
+      try {
+        const extracted = await extractAttachment(file);
+        setAttachments((p) =>
+          p.map((a) => (a.id === draftId ? { ...a, ...extracted, loading: false } : a)),
+        );
+        if (extracted.truncated) {
+          toast.info(`${file.name} foi truncado pra caber no contexto da IA.`);
+        }
+      } catch (err: any) {
+        console.error(err);
+        toast.error(err?.message ?? `Falha ao processar ${file.name}.`);
+        setAttachments((p) => p.filter((a) => a.id !== draftId));
+      }
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((p) => p.filter((a) => a.id !== id));
+  }
+
+  /**
+   * Monta o content multimodal da mensagem do usuário enviada à IA.
+   * - Texto do usuário + blocos de cada anexo de texto
+   * - image_url para cada anexo de imagem
+   */
+  function buildOutgoingUserContent(text: string, ready: ExtractedAttachment[]) {
+    const textBlocks: string[] = [];
+    if (text.trim()) textBlocks.push(text.trim());
+
+    for (const a of ready) {
+      if (a.kind === "text" && a.text) {
+        textBlocks.push(
+          `[Arquivo anexado: ${a.name}]\n${a.text}\n[/Arquivo: ${a.name}]`,
+        );
+      }
+    }
+
+    const imageParts = ready
+      .filter((a) => a.kind === "image" && a.dataUrl)
+      .map((a) => ({
+        type: "image_url" as const,
+        image_url: { url: a.dataUrl },
+      }));
+
+    if (imageParts.length === 0) {
+      // Sem imagens: simples string (mais barato/menor payload)
+      return textBlocks.join("\n\n");
+    }
+    return [
+      { type: "text" as const, text: textBlocks.join("\n\n") || "(sem texto)" },
+      ...imageParts,
+    ];
+  }
+
   async function send() {
     const txt = input.trim();
-    if (!txt || loading) return;
-    setInput("");
-    const userMsg: ChatMsg = { id: crypto.randomUUID(), role: "user", content: txt };
+    const ready = attachments.filter(
+      (a): a is AttachmentDraft & ExtractedAttachment => !a.loading && !!a.kind,
+    );
+    if (attachments.some((a) => a.loading)) {
+      toast.info("Aguarde os anexos terminarem de carregar.");
+      return;
+    }
+    if (!txt && ready.length === 0) return;
+    if (loading) return;
+
+    // Render local da mensagem do usuário (com chips de anexo inline no texto)
+    const localText =
+      txt + (ready.length > 0 ? `\n\n${ready.map((a) => `📎 ${a.name}`).join("\n")}` : "");
+    const userMsg: ChatMsg = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: localText || "(anexo enviado)",
+    };
     setMessages((p) => [...p, userMsg]);
-    persistMsg("user", txt);
+    persistMsg("user", localText || "(anexo enviado)");
+
+    // Limpa input/anexos antes do request pra UX rápida
+    setInput("");
+    setAttachments([]);
     setLoading(true);
 
     try {
+      // Constrói histórico (sem reprocessar anexos antigos — só o turn atual carrega arquivos)
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
+      const outgoingContent = buildOutgoingUserContent(txt, ready);
+
       const { data, error } = await supabase.functions.invoke("agenda-lider-chat", {
         body: {
-          messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+          messages: [...history, { role: "user", content: outgoingContent }],
           available_users: membros.map((m) => ({
             user_id: m.user_id,
             nome: m.nome,
@@ -172,6 +294,11 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
       .then(() => setMessages([]));
   }
 
+  const canSend =
+    !loading &&
+    !attachments.some((a) => a.loading) &&
+    (input.trim().length > 0 || attachments.length > 0);
+
   return (
     <div className="flex h-[calc(100vh-220px)] min-h-[500px] flex-col gap-3">
       <Card className="flex flex-1 flex-col overflow-hidden border-primary/20 bg-card/60 backdrop-blur">
@@ -183,7 +310,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
             <div>
               <p className="text-sm font-semibold">Brain Dump com IA</p>
               <p className="text-xs text-muted-foreground">
-                Descreva o que precisa — a IA estrutura em missões delegáveis
+                Descreva, anexe auditorias ou prints — a IA estrutura em missões delegáveis
               </p>
             </div>
           </div>
@@ -199,13 +326,13 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
             {messages.length === 0 && (
               <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Comece descrevendo a semana. Exemplos:
+                  Comece descrevendo a semana — ou anexe um relatório / print:
                 </p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
                   {[
                     "CMV do Caminito está estourando esta semana",
-                    "Preciso contratar Chefe de Cozinha pro Nazo",
-                    "Plano de ação da auditoria de ontem",
+                    "Anexe a auditoria e peça os 3 pontos mais críticos",
+                    "Cole o print da reclamação — a IA vira em plano de ação",
                   ].map((s) => (
                     <Button
                       key={s}
@@ -266,22 +393,62 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
         </ScrollArea>
 
         <div className="border-t border-border/40 bg-card/80 p-3">
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="Descreva o que precisa fazer essa semana..."
-              className="min-h-[60px] resize-none"
-            />
-            <Button onClick={send} disabled={loading || !input.trim()} size="icon" className="h-[60px] w-[60px]">
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-            </Button>
+          <div className="mx-auto flex max-w-3xl flex-col gap-2">
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((a) => (
+                  <AttachmentChip
+                    key={a.id}
+                    name={a.name}
+                    kind={(a.kind as "text" | "image") ?? "text"}
+                    loading={a.loading}
+                    truncated={a.truncated}
+                    onRemove={() => removeAttachment(a.id)}
+                  />
+                ))}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.txt,.md,.csv,.log,.json,image/*"
+                className="hidden"
+                onChange={handleFilesSelected}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-[60px] w-[60px] shrink-0"
+                onClick={handlePickFiles}
+                disabled={loading || attachments.length >= MAX_FILES}
+                title={`Anexar (até ${MAX_FILES})`}
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
+                }}
+                placeholder="Descreva o que precisa fazer essa semana ou anexe um relatório..."
+                className="min-h-[60px] resize-none"
+              />
+              <Button
+                onClick={send}
+                disabled={!canSend}
+                size="icon"
+                className="h-[60px] w-[60px] shrink-0"
+              >
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+              </Button>
+            </div>
           </div>
         </div>
       </Card>

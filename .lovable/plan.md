@@ -1,55 +1,64 @@
-## Por que não apareceu
+## Objetivo
 
-Naquele plano anterior eu **construí toda a Agenda do Líder** (o componente, as sub-abas Chat IA / Board / Meu Painel / Diretoria, os hooks, as tabelas no banco e a edge function de IA), mas **esqueci de plugar no menu**. O componente `AgendaLiderTab.tsx` está pronto e funcional, só está órfão — nenhuma página o renderiza, nenhum item de menu navega até ele.
+Adicionar um botão de anexo no chat IA da Agenda do Líder que aceite **PDF, imagem (JPG/PNG/WEBP) e texto (TXT/MD)**. A IA usa o conteúdo extraído como contexto para sugerir missões — útil para colar uma auditoria, uma reclamação por print de WhatsApp, um relatório em PDF, etc.
 
-Em outras palavras: faltou o **último passo de 5 minutos** — adicionar um item no sidebar e um `case` no switch da página principal.
+## Como vai funcionar (visão do usuário)
 
-## O que vou fazer (3 edições pequenas)
+1. No chat, ao lado do campo de texto, aparece um botão de clipe (📎) **"Anexar"**.
+2. Ao clicar, abre o seletor de arquivos (até 3 anexos por mensagem, máx. 10 MB cada).
+3. Os anexos aparecem como chips acima do textarea (com nome do arquivo, ícone do tipo e botão de remover).
+4. O usuário pode escrever junto algo como _"Crie missões pra resolver os 3 pontos mais críticos dessa auditoria"_ e enviar.
+5. A IA recebe o texto + o conteúdo dos arquivos e devolve missões estruturadas como já faz hoje.
 
-### 1. Adicionar "AGENDA DO LÍDER" no menu lateral
-Arquivo: `src/components/layout/AppSidebar.tsx`
+## Como vai funcionar por trás
 
-Novo item no `menuItems`, logo abaixo de "AGENDA":
+### Frontend — `MissoesChatView.tsx`
+- Estado novo: `attachments: AttachmentDraft[]` (arquivo + texto extraído + tipo).
+- Botão "Anexar" abre `<input type="file" multiple accept=".pdf,.txt,.md,image/*">`.
+- **Extração no próprio navegador** (sem upload pra storage, mais rápido e privado):
+  - **TXT/MD**: `file.text()` direto.
+  - **PDF**: `pdfjs-dist` (já é leve via dynamic import) extrai todo o texto das páginas.
+  - **Imagens**: convertidas em base64 e mandadas como `image_url` para o modelo (Gemini 3 Flash já é multimodal).
+- Limite: 3 arquivos, 10 MB cada, ~50 mil chars de texto extraído (truncamento elegante com aviso).
+- Os chips ficam visíveis até a resposta chegar e somem após `send()` com sucesso.
+- A mensagem do usuário no histórico mostra "📎 nome-do-arquivo.pdf" inline pra ficar claro o que foi anexado.
 
-```text
-title: "AGENDA DO LÍDER"
-id: "agenda-lider"
-icon: ShieldCheck
-description: "Chat IA, missões e planos de ação"
-```
+### Edge function — `agenda-lider-chat`
+- Aceitar nova forma de `messages[].content`: além de string, aceitar array OpenAI-style `[{type:"text",text:...}, {type:"image_url",image_url:{url:"data:..."}}]`.
+- Quando vier anexo do tipo PDF/TXT, o frontend já manda o **texto extraído embutido no content** com cabeçalho `[Arquivo anexado: relatorio.pdf]\n\n<conteúdo>\n\n[/Arquivo]`.
+- Quando vier imagem, o frontend manda como `image_url` (data URL base64). A função só repassa pro gateway — Gemini já lê.
+- Ajuste no system prompt: instrução curta dizendo "Se houver arquivos anexados, priorize extrair os pontos críticos deles ao sugerir missões."
+- Sem mudança em tabelas, storage ou config.
 
-### 2. Renderizar a aba na página principal
-Arquivo: `src/pages/Index.tsx`
+### Persistência
+- O texto da mensagem do usuário salvo em `missao_chat` continua sendo só o que ele escreveu + lista dos nomes dos anexos (não o conteúdo cru, pra não inflar a tabela).
+- Conteúdo extraído fica só na requisição da IA — perfeito porque é one-shot.
 
-- Importar `AgendaLiderTab`
-- Adicionar `case "agenda-lider": return <AgendaLiderTab />;` no switch
-- Adicionar entrada em `tabConfig` para o título/breadcrumb
+## Bibliotecas
 
-### 3. Adicionar também na navegação inferior mobile (se houver espaço)
-Arquivo: `src/components/layout/BottomNavigation.tsx`
+- **`pdfjs-dist`** (~400 KB gzip, dynamic import só quando o usuário anexa um PDF — não pesa no bundle inicial).
+- Imagens: `FileReader` nativo, sem libs.
 
-Verificar se cabe — se não couber, fica só no sidebar (acessível pelo menu mobile expandido).
+## Casos de uso desbloqueados
 
-## Como vou validar
+- Anexar PDF de auditoria → "Crie missões pros 3 maiores ofensores"
+- Anexar print do WhatsApp de uma reclamação → "Vire isso em plano de ação pro gerente"
+- Anexar TXT exportado do checklist diário → "Resuma e me dê 2 missões prioritárias"
+- Anexar foto de um problema operacional → "Identifique o problema e crie missão pra equipe certa"
 
-Depois de aplicar:
-1. Abro `/` no app
-2. Clico em **"AGENDA DO LÍDER"** no menu
-3. Confirmo que renderiza as 4 sub-abas: **Chat IA**, **Board**, **Meu Painel**, **Diretoria**
-4. Testo o Chat IA: digito "Crie uma missão de limpeza geral para amanhã" e confirmo que a IA responde via `agenda-lider-chat`
-5. Confirmo no Board que a missão aparece como card
+## O que NÃO vai mudar
 
-## O que NÃO precisa ser refeito
+- Schema de banco (nada novo)
+- Storage (não vou salvar os arquivos, são efêmeros)
+- Visual e fluxo do chat existente (tudo continua igual, só ganha o botão e os chips)
+- A função `agenda-lider-chat` mantém o mesmo contrato de saída (`{ text, missoes }`)
 
-Tudo isso já existe e está deployado, não vou tocar:
-- Tabelas `missoes`, `missao_membros`, `missao_atualizacoes`, `missao_anexos`
-- RLS policies (`is_missao_member`, `user_can_see_missao`, etc.)
-- Edge function `agenda-lider-chat` (Lovable AI Gateway)
-- Hooks (`useMissoes`, `useMissaoDetalhe`, `useUnidadeMembros`)
-- Sub-componentes (board, cards, chat view, diretoria, meu-painel)
+## Arquivos que vou tocar
 
-## Tempo estimado
+1. `src/components/agenda-lider/chat/MissoesChatView.tsx` — botão, chips, extração, envio.
+2. `src/components/agenda-lider/chat/AttachmentChip.tsx` — **novo**, componente do chip.
+3. `src/lib/extract-attachment-text.ts` — **novo**, helper de extração (PDF/TXT/imagem).
+4. `supabase/functions/agenda-lider-chat/index.ts` — aceitar content multimodal + ajuste no prompt.
+5. `package.json` — adicionar `pdfjs-dist`.
 
-Funcional em poucos minutos após você aprovar — são apenas 2 a 3 arquivos pequenos para conectar peças que já existem.
-
-Aprova que eu já aplico?
+Aprova que eu implemento?

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUnidade } from "@/contexts/UnidadeContext";

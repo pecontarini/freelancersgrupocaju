@@ -1195,9 +1195,11 @@ export function ManualScheduleGrid() {
                 </div>
               ) : (
                 <div
-                  className="overflow-x-auto outline-none"
+                  ref={gridContainerRef}
+                  className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
                   tabIndex={0}
                   onKeyDown={handleGridKeyDown}
+                  onMouseDown={() => focusGrid()}
                 >
                   <div className="px-3 pb-2 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 uppercase tracking-wide">
                     <span><kbd className="px-1 rounded bg-muted">1</kbd>/<kbd className="px-1 rounded bg-muted">2</kbd>/<kbd className="px-1 rounded bg-muted">3</kbd> turno</span>

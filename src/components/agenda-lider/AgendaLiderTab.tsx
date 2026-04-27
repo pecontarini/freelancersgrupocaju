@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useQuery } from "@tanstack/react-query";
@@ -35,9 +34,16 @@ export function AgendaLiderTab() {
 
   return (
     <div className="space-y-4">
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-card to-card p-4">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15">
+      <div className="glass-card-strong relative overflow-hidden p-4">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            background:
+              "radial-gradient(ellipse at top left, hsl(var(--primary) / 0.18) 0%, transparent 55%)",
+          }}
+        />
+        <div className="relative flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 backdrop-blur">
             <ShieldCheck className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1">
@@ -48,7 +54,7 @@ export function AgendaLiderTab() {
             </p>
           </div>
         </div>
-      </Card>
+      </div>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex-wrap h-auto gap-1">

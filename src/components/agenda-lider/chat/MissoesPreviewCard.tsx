@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Check, User } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { PrioridadeBadge } from "../shared/Badges";
+import { PrioridadeBadge, PrioridadeAccentBar } from "../shared/Badges";
 import type { UnidadeMembro } from "@/hooks/useUnidadeMembros";
 import type { MissaoPrioridade } from "@/hooks/useMissoes";
 import { cn } from "@/lib/utils";
@@ -53,7 +52,8 @@ export function MissoesPreviewCard({
   const prazoCls = useMemo(() => prazoBadgeClass(missao.prazo), [missao.prazo]);
 
   return (
-    <Card className={cn("border-primary/20 bg-background p-3", confirmed && "opacity-70")}>
+    <div className={cn("glass-card relative overflow-hidden p-3 pl-4", confirmed && "opacity-70")}>
+      <PrioridadeAccentBar prioridade={missao.prioridade} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -133,6 +133,6 @@ export function MissoesPreviewCard({
           })}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

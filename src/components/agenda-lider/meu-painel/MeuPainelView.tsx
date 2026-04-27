@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, CheckCircle2, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import { useMissoes, type Missao } from "@/hooks/useMissoes";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { PrioridadeBadge, StatusBadge } from "../shared/Badges";
+import { PrioridadeBadge, StatusBadge, PrioridadeAccentBar } from "../shared/Badges";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 
 interface TarefaCompacta {
@@ -82,7 +80,8 @@ export function MeuPainelView() {
   return (
     <div className="space-y-6">
       {/* Hoje */}
-      <Card className="border-primary/30 bg-primary/5 p-4">
+      <div className="glass-card relative overflow-hidden p-4">
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
         <div className="mb-3 flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
@@ -100,7 +99,7 @@ export function MeuPainelView() {
               return (
                 <li
                   key={t.id}
-                  className="flex items-start gap-2 rounded-md border border-border/40 bg-background p-2"
+                  className="flex items-start gap-2 rounded-md border border-white/40 bg-white/40 p-2 backdrop-blur dark:border-white/10 dark:bg-white/5"
                 >
                   <Checkbox
                     checked={t.concluido}
@@ -125,7 +124,7 @@ export function MeuPainelView() {
             })}
           </ul>
         )}
-      </Card>
+      </div>
 
       {/* Missões ativas */}
       <div>
@@ -165,8 +164,9 @@ function MissaoCardMeuPainel({ missao, onClick }: { missao: Missao; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="flex w-full flex-col items-start gap-2 rounded-lg border border-border/60 bg-card/80 p-3 text-left transition hover:border-primary/40 hover:shadow-md"
+      className="glass-card hover-lift relative flex w-full flex-col items-start gap-2 overflow-hidden p-3 pl-4 text-left"
     >
+      <PrioridadeAccentBar prioridade={missao.prioridade} />
       <div className="flex w-full items-center justify-between gap-2">
         <PrioridadeBadge prioridade={missao.prioridade} className="px-1.5 py-0 text-[10px]" />
         <StatusBadge status={missao.status} className="px-1.5 py-0 text-[10px]" />

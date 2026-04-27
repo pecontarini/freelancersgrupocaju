@@ -29,19 +29,17 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useMissoes, type Missao } from "@/hooks/useMissoes";
 import { useGoogleCalendarEvents, type GoogleEvent } from "@/hooks/useGoogleCalendarEvents";
 import { startGoogleOAuth } from "@/services/googleCalendar";
-import { PrioridadeBadge, StatusBadge } from "../shared/Badges";
+import { PrioridadeBadge, StatusBadge, prioridadeAccent } from "../shared/Badges";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 
 type ModoVisualizacao = "mes" | "semana" | "lista";
@@ -177,7 +175,7 @@ export function AgendaUnificadaView() {
   return (
     <div className="space-y-4">
       {/* Header / Controles */}
-      <Card className="p-3 sm:p-4">
+      <div className="glass-card-strong p-3 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
@@ -261,13 +259,13 @@ export function AgendaUnificadaView() {
             </Button>
           </div>
         )}
-      </Card>
+      </div>
 
       {/* Conteúdo */}
       {(loadingMissoes || loadingGoogle) && items.length === 0 ? (
-        <Card className="flex items-center justify-center p-10 text-sm text-muted-foreground">
+        <div className="glass-card flex items-center justify-center p-10 text-sm text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando agenda…
-        </Card>
+        </div>
       ) : modo === "mes" ? (
         <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
       ) : modo === "semana" ? (
@@ -322,7 +320,7 @@ function MesView({
   const weekDayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   return (
-    <Card className="overflow-hidden p-0">
+    <div className="glass-card overflow-hidden p-0">
       <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {weekDayLabels.map((w) => (
           <div key={w} className="py-2">
@@ -378,7 +376,7 @@ function MesView({
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -400,7 +398,7 @@ function SemanaView({
   }, [refDate]);
 
   return (
-    <Card className="overflow-hidden p-0">
+    <div className="glass-card overflow-hidden p-0">
       <div className="grid grid-cols-7 border-b bg-muted/40 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {days.map((d) => {
           const isToday = isSameDay(d, new Date());
@@ -450,7 +448,7 @@ function SemanaView({
           );
         })}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -477,14 +475,14 @@ function ListaView({
 
   if (grouped.length === 0) {
     return (
-      <Card className="p-10 text-center text-sm text-muted-foreground">
+      <div className="glass-card p-10 text-center text-sm text-muted-foreground">
         Nada agendado nos próximos 30 dias.
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="p-0">
+    <div className="glass-card p-0">
       <ScrollArea className="max-h-[640px]">
         <div className="divide-y">
           {grouped.map(([dateKey, dayItems]) => {
@@ -521,7 +519,7 @@ function ListaView({
           })}
         </div>
       </ScrollArea>
-    </Card>
+    </div>
   );
 }
 
@@ -538,10 +536,10 @@ function CalendarChip({
   onClick?: () => void;
 }) {
   const isMissao = item.type === "missao";
+  const accent = isMissao && item.missao ? prioridadeAccent(item.missao.prioridade) : null;
   const baseColor = isMissao
-    ? "bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary-foreground"
+    ? "bg-primary/10 hover:bg-primary/20 border-primary/30"
     : "bg-blue-500/10 hover:bg-blue-500/20 border-blue-500/30";
-  const dotColor = isMissao ? "bg-primary" : "bg-blue-500";
 
   if (compact) {
     return (
@@ -549,13 +547,17 @@ function CalendarChip({
         type="button"
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-1 truncate rounded border px-1.5 py-0.5 text-left text-[10.5px] font-medium leading-tight transition",
+          "relative flex w-full items-center gap-1 truncate rounded border px-1.5 py-0.5 pl-2 text-left text-[10.5px] font-medium leading-tight backdrop-blur transition",
           baseColor,
           isMissao ? "text-primary" : "text-blue-700 dark:text-blue-300",
         )}
         title={item.title}
       >
-        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotColor)} />
+        {accent ? (
+          <span aria-hidden className={cn("absolute inset-y-0 left-0 w-[3px] rounded-l", accent)} />
+        ) : (
+          <span aria-hidden className="absolute inset-y-0 left-0 w-[3px] rounded-l bg-blue-500" />
+        )}
         <span className="truncate uppercase tracking-wide">{item.title}</span>
       </button>
     );
@@ -566,10 +568,15 @@ function CalendarChip({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full flex-col gap-1 rounded-md border p-2 text-left transition",
+        "group relative flex w-full flex-col gap-1 overflow-hidden rounded-md border p-2 pl-3 text-left backdrop-blur transition",
         baseColor,
       )}
     >
+      {accent ? (
+        <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", accent)} />
+      ) : (
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-blue-500" />
+      )}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2">
           {isMissao ? (

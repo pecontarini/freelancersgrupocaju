@@ -19,6 +19,7 @@ import {
   MAX_FILE_SIZE,
   type ExtractedAttachment,
 } from "@/lib/extract-attachment-text";
+import { cn } from "@/lib/utils";
 
 interface ChatMsg {
   id: string;
@@ -345,7 +346,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
 
   return (
     <div className="flex h-[calc(100vh-220px)] min-h-[500px] flex-col gap-3">
-      <Card className="flex flex-1 flex-col overflow-hidden border-primary/20 bg-card/60 backdrop-blur">
+      <Card className="glass-card-strong flex flex-1 flex-col overflow-hidden border-0 bg-transparent">
         <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">
@@ -401,11 +402,12 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm ${
+                    className={cn(
+                      "max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm",
                       m.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
+                        ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
+                        : "glass-card text-foreground",
+                    )}
                   >
                     <p className="whitespace-pre-wrap">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, TrendingUp } from "lucide-react";
-import { Card } from "@/components/ui/card";
+
 import { Progress } from "@/components/ui/progress";
 import { useMissoes } from "@/hooks/useMissoes";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,7 +98,7 @@ export function DiretoriaView() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-4">
+        <div className="glass-card p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             <TrendingUp className="h-3 w-3" /> Execução por unidade
           </h3>
@@ -118,9 +118,9 @@ export function DiretoriaView() {
               <p className="text-sm text-muted-foreground">Sem dados.</p>
             )}
           </div>
-        </Card>
+        </div>
 
-        <Card className="p-4">
+        <div className="glass-card p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             <TrendingUp className="h-3 w-3" /> Execução por responsável
           </h3>
@@ -140,10 +140,10 @@ export function DiretoriaView() {
               <p className="text-sm text-muted-foreground">Sem dados.</p>
             )}
           </div>
-        </Card>
+        </div>
       </div>
 
-      <Card className="p-4">
+      <div className="glass-card p-4">
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Todas as missões ({missoes.length})
         </h3>
@@ -194,7 +194,7 @@ export function DiretoriaView() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
 
       <MissaoDetailDialog missaoId={openId} open={!!openId} onClose={() => setOpenId(null)} />
     </div>

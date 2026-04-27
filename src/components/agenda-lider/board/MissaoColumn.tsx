@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 import type { MissaoStatus } from "@/hooks/useMissoes";
 import { STATUS_LABEL } from "../shared/Badges";
 
-const STATUS_COLOR: Record<MissaoStatus, string> = {
-  a_fazer: "border-border bg-muted/30",
-  em_andamento: "border-primary/30 bg-primary/5",
-  aguardando: "border-amber-500/30 bg-amber-500/5",
-  concluido: "border-emerald-500/30 bg-emerald-500/5",
+const STATUS_ACCENT: Record<MissaoStatus, string> = {
+  a_fazer: "before:bg-muted-foreground/30",
+  em_andamento: "before:bg-primary/60",
+  aguardando: "before:bg-amber-500/60",
+  concluido: "before:bg-emerald-500/60",
 };
 
 export function MissaoColumn({
@@ -29,16 +29,17 @@ export function MissaoColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex h-full min-h-[400px] flex-col rounded-xl border-2 border-dashed p-3 transition",
-        STATUS_COLOR[status],
-        isOver && "ring-2 ring-primary/50",
+        "glass-card relative flex h-full min-h-[400px] flex-col p-3 transition",
+        "before:absolute before:left-0 before:top-0 before:h-full before:w-[3px] before:rounded-l-[inherit]",
+        STATUS_ACCENT[status],
+        isOver && "ring-2 ring-primary/50 shadow-[var(--shadow-primary)]",
       )}
     >
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
           {STATUS_LABEL(status)}
         </h3>
-        <span className="rounded-full bg-background/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <span className="rounded-full border border-white/40 bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-foreground backdrop-blur">
           {count}
         </span>
       </div>

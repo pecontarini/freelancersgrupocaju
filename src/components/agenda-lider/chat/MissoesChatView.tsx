@@ -346,7 +346,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
 
   return (
     <div className="flex h-[calc(100vh-220px)] min-h-[500px] flex-col gap-3">
-      <Card className="flex flex-1 flex-col overflow-hidden border-primary/20 bg-card/60 backdrop-blur">
+      <Card className="glass-card-strong flex flex-1 flex-col overflow-hidden border-0 bg-transparent">
         <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">

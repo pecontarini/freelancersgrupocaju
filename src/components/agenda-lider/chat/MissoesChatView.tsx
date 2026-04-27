@@ -253,7 +253,30 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
     }
   }
 
-  async function confirmMissao(m: MissaoSugerida) {
+  // Estado de checkboxes do plano de ação por (msgId -> missaoIdx -> taskIdx)
+  const [taskDone, setTaskDone] = useState<Record<string, Record<number, boolean[]>>>({});
+  // Missões já confirmadas: Set "msgId:missaoIdx"
+  const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set());
+
+  function getDoneArr(msgId: string, missaoIdx: number, total: number): boolean[] {
+    const fromState = taskDone[msgId]?.[missaoIdx];
+    if (fromState && fromState.length === total) return fromState;
+    return Array(total).fill(false);
+  }
+
+  function toggleTask(msgId: string, missaoIdx: number, taskIdx: number, value: boolean, total: number) {
+    setTaskDone((prev) => {
+      const msgMap = { ...(prev[msgId] ?? {}) };
+      const arr = [...(msgMap[missaoIdx] ?? Array(total).fill(false))];
+      arr[taskIdx] = value;
+      msgMap[missaoIdx] = arr;
+      return { ...prev, [msgId]: msgMap };
+    });
+  }
+
+  async function confirmMissao(m: MissaoSugerida, msgId: string, missaoIdx: number) {
+    const key = `${msgId}:${missaoIdx}`;
+    if (confirmedSet.has(key)) return;
     try {
       const membrosArr: { user_id: string; papel: "responsavel" | "co_responsavel" }[] = [];
       if (m.responsavel_user_id && m.responsavel_user_id.trim()) {
@@ -262,6 +285,8 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
       (m.co_responsaveis ?? []).filter(Boolean).forEach((uid) => {
         membrosArr.push({ user_id: uid, papel: "co_responsavel" });
       });
+
+      const doneArr = getDoneArr(msgId, missaoIdx, (m.plano_acao ?? []).length);
 
       await create.mutateAsync({
         titulo: m.titulo,
@@ -275,11 +300,24 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
           descricao: t.descricao,
           dia_semana: t.dia_semana && t.dia_semana.trim() ? t.dia_semana : null,
           ordem: i,
+          concluido: !!doneArr[i],
         })),
       });
+      setConfirmedSet((prev) => new Set(prev).add(key));
       toast.success(`Missão criada: ${m.titulo}`);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao criar missão.");
+    }
+  }
+
+  async function confirmAllInTopic(msg: ChatMsg, topico: string) {
+    const items = (msg.missoes ?? [])
+      .map((m, idx) => ({ m, idx }))
+      .filter(({ m, idx }) => (m.topico ?? "Outros") === topico && !confirmedSet.has(`${msg.id}:${idx}`));
+    for (const { m, idx } of items) {
+      // sequencial pra não estourar rate limit / RLS
+      // eslint-disable-next-line no-await-in-loop
+      await confirmMissao(m, msg.id, idx);
     }
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, TrendingUp } from "lucide-react";
-import { Card } from "@/components/ui/card";
+
 import { Progress } from "@/components/ui/progress";
 import { useMissoes } from "@/hooks/useMissoes";
 import { supabase } from "@/integrations/supabase/client";

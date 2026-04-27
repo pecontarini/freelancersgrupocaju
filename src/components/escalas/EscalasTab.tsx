@@ -103,6 +103,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <PracasConfig />
         </div>
       </TabsContent>
+      {isAdmin && (
+        <TabsContent value="escalas-minimas">
+          <MinimumStaffingTab />
+        </TabsContent>
+      )}
       <TabsContent value="matrix">
         <StaffingMatrixConfig />
       </TabsContent>

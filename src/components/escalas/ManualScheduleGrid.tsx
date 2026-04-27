@@ -417,6 +417,13 @@ export function ManualScheduleGrid() {
   const upsertSchedule = useUpsertSchedule();
   const cancelSchedule = useCancelSchedule();
   const grid = useGridSelection();
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  // Garante que o foco do teclado volte para o container — sem isso, Ctrl+V não chega.
+  function focusGrid() {
+    // setTimeout 0 para acontecer após o handler de clique do navegador
+    setTimeout(() => gridContainerRef.current?.focus({ preventScroll: true }), 0);
+  }
 
   // Lista plana de funcionários (linha do grid → emp). Acompanha groupedScheduled.
   const flatEmployees = useMemo(() => {

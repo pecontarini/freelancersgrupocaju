@@ -164,8 +164,9 @@ function MissaoCardMeuPainel({ missao, onClick }: { missao: Missao; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="flex w-full flex-col items-start gap-2 rounded-lg border border-border/60 bg-card/80 p-3 text-left transition hover:border-primary/40 hover:shadow-md"
+      className="glass-card hover-lift relative flex w-full flex-col items-start gap-2 overflow-hidden p-3 pl-4 text-left"
     >
+      <PrioridadeAccentBar prioridade={missao.prioridade} />
       <div className="flex w-full items-center justify-between gap-2">
         <PrioridadeBadge prioridade={missao.prioridade} className="px-1.5 py-0 text-[10px]" />
         <StatusBadge status={missao.status} className="px-1.5 py-0 text-[10px]" />

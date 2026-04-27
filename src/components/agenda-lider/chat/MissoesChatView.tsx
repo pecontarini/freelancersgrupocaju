@@ -19,6 +19,7 @@ import {
   MAX_FILE_SIZE,
   type ExtractedAttachment,
 } from "@/lib/extract-attachment-text";
+import { cn } from "@/lib/utils";
 
 interface ChatMsg {
   id: string;

@@ -86,6 +86,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PracaBadge } from "./PracaBadge";
 import { PlanoChaoStatus } from "./PlanoChaoStatus";
 import { usePracasByUnit } from "@/hooks/usePracas";
+import { toast } from "sonner";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 

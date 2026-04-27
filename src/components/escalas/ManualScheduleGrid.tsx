@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { format, addDays, startOfWeek, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -417,6 +417,13 @@ export function ManualScheduleGrid() {
   const upsertSchedule = useUpsertSchedule();
   const cancelSchedule = useCancelSchedule();
   const grid = useGridSelection();
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  // Garante que o foco do teclado volte para o container — sem isso, Ctrl+V não chega.
+  function focusGrid() {
+    // setTimeout 0 para acontecer após o handler de clique do navegador
+    setTimeout(() => gridContainerRef.current?.focus({ preventScroll: true }), 0);
+  }
 
   // Lista plana de funcionários (linha do grid → emp). Acompanha groupedScheduled.
   const flatEmployees = useMemo(() => {
@@ -460,6 +467,7 @@ export function ManualScheduleGrid() {
     const before: (ManualSchedule | null)[] = [];
     const after: (any | null)[] = [];
     const tasks: Promise<any>[] = [];
+    let skipped = 0;
 
     for (const { row, col } of cells) {
       const emp = flatEmployees[row];
@@ -471,14 +479,18 @@ export function ManualScheduleGrid() {
       after.push(patch);
 
       if (patch === null) {
+        // Apagar célula
         if (existing) tasks.push(cancelSchedule.mutateAsync(existing.id));
-      } else if (patch.schedule_type === "off" && existing && existing.schedule_type !== "off") {
+      } else if (patch.schedule_type === "off") {
+        // Folga: cria ou atualiza
+        const sectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
+        if (!sectorId) { skipped++; continue; }
         tasks.push(
           upsertSchedule.mutateAsync({
-            id: existing.id,
+            id: existing?.id,
             employee_id: emp.id,
             schedule_date: dateStr,
-            sector_id: existing.sector_id || resolveSectorForEmployee(emp.id),
+            sector_id: sectorId,
             schedule_type: "off",
             start_time: null,
             end_time: null,
@@ -487,8 +499,9 @@ export function ManualScheduleGrid() {
           })
         );
       } else {
+        // Working: cria ou atualiza
         const sectorId = existing?.sector_id || resolveSectorForEmployee(emp.id);
-        if (!sectorId) continue;
+        if (!sectorId) { skipped++; continue; }
         tasks.push(
           upsertSchedule.mutateAsync({
             id: existing?.id,
@@ -499,9 +512,9 @@ export function ManualScheduleGrid() {
             shift_type: patch.shift_type,
             start_time: patch.start_time,
             end_time: patch.end_time,
-            break_duration: patch.break_duration,
+            break_duration: patch.break_duration ?? 0,
             agreed_rate: patch.agreed_rate ?? existing?.agreed_rate ?? 0,
-            praca_id: patch.praca_id ?? existing?.praca_id ?? null,
+            praca_id: patch.praca_id !== undefined ? patch.praca_id : (existing?.praca_id ?? null),
           })
         );
       }
@@ -510,6 +523,9 @@ export function ManualScheduleGrid() {
     try {
       await Promise.all(tasks);
       grid.pushHistory({ affected: cells, before, after });
+      if (skipped > 0) {
+        toast.warning(`${skipped} célula(s) ignorada(s) — funcionário sem setor`);
+      }
     } catch (err) {
       // Erros individuais já mostram toast pelo hook
     }
@@ -527,11 +543,33 @@ export function ManualScheduleGrid() {
     await applyPatchToCells(cells, () => null);
   }
 
+  // Inferir shift_type a partir de horários (para preservar a "cor" do turno no paste)
+  function inferShiftType(start?: string | null, end?: string | null, brk?: number): string | undefined {
+    if (!start || !end) return undefined;
+    const s = String(start).slice(0, 5);
+    const e = String(end).slice(0, 5);
+    // T3 = jornada longa com pausa
+    if ((brk ?? 0) >= 30) return "T3";
+    // T1 = turno almoço (manhã/tarde)
+    if (s < "16:00" && e <= "17:30") return "T1";
+    // Meia = jornada curta sem pausa
+    const sh = parseInt(s.split(":")[0], 10);
+    const eh = parseInt(e.split(":")[0], 10);
+    if (eh - sh <= 5 && (brk ?? 0) === 0 && s < "16:00") return "meia";
+    // T2 = turno noite
+    if (s >= "16:00") return "T2";
+    return undefined;
+  }
+
   function copySelection(cut: boolean) {
-    if (!selectionRect) return;
+    if (!selectionRect) {
+      toast.warning("Selecione células antes de copiar");
+      return;
+    }
     const rows = selectionRect.r1 - selectionRect.r0 + 1;
     const cols = selectionRect.c1 - selectionRect.c0 + 1;
     const cells: any[][] = [];
+    let nonEmpty = 0;
     for (let r = selectionRect.r0; r <= selectionRect.r1; r++) {
       const rowArr: any[] = [];
       for (let c = selectionRect.c0; c <= selectionRect.c1; c++) {
@@ -545,15 +583,18 @@ export function ManualScheduleGrid() {
         if (!sch) {
           rowArr.push(null);
         } else {
+          nonEmpty++;
           rowArr.push({
             patch: {
               schedule_type: sch.schedule_type === "off" ? "off" : "working",
-              shift_type: undefined,
+              shift_type: sch.schedule_type === "off"
+                ? undefined
+                : inferShiftType(sch.start_time, sch.end_time, sch.break_duration),
               start_time: sch.start_time,
               end_time: sch.end_time,
-              break_duration: sch.break_duration,
-              agreed_rate: sch.agreed_rate,
-              praca_id: sch.praca_id,
+              break_duration: sch.break_duration ?? 0,
+              agreed_rate: sch.agreed_rate ?? 0,
+              praca_id: sch.praca_id ?? null,
             },
           });
         }
@@ -563,16 +604,23 @@ export function ManualScheduleGrid() {
     grid.setClipboard({ rows, cols, cells });
     if (cut) {
       void deleteSelection();
-      toast.success(`${rows * cols} célula(s) recortada(s)`);
+      toast.success(`${nonEmpty} célula(s) recortada(s)`);
     } else {
-      toast.success(`${rows * cols} célula(s) copiada(s)`);
+      toast.success(`${nonEmpty} célula(s) copiada(s) — Ctrl+V para colar`);
     }
   }
 
   async function pasteAtActiveReal() {
     const clip = grid.state.clipboard;
     const active = grid.state.active;
-    if (!clip || !active) return;
+    if (!clip) {
+      toast.warning("Nada para colar — copie células primeiro (Ctrl+C)");
+      return;
+    }
+    if (!active) {
+      toast.warning("Selecione uma célula de destino antes de colar");
+      return;
+    }
     const cells: Cell[] = [];
     const patches: (any | null)[] = [];
     for (let dr = 0; dr < clip.rows; dr++) {
@@ -590,7 +638,8 @@ export function ManualScheduleGrid() {
       const p = patches[i++];
       return p;
     });
-    toast.success(`${cells.length} turno(s) colado(s)`);
+    const applied = patches.filter((p) => p !== null).length;
+    toast.success(`${applied} turno(s) colado(s)`);
   }
 
   async function undoLast() {
@@ -1146,9 +1195,11 @@ export function ManualScheduleGrid() {
                 </div>
               ) : (
                 <div
-                  className="overflow-x-auto outline-none"
+                  ref={gridContainerRef}
+                  className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
                   tabIndex={0}
                   onKeyDown={handleGridKeyDown}
+                  onMouseDown={() => focusGrid()}
                 >
                   <div className="px-3 pb-2 text-[10px] text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 uppercase tracking-wide">
                     <span><kbd className="px-1 rounded bg-muted">1</kbd>/<kbd className="px-1 rounded bg-muted">2</kbd>/<kbd className="px-1 rounded bg-muted">3</kbd> turno</span>
@@ -1431,6 +1482,7 @@ export function ManualScheduleGrid() {
                                         } else {
                                           grid.setActive({ row: rowIdx, col: i });
                                         }
+                                        focusGrid();
                                       }}
                                       onDoubleClick={(e) => {
                                         if (copyMode) return;

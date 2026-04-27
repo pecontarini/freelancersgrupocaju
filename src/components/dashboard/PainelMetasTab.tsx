@@ -1998,50 +1998,109 @@ function PlaceholderCard({ name }: { name: string }) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// Root
+// Root — nova arquitetura: sidebar lateral por meta + 6 meses por loja
 // ──────────────────────────────────────────────────────────────
+
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet as MetaSheet, SheetContent as MetaSheetContent, SheetTrigger as MetaSheetTrigger } from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
+import { PainelSidebar } from "./painel-metas/shared/PainelSidebar";
+import { VisaoGeralView } from "./painel-metas/views/VisaoGeralView";
+import { SixMonthsForUserUnit } from "./painel-metas/shared/SixMonthsForUserUnit";
+import { currentMonth as currentMonthHelper } from "./painel-metas/shared/dateUtils";
+import { META_DEFINITIONS } from "./painel-metas/shared/metas";
+import type { MetaKey } from "./painel-metas/shared/types";
+
+function PlaceholderView({ metaKey }: { metaKey: MetaKey }) {
+  const def = META_DEFINITIONS[metaKey];
+  return (
+    <Card className="glass-card">
+      <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-2 p-10 text-center">
+        <p className="text-base font-semibold text-foreground">{def.label}</p>
+        <p className="max-w-md text-sm text-muted-foreground">
+          Em breve: KPIs por loja, ranking comparativo entre unidades e gráficos
+          interativos para esta meta. O motor de importação continua ativo.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   const { isAdmin, isOperator } = useUserProfile();
-  const showHolding = isAdmin || isOperator;
+  const showAdmin = isAdmin || isOperator;
+  const isMobile = useIsMobile();
 
-  const subtabs = showHolding ? [...BASE_SUBTABS, HOLDING_SUBTAB] : BASE_SUBTABS;
+  const [active, setActive] = useState<MetaKey>("visao-geral");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [individualMes] = useState<string>(currentMonthHelper());
+
+  const handleSelect = (key: MetaKey) => {
+    setActive(key);
+    setDrawerOpen(false);
+  };
+
+  const showSixMonths =
+    active !== "visao-geral" &&
+    active !== "planos" &&
+    active !== "diario" &&
+    active !== "holding" &&
+    active !== "red-flag";
+
+  const renderView = () => {
+    switch (active) {
+      case "visao-geral":
+        return <VisaoGeralView />;
+      case "nps":
+        return <NpsView />;
+      case "conformidade":
+        return <ConformidadeView />;
+      case "planos":
+        return <PlanosView />;
+      case "diario":
+        return <DiarioView selectedUnidadeId={selectedUnidadeId} />;
+      case "holding":
+        return <HoldingCentralTab selectedUnidadeId={selectedUnidadeId} />;
+      case "cmv-salmao":
+      case "cmv-carnes":
+      case "kds":
+      case "red-flag":
+      default:
+        return <PlaceholderView metaKey={active} />;
+    }
+  };
+
+  const sidebar = (
+    <PainelSidebar active={active} onSelect={handleSelect} showAdmin={showAdmin} />
+  );
 
   return (
-    <Tabs defaultValue="visao-geral" className="space-y-4">
-      <TabsList className="h-auto w-full justify-start gap-1 bg-muted/40 p-1 flex-wrap">
-        {subtabs.map(({ value, label, icon: Icon }) => (
-          <TabsTrigger
-            key={value}
-            value={value}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
-          >
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      <TabsContent value="visao-geral" className="mt-4">
-        <VisaoGeral />
-      </TabsContent>
-      <TabsContent value="diario" className="mt-4">
-        <DiarioView selectedUnidadeId={selectedUnidadeId} />
-      </TabsContent>
-      <TabsContent value="nps" className="mt-4">
-        <NpsView />
-      </TabsContent>
-      <TabsContent value="conformidade" className="mt-4">
-        <ConformidadeView />
-      </TabsContent>
-      <TabsContent value="planos" className="mt-4">
-        <PlanosView />
-      </TabsContent>
-      {showHolding && (
-        <TabsContent value="holding" className="mt-4">
-          <HoldingCentralTab selectedUnidadeId={selectedUnidadeId} />
-        </TabsContent>
+    <div className="space-y-3">
+      {isMobile && (
+        <MetaSheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <MetaSheetTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+              <Menu className="h-4 w-4" />
+              <span className="font-semibold uppercase tracking-wide text-xs">
+                Metas — {META_DEFINITIONS[active].label}
+              </span>
+            </Button>
+          </MetaSheetTrigger>
+          <MetaSheetContent side="left" className="w-[280px] p-3">
+            {sidebar}
+          </MetaSheetContent>
+        </MetaSheet>
       )}
-    </Tabs>
+
+      <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+        {!isMobile && <aside className="sticky top-2 self-start">{sidebar}</aside>}
+        <div className="min-w-0 space-y-4">
+          {renderView()}
+          {showSixMonths && (
+            <SixMonthsForUserUnit metaKey={active} mes={individualMes} />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

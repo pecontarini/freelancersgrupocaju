@@ -21,12 +21,12 @@ interface BottomNavigationProps {
 }
 
 const navItems = [
-  { id: "budgets", label: "Budgets", icon: Wallet },
+  { id: "unitarios-gerentes", label: "Unitários", icon: LayoutGrid },
+  { id: "gestao-pessoas", label: "Pessoas", icon: Users },
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
-  { id: "escalas", label: "Escalas", icon: CalendarClock },
   { id: "agenda-lider", label: "Agenda", icon: Calendar },
-  { id: "painel", label: "Metas", icon: BarChart2 },
+  { id: "painel", label: "Indicadores", icon: BarChart2 },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {

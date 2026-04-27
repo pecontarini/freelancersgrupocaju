@@ -25,6 +25,7 @@ import {
   CMVContagemCarnes,
 } from "@/components/cmv";
 import { CMVAIAssistant } from "@/components/cmv/CMVAIAssistant";
+import { CMVResetZone } from "@/components/cmv/CMVResetZone";
 import { useUnmappedSalesItems } from "@/hooks/useUnmappedSalesItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -325,6 +326,8 @@ export function CMVTab() {
                   <CMVPriceHistory />
                 </TabsContent>
               </Tabs>
+
+              <CMVResetZone />
             </div>
           ) : (
             <Card>

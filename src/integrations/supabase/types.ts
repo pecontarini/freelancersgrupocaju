@@ -4579,6 +4579,7 @@ export type Database = {
         Args: { p_approval_id: string }
         Returns: number
       }
+      reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
       user_can_see_missao: {
         Args: { _missao_id: string; _user_id: string }

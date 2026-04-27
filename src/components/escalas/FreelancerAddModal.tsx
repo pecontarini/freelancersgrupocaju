@@ -593,6 +593,18 @@ export function FreelancerAddModal({
           )}
         </div>
       </DialogContent>
+
+      <QuickCreateJobTitleDialog
+        open={quickJobTitleOpen}
+        onClose={() => setQuickJobTitleOpen(false)}
+        unitId={targetUnitId}
+        sectorId={targetSectorId}
+        alreadyLinkedIds={allowedJobTitleIds}
+        onLinked={(jt) => {
+          // Pré-seleciona automaticamente o cargo recém-criado
+          setSelectedJobTitleId(jt.id);
+        }}
+      />
     </Dialog>
   );
 }

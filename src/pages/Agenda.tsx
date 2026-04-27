@@ -37,8 +37,7 @@ import {
   getTokenFromSupabase,
   GoogleAuthExpiredError,
   initGoogleAuth,
-  requestGoogleToken,
-  saveTokenToSupabase,
+  startGoogleOAuth,
   updateCalendarEvent,
 } from "@/services/googleCalendar";
 
@@ -107,6 +106,26 @@ export default function Agenda() {
   useEffect(() => {
     initGoogleAuth().catch(() => {});
     refreshTokenStatus();
+
+    // Tratar retorno do callback OAuth (?google_oauth=success|error)
+    const params = new URLSearchParams(window.location.search);
+    const oauthStatus = params.get("google_oauth");
+    if (oauthStatus === "success") {
+      toast.success("Google Calendar conectado! Conexão será mantida automaticamente.");
+      // Limpa query da URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google_oauth");
+      url.searchParams.delete("reason");
+      window.history.replaceState({}, "", url.toString());
+      refreshTokenStatus();
+    } else if (oauthStatus === "error") {
+      const reason = params.get("reason") || "desconhecido";
+      toast.error(`Falha ao conectar Google: ${reason}`);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("google_oauth");
+      url.searchParams.delete("reason");
+      window.history.replaceState({}, "", url.toString());
+    }
   }, []);
 
   // Carregar nomes dos donos quando admin
@@ -154,14 +173,11 @@ export default function Agenda() {
   const handleConnect = async () => {
     try {
       setConnecting(true);
-      const token = await requestGoogleToken();
-      await saveTokenToSupabase(token);
-      await refreshTokenStatus();
-      toast.success("Google Calendar conectado!");
+      // Redirect para a tela de consent do Google. A página recarrega no callback.
+      await startGoogleOAuth("/agenda");
     } catch (err: any) {
       console.error(err);
-      toast.error(err?.message ?? "Falha ao conectar Google.");
-    } finally {
+      toast.error(err?.message ?? "Falha ao iniciar conexão com Google.");
       setConnecting(false);
     }
   };
@@ -170,21 +186,16 @@ export default function Agenda() {
     try {
       setConnecting(true);
       await clearTokenFromSupabase();
-      const token = await requestGoogleToken();
-      await saveTokenToSupabase(token);
-      await refreshTokenStatus();
-      toast.success("Google Calendar reconectado!");
-      setReconnectOpen(false);
-
+      // Salva o formulário pendente em sessionStorage para retomar após o redirect
       if (pendingForm) {
-        const form = pendingForm;
+        sessionStorage.setItem("agenda_pending_form", JSON.stringify(pendingForm));
         setPendingForm(null);
-        await handleSubmit(form);
       }
+      setReconnectOpen(false);
+      await startGoogleOAuth("/agenda");
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message ?? "Falha ao reconectar Google.");
-    } finally {
       setConnecting(false);
     }
   };

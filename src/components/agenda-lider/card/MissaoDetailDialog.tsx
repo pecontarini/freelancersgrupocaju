@@ -33,6 +33,7 @@ export function MissaoDetailDialog({
 
   const detalhe = useMissaoDetalhe(missaoId);
   const { data: membros = [] } = useUnidadeMembros(effectiveUnidadeId);
+  const sync = useSyncMissaoCalendar();
   const profilesById = useMemo(
     () => new Map(membros.map((m) => [m.user_id, m])),
     [membros],

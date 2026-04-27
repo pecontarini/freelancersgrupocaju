@@ -425,6 +425,12 @@ export function ManualScheduleGrid() {
     return arr;
   }, [groupedScheduled]);
 
+  const empRowIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    flatEmployees.forEach((e: any, i: number) => m.set(e.id, i));
+    return m;
+  }, [flatEmployees]);
+
   const maxRows = flatEmployees.length;
   const maxCols = weekDays.length;
 

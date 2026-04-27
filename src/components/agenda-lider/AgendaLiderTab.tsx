@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Calendar, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
+import { CalendarRange, KanbanSquare, MessagesSquare, ShieldCheck, User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -11,6 +11,7 @@ import { MissoesChatView } from "./chat/MissoesChatView";
 import { MissoesBoardView } from "./board/MissoesBoardView";
 import { MeuPainelView } from "./meu-painel/MeuPainelView";
 import { DiretoriaView } from "./diretoria/DiretoriaView";
+import { AgendaUnificadaView } from "./agenda/AgendaUnificadaView";
 
 export function AgendaLiderTab() {
   const { effectiveUnidadeId } = useUnidade();
@@ -59,6 +60,10 @@ export function AgendaLiderTab() {
             <KanbanSquare className="h-4 w-4" />
             Board
           </TabsTrigger>
+          <TabsTrigger value="agenda" className="gap-1.5">
+            <CalendarRange className="h-4 w-4" />
+            Agenda
+          </TabsTrigger>
           <TabsTrigger value="meu-painel" className="gap-1.5">
             <User className="h-4 w-4" />
             Meu Painel
@@ -76,6 +81,9 @@ export function AgendaLiderTab() {
         </TabsContent>
         <TabsContent value="board">
           <MissoesBoardView />
+        </TabsContent>
+        <TabsContent value="agenda">
+          <AgendaUnificadaView />
         </TabsContent>
         <TabsContent value="meu-painel">
           <MeuPainelView />

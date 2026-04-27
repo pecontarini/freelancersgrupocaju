@@ -25,6 +25,42 @@ export function useSectorJobTitles(sectorIds: string[]) {
   });
 }
 
+/**
+ * Vincula UM cargo a UM setor sem apagar os existentes.
+ * Idempotente: se já existir, ignora silenciosamente.
+ */
+export function useAddSectorJobTitle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sectorId,
+      jobTitleId,
+    }: {
+      sectorId: string;
+      jobTitleId: string;
+    }) => {
+      // Verifica duplicata antes de inserir
+      const { data: existing } = await supabase
+        .from("sector_job_titles")
+        .select("id")
+        .eq("sector_id", sectorId)
+        .eq("job_title_id", jobTitleId)
+        .maybeSingle();
+
+      if (existing) return;
+
+      const { error } = await supabase
+        .from("sector_job_titles")
+        .insert({ sector_id: sectorId, job_title_id: jobTitleId });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["sector_job_titles"] });
+    },
+    onError: (err: Error) => toast.error("Erro ao vincular cargo: " + err.message),
+  });
+}
+
 export function useSetSectorJobTitles() {
   const qc = useQueryClient();
   return useMutation({

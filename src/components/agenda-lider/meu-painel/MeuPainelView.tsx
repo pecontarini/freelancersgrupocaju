@@ -80,7 +80,8 @@ export function MeuPainelView() {
   return (
     <div className="space-y-6">
       {/* Hoje */}
-      <Card className="border-primary/30 bg-primary/5 p-4">
+      <div className="glass-card relative overflow-hidden p-4">
+        <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-primary" />
         <div className="mb-3 flex items-center gap-2">
           <CalendarDays className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold uppercase tracking-wide text-primary">
@@ -98,7 +99,7 @@ export function MeuPainelView() {
               return (
                 <li
                   key={t.id}
-                  className="flex items-start gap-2 rounded-md border border-border/40 bg-background p-2"
+                  className="flex items-start gap-2 rounded-md border border-white/40 bg-white/40 p-2 backdrop-blur dark:border-white/10 dark:bg-white/5"
                 >
                   <Checkbox
                     checked={t.concluido}
@@ -123,7 +124,7 @@ export function MeuPainelView() {
             })}
           </ul>
         )}
-      </Card>
+      </div>
 
       {/* Missões ativas */}
       <div>

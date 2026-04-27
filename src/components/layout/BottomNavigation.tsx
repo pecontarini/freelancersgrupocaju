@@ -1,4 +1,4 @@
-import { TrendingUp, ClipboardCheck, User, Menu, Package, CalendarClock, Sun, Moon, Calendar, BarChart2, LayoutGrid, Users } from "lucide-react";
+import { ClipboardCheck, User, Menu, Package, CalendarClock, Sun, Moon, Calendar, BarChart2, LayoutGrid, Users } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {

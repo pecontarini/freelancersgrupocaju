@@ -12,7 +12,7 @@ import { PortalHeader } from "@/components/layout/PortalHeader";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
-import { RemuneracaoVariavelTab } from "@/components/dashboard/RemuneracaoVariavelTab";
+
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
 import { CMVTab } from "@/components/dashboard/CMVTab";

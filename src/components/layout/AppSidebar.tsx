@@ -3,7 +3,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
-  TrendingUp,
+  
   Settings,
   Building2,
   LogOut,

@@ -1,221 +1,155 @@
 
-# Integração n8n → Central de Reclamações
+# Plano: Metas Customizadas por Cargo + Importação de Tempo de Comanda
 
-## Objetivo
+## 🎯 Objetivos
 
-Criar um endpoint público e seguro para o n8n enviar reclamações automaticamente (1x ou 2x por dia, conforme a automação), com normalização de dados, deduplicação, rastreamento de execuções e visualização na Central Holding.
-
----
-
-## Arquitetura proposta
-
-```
-┌─────────┐    HTTPS POST    ┌──────────────────────┐    INSERT    ┌──────────────┐
-│   n8n   │ ───────────────► │  Edge Function       │ ───────────► │ reclamacoes  │
-│         │  (webhook + key) │  ingest-reclamacoes  │              └──────────────┘
-└─────────┘                  │                      │    LOG       ┌──────────────┐
-                             └──────────────────────┘ ───────────► │ n8n_webhook_ │
-                                                                    │ executions   │
-                                                                    └──────────────┘
-                                                                          ▲
-                                                                          │
-                              ┌──────────────────────┐                    │
-                              │ HoldingCentralTab    │ ────── lê ─────────┘
-                              │  → aba "Webhooks"    │
-                              └──────────────────────┘
-```
-
-**Por que webhook (push) e não polling?**
-- n8n já dispara automaticamente quando os dados estão prontos → menor latência, sem cron extra do nosso lado
-- Você já controla a frequência no n8n (1x ou 2x ao dia, ou quando quiser)
-- Simples de adicionar mais fontes (Google Reviews, iFood, TripAdvisor) — cada uma vira um workflow no n8n apontando para o mesmo endpoint
+1. **Botão "Adicionar Meta"** na seção de Metas por Cargo (`CargosConfigSection`), permitindo criar uma nova meta com:
+   - Tipo de meta (codigo_meta)
+   - Teto em R$
+   - Peso
+   - Origem do dado
+   - Ativo (toggle)
+2. **Editar** todos esses campos em metas existentes (hoje só edita `teto_valor`).
+3. **Ativar/desativar** metas individualmente sem precisar excluir.
+4. **Suporte a "Tempo de Comanda" / Tempo de Prato** no motor de importação de IA já existente (`AiImportSection` na Holding Central) — sem criar botão novo, reaproveitando o mesmo fluxo de upload.
+5. Adicionar a meta `tempo_prato` automaticamente para os cargos de **Chefia** (Cozinha, Bar, Parrilla, Sushi, Salão, APV) e Gerência, prontas para receber dados.
 
 ---
 
-## 1. Banco de dados (1 migration)
+## 📊 Análise do estado atual
 
-### Nova tabela `n8n_webhook_endpoints`
-Cada endpoint representa uma "automação" do n8n (ex: "Google Reviews diário", "iFood 2x por dia").
+✅ Schema `metas_cargo` já suporta tudo o que precisamos:
+- `id`, `cargo_id`, `codigo_meta` (enum), `teto_valor`, `peso`, `origem_dado` (enum), `ativo`, timestamps.
+- Enum `codigo_meta` já contém: `nps_salao | nps_delivery | supervisao | conformidade_setor | tempo_prato`
+- Enum `origem_dado` já contém: `sheets | pdf | kds | manual`
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `id` | uuid PK | |
-| `nome` | text | Ex: "Google Reviews — Diário" |
-| `slug` | text unique | Identificador na URL (ex: `google-reviews-diario`) |
-| `secret_token` | text | Token bearer para autenticar (gerado uma vez) |
-| `tipo_dado` | text | `reclamacoes` (extensível futuramente) |
-| `ativo` | boolean | Liga/desliga sem deletar |
-| `loja_id_default` | uuid nullable | Se preenchido, força a loja (opcional) |
-| `ultima_execucao_at` | timestamptz | |
-| `total_recebido` | int default 0 | Contador acumulado |
-| `created_at`, `updated_at` | timestamptz | |
+✅ O hook `useMetasCargo` já tem `updateMeta`, mas **não tem `createMeta` nem `deleteMeta`**.
 
-RLS: apenas `admin` lê/escreve. O endpoint público bypassa RLS via service role.
+✅ O componente `CargosConfigSection.tsx` só edita `teto_valor` inline; precisa ganhar:
+- Botão "+ Adicionar Meta" por cargo
+- Modal/diálogo com formulário completo
+- Switch para `ativo`
+- Edição de `peso` e `origem_dado`
 
-### Nova tabela `n8n_webhook_executions`
-Log de cada chamada vinda do n8n para auditoria/debug.
-
-| Coluna | Tipo |
-|---|---|
-| `id` | uuid PK |
-| `endpoint_id` | uuid FK |
-| `status` | text (`success`, `partial`, `error`) |
-| `payload_recebido` | jsonb |
-| `linhas_processadas` | int |
-| `linhas_inseridas` | int |
-| `linhas_duplicadas` | int |
-| `linhas_invalidas` | int |
-| `erros` | jsonb |
-| `created_at` | timestamptz |
-
-RLS: leitura apenas para `admin`.
-
-### Índice de deduplicação na `reclamacoes`
-Para evitar duplicação quando o n8n reenviar:
-```sql
-CREATE UNIQUE INDEX idx_reclamacoes_dedupe
-  ON public.reclamacoes (loja_id, fonte, data_reclamacao, md5(coalesce(texto_original, '')))
-  WHERE fonte != 'manual';
-```
-Insert usará `ON CONFLICT DO NOTHING` para ser idempotente.
+✅ Motor de IA (`ai-import-extract` + `ai-import-confirm`) já reconhece `tempo_prato_avg` em `store_performance` (campo já presente no `SCHEMA_DEFINITIONS` linha 89). Falta:
+- Reforçar o prompt para reconhecer variações ("Tempo de Comanda", "Tempo Médio de Prato", "Tempo KDS", em minutos ou mm:ss).
+- Permitir um "destino" mais explícito no `AiImportSection` para o usuário sinalizar que o arquivo é de tempo de prato (chip/dica de destino opcional).
 
 ---
 
-## 2. Edge Function: `ingest-reclamacoes`
+## 🛠️ Mudanças
 
-**Path:** `POST /functions/v1/ingest-reclamacoes/{slug}`
+### 1. Banco de dados (migração)
 
-### Autenticação
-- `verify_jwt = false` no `config.toml` (n8n não tem JWT)
-- Header obrigatório: `Authorization: Bearer <secret_token>`
-- Token comparado com `n8n_webhook_endpoints.secret_token` (lookup pelo slug da URL)
+**Sem alteração de schema** — o modelo já suporta tudo. Apenas:
+- **Seed/Insert** de metas `tempo_prato` (inativas por padrão, teto R$ 0, peso 0) para os cargos de Chefia e Gerência que ainda não têm essa meta, para que apareçam listadas na UI prontas para o admin configurar.
+- Adicionar `UNIQUE (cargo_id, codigo_meta)` em `metas_cargo` para impedir duplicatas (caso ainda não exista).
 
-### Payload aceito (JSON)
-Aceita 1 reclamação ou um array — flexível para o n8n:
-```json
-{
-  "reclamacoes": [
-    {
-      "loja": "Caju Limão Centro",        // nome → fuzzy match com config_lojas.nome
-      "loja_id": "uuid-opcional",          // se já souber, evita match
-      "fonte": "google",                   // google|ifood|tripadvisor|getin|sheets
-      "tipo_operacao": "salao",            // salao|delivery
-      "data_reclamacao": "2026-04-26",
-      "nota_reclamacao": 2,
-      "texto_original": "Demorou 40 min...",
-      "resumo_ia": "Demora no atendimento", // opcional
-      "temas": ["atendimento", "tempo"],    // opcional
-      "palavras_chave": ["lento"],          // opcional
-      "anexo_url": "https://..."            // opcional
-    }
-  ]
+### 2. Hook `src/hooks/useCargos.ts`
+
+Adicionar duas mutations no `useMetasCargo`:
+
+```ts
+const createMeta = useMutation({
+  mutationFn: async (params: {
+    cargo_id: string;
+    codigo_meta: CodigoMeta;
+    teto_valor: number;
+    peso: number;
+    origem_dado: OrigemDado;
+    ativo: boolean;
+  }) => {
+    const { error } = await supabase.from('metas_cargo').insert(params);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['metas_cargo'] });
+    toast.success('Meta adicionada!');
+  },
+});
+
+const deleteMeta = useMutation({ /* delete by id */ });
+```
+
+A mutation `updateMeta` já existe e aceita `Partial<MetaCargo>`, então não precisa mudar — basta passar `peso`, `origem_dado`, `ativo` quando editado.
+
+### 3. Componente `src/components/CargosConfigSection.tsx`
+
+- Importar `Dialog`, `Switch`, `Select`, `Trash2` icon.
+- Por baixo da tabela de metas de cada `CargoCard`, adicionar:
+  ```
+  <Button variant="outline" size="sm">+ Adicionar Meta</Button>
+  ```
+- Abrir um `Dialog` com formulário:
+  - Select **Tipo de Meta** (codigo_meta) — opções de `META_LABELS`, filtrando as que já existem no cargo
+  - Input **Teto (R$)** — usar `formatCurrency` no display
+  - Input **Peso** (number, default 1)
+  - Select **Origem do Dado** — `sheets | pdf | kds | manual`
+  - **Switch "Ativo"** (default ligado)
+  - Botões: Cancelar / Salvar
+- Na tabela de metas existente:
+  - Adicionar **Switch "Ativo"** em cada linha (chama `updateMeta.mutate({ id, ativo: !meta.ativo })`)
+  - Permitir editar **Peso** e **Origem** inline (já temos padrão de edição inline para teto)
+  - Adicionar botão **lixeira** (com confirmação) → `deleteMeta`
+- Carregar **TODAS** as metas (não só `ativo=true`) para que o admin possa reativar metas desativadas. Atualizar a query do hook ou criar variante `useMetasCargo({ includeInactive: true })`.
+
+### 4. Motor de importação de IA — suporte a Tempo de Comanda
+
+#### 4a. `supabase/functions/ai-import-extract/index.ts`
+
+Reforçar o prompt em `SCHEMA_DEFINITIONS` (linhas 87–92) e nas regras (`REGRAS:`) para deixar explícito o reconhecimento de "Tempo de Comanda":
+
+- Adicionar nota:
+  > Para "Tempo de Comanda", "Tempo de Prato", "Tempo Médio KDS" ou similares: mapear para `tempo_prato_avg` em `store_performance` (mensal) ou criar novo destino diário se vier por dia. Sempre converter para **minutos** (mm:ss → minutos decimais; "00:08:32" → 8.53). Origem provável: `kds`.
+- Adicionar exemplos explícitos de cabeçalhos comuns de relatórios KDS (Consumer, Goomer, etc.) para a IA reconhecer.
+
+#### 4b. `supabase/functions/ai-import-confirm/index.ts`
+
+Já trata `tempo_prato_avg` corretamente em `store_performance` (linha 110). Garantir que aceite o formato mm:ss adicionando um helper `parseDurationToMinutes`:
+
+```ts
+function parseDurationToMinutes(v: any): number | null {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  // mm:ss ou hh:mm:ss
+  const parts = s.split(":").map((p) => parseInt(p, 10));
+  if (parts.every((n) => !isNaN(n))) {
+    if (parts.length === 2) return parts[0] + parts[1] / 60;
+    if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+  }
+  return parseNumber(v); // já vem em minutos
 }
 ```
 
-### Lógica
-1. Valida bearer token → busca endpoint ativo pelo slug
-2. Para cada reclamação:
-   - Resolve `loja_id` (direto, ou via `loja_id_default`, ou fuzzy match no nome com `config_lojas`)
-   - Calcula `referencia_mes` a partir de `data_reclamacao` (`YYYY-MM`)
-   - Valida campos obrigatórios e enums (fonte, tipo_operacao, nota 1–5)
-   - `INSERT ... ON CONFLICT DO NOTHING` em `reclamacoes`
-3. Grava resumo em `n8n_webhook_executions` (sucesso/parcial/erro com detalhes por linha)
-4. Atualiza `ultima_execucao_at` e `total_recebido` no endpoint
-5. Retorna JSON: `{ success, processadas, inseridas, duplicadas, invalidas, erros }`
+E aplicar: `tempo_prato_avg: parseDurationToMinutes(r.tempo_prato_avg ?? r.tempo_prato ?? r.tempo_comanda)`.
 
-### Códigos HTTP
-- `200` — processado (mesmo que algumas linhas falhem; detalhes no body)
-- `401` — token inválido
-- `404` — slug inexistente ou inativo
-- `400` — payload malformado
-- `500` — erro interno
+#### 4c. `src/components/dashboard/AiImportSection.tsx`
+
+Adicionar à lista de "destinos" um chip/Select **opcional** "Tempo de Comanda (KDS)" que envia `hintDestino: "store_performance"` mais um campo `subtipo: "tempo_prato"` no body — usado pelo extract para reforçar o prompt. Sem novo botão, mesmo fluxo de upload.
+
+### 5. Memória de projeto
+
+Atualizar `mem://logic/variable-remuneration-and-kpi-engine` (já existe) para refletir que metas de cargo são agora 100% customizáveis (teto, peso, origem, ativo) e que `tempo_prato` é importado via o motor central de IA (mesmo botão de upload da Holding Central).
 
 ---
 
-## 3. UI — Nova aba "Webhooks n8n" no HoldingCentralTab
+## 📁 Arquivos afetados
 
-Ao lado das abas existentes (Upload de Dados, Sincronizações, etc.):
+**Editados:**
+- `src/components/CargosConfigSection.tsx` — UI de adicionar/editar/desativar metas
+- `src/hooks/useCargos.ts` — `createMeta` + `deleteMeta` + opção de carregar inativas
+- `src/components/dashboard/AiImportSection.tsx` — chip "Tempo de Comanda"
+- `supabase/functions/ai-import-extract/index.ts` — prompt reforçado
+- `supabase/functions/ai-import-confirm/index.ts` — helper `parseDurationToMinutes`
 
-### Painel principal
-- **Lista de endpoints** (tabela): nome, slug, fonte, status (ativo/inativo), última execução, total recebido, ações (copiar URL, copiar token, ver logs, editar, excluir)
-- Botão **"+ Novo Endpoint Webhook"** abre modal com:
-  - Nome (ex: "Google Reviews — Diário")
-  - Slug (auto-gerado, editável)
-  - Loja padrão (opcional, dropdown de `config_lojas`)
-  - Switch ativo
-  - Ao salvar: gera `secret_token` aleatório (32 bytes hex) e mostra **uma única vez** com botão de copiar + URL completa pronta para colar no n8n
-
-### Card "Como configurar no n8n" (instruções inline)
-```
-URL:  https://<projeto>.supabase.co/functions/v1/ingest-reclamacoes/<slug>
-Method: POST
-Headers:
-  Authorization: Bearer <token>
-  Content-Type: application/json
-Body: { "reclamacoes": [ {...} ] }
-```
-Com botão "Copiar exemplo de payload".
-
-### Drawer "Histórico de execuções"
-Ao clicar num endpoint, abre painel lateral com:
-- Últimas 50 execuções (status badge, data, linhas inseridas/duplicadas/inválidas)
-- Expandível: ver `payload_recebido` e `erros` (JSON formatado)
-- Útil para debugar quando o n8n manda algo errado
+**Criados:**
+- Migração SQL: índice único `(cargo_id, codigo_meta)` + insert de metas `tempo_prato` inativas para Chefias e Gerências que ainda não têm.
 
 ---
 
-## 4. Visualização automática (já pronta!)
+## ✅ Resultado esperado
 
-Como as reclamações entram na tabela `reclamacoes` que já alimenta:
-- `CentralReclamacoes` (lista detalhada)
-- `useReclamacoes` (agregações por loja)
-- `DiarioView` (gráfico diário de reclamações — recém criado)
-- `AdminCXDashboard` (dashboard executivo CX)
-
-…**a visualização aparece automaticamente** assim que o n8n envia. Sem trabalho extra de UI para os dashboards.
-
----
-
-## 5. Arquivos a criar/alterar
-
-| Arquivo | Ação |
-|---|---|
-| `supabase/migrations/<novo>.sql` | Criar (2 tabelas + índice dedupe) |
-| `supabase/functions/ingest-reclamacoes/index.ts` | Criar |
-| `supabase/config.toml` | Adicionar `[functions.ingest-reclamacoes] verify_jwt = false` |
-| `src/hooks/useN8nWebhooks.ts` | Criar (CRUD endpoints + executions) |
-| `src/components/dashboard/N8nWebhooksSection.tsx` | Criar (UI completa da aba) |
-| `src/components/dashboard/HoldingCentralTab.tsx` | Adicionar aba "Webhooks n8n" |
-
-**Nada mais é tocado** — `useReclamacoes`, `CentralReclamacoes`, dashboards continuam intactos e ganham os dados automaticamente.
-
----
-
-## 6. Segurança
-
-- ✅ Token bearer único por endpoint (rotacionável — botão "regenerar token")
-- ✅ Slug + token: dois fatores na URL, vazamento de um sozinho não autoriza
-- ✅ RLS bloqueia acesso à tabela de endpoints/logs (somente admin)
-- ✅ Edge function usa service role apenas internamente, nunca exposto
-- ✅ Validação rigorosa de payload (enums, ranges, datas)
-- ✅ Deduplicação no DB previne reenvios acidentais do n8n
-- ⚠️ Sem rate limiting (limitação conhecida do Lovable Cloud) — mitigado por token secreto
-
----
-
-## 7. Extensibilidade futura (não implementado agora, mas a arquitetura suporta)
-
-- Adicionar `tipo_dado = 'store_performance'` ou `'auditoria'` no mesmo endpoint genérico
-- Adicionar webhook outbound (notificar n8n quando uma reclamação grave entra)
-- Filtrar execuções por status/data no histórico
-
----
-
-## Pronto para executar?
-
-Após aprovação, eu:
-1. Crio a migration (você aprova as alterações de schema)
-2. Crio a edge function e atualizo `config.toml`
-3. Crio o hook e o componente de UI
-4. Adiciono a aba no HoldingCentralTab
-5. Te entrego a URL/token de exemplo para você plugar no n8n
+1. Admin abre **Configurações → Cargos V2** → expande qualquer cargo → clica "+ Adicionar Meta" → escolhe tipo/teto/peso/origem/ativo → salva.
+2. Admin pode **desativar** uma meta com um clique no Switch (sem perder histórico).
+3. Admin sobe um arquivo Excel/PDF/imagem com tempos de comanda no mesmo botão de upload da Holding Central → IA reconhece, normaliza mm:ss para minutos, e popula `store_performance.tempo_prato_avg`.
+4. A meta `tempo_prato` de cada Chefe/Gerente passa a usar esses dados no cálculo de remuneração variável assim que estiver ativa e com teto > 0.

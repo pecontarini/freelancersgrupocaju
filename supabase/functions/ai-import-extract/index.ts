@@ -86,9 +86,16 @@ function rowsToObjects(headers: string[], rows: any[][]): Record<string, any>[] 
 
 const SCHEMA_DEFINITIONS = `
 DESTINOS DISPONÍVEIS:
-- "store_performance": dados mensais agregados por unidade. Colunas-alvo: loja_nome, month_year (YYYY-MM), faturamento (numeric), num_reclamacoes (int), nps_score (0-100), supervisao_score (0-100), tempo_prato_avg (minutos).
-- "store_performance_entries": dados diários por unidade. Colunas-alvo: loja_nome, entry_date (YYYY-MM-DD), faturamento_salao, faturamento_delivery, reclamacoes_salao, reclamacoes_ifood.
+- "store_performance": dados mensais agregados por unidade. Colunas-alvo: loja_nome, month_year (YYYY-MM), faturamento (numeric), num_reclamacoes (int), nps_score (0-100), supervisao_score (0-100), tempo_prato_avg (minutos decimais — ex: 8.5 = 8 min 30s).
+- "store_performance_entries": dados diários por unidade. Colunas-alvo: loja_nome, entry_date (YYYY-MM-DD), faturamento_salao, faturamento_delivery, reclamacoes_salao, reclamacoes_ifood, tempo_prato_avg (minutos decimais — opcional, se houver tempo de comanda diário).
 - "reclamacoes": lista individual de reclamações. Colunas-alvo: loja_nome, data_reclamacao (YYYY-MM-DD), fonte (google|ifood|tripadvisor|getin|manual|sheets), tipo_operacao (salao|delivery), nota_reclamacao (0-5), texto_original (string), is_grave (bool).
+
+RECONHECIMENTO DE TEMPO DE COMANDA / TEMPO DE PRATO:
+- Cabeçalhos comuns: "Tempo de Comanda", "Tempo Médio de Comanda", "Tempo de Prato", "Tempo Médio KDS", "Tempo Cozinha", "Tempo Salão", "Tempo Total Entrega", "AVG", "Tempo Médio".
+- Formatos aceitos no dado: minutos decimais (8.5), minutos inteiros (9), "8min30s", "00:08:32" (hh:mm:ss), "08:32" (mm:ss). NÃO converta — devolva o valor literal exatamente como aparece na planilha em "tempo_prato_avg" (o backend normaliza).
+- Se a planilha tiver Tempo de Comanda por mês → use destino "store_performance" e coloque o valor em "tempo_prato_avg".
+- Se tiver Tempo de Comanda por dia → use destino "store_performance_entries" com "entry_date" e "tempo_prato_avg".
+- Origem provável quando há tempo de comanda: KDS (sistemas como Consumer, Goomer, FoodReady).
 `;
 
 async function callAIForExtraction(opts: {

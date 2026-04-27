@@ -161,17 +161,21 @@ export function useCargos() {
 }
 
 // Hook for metas_cargo
-export function useMetasCargo(cargoId?: string) {
+export function useMetasCargo(cargoId?: string, options?: { includeInactive?: boolean }) {
   const queryClient = useQueryClient();
+  const includeInactive = options?.includeInactive ?? true; // default: include inactive for admin UI
 
   const { data: metas = [], isLoading } = useQuery({
-    queryKey: ['metas_cargo', cargoId],
+    queryKey: ['metas_cargo', cargoId, includeInactive],
     queryFn: async () => {
       let query = supabase
         .from('metas_cargo')
         .select('*')
-        .eq('ativo', true)
         .order('codigo_meta');
+
+      if (!includeInactive) {
+        query = query.eq('ativo', true);
+      }
 
       if (cargoId) {
         query = query.eq('cargo_id', cargoId);
@@ -196,25 +200,62 @@ export function useMetasCargo(cargoId?: string) {
       queryClient.invalidateQueries({ queryKey: ['metas_cargo'] });
       toast.success('Meta atualizada!');
     },
-    onError: () => {
-      toast.error('Erro ao atualizar meta.');
+    onError: (err: Error) => {
+      toast.error('Erro ao atualizar meta: ' + err.message);
     },
   });
 
-  // Get metas for a specific cargo
-  const getMetasByCargo = (cargoId: string) => {
-    return metas.filter((m) => m.cargo_id === cargoId);
+  const createMeta = useMutation({
+    mutationFn: async (params: {
+      cargo_id: string;
+      codigo_meta: CodigoMeta;
+      teto_valor: number;
+      peso: number;
+      origem_dado: OrigemDado;
+      ativo: boolean;
+    }) => {
+      const { error } = await supabase.from('metas_cargo').insert(params);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metas_cargo'] });
+      toast.success('Meta adicionada!');
+    },
+    onError: (err: Error) => {
+      toast.error('Erro ao adicionar meta: ' + err.message);
+    },
+  });
+
+  const deleteMeta = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('metas_cargo').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metas_cargo'] });
+      toast.success('Meta removida.');
+    },
+    onError: (err: Error) => {
+      toast.error('Erro ao remover meta: ' + err.message);
+    },
+  });
+
+  // Get metas for a specific cargo (only active by default for calculations)
+  const getMetasByCargo = (cargoIdParam: string, onlyActive = false) => {
+    return metas.filter((m) => m.cargo_id === cargoIdParam && (!onlyActive || m.ativo));
   };
 
-  // Calculate total teto for a cargo
-  const getTotalTeto = (cargoId: string) => {
-    return getMetasByCargo(cargoId).reduce((sum, m) => sum + m.teto_valor, 0);
+  // Calculate total teto for a cargo (active only)
+  const getTotalTeto = (cargoIdParam: string) => {
+    return getMetasByCargo(cargoIdParam, true).reduce((sum, m) => sum + m.teto_valor, 0);
   };
 
   return {
     metas,
     isLoading,
     updateMeta,
+    createMeta,
+    deleteMeta,
     getMetasByCargo,
     getTotalTeto,
   };

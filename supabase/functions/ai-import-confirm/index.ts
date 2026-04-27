@@ -51,6 +51,32 @@ function normDate(v: any): string | null {
   return null;
 }
 
+// Converte valores de tempo (mm:ss, hh:mm:ss, "8min30s", número) para minutos decimais.
+function parseDurationToMinutes(v: any): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (typeof v === "number") return v;
+  const s = String(v).trim();
+
+  // hh:mm:ss ou mm:ss
+  if (/^\d{1,3}:\d{1,2}(:\d{1,2})?$/.test(s)) {
+    const parts = s.split(":").map((p) => parseInt(p, 10));
+    if (parts.some((n) => isNaN(n))) return null;
+    if (parts.length === 2) return parts[0] + parts[1] / 60;
+    if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+  }
+
+  // "8min30s" / "8 min 30 s"
+  const mr = s.match(/^(\d+)\s*m(?:in)?\s*(?:(\d+)\s*s)?$/i);
+  if (mr) {
+    const min = parseInt(mr[1], 10);
+    const sec = mr[2] ? parseInt(mr[2], 10) : 0;
+    return min + sec / 60;
+  }
+
+  // Fallback: número simples (já em minutos)
+  return parseNumber(v);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -100,6 +126,7 @@ serve(async (req) => {
         if (!r._matched_loja_id) continue;
         const month = normMonth(r.month_year ?? r.mes ?? r.referencia_mes);
         if (!month) continue;
+        const tempoRaw = r.tempo_prato_avg ?? r.tempo_prato ?? r.tempo_comanda ?? r.tempo_medio_comanda;
         payload.push({
           loja_id: r._matched_loja_id,
           month_year: month,
@@ -107,7 +134,7 @@ serve(async (req) => {
           num_reclamacoes: parseInt0(r.num_reclamacoes ?? r.reclamacoes),
           nps_score: r.nps_score != null ? parseNumber(r.nps_score) : null,
           supervisao_score: r.supervisao_score != null ? parseNumber(r.supervisao_score) : null,
-          tempo_prato_avg: r.tempo_prato_avg != null ? parseNumber(r.tempo_prato_avg) : null,
+          tempo_prato_avg: tempoRaw != null && tempoRaw !== "" ? parseDurationToMinutes(tempoRaw) : null,
         });
       }
       if (payload.length) {
@@ -123,6 +150,8 @@ serve(async (req) => {
         if (!r._matched_loja_id) continue;
         const date = normDate(r.entry_date ?? r.data ?? r.data_referencia);
         if (!date) continue;
+        const tempoRaw = r.tempo_prato_avg ?? r.tempo_prato ?? r.tempo_comanda ?? r.tempo_medio_comanda;
+        const tempoMin = tempoRaw != null && tempoRaw !== "" ? parseDurationToMinutes(tempoRaw) : null;
         payload.push({
           loja_id: r._matched_loja_id,
           entry_date: date,
@@ -130,7 +159,9 @@ serve(async (req) => {
           faturamento_delivery: parseNumber(r.faturamento_delivery),
           reclamacoes_salao: parseInt0(r.reclamacoes_salao ?? r.reclamacoes),
           reclamacoes_ifood: parseInt0(r.reclamacoes_ifood),
-          notes: `Importado via IA (job ${jobId})`,
+          notes: tempoMin != null
+            ? `Importado via IA (job ${jobId}) | tempo_comanda=${tempoMin.toFixed(2)}min`
+            : `Importado via IA (job ${jobId})`,
         });
       }
       if (payload.length) {

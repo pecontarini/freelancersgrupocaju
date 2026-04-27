@@ -2001,7 +2001,6 @@ function PlaceholderCard({ name }: { name: string }) {
 // Root — nova arquitetura: sidebar lateral por meta + 6 meses por loja
 // ──────────────────────────────────────────────────────────────
 
-import { useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet as MetaSheet, SheetContent as MetaSheetContent, SheetTrigger as MetaSheetTrigger } from "@/components/ui/sheet";
 import { Menu } from "lucide-react";

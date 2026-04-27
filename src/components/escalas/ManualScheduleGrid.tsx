@@ -1165,7 +1165,11 @@ export function ManualScheduleGrid() {
                   )}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div
+                  className="overflow-x-auto outline-none"
+                  tabIndex={0}
+                  onKeyDown={handleGridKeyDown}
+                >
                   <Table>
                     <TableHeader>
                       <TableRow>

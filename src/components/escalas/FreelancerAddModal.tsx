@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle } from "lucide-react";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { useJobTitles } from "@/hooks/useJobTitles";
@@ -307,7 +307,7 @@ export function FreelancerAddModal({
             );
         }
       } catch (err: any) {
-        toast.error("Erro ao criar freelancer: " + err.message);
+        toast.error(friendlyEmployeeError(err));
         return;
       }
     }

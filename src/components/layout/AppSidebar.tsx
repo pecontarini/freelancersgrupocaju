@@ -164,7 +164,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {(isChefeSetor
-                ? menuItems.filter((i) => i.id === "escalas")
+                ? menuItems.filter((i) => i.id === "gestao-pessoas")
                 : menuItems
               ).map((item) => (
                 <SidebarMenuItem key={item.id}>
@@ -176,7 +176,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                   >
                     <item.icon className="h-4 w-4 transition-colors group-hover:text-primary" />
                     <span className="font-medium">{item.title}</span>
-                    {item.id === "escalas" && escalaPending > 0 && (
+                    {item.id === "gestao-pessoas" && escalaPending > 0 && (
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground px-1">
                         {escalaPending}
                       </span>

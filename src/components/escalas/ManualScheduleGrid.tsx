@@ -536,11 +536,33 @@ export function ManualScheduleGrid() {
     await applyPatchToCells(cells, () => null);
   }
 
+  // Inferir shift_type a partir de horários (para preservar a "cor" do turno no paste)
+  function inferShiftType(start?: string | null, end?: string | null, brk?: number): string | undefined {
+    if (!start || !end) return undefined;
+    const s = String(start).slice(0, 5);
+    const e = String(end).slice(0, 5);
+    // T3 = jornada longa com pausa
+    if ((brk ?? 0) >= 30) return "T3";
+    // T1 = turno almoço (manhã/tarde)
+    if (s < "16:00" && e <= "17:30") return "T1";
+    // Meia = jornada curta sem pausa
+    const sh = parseInt(s.split(":")[0], 10);
+    const eh = parseInt(e.split(":")[0], 10);
+    if (eh - sh <= 5 && (brk ?? 0) === 0 && s < "16:00") return "meia";
+    // T2 = turno noite
+    if (s >= "16:00") return "T2";
+    return undefined;
+  }
+
   function copySelection(cut: boolean) {
-    if (!selectionRect) return;
+    if (!selectionRect) {
+      toast.warning("Selecione células antes de copiar");
+      return;
+    }
     const rows = selectionRect.r1 - selectionRect.r0 + 1;
     const cols = selectionRect.c1 - selectionRect.c0 + 1;
     const cells: any[][] = [];
+    let nonEmpty = 0;
     for (let r = selectionRect.r0; r <= selectionRect.r1; r++) {
       const rowArr: any[] = [];
       for (let c = selectionRect.c0; c <= selectionRect.c1; c++) {
@@ -554,15 +576,18 @@ export function ManualScheduleGrid() {
         if (!sch) {
           rowArr.push(null);
         } else {
+          nonEmpty++;
           rowArr.push({
             patch: {
               schedule_type: sch.schedule_type === "off" ? "off" : "working",
-              shift_type: undefined,
+              shift_type: sch.schedule_type === "off"
+                ? undefined
+                : inferShiftType(sch.start_time, sch.end_time, sch.break_duration),
               start_time: sch.start_time,
               end_time: sch.end_time,
-              break_duration: sch.break_duration,
-              agreed_rate: sch.agreed_rate,
-              praca_id: sch.praca_id,
+              break_duration: sch.break_duration ?? 0,
+              agreed_rate: sch.agreed_rate ?? 0,
+              praca_id: sch.praca_id ?? null,
             },
           });
         }
@@ -572,16 +597,23 @@ export function ManualScheduleGrid() {
     grid.setClipboard({ rows, cols, cells });
     if (cut) {
       void deleteSelection();
-      toast.success(`${rows * cols} célula(s) recortada(s)`);
+      toast.success(`${nonEmpty} célula(s) recortada(s)`);
     } else {
-      toast.success(`${rows * cols} célula(s) copiada(s)`);
+      toast.success(`${nonEmpty} célula(s) copiada(s) — Ctrl+V para colar`);
     }
   }
 
   async function pasteAtActiveReal() {
     const clip = grid.state.clipboard;
     const active = grid.state.active;
-    if (!clip || !active) return;
+    if (!clip) {
+      toast.warning("Nada para colar — copie células primeiro (Ctrl+C)");
+      return;
+    }
+    if (!active) {
+      toast.warning("Selecione uma célula de destino antes de colar");
+      return;
+    }
     const cells: Cell[] = [];
     const patches: (any | null)[] = [];
     for (let dr = 0; dr < clip.rows; dr++) {
@@ -599,7 +631,8 @@ export function ManualScheduleGrid() {
       const p = patches[i++];
       return p;
     });
-    toast.success(`${cells.length} turno(s) colado(s)`);
+    const applied = patches.filter((p) => p !== null).length;
+    toast.success(`${applied} turno(s) colado(s)`);
   }
 
   async function undoLast() {

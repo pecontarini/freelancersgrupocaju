@@ -1,96 +1,87 @@
+# Plano: etiqueta de prioridade + glassmorphism na Agenda do Líder
 
-# Filtro estrito por unidade + Status em CAPS + Sync Google Calendar
+Dois ajustes visuais coordenados, mantendo o sistema de design Apple Liquid Glass que já existe no projeto (`.glass-card`, `.glass-card-strong`, tokens `--glass-*`).
 
-Três melhorias na Agenda do Líder, todas focadas em precisão operacional do líder de cada loja.
+---
 
-## 1. Filtro estrito de membros por unidade
+## 1. Etiqueta lateral colorida por prioridade
 
-**Problema atual:** `useUnidadeMembros` usa fallback "se a unidade não tiver ninguém, mostra todos" (linha 71). Isso permite que o seletor — e a IA — atribua missões a funcionários de outras lojas.
+Hoje, o único indicador de prioridade nos cards é a tag `[ALTA]` no canto superior direito. Pouco visível à distância.
 
-**Solução:**
-- Em `src/hooks/useUnidadeMembros.ts`: remover o fallback `return filtered.length > 0 ? filtered : all`. Quando `unidadeId` for fornecido, retornar **apenas** quem tem `profiles.unidade_id = unidadeId` OU registro em `user_stores` para essa loja. Admins continuam aparecendo apenas se vinculados explicitamente via `user_stores`. Se ninguém estiver vinculado, retorna lista vazia (com mensagem clara na UI).
-- Adicionar nova flag opcional `includeAdmins?: boolean` (default `false`) — quando `true`, inclui usuários com role `admin` mesmo sem vínculo, útil só para o detalhe administrativo. Os formulários de criação de missão usam o default (`false`).
-- Em `MissoesChatView.tsx`: já passa `available_users: membros` para a edge function, então automaticamente passa a enviar só os da loja. Adicionar guarda extra: filtrar no cliente antes de enviar, garantindo que mesmo que o cache traga algo a mais, só vai pra IA quem é da unidade selecionada.
-- Em `supabase/functions/agenda-lider-chat/index.ts`: reforçar no system prompt — "NUNCA use um user_id que não esteja na lista de USUÁRIOS DISPONÍVEIS abaixo. Se a lista estiver vazia, deixe `responsavel_user_id` como string vazia."
-- Em `NovaMissaoDialog.tsx` e `MissaoDetailDialog.tsx`: mostrar aviso "Nenhum membro vinculado a esta unidade — vincule no painel admin" quando `membros.length === 0`.
+**Ideia:** adicionar uma **barra vertical colorida** (4px) na borda esquerda do card, na cor da prioridade — exatamente como Notion / Things / Linear marcam itens. A tag textual continua existindo, mas a leitura primária passa a ser a etiqueta lateral.
 
-## 2. Status em CAPS LOCK
+```text
+┌──┬───────────────────────────────┐
+│██│ TÍTULO DA MISSÃO       [ALTA] │   ← faixa vermelha = alta
+│██│ descrição curta…              │
+│██│ 👤 Responsável        📅 27/04│
+└──┴───────────────────────────────┘
 
-Em `src/components/agenda-lider/shared/Badges.tsx`, atualizar os labels do `STATUS_MAP`:
-- "A Fazer" → "A FAZER"
-- "Em Andamento" → "EM ANDAMENTO"  
-- "Aguardando" → "AGUARDANDO"
-- "Concluído" → "CONCLUÍDO"
+┌──┬───────────────────────────────┐
+│██│ outra missão          [MÉDIA] │   ← faixa âmbar = média
+└──┴───────────────────────────────┘
 
-E adicionar `tracking-wide` à classe do `StatusBadge` para padronizar visualmente. Como todos os usos do badge passam pelo helper, a mudança propaga para Quadro, Detalhe, Meu Painel e Diretoria automaticamente.
+┌──┬───────────────────────────────┐
+│██│ tarefa simples        [BAIXA] │   ← faixa verde = baixa
+└──┴───────────────────────────────┘
+```
 
-## 3. Sincronização com Google Agenda do líder
+**Cores (já usadas no `PRIORIDADE_MAP`):**
+- Alta → `bg-destructive` (vermelho coral)
+- Média → `bg-amber-500`
+- Baixa → `bg-emerald-500`
 
-**Decisão de produto:** Google Tasks tem API limitada (sem sync de prazo, sem participantes). Vamos integrar direto com **Google Calendar** — cria um evento "all-day" no dia do `prazo` da missão, no calendário primário do líder responsável, com checklist do plano de ação na descrição. É o que dá melhor visibilidade no celular do líder.
+**Onde aplicar a faixa:**
+- `MissaoCardCompact.tsx` (board Kanban) — principal
+- `MissoesPreviewCard.tsx` (chat IA) — espelha o board
+- Cartões da `MeuPainelView.tsx` e `DiretoriaView.tsx` (se exibirem missão como card)
+- Chips da agenda unificada (`CalendarChip`) — versão ultra-fina (2px) para não poluir o calendário
 
-**Infraestrutura existente já cobre:**
-- OAuth completo com refresh_token persistente (`user_google_tokens`).
-- Edge functions `google-oauth-start`, `google-oauth-callback`, `google-oauth-refresh` deployadas.
-- Helpers `ensureValidGoogleToken()` e `createCalendarEvent()` em `src/services/googleCalendar.ts`.
+**Implementação técnica:**
+- Novo helper em `shared/Badges.tsx`: `prioridadeAccent(prioridade)` que devolve a classe da cor (ex: `bg-destructive`, `bg-amber-500`, `bg-emerald-500`).
+- No card: wrapper `relative overflow-hidden` + `<span className="absolute inset-y-0 left-0 w-1 {accent}" />` com padding-left ajustado.
 
-**O que falta criar:**
+---
 
-### Migration
-Adicionar à tabela `missoes`:
-- `google_event_id text` — id do evento criado no Calendar
-- `google_calendar_synced_at timestamptz` — última sincronização
-- `google_calendar_user_id uuid` — qual líder dono do calendário (geralmente o responsável)
+## 2. Glassmorphism / Liquid Glass nos componentes da Agenda do Líder
 
-### Edge function nova: `sync-missao-to-calendar`
-- Input: `{ missao_id }`.
-- Resolve responsável da missão via `missao_membros` (papel `responsavel`).
-- Busca token do responsável em `user_google_tokens`. Se não existir, retorna `{ status: "needs_connect", user_id }` para o frontend mostrar CTA.
-- Renova token via lógica idêntica a `google-oauth-refresh` se expirado.
-- Monta evento:
-  - **Título:** título da missão em CAPS (já vem assim do banco/UI) com prefixo `[Caju]`.
-  - **All-day** no `prazo` (1 dia).
-  - **Descrição:** descrição + plano de ação como checklist em texto (`☐ tarefa 1\n☐ tarefa 2…`) + link de volta para o portal (`/?tab=agenda-lider&missao={id}`).
-  - **Reminders:** 1 dia antes (popup) + 2h antes (popup).
-  - **ColorId:** vermelho/amarelo/verde conforme prioridade.
-- Se `google_event_id` já existir → `PATCH` no evento; caso contrário `POST` e salva o id retornado.
-- Atualiza `google_event_id`, `google_calendar_synced_at`, `google_calendar_user_id` na missão.
+O projeto já tem o sistema pronto em `index.css` (`.glass-card`, `.glass-card-strong`, `.glass-header`). Hoje a Agenda do Líder usa `Card` padrão sólido. Vou trocar pelos utilitários glass para alinhar com o resto da plataforma.
 
-### Hook frontend: `useSyncMissaoCalendar.ts`
-- `mutation` que chama a edge function.
-- Trata retorno `needs_connect`: dispara `startGoogleOAuth("/?tab=agenda-lider")` para o líder conectar (com toast explicando).
-- Trata `GoogleAuthExpiredError` igual.
+**Substituições:**
 
-### UI
+| Componente | Antes | Depois |
+|---|---|---|
+| Hero header da aba (`AgendaLiderTab`) | `Card border-primary/20 bg-gradient-to-r from-primary/5 ...` | `glass-card-strong` + leve gradient overlay coral |
+| Cards do Kanban (`MissaoCardCompact`) | `bg-card/80` | `glass-card` + faixa de prioridade lateral + hover-lift |
+| Colunas do board (`MissaoColumn`) | `border-2 border-dashed bg-...` | `glass-card` sutil (blur menor, border-subtle), drop-zone destacada com `ring-primary/40` |
+| Header/controles da Agenda Unificada | `Card p-3` sólido | `glass-card-strong` |
+| Grid Mês / Semana | `Card overflow-hidden p-0` | `glass-card` + cabeçalho dos dias com `bg-white/40 backdrop-blur` |
+| Lista da agenda | `Card p-0` | `glass-card` |
+| Chat IA (`MissoesChatView`) — bolhas de mensagem do assistente | sólidas | `glass-card` com blur sutil |
 
-- **`MissaoDetailDialog.tsx`:** novo botão "Sincronizar com Google Agenda" no header, ao lado do Editar/Excluir. Ícone de calendário. Estado:
-  - Se já sincronizado: mostra ✓ "Sincronizado em DD/MM HH:mm" + botão "Atualizar agenda".
-  - Se não: botão "Adicionar ao Google Agenda".
-  - Se responsável não tem token: toast "O líder responsável precisa conectar o Google" + botão de conectar (válido só se o usuário logado for o próprio responsável, senão só explica).
-- **`MissoesPreviewCard.tsx` (chat):** checkbox opcional "Adicionar ao Google Agenda do responsável ao confirmar" — controlado por preferência por mensagem.
-- **`MissoesChatView.tsx`:** após criar missão via `confirmMissao`, se a flag estiver ativa, dispara o sync.
-- **`NovaMissaoDialog.tsx`:** mesmo checkbox no rodapé.
+**Refinamentos visuais alinhados ao Apple LG:**
+- Bordas com `border-top-color` mais claro (efeito de luz vinda de cima) — já está no `.glass-card`.
+- `hover-lift` (utility já existente) nos cards do board para resposta de toque.
+- Animação `fade-in` ao abrir cada aba (já existente).
+- Manter `font-feature-settings` e `tabular-nums` para números (já no `body`).
 
-### Auto-sync na mudança de prazo (opcional, só se já estiver sincronizado)
-Listener em `useMissoes.update` — quando `prazo` muda numa missão que tem `google_event_id`, dispara sync automático. Implementação simples: invalidar query + re-call do hook no Detail.
+---
 
-## Arquivos afetados
+## Arquivos a modificar
 
-**Migration:** 1 nova (3 colunas em `missoes`).
+- `src/components/agenda-lider/shared/Badges.tsx` — exportar helper `prioridadeAccent()`
+- `src/components/agenda-lider/board/MissaoCardCompact.tsx` — faixa lateral + `glass-card`
+- `src/components/agenda-lider/board/MissaoColumn.tsx` — `glass-card` sutil
+- `src/components/agenda-lider/board/MissoesBoardView.tsx` — espaçamentos
+- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` — faixa lateral + `glass-card`
+- `src/components/agenda-lider/chat/MissoesChatView.tsx` — bolhas glass
+- `src/components/agenda-lider/agenda/AgendaUnificadaView.tsx` — header, grid e chips em glass + faixa fina nos chips de missão
+- `src/components/agenda-lider/AgendaLiderTab.tsx` — hero `glass-card-strong`
+- `src/components/agenda-lider/meu-painel/MeuPainelView.tsx` — cards em glass + faixa
+- `src/components/agenda-lider/diretoria/DiretoriaView.tsx` — cards em glass + faixa
 
-**Criar:**
-- `supabase/functions/sync-missao-to-calendar/index.ts`
-- `src/hooks/useSyncMissaoCalendar.ts`
+Sem mudanças de schema, sem novas dependências — apenas CSS/utilitários já existentes.
 
-**Editar:**
-- `src/hooks/useUnidadeMembros.ts` (filtro estrito)
-- `src/components/agenda-lider/shared/Badges.tsx` (CAPS + tracking)
-- `supabase/functions/agenda-lider-chat/index.ts` (reforço no prompt)
-- `src/components/agenda-lider/chat/MissoesChatView.tsx` (filtro extra + flag sync)
-- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` (checkbox sync)
-- `src/components/agenda-lider/card/NovaMissaoDialog.tsx` (aviso vazio + checkbox sync)
-- `src/components/agenda-lider/card/MissaoDetailDialog.tsx` (botão sync + status do sync)
-- `src/integrations/supabase/types.ts` é regenerado automaticamente
-
-Sem nova chave/secret — usa o `LOVABLE_API_KEY` (IA) e o OAuth Google que já está rodando.
+---
 
 Posso aplicar?

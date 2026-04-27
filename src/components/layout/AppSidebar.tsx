@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
   TrendingUp,
-  Package,
   Settings,
   Building2,
   LogOut,
@@ -12,12 +11,9 @@ import {
   ChevronRight,
   ClipboardCheck,
   AlertTriangle,
-  BarChart3,
   BarChart2,
-  CalendarClock,
-  ScanFace,
-  UtensilsCrossed,
-  Warehouse,
+  Users,
+  LayoutGrid,
   Calendar,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
@@ -59,16 +55,16 @@ interface AppSidebarProps {
 
 const menuItems = [
   {
-    title: "BUDGETS GERENCIAIS",
-    id: "budgets",
-    icon: Wallet,
-    description: "Controle diário de gastos",
+    title: "UNITÁRIOS GERENTES",
+    id: "unitarios-gerentes",
+    icon: LayoutGrid,
+    description: "Budgets, CMV e Utensílios",
   },
   {
-    title: "PRESENÇA FREELANCERS",
-    id: "presenca",
-    icon: ScanFace,
-    description: "Check-in/check-out via QR",
+    title: "GESTÃO DE PESSOAS",
+    id: "gestao-pessoas",
+    icon: Users,
+    description: "Escalas e Presença Freelancers",
   },
   {
     title: "REMUNERAÇÃO VARIÁVEL",
@@ -81,30 +77,6 @@ const menuItems = [
     id: "diagnostico",
     icon: ClipboardCheck,
     description: "Análise de não conformidades",
-  },
-  {
-    title: "PERFORMANCE LIDERANÇA",
-    id: "performance",
-    icon: BarChart3,
-    description: "Diagnóstico por responsável",
-  },
-  {
-    title: "CMV (UNITÁRIOS)",
-    id: "cmv",
-    icon: Package,
-    description: "Controle de insumos",
-  },
-  {
-    title: "ESCALAS",
-    id: "escalas",
-    icon: CalendarClock,
-    description: "Matriz de efetivo mínimo",
-  },
-  {
-    title: "UTENSÍLIOS",
-    id: "utensilios",
-    icon: UtensilsCrossed,
-    description: "Controle de utensílios e budget",
   },
   {
     title: "AGENDA DO LÍDER",
@@ -137,10 +109,10 @@ const adminMenuItems = [
 
 const gestaoMenuItems = [
   {
-    title: "PAINEL DE METAS",
+    title: "PAINEL DE INDICADORES",
     id: "painel",
     icon: BarChart2,
-    description: "Resultados e metas da rede",
+    description: "Resultados e indicadores da rede",
   },
 ];
 

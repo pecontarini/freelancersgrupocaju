@@ -23,7 +23,7 @@ interface BottomNavigationProps {
 const navItems = [
   { id: "unitarios-gerentes", label: "Unitários", icon: LayoutGrid },
   { id: "gestao-pessoas", label: "Pessoas", icon: Users },
-  { id: "remuneracao", label: "Bônus", icon: TrendingUp },
+  
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "agenda-lider", label: "Agenda", icon: Calendar },
   { id: "painel", label: "Indicadores", icon: BarChart2 },

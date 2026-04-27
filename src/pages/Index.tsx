@@ -49,10 +49,6 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "Budgets Gerenciais",
     subtitle: "Controle diário de gastos operacionais",
   },
-  remuneracao: {
-    title: "Remuneração Variável",
-    subtitle: "Performance mensal e metas de bônus",
-  },
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
@@ -257,10 +253,6 @@ const Index = () => {
             <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
             <BudgetsGerenciaisTab {...budgetsProps} />
           </div>
-        );
-      case "remuneracao":
-        return (
-          <RemuneracaoVariavelTab selectedUnidadeId={selectedUnidadeId} />
         );
       case "diagnostico":
         return (

@@ -67,12 +67,6 @@ const menuItems = [
     description: "Escalas e Presença Freelancers",
   },
   {
-    title: "REMUNERAÇÃO VARIÁVEL",
-    id: "remuneracao",
-    icon: TrendingUp,
-    description: "Performance e metas",
-  },
-  {
     title: "DIAGNÓSTICO AUDITORIA",
     id: "diagnostico",
     icon: ClipboardCheck,

@@ -1,64 +1,54 @@
-## Objetivo
+# Organizar respostas da IA por tópicos com prazo, responsável e to-dos marcáveis
 
-Adicionar um botão de anexo no chat IA da Agenda do Líder que aceite **PDF, imagem (JPG/PNG/WEBP) e texto (TXT/MD)**. A IA usa o conteúdo extraído como contexto para sugerir missões — útil para colar uma auditoria, uma reclamação por print de WhatsApp, um relatório em PDF, etc.
+## O que muda na prática para o líder
 
-## Como vai funcionar (visão do usuário)
+Hoje o líder pode colar texto vindo de qualquer LLM (ChatGPT, Gemini, Claude…) ou anexar relatório, e a IA da Agenda devolve missões — mas tudo fica numa lista plana, sem agrupamento, e o "plano de ação" aparece só como leitura.
 
-1. No chat, ao lado do campo de texto, aparece um botão de clipe (📎) **"Anexar"**.
-2. Ao clicar, abre o seletor de arquivos (até 3 anexos por mensagem, máx. 10 MB cada).
-3. Os anexos aparecem como chips acima do textarea (com nome do arquivo, ícone do tipo e botão de remover).
-4. O usuário pode escrever junto algo como _"Crie missões pra resolver os 3 pontos mais críticos dessa auditoria"_ e enviar.
-5. A IA recebe o texto + o conteúdo dos arquivos e devolve missões estruturadas como já faz hoje.
+Depois deste ajuste, ao colar/anexar conteúdo o líder vai ver:
 
-## Como vai funcionar por trás
+1. **Tópicos (categorias)** agrupando as missões — ex.: `CMV`, `Atendimento/NPS`, `Manutenção`, `Equipe/Escala`, `Auditoria`, `Outros`. Cada tópico vira uma seção colapsável no chat.
+2. Dentro de cada tópico, **um card por missão** mostrando:
+   - Título + prioridade (alta/média/baixa)
+   - Responsável principal + co-responsáveis (chips)
+   - Prazo formatado (dd/mm/aaaa)
+   - **Checklist de to-dos** com caixinhas marcáveis (em vez de só uma lista de leitura)
+   - Botão "Confirmar e criar missão" (cria no Quadro como hoje)
+3. Um botão extra no topo de cada tópico: **"Confirmar todas deste tópico"** — para o líder não precisar clicar 1 a 1.
 
-### Frontend — `MissoesChatView.tsx`
-- Estado novo: `attachments: AttachmentDraft[]` (arquivo + texto extraído + tipo).
-- Botão "Anexar" abre `<input type="file" multiple accept=".pdf,.txt,.md,image/*">`.
-- **Extração no próprio navegador** (sem upload pra storage, mais rápido e privado):
-  - **TXT/MD**: `file.text()` direto.
-  - **PDF**: `pdfjs-dist` (já é leve via dynamic import) extrai todo o texto das páginas.
-  - **Imagens**: convertidas em base64 e mandadas como `image_url` para o modelo (Gemini 3 Flash já é multimodal).
-- Limite: 3 arquivos, 10 MB cada, ~50 mil chars de texto extraído (truncamento elegante com aviso).
-- Os chips ficam visíveis até a resposta chegar e somem após `send()` com sucesso.
-- A mensagem do usuário no histórico mostra "📎 nome-do-arquivo.pdf" inline pra ficar claro o que foi anexado.
+## Como o sistema vai garantir essa estrutura
 
-### Edge function — `agenda-lider-chat`
-- Aceitar nova forma de `messages[].content`: além de string, aceitar array OpenAI-style `[{type:"text",text:...}, {type:"image_url",image_url:{url:"data:..."}}]`.
-- Quando vier anexo do tipo PDF/TXT, o frontend já manda o **texto extraído embutido no content** com cabeçalho `[Arquivo anexado: relatorio.pdf]\n\n<conteúdo>\n\n[/Arquivo]`.
-- Quando vier imagem, o frontend manda como `image_url` (data URL base64). A função só repassa pro gateway — Gemini já lê.
-- Ajuste no system prompt: instrução curta dizendo "Se houver arquivos anexados, priorize extrair os pontos críticos deles ao sugerir missões."
-- Sem mudança em tabelas, storage ou config.
+### 1. Edge Function `agenda-lider-chat`
+- Adicionar campo `topico` (string curta, max 30 chars, vinda de uma lista sugerida no prompt) na ferramenta `criar_missoes`.
+- Reforçar o system prompt para:
+  - Quando o usuário **colar texto longo de outra LLM** (detectar por tamanho > 800 chars ou estrutura tipo "1. … 2. …"), tratar como briefing já estruturado: extrair TODOS os itens acionáveis, não resumir.
+  - SEMPRE preencher `prazo` (calculando a partir da prioridade: alta = +3 dias úteis, média = +7, baixa = +14) quando o usuário não informar.
+  - SEMPRE escolher um `responsavel_user_id` da lista — só deixar vazio se realmente não houver cargo compatível.
+  - SEMPRE devolver pelo menos 2 itens em `plano_acao` por missão (passos verificáveis, no formato "verbo + objeto").
 
-### Persistência
-- O texto da mensagem do usuário salvo em `missao_chat` continua sendo só o que ele escreveu + lista dos nomes dos anexos (não o conteúdo cru, pra não inflar a tabela).
-- Conteúdo extraído fica só na requisição da IA — perfeito porque é one-shot.
+### 2. Frontend — `MissoesPreviewCard.tsx`
+- Adicionar estado local de checkboxes para cada item do `plano_acao` (visual no preview; ao confirmar, viram tarefas reais com `concluida = true/false` no banco).
+- Trocar `<li>` por `<Checkbox>` shadcn + label.
+- Mostrar prazo com destaque (badge âmbar se < 3 dias, vermelho se vencido).
 
-## Bibliotecas
+### 3. Frontend — `MissoesChatView.tsx`
+- Agrupar `m.missoes` por `topico` antes de renderizar.
+- Cada grupo vira um bloco com:
+  - Header do tópico + contador (ex.: "CMV · 3 missões")
+  - Lista dos `MissoesPreviewCard` do grupo
+  - Botão "Confirmar tudo deste tópico" → chama `confirmMissao` em sequência
 
-- **`pdfjs-dist`** (~400 KB gzip, dynamic import só quando o usuário anexa um PDF — não pesa no bundle inicial).
-- Imagens: `FileReader` nativo, sem libs.
+### 4. Tipo `MissaoSugerida`
+- Adicionar `topico?: string` (opcional, default "Outros").
+- Tarefas no preview ganham estado `done: boolean` que é passado para `useMissoes.create` no array `tarefas`.
 
-## Casos de uso desbloqueados
+## Arquivos afetados
+- `supabase/functions/agenda-lider-chat/index.ts` — schema da tool + prompt
+- `src/components/agenda-lider/chat/MissoesPreviewCard.tsx` — checkboxes + badge de prazo
+- `src/components/agenda-lider/chat/MissoesChatView.tsx` — agrupamento por tópico + confirmar em lote
+- (sem mudanças de schema no banco — `tarefas_missao` já tem `concluida` e `dia_semana`)
 
-- Anexar PDF de auditoria → "Crie missões pros 3 maiores ofensores"
-- Anexar print do WhatsApp de uma reclamação → "Vire isso em plano de ação pro gerente"
-- Anexar TXT exportado do checklist diário → "Resuma e me dê 2 missões prioritárias"
-- Anexar foto de um problema operacional → "Identifique o problema e crie missão pra equipe certa"
+## Fora de escopo
+- Editar manualmente missão antes de confirmar (continua sendo "confirmar como veio" — pode ser próximo passo se você quiser).
+- Reagrupar missões já criadas no Quadro por tópico (focado só na etapa de sugestão da IA agora).
 
-## O que NÃO vai mudar
-
-- Schema de banco (nada novo)
-- Storage (não vou salvar os arquivos, são efêmeros)
-- Visual e fluxo do chat existente (tudo continua igual, só ganha o botão e os chips)
-- A função `agenda-lider-chat` mantém o mesmo contrato de saída (`{ text, missoes }`)
-
-## Arquivos que vou tocar
-
-1. `src/components/agenda-lider/chat/MissoesChatView.tsx` — botão, chips, extração, envio.
-2. `src/components/agenda-lider/chat/AttachmentChip.tsx` — **novo**, componente do chip.
-3. `src/lib/extract-attachment-text.ts` — **novo**, helper de extração (PDF/TXT/imagem).
-4. `supabase/functions/agenda-lider-chat/index.ts` — aceitar content multimodal + ajuste no prompt.
-5. `package.json` — adicionar `pdfjs-dist`.
-
-Aprova que eu implemento?
+Posso aplicar?

@@ -253,7 +253,30 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
     }
   }
 
-  async function confirmMissao(m: MissaoSugerida) {
+  // Estado de checkboxes do plano de ação por (msgId -> missaoIdx -> taskIdx)
+  const [taskDone, setTaskDone] = useState<Record<string, Record<number, boolean[]>>>({});
+  // Missões já confirmadas: Set "msgId:missaoIdx"
+  const [confirmedSet, setConfirmedSet] = useState<Set<string>>(new Set());
+
+  function getDoneArr(msgId: string, missaoIdx: number, total: number): boolean[] {
+    const fromState = taskDone[msgId]?.[missaoIdx];
+    if (fromState && fromState.length === total) return fromState;
+    return Array(total).fill(false);
+  }
+
+  function toggleTask(msgId: string, missaoIdx: number, taskIdx: number, value: boolean, total: number) {
+    setTaskDone((prev) => {
+      const msgMap = { ...(prev[msgId] ?? {}) };
+      const arr = [...(msgMap[missaoIdx] ?? Array(total).fill(false))];
+      arr[taskIdx] = value;
+      msgMap[missaoIdx] = arr;
+      return { ...prev, [msgId]: msgMap };
+    });
+  }
+
+  async function confirmMissao(m: MissaoSugerida, msgId: string, missaoIdx: number) {
+    const key = `${msgId}:${missaoIdx}`;
+    if (confirmedSet.has(key)) return;
     try {
       const membrosArr: { user_id: string; papel: "responsavel" | "co_responsavel" }[] = [];
       if (m.responsavel_user_id && m.responsavel_user_id.trim()) {
@@ -262,6 +285,8 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
       (m.co_responsaveis ?? []).filter(Boolean).forEach((uid) => {
         membrosArr.push({ user_id: uid, papel: "co_responsavel" });
       });
+
+      const doneArr = getDoneArr(msgId, missaoIdx, (m.plano_acao ?? []).length);
 
       await create.mutateAsync({
         titulo: m.titulo,
@@ -275,11 +300,24 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
           descricao: t.descricao,
           dia_semana: t.dia_semana && t.dia_semana.trim() ? t.dia_semana : null,
           ordem: i,
+          concluido: !!doneArr[i],
         })),
       });
+      setConfirmedSet((prev) => new Set(prev).add(key));
       toast.success(`Missão criada: ${m.titulo}`);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao criar missão.");
+    }
+  }
+
+  async function confirmAllInTopic(msg: ChatMsg, topico: string) {
+    const items = (msg.missoes ?? [])
+      .map((m, idx) => ({ m, idx }))
+      .filter(({ m, idx }) => (m.topico ?? "Outros") === topico && !confirmedSet.has(`${msg.id}:${idx}`));
+    for (const { m, idx } of items) {
+      // sequencial pra não estourar rate limit / RLS
+      // eslint-disable-next-line no-await-in-loop
+      await confirmMissao(m, msg.id, idx);
     }
   }
 
@@ -366,18 +404,69 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                     <p className="whitespace-pre-wrap">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}
                     </p>
-                    {m.missoes && m.missoes.length > 0 && (
-                      <div className="space-y-2 pt-2">
-                        {m.missoes.map((mi, idx) => (
-                          <MissoesPreviewCard
-                            key={idx}
-                            missao={mi}
-                            membros={membros}
-                            onConfirm={() => confirmMissao(mi)}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    {m.missoes && m.missoes.length > 0 && (() => {
+                      // Agrupa missões por tópico, preservando ordem de aparição
+                      const order: string[] = [];
+                      const groups = new Map<string, { mi: MissaoSugerida; idx: number }[]>();
+                      m.missoes.forEach((mi, idx) => {
+                        const t = (mi.topico ?? "Outros").trim() || "Outros";
+                        if (!groups.has(t)) {
+                          groups.set(t, []);
+                          order.push(t);
+                        }
+                        groups.get(t)!.push({ mi, idx });
+                      });
+                      return (
+                        <div className="space-y-3 pt-2">
+                          {order.map((topico) => {
+                            const items = groups.get(topico)!;
+                            const pending = items.filter(
+                              (it) => !confirmedSet.has(`${m.id}:${it.idx}`),
+                            );
+                            return (
+                              <div
+                                key={topico}
+                                className="rounded-xl border border-border/40 bg-background/50 p-2"
+                              >
+                                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                                    {topico} · {items.length} {items.length === 1 ? "missão" : "missões"}
+                                  </p>
+                                  {pending.length > 1 && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => confirmAllInTopic(m, topico)}
+                                    >
+                                      Confirmar {pending.length}
+                                    </Button>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  {items.map(({ mi, idx }) => {
+                                    const total = (mi.plano_acao ?? []).length;
+                                    return (
+                                      <MissoesPreviewCard
+                                        key={idx}
+                                        missao={mi}
+                                        membros={membros}
+                                        doneState={getDoneArr(m.id, idx, total)}
+                                        onToggleTask={(taskIdx, v) =>
+                                          toggleTask(m.id, idx, taskIdx, v, total)
+                                        }
+                                        onConfirm={() => confirmMissao(mi, m.id, idx)}
+                                        confirmed={confirmedSet.has(`${m.id}:${idx}`)}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </motion.div>
               ))}

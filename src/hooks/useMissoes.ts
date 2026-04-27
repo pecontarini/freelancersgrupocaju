@@ -79,7 +79,7 @@ export function useMissoes(opts?: { unidadeId?: string | null; onlyMine?: boolea
   });
 
   const create = useMutation({
-    mutationFn: async (input: MissaoUpsert & { membros?: { user_id: string; papel: MissaoPapel }[]; tarefas?: { descricao: string; dia_semana?: string | null; ordem?: number }[] }) => {
+    mutationFn: async (input: MissaoUpsert & { membros?: { user_id: string; papel: MissaoPapel }[]; tarefas?: { descricao: string; dia_semana?: string | null; ordem?: number; concluido?: boolean }[] }) => {
       if (!user) throw new Error("Sem usuário.");
       if (!input.titulo) throw new Error("Título obrigatório.");
       const { data: created, error } = await supabase
@@ -127,6 +127,7 @@ export function useMissoes(opts?: { unidadeId?: string | null; onlyMine?: boolea
               descricao: t.descricao,
               dia_semana: t.dia_semana ?? null,
               ordem: t.ordem ?? i,
+              concluido: t.concluido ?? false,
             })) as any,
           );
         if (e3) console.warn("Falha ao inserir tarefas:", e3);

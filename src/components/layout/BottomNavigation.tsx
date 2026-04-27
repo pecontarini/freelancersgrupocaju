@@ -25,7 +25,7 @@ const navItems = [
   { id: "remuneracao", label: "Bônus", icon: TrendingUp },
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "escalas", label: "Escalas", icon: CalendarClock },
-  { id: "agenda", label: "Agenda", icon: Calendar },
+  { id: "agenda-lider", label: "Agenda", icon: Calendar },
   { id: "painel", label: "Metas", icon: BarChart2 },
 ];
 

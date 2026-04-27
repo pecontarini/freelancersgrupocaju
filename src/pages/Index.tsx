@@ -126,7 +126,7 @@ const Index = () => {
   // Use global context as single source of truth
   const { selectedUnidadeId, setSelectedUnidadeId, effectiveUnidadeId } = useUnidade();
 
-  const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "escalas" : "budgets");
+  const [activeTab, setActiveTab] = useState<string>(isChefeSetor ? "gestao-pessoas" : "unitarios-gerentes");
   const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
@@ -145,7 +145,7 @@ const Index = () => {
   useEffect(() => {
     if (!isLoadingProfile && !isInitialized) {
       if (isChefeSetor) {
-        setActiveTab("escalas");
+        setActiveTab("gestao-pessoas");
       }
       setIsInitialized(true);
     }

@@ -15,14 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle } from "lucide-react";
+import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus } from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { useJobTitles } from "@/hooks/useJobTitles";
 import { useCpfLookup } from "@/hooks/useCpfLookup";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCPF } from "@/lib/formatters";
 import { toast } from "sonner";
+import { QuickCreateJobTitleDialog } from "./QuickCreateJobTitleDialog";
 
 interface FreelancerAddModalProps {
   open: boolean;
@@ -64,6 +66,10 @@ export function FreelancerAddModal({
   const { data: allJobTitles = [] } = useJobTitles(targetUnitId);
   const upsertSchedule = useUpsertSchedule();
   const { lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
+  const userProfile = useUserProfile();
+  const canManageJobTitles = !!(userProfile?.isAdmin || userProfile?.isOperator || userProfile?.isGerenteUnidade);
+
+  const [quickJobTitleOpen, setQuickJobTitleOpen] = useState(false);
 
   const allowedJobTitleIds = useMemo(
     () => new Set(sectorJobTitles.map((sjt) => sjt.job_title_id)),
@@ -485,22 +491,50 @@ export function FreelancerAddModal({
               <div className="space-y-1.5">
                 <Label>Cargo *</Label>
                 {allowedJobTitles.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Nenhum cargo vinculado a este setor.</p>
+                  canManageJobTitles ? (
+                    <Button
+                      type="button"
+                      variant="default"
+                      className="w-full"
+                      onClick={() => setQuickJobTitleOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Criar e vincular cargo
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum cargo vinculado a este setor. Peça ao gerente para configurar.
+                    </p>
+                  )
                 ) : (
-                  <Select value={selectedJobTitleId} onValueChange={setSelectedJobTitleId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o cargo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allowedJobTitles.map((jt) => (
-                        <SelectItem key={jt.id} value={jt.id}>
-                          {jt.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={selectedJobTitleId} onValueChange={setSelectedJobTitleId}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione o cargo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allowedJobTitles.map((jt) => (
+                          <SelectItem key={jt.id} value={jt.id}>
+                            {jt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {canManageJobTitles && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        title="Criar/vincular novo cargo"
+                        onClick={() => setQuickJobTitleOpen(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
+
 
               {!noCpfMode && (
                 <div className="grid grid-cols-2 gap-3">
@@ -559,6 +593,18 @@ export function FreelancerAddModal({
           )}
         </div>
       </DialogContent>
+
+      <QuickCreateJobTitleDialog
+        open={quickJobTitleOpen}
+        onClose={() => setQuickJobTitleOpen(false)}
+        unitId={targetUnitId}
+        sectorId={targetSectorId}
+        alreadyLinkedIds={allowedJobTitleIds}
+        onLinked={(jt) => {
+          // Pré-seleciona automaticamente o cargo recém-criado
+          setSelectedJobTitleId(jt.id);
+        }}
+      />
     </Dialog>
   );
 }

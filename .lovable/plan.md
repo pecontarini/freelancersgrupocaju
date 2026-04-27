@@ -1,81 +1,41 @@
+## Diagnóstico
 
-## Problema identificado
+O erro **"Nenhum cargo vinculado a este setor"** + toast **"Selecione um cargo"** aparece porque o modal `FreelancerAddModal` só lista cargos que estão em `sector_job_titles` (relação setor ↔ cargo). Quando o setor (ex: AUXILIAR DE BAR, AUX. SUSHIMAN) não tem nenhum cargo vinculado, o usuário trava — não consegue salvar e não tem ação rápida para criar/vincular um cargo sem sair da escala.
 
-A usuária tentou cadastrar uma funcionária **ANA (SUBCHEFE)** na MULT 02 - NAZO GO e recebeu:
+Hoje, a única forma de resolver é fechar o modal, ir em **Configurações → Vinculação de Cargos por Setor**, criar/vincular o cargo e voltar. Vamos eliminar esse atrito.
 
-> Erro ao salvar: duplicate key value violates unique constraint "unique_active_employee_no_cpf"
+## O que será feito
 
-**Causa:** já existe uma **ANA (CUMIM)** ativa sem CPF nessa mesma unidade. O índice único atual no banco proíbe dois funcionários ativos com o mesmo nome quando ambos estão sem CPF:
+### 1. Botão "+" ao lado do seletor de Cargo no `FreelancerAddModal`
+- Quando há cargos vinculados → botão `+` discreto ao lado do `Select` para adicionar um novo cargo já vinculado ao setor.
+- Quando não há nenhum cargo vinculado → substituir a mensagem "Nenhum cargo vinculado a este setor" por um **CTA primário "+ Criar e vincular cargo"** (mais convidativo).
 
-```sql
-CREATE UNIQUE INDEX unique_active_employee_no_cpf
-ON public.employees (unit_id, lower(trim(name)))
-WHERE active = true AND (cpf IS NULL OR cpf = '');
+### 2. Mini-dialog `QuickCreateJobTitleDialog`
+Diálogo leve (dentro do próprio modal de freelancer) com:
+- **Combobox** dos cargos já existentes na unidade (vindos de `useJobTitles(unitId)`) que **ainda não estão vinculados** ao setor → permite vincular um cargo existente em 1 clique.
+- Campo "**Criar novo cargo**" (input de texto) — usa `useUpsertJobTitle` (idempotente por nome+unidade).
+- Botão **"Vincular ao setor"** que:
+  1. Cria o cargo se for novo (via `useUpsertJobTitle`).
+  2. Chama uma nova mutação `useAddSectorJobTitle` (insert único em `sector_job_titles`, sem apagar os existentes — diferente do `useSetSectorJobTitles` que faz delete+insert).
+  3. Invalida `["sector_job_titles"]` e `["job_titles"]`.
+  4. **Pré-seleciona automaticamente** o cargo recém-criado no `Select` do modal pai.
+
+### 3. Nova mutação `useAddSectorJobTitle` em `useSectorJobTitles.ts`
+```ts
+export function useAddSectorJobTitle() {
+  // insert { sector_id, job_title_id } com onConflict: ignore
+  // invalida ["sector_job_titles"]
+}
 ```
+Mantém o `useSetSectorJobTitles` existente intacto (continua usado pela tela de configuração para edição em massa).
 
-Esse constraint foi pensado para evitar duplicatas acidentais, mas é restritivo demais para a realidade operacional — é comum ter dois colaboradores com o mesmo primeiro nome (ex.: ANA SILVA e ANA COSTA), e nem sempre o CPF está disponível no momento do cadastro inicial.
+### 4. Permissão
+O botão "+" só aparece para usuários com permissão de gerência/admin (mesma regra que controla acesso ao TeamManagement). Operadores comuns continuam vendo o estado atual. Vou usar o hook `useUserProfile` para checar `role`.
 
-Além disso, a mensagem de erro mostrada hoje é técnica (texto bruto da Postgres) e não orienta o usuário sobre o que fazer.
-
-## Plano de correção
-
-### 1. Substituir o constraint rígido por um soft-warning (migration)
-
-Remover o índice atual `unique_active_employee_no_cpf` e substituir por uma versão baseada em **(unit_id, name, job_title)** — assim duas pessoas com o mesmo primeiro nome só serão bloqueadas se também tiverem o **mesmo cargo**, o que é um indicador muito mais confiável de duplicata acidental:
-
-```sql
-DROP INDEX IF EXISTS public.unique_active_employee_no_cpf;
-
-CREATE UNIQUE INDEX unique_active_employee_no_cpf
-ON public.employees (unit_id, lower(trim(name)), lower(coalesce(trim(job_title), '')))
-WHERE active = true AND (cpf IS NULL OR cpf = '');
-```
-
-Isso libera o caso da usuária (ANA CUMIM ≠ ANA SUBCHEFE) e ainda protege contra cadastros duplicados óbvios. O índice de freelancer com CPF (`unique_freelancer_cpf_unit`) permanece intocado.
-
-### 2. Tradução amigável de erros nos 3 hooks de mutação (`useEmployees.ts`)
-
-Atualmente o `onError` apenas concatena `err.message`. Vou adicionar um helper `friendlyEmployeeError(err)` em `useEmployees.ts` que detecta os códigos/mensagens conhecidos do Postgres e devolve textos claros em português:
-
-- `unique_active_employee_no_cpf` → "Já existe um funcionário com este nome e cargo nesta unidade. Adicione um sobrenome ou informe o CPF para diferenciar."
-- `unique_freelancer_cpf_unit` → "Este CPF já está cadastrado como freelancer nesta unidade."
-- Demais erros caem no fallback `err.message`.
-
-Aplicar nos 3 hooks: `useAddEmployee`, `useUpdateEmployee`, `useDeleteEmployee`.
-
-### 3. Tratamento defensivo no formulário de cadastro (`TeamManagement.tsx`)
-
-No `handleSubmit`, antes de chamar `addEmployee.mutateAsync`, fazer uma checagem leve no array `employees` já carregado:
-
-- Se existir outro ativo com o **mesmo nome (case-insensitive) e mesmo cargo** sem CPF na unidade alvo, mostrar um `confirm`/toast de aviso pedindo para o usuário diferenciar (adicionar sobrenome ou cargo) antes de tentar salvar.
-- Isso evita o round-trip ao banco para o caso óbvio e melhora a UX.
-
-Manter o fallback do `onError` traduzido caso o usuário insista ou exista uma corrida.
-
-### 4. Mesmo tratamento no `FreelancerAddModal.tsx` e `EditEmployeeQuickModal.tsx`
-
-Ambos modais hoje exibem o `err.message` cru via toast (ou silenciosamente nos hooks). Vou:
-
-- Garantir que ambos usem os hooks atualizados (`useAddEmployee`/`useUpdateEmployee`) para herdar automaticamente as mensagens amigáveis.
-- No `FreelancerAddModal`, a criação direta via `supabase.from("employees").insert(...)` (linha do `handleSubmit`) precisa do mesmo tratamento — encapsular em try/catch e usar o helper compartilhado.
-
-### 5. Memória do projeto
-
-Atualizar `mem://technical/escalas/database-uniqueness-constraints` para refletir que a chave de duplicação sem CPF agora considera **nome + cargo**, e não apenas o nome.
-
-## Resumo das mudanças
-
-| Arquivo | Mudança |
-|---|---|
-| `supabase/migrations/<novo>.sql` | Recriar `unique_active_employee_no_cpf` incluindo `job_title` |
-| `src/hooks/useEmployees.ts` | Helper `friendlyEmployeeError` + uso nos 3 mutations |
-| `src/components/escalas/TeamManagement.tsx` | Pré-check de duplicata por nome+cargo antes de salvar |
-| `src/components/escalas/FreelancerAddModal.tsx` | Tratamento amigável no insert direto |
-| `src/components/escalas/EditEmployeeQuickModal.tsx` | Herda do hook atualizado (sem mudanças adicionais) |
-| `mem://technical/escalas/database-uniqueness-constraints` | Atualizar regra |
+## Arquivos a alterar
+- `src/hooks/useSectorJobTitles.ts` — adicionar `useAddSectorJobTitle`.
+- `src/components/escalas/FreelancerAddModal.tsx` — botão "+", CTA quando vazio, abrir mini-dialog, auto-selecionar cargo após criação.
+- `src/components/escalas/QuickCreateJobTitleDialog.tsx` (novo) — componente reutilizável.
 
 ## Resultado esperado
-
-- A usuária consegue cadastrar **ANA (SUBCHEFE)** mesmo já existindo **ANA (CUMIM)** na mesma unidade.
-- Se ela tentar cadastrar outra **ANA (SUBCHEFE)** sem CPF, recebe a mensagem clara: "Já existe um funcionário com este nome e cargo nesta unidade. Adicione um sobrenome ou informe o CPF para diferenciar."
-- Os outros pontos de criação de funcionário (modal de freelancer e edição rápida) seguem o mesmo padrão.
+Na situação da imagem (setor sem cargos vinculados), o usuário verá um botão **"+ Criar e vincular cargo"** dentro do próprio modal "Freelancer extra". Em 2 cliques ele cria/vincula o cargo (ex: "Auxiliar de Bar"), o `Select` é populado e pré-selecionado, e o usuário consegue escalar o freelancer sem fechar nada.

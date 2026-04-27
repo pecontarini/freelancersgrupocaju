@@ -15,14 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle } from "lucide-react";
+import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus } from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { useJobTitles } from "@/hooks/useJobTitles";
 import { useCpfLookup } from "@/hooks/useCpfLookup";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCPF } from "@/lib/formatters";
 import { toast } from "sonner";
+import { QuickCreateJobTitleDialog } from "./QuickCreateJobTitleDialog";
 
 interface FreelancerAddModalProps {
   open: boolean;

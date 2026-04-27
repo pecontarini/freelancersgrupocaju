@@ -98,12 +98,18 @@ export function AiImportSection() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Detectar automaticamente</SelectItem>
-                <SelectItem value="store_performance">Performance Mensal</SelectItem>
-                <SelectItem value="store_performance_entries">Lançamentos Diários</SelectItem>
+                <SelectItem value="store_performance">Performance Mensal (inclui Tempo de Comanda)</SelectItem>
+                <SelectItem value="store_performance_entries">Lançamentos Diários (inclui Tempo de Comanda)</SelectItem>
                 <SelectItem value="reclamacoes">Reclamações Individuais</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          <p className="text-xs text-muted-foreground -mt-1">
+            💡 Para metas de <strong>Tempo de Comanda / Tempo de Prato</strong> dos chefes, suba a planilha do KDS no
+            mesmo botão abaixo. A IA detecta colunas tipo "Tempo Médio", "mm:ss", etc., e popula
+            automaticamente <code>tempo_prato_avg</code>.
+          </p>
 
           <div
             onDrop={handleDrop}

@@ -227,22 +227,35 @@ const Index = () => {
   const currentTabConfig = tabConfig[activeTab] || tabConfig.budgets;
 
   const renderTabContent = () => {
-    // Chefe de setor only sees escalas
-    if (isChefeSetor && activeTab !== "escalas") {
-      return <EscalasTab />;
+    const budgetsProps = {
+      freelancerEntries: filteredEntries,
+      operationalExpenses: filteredOperationalExpenses,
+      maintenanceEntries: filteredMaintenanceEntries,
+      selectedUnidadeId:
+        effectiveUnidadeId ||
+        ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : ""),
+    };
+
+    // Chefe de setor only sees Gestão de Pessoas (Escalas + Presença)
+    if (isChefeSetor && activeTab !== "gestao-pessoas") {
+      return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
     }
 
     switch (activeTab) {
+      case "unitarios-gerentes":
+        return (
+          <div className="space-y-4">
+            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
+            <UnitariosGerentesTab budgetsProps={budgetsProps} />
+          </div>
+        );
+      case "gestao-pessoas":
+        return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
       case "budgets":
         return (
           <div className="space-y-4">
-            <TeamReadinessCard onNavigate={() => setActiveTab("escalas")} />
-            <BudgetsGerenciaisTab
-              freelancerEntries={filteredEntries}
-              operationalExpenses={filteredOperationalExpenses}
-              maintenanceEntries={filteredMaintenanceEntries}
-              selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
-            />
+            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
+            <BudgetsGerenciaisTab {...budgetsProps} />
           </div>
         );
       case "remuneracao":
@@ -251,14 +264,7 @@ const Index = () => {
         );
       case "diagnostico":
         return (
-          <AuditDiagnosticDashboard 
-            selectedUnidadeId={selectedUnidadeId} 
-            isAdmin={isAdmin} 
-          />
-        );
-      case "performance":
-        return (
-          <LeadershipPerformanceDashboard 
+          <AuditDiagnosticDashboard
             selectedUnidadeId={selectedUnidadeId}
             isAdmin={isAdmin}
           />
@@ -284,14 +290,7 @@ const Index = () => {
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:
-        return (
-          <BudgetsGerenciaisTab
-            freelancerEntries={filteredEntries}
-            operationalExpenses={filteredOperationalExpenses}
-            maintenanceEntries={filteredMaintenanceEntries}
-            selectedUnidadeId={effectiveUnidadeId || ((isGerenteUnidade || isOperator) && unidades.length > 0 ? unidades[0].id : "")}
-          />
-        );
+        return <UnitariosGerentesTab budgetsProps={budgetsProps} />;
     }
   };
 

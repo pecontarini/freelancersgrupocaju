@@ -559,3 +559,151 @@
     }
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   VISION PRO LIQUID GLASS — Painel de Indicadores
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+  /* Tokens (light + dark friendly via overlay translucency) */
+  :root {
+    --vision-glass-bg: rgba(255, 255, 255, 0.55);
+    --vision-glass-bg-strong: rgba(255, 255, 255, 0.72);
+    --vision-glass-border-top: rgba(255, 255, 255, 0.95);
+    --vision-glass-border-bot: rgba(0, 0, 0, 0.06);
+    --vision-glass-shadow:
+      0 8px 32px rgba(20, 20, 30, 0.10),
+      0 2px 8px rgba(20, 20, 30, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --vision-tooltip-bg: rgba(20, 20, 28, 0.78);
+  }
+
+  .dark {
+    --vision-glass-bg: rgba(30, 32, 42, 0.55);
+    --vision-glass-bg-strong: rgba(30, 32, 42, 0.72);
+    --vision-glass-border-top: rgba(255, 255, 255, 0.18);
+    --vision-glass-border-bot: rgba(0, 0, 0, 0.35);
+    --vision-glass-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.45),
+      0 2px 8px rgba(0, 0, 0, 0.30),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    --vision-tooltip-bg: rgba(15, 16, 22, 0.82);
+  }
+
+  /* Base glass surface */
+  .vision-glass {
+    position: relative;
+    background: var(--vision-glass-bg);
+    backdrop-filter: blur(36px) saturate(190%);
+    -webkit-backdrop-filter: blur(36px) saturate(190%);
+    border: 1px solid var(--vision-glass-border-top);
+    border-bottom-color: var(--vision-glass-border-bot);
+    border-right-color: var(--vision-glass-border-bot);
+    border-radius: 24px;
+    box-shadow: var(--vision-glass-shadow);
+    overflow: hidden;
+  }
+  .vision-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 50%;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.18) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: 24px 24px 0 0;
+  }
+  .dark .vision-glass::before {
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.06) 0%,
+      transparent 100%
+    );
+  }
+
+  .vision-glass-strong {
+    background: var(--vision-glass-bg-strong);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+  }
+
+  /* Pill — used for tab strips and chips */
+  .vision-glass-pill {
+    background: var(--vision-glass-bg);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--vision-glass-border-top);
+    border-bottom-color: var(--vision-glass-border-bot);
+    border-radius: 999px;
+    box-shadow: var(--vision-glass-shadow);
+  }
+
+  /* Circular icon container — Vision Pro left-rail style */
+  .vision-glass-icon {
+    border-radius: 999px;
+    background: var(--vision-glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--vision-glass-border-top);
+    border-bottom-color: var(--vision-glass-border-bot);
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    transition: transform 220ms var(--ease-cinematic, cubic-bezier(0.65,0,0.35,1)),
+      box-shadow 220ms ease;
+  }
+  .vision-glass-icon:hover {
+    transform: translateY(-1px) scale(1.04);
+    box-shadow:
+      0 6px 18px rgba(208, 89, 55, 0.20),
+      inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+  .vision-glass-icon[data-active="true"] {
+    background: linear-gradient(
+      135deg,
+      hsl(14 80% 55% / 0.30) 0%,
+      hsl(14 80% 50% / 0.22) 100%
+    );
+    border-color: hsl(14 80% 60% / 0.55);
+    box-shadow:
+      0 6px 20px hsl(14 80% 55% / 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  /* Tooltip used by Recharts and InteractiveProgress */
+  .vision-glass-tooltip {
+    background: var(--vision-tooltip-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(208, 89, 55, 0.10),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    color: white;
+  }
+
+  /* Scoped backdrop helper */
+  .vision-painel-root {
+    position: relative;
+  }
+  .vision-painel-root > * { position: relative; z-index: 1; }
+}
+
+@layer utilities {
+  @keyframes vision-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Recharts: ensure tooltip wrapper doesn't paint its own bg over the glass */
+  .recharts-tooltip-wrapper { outline: none; }
+  .recharts-default-tooltip { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .vision-glass-icon { transition: none; }
+  }
+}

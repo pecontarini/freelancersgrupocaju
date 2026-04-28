@@ -42,31 +42,31 @@ export function VisionKpiCard({
       : value.toFixed(1);
 
   return (
-    <div className="vision-glass relative p-5">
+    <div className="vision-glass relative p-3 sm:p-5">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground line-clamp-2">
           {title}
         </span>
         <div
-          className="vision-glass-icon flex h-10 w-10 shrink-0 items-center justify-center"
+          className="vision-glass-icon flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center"
           style={{ boxShadow: `0 4px 16px ${accent}33, inset 0 1px 0 rgba(255,255,255,0.4)` }}
         >
-          <Icon className="h-4 w-4" style={{ color: accent }} />
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" style={{ color: accent }} />
         </div>
       </div>
 
       {loading ? (
-        <Skeleton className="mt-3 h-9 w-24" />
+        <Skeleton className="mt-3 h-7 sm:h-9 w-20 sm:w-24" />
       ) : (
-        <div className="mt-3 flex items-baseline gap-1">
+        <div className="mt-2 sm:mt-3 flex items-baseline gap-1">
           <span
-            className="text-3xl font-bold tabular-nums"
+            className="text-xl sm:text-3xl font-bold tabular-nums"
             style={{ textShadow: value !== null ? `0 0 24px ${accent}40` : undefined }}
           >
             {display}
           </span>
           {suffix && value !== null && (
-            <span className="text-sm font-medium text-muted-foreground">{suffix}</span>
+            <span className="text-xs sm:text-sm font-medium text-muted-foreground">{suffix}</span>
           )}
         </div>
       )}

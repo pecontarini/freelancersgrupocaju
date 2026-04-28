@@ -324,7 +324,7 @@ function VisaoGeral() {
       )}
 
       {/* BLOCO 2 — KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         <KpiCard
           title="Back Score Médio"
           icon={TrendingDown}
@@ -766,7 +766,7 @@ function NpsView() {
       </Card>
 
       {/* BLOCO 1 — KPI Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
         <KpiCard
           title="Reclamações Salão"
           icon={Store}

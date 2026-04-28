@@ -285,9 +285,12 @@ const Index = () => {
     return (
       <SidebarProvider>
         <AppGlassBackground />
-        <div className="flex min-h-screen flex-col pb-20 pt-14 w-full">
+        <div
+          className="flex min-h-screen flex-col pt-14 w-full"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
+        >
           <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
-          <div className="px-4 py-4">
+          <div className="px-3 py-3">
             <PortalHeader
               title={currentTabConfig.title}
               subtitle={currentTabConfig.subtitle}
@@ -295,7 +298,7 @@ const Index = () => {
               onUnidadeChange={setSelectedUnidadeId}
             />
           </div>
-          <main className="flex-1 px-4 pb-4">{renderTabContent()}</main>
+          <main className="flex-1 px-3 pb-4">{renderTabContent()}</main>
         </div>
       </SidebarProvider>
     );

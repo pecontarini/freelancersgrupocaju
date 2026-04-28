@@ -1,4 +1,15 @@
-import { ClipboardCheck, User, Menu, Package, CalendarClock, Sun, Moon, Calendar, BarChart2, LayoutGrid, Users } from "lucide-react";
+import {
+  ClipboardCheck,
+  User,
+  Menu,
+  Package,
+  Sun,
+  Moon,
+  Calendar,
+  BarChart2,
+  LayoutGrid,
+  Users,
+} from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
 import {
@@ -23,10 +34,9 @@ interface BottomNavigationProps {
 const navItems = [
   { id: "unitarios-gerentes", label: "Unitários", icon: LayoutGrid },
   { id: "gestao-pessoas", label: "Pessoas", icon: Users },
-  
   { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "agenda-lider", label: "Agenda", icon: Calendar },
-  { id: "painel", label: "Indicadores", icon: BarChart2 },
+  { id: "painel", label: "Painel", icon: BarChart2 },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
@@ -42,15 +52,19 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
 
   return (
     <>
-      {/* Mobile Header with Logo and Menu */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between bg-background/60 px-4 md:hidden glass-header">
-        <div className="flex items-center gap-2">
-          <img src={theme === "dark" ? cajuparLogoLight : cajuparLogoDark} alt="CajuPAR" className="h-8 w-auto" />
+      {/* Mobile Header — Vision Glass */}
+      <header className="vision-glass-header fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between px-4 md:hidden">
+        <div className="flex items-center gap-2 min-w-0">
+          <img
+            src={theme === "dark" ? cajuparLogoLight : cajuparLogoDark}
+            alt="CajuPAR"
+            className="h-8 w-auto"
+          />
         </div>
-        
+
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-10 w-10">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -65,7 +79,6 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
               <div className="text-sm text-muted-foreground">
                 {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente de Unidade"}
               </div>
-              
               <div className="space-y-2 border-t pt-4">
                 <Button
                   variant="ghost"
@@ -102,24 +115,19 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   </>
                 )}
               </div>
-              
               <div className="border-t pt-4 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Tema</span>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 rounded-full"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                 >
                   {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
               </div>
               <div className="pt-2">
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={signOut}
-                >
+                <Button variant="destructive" className="w-full" onClick={signOut}>
                   Sair
                 </Button>
               </div>
@@ -128,56 +136,63 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
         </Sheet>
       </header>
 
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/60 md:hidden safe-area-bottom glass-nav">
-        <div className="flex h-16 items-stretch justify-around">
+      {/* Floating Vision Glass Dock */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 md:hidden pointer-events-none"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 12px)" }}
+      >
+        <nav
+          className="vision-dock pointer-events-auto mx-3 flex items-center justify-between gap-1 px-2 py-2"
+          aria-label="Navegação principal"
+        >
           {visibleNavItems.map((item) => {
             const isActive = activeTab === item.id;
             const Icon = item.icon;
-            
+            const showBadge = item.id === "gestao-pessoas" && escalaPending > 0;
+
             return (
               <button
                 key={item.id}
+                type="button"
                 onClick={() => onTabChange(item.id)}
-                className={cn(
-                  "relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors min-h-[56px]",
-                  isActive
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+                data-active={isActive}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={item.label}
+                className={cn("vision-dock-item flex-shrink-0", isActive && "flex-1")}
               >
-                <div className="relative">
-                  <Icon className={cn("h-5 w-5", isActive && "text-primary")} />
-                  {item.id === "gestao-pessoas" && escalaPending > 0 && (
-                    <span className="absolute -top-1.5 -right-2.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground px-0.5">
+                <span className="relative flex items-center justify-center">
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+                  {showBadge && (
+                    <span
+                      className={cn(
+                        "absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center",
+                        "rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground",
+                        "ring-2 ring-background/80",
+                      )}
+                    >
                       {escalaPending}
                     </span>
                   )}
-                </div>
-                <span className={cn(
-                  "text-[10px] font-medium uppercase tracking-wide",
-                  isActive && "font-bold"
-                )}>
-                  {item.label}
                 </span>
-                {isActive && (
-                  <div className="absolute bottom-1 h-1 w-8 rounded-full bg-primary" />
-                )}
+                <span className="vision-dock-label">{item.label}</span>
               </button>
             );
           })}
-          
+
           {/* Profile button */}
           <Sheet>
             <SheetTrigger asChild>
-              <button className="flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground min-h-[56px]">
-                <User className="h-5 w-5" />
-                <span className="text-[10px] font-medium uppercase tracking-wide">
-                  Perfil
+              <button
+                type="button"
+                aria-label="Perfil"
+                className="vision-dock-item flex-shrink-0"
+              >
+                <span className="flex items-center justify-center">
+                  <User className="h-[18px] w-[18px]" strokeWidth={2.2} />
                 </span>
               </button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="h-auto rounded-t-2xl">
+            <SheetContent side="bottom" className="h-auto rounded-t-3xl">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
@@ -194,7 +209,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
               <div className="mt-6 space-y-3 pb-8">
                 <Button
                   variant="outline"
-                  className="w-full justify-start h-12"
+                  className="w-full justify-start h-12 rounded-2xl"
                   onClick={() => onTabChange("agenda-lider")}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
@@ -202,7 +217,7 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full justify-start h-12"
+                  className="w-full justify-start h-12 rounded-2xl"
                   onClick={() => onTabChange("utensilios")}
                 >
                   <Package className="h-4 w-4 mr-2" />
@@ -212,14 +227,14 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   <>
                     <Button
                       variant="outline"
-                      className="w-full justify-start h-12"
+                      className="w-full justify-start h-12 rounded-2xl"
                       onClick={() => onTabChange("configuracoes")}
                     >
                       Configurações
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full justify-start h-12"
+                      className="w-full justify-start h-12 rounded-2xl"
                       onClick={() => onTabChange("rede")}
                     >
                       Visão Rede
@@ -231,24 +246,20 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-10 w-10"
+                    className="h-10 w-10 rounded-full"
                     onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   >
                     {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                   </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  className="w-full h-12"
-                  onClick={signOut}
-                >
+                <Button variant="destructive" className="w-full h-12 rounded-2xl" onClick={signOut}>
                   Sair da Conta
                 </Button>
               </div>
             </SheetContent>
           </Sheet>
-        </div>
-      </nav>
+        </nav>
+      </div>
     </>
   );
 }

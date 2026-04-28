@@ -341,7 +341,7 @@ export function BudgetsGerenciaisTab({
       )}
 
       {/* Summary Cards - Show accumulated values by default (current month) */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
         {/* Freelancers - Accumulated Total */}
         <Card className="rounded-2xl shadow-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -73,6 +73,7 @@ import {
   ChevronDown,
   Loader2,
   Send,
+  type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -447,7 +448,7 @@ function VisaoGeral() {
 
 interface KpiCardProps {
   title: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: LucideIcon;
   value: number | null;
   loading: boolean;
   showProgress?: boolean;

@@ -582,6 +582,7 @@ function faixaBadgeVariant(faixa: FaixaSalao | null): "default" | "secondary" | 
 
 function NpsView() {
   const [mes, setMes] = useState<string>(currentMonth());
+  const [activePieIdx, setActivePieIdx] = useState<number | null>(null);
 
   const reclamQ = useQuery({
     queryKey: ["painel-nps", mes],

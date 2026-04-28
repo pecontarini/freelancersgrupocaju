@@ -403,13 +403,13 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm",
+                      "max-w-[92%] sm:max-w-[85%] space-y-2 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm break-words",
                       m.role === "user"
                         ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
                         : "glass-card text-foreground",
                     )}
                   >
-                    <p className="whitespace-pre-wrap">
+                    <p className="whitespace-pre-wrap break-words">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}
                     </p>
                     {m.missoes && m.missoes.length > 0 && (() => {
@@ -489,7 +489,10 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
           </div>
         </ScrollArea>
 
-        <div className="border-t border-border/40 bg-card/80 p-3">
+        <div
+          className="border-t border-border/40 bg-card/80 px-2 py-2 sm:p-3"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)" }}
+        >
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -505,7 +508,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 ))}
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-1.5 sm:gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -518,12 +521,12 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-[60px] w-[60px] shrink-0"
+                className="h-11 w-11 sm:h-[60px] sm:w-[60px] shrink-0 rounded-2xl"
                 onClick={handlePickFiles}
                 disabled={loading || attachments.length >= MAX_FILES}
                 title={`Anexar (até ${MAX_FILES})`}
               >
-                <Paperclip className="h-5 w-5" />
+                <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <Textarea
                 value={input}
@@ -535,15 +538,15 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                   }
                 }}
                 placeholder="Descreva o que precisa fazer essa semana ou anexe um relatório..."
-                className="min-h-[60px] resize-none"
+                className="min-h-11 sm:min-h-[60px] resize-none text-sm rounded-2xl"
               />
               <Button
                 onClick={send}
                 disabled={!canSend}
                 size="icon"
-                className="h-[60px] w-[60px] shrink-0"
+                className="h-11 w-11 sm:h-[60px] sm:w-[60px] shrink-0 rounded-2xl"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                {loading ? <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <Send className="h-4 w-4 sm:h-5 sm:w-5" />}
               </Button>
             </div>
           </div>

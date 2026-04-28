@@ -1311,7 +1311,7 @@ export function ManualScheduleGrid() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[160px] sticky left-0 bg-background z-20 border-r">
+                        <TableHead className="min-w-[160px] sticky left-0 bg-card/95 backdrop-blur z-20 border-r-2 border-primary/20">
                           Funcionário
                         </TableHead>
                         {weekDays.map((day, i) => {
@@ -1473,7 +1473,7 @@ export function ManualScheduleGrid() {
                                     : undefined
                                 }
                               >
-                                <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                <TableCell className="font-medium sticky left-0 bg-card/95 backdrop-blur z-10 border-r-2 border-primary/15">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
                                     {isFreelancer && (
@@ -1694,7 +1694,7 @@ export function ManualScheduleGrid() {
                           </TableRow>
                           {showSectorBase && sortedBase.map((emp) => (
                             <TableRow key={emp.id} className="opacity-60">
-                              <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                              <TableCell className="font-medium sticky left-0 bg-card/95 backdrop-blur z-10 border-r-2 border-primary/15">
                                 <div className="flex items-center gap-1.5">
                                   <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
                                 </div>

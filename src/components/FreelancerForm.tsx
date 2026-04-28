@@ -494,7 +494,8 @@ export function FreelancerForm() {
             )}
           </Button>
         </form>
-      </CardContent>
-    </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

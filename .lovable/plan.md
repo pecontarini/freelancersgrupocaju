@@ -1,78 +1,93 @@
+# Otimização Mobile + Bottom Nav Vision Glass
 
-# Plano — Liquid Glass Vision Pro no Painel de Indicadores
+## Objetivo
+Aplicar o mesmo idioma "Apple Vision Pro / Liquid Glass" usado na sidebar do Painel de Indicadores na **barra inferior mobile** e fazer uma passada de **otimização responsiva** nas telas mais críticas do app, garantindo que tudo respeite a largura de 375–414px sem overflow, com tipografia legível e áreas de toque ≥44px.
 
-Aplicar a estética glassmorphism imersiva (referência Apple Vision Pro Smart Home Dashboard) ao **Painel de Indicadores**, redesenhar os itens do grupo **Gestão** da sidebar com ícones arredondados em pílula de vidro, e tornar **todos os gráficos e barras de progresso interativos ao toque/hover**.
+---
 
-## 1. Sistema visual Liquid Glass (Vision Pro)
+## 1. Bottom Navigation — Vision Glass Floating Dock
 
-Novos tokens e classes em `src/index.css` + `tailwind.config.ts`:
+Refatorar `src/components/layout/BottomNavigation.tsx` para um **dock flutuante arredondado**, fiel ao estilo da `PainelSidebar`.
 
-- `--vision-glass-bg`, `--vision-glass-bg-strong`, `--vision-glass-border-top`, `--vision-glass-border-bottom`, `--vision-glass-shadow`.
-- Classes utilitárias:
-  - `.vision-glass` — superfície vidro escura translúcida com `backdrop-filter: blur(36px) saturate(190%)`, borda superior clara (highlight especular), borda inferior escura, sombra interna sutil, radius 28px.
-  - `.vision-glass-strong` — variante mais opaca para cartões principais (KPIs, ranking).
-  - `.vision-glass-pill` — pílula arredondada para chips/abas internas.
-  - `.vision-glass-icon` — círculo 40px com glass + glow sutil para ícones (será usado na sidebar e dentro de KPIs).
-- `.vision-aurora-bg` — pseudo-fundo do painel com 3 orbes coral/âmbar/azul difusos (usa as keyframes `aurora-drift-*` já existentes do sistema motion).
-- Specular highlight (`::before`) sutil no topo de cada cartão glass para imitar o efeito vidro real da referência.
+**Mudanças visuais:**
+- Trocar a barra colada na borda por um **dock flutuante** com margens laterais (`mx-3 mb-3`), `rounded-full`, usando `.vision-glass` (blur 36px + specular highlight + sombra cinematográfica).
+- Cada item vira um **ícone circular** estilo `.vision-glass-icon` (44×44, atende touch target). 
+- Ativo: glow coral (`shadow-[0_0_20px_hsl(var(--primary)/0.5)]`), ícone em `text-primary`, fundo `bg-primary/15`.
+- Label só aparece no item ativo (animação de width/opacity com `cubic-bezier(0.65,0,0.35,1)`), igual ao padrão "rail expansível" da sidebar — economiza espaço horizontal.
+- Badge de notificações (`escalaPending`) ganha estilo glass com ring branco para destacar sobre o blur.
+- Header mobile (topo) também recebe `.vision-glass` no lugar de `glass-header` para consistência.
 
-## 2. Painel de Indicadores — Reskin
+**Comportamento:**
+- Manter mesma API (`activeTab`, `onTabChange`).
+- Adicionar `safe-area-inset-bottom` no padding do wrapper externo, não dentro do dock.
+- Sheet de Perfil mantida, mas o trigger vira ícone circular igual aos outros.
 
-Editar `src/components/dashboard/PainelMetasTab.tsx`:
+---
 
-- Wrapper externo do painel: container com `vision-aurora-bg` fixo atrás, conteúdo com `relative z-10`.
-- Substituir todos `glass-card` **dentro do painel** por `vision-glass` (KPI cards, mapa de calor, NPS, conformidade, planos, holding) — mantendo o `glass-card` global intacto para o resto do app.
-- `Tabs` internas (`Visão Geral`, `Diário`, `NPS`, `Conformidade`, `Planos`, `Holding`): TabsList vira pílula glass flutuante (`vision-glass-pill`), TabsTrigger ativo recebe pill sólida coral com leve glow.
-- KPI cards: ícone passa para um `vision-glass-icon` no canto superior direito, número grande com leve text-shadow coral, helper sutil.
-- Tabela "Mapa de Calor" e "Ranking": linhas com hover translúcido, badges de tier com gradient + blur leve.
-- Banner crítico: variante glass destrutiva (vidro com tinge vermelho, em vez de Alert padrão).
+## 2. Otimização Mobile Geral
 
-## 3. Sidebar — Itens do grupo "Gestão" com ícone arredondado
+Auditoria e correções em telas que hoje quebram ou ficam apertadas em 390px:
 
-Editar `src/components/layout/AppSidebar.tsx` (apenas o bloco `gestaoMenuItems`, conforme pedido):
+### 2.1 Tabs e cabeçalhos (`PainelMetasTab`, `BudgetsGerenciaisTab`, `RemuneracaoVariavelTab`, `EstoqueTab`, `UtensiliosTab`, `CMVTab`)
+- TabsList com `overflow-x-auto scrollbar-none` + `snap-x` no mobile, ao invés de quebrar em grid apertado.
+- Triggers com `text-xs` no mobile, `text-sm` em sm:+, padding reduzido.
+- Títulos de página: `text-xl md:text-2xl`, subtítulo `text-xs md:text-sm`.
 
-- Cada item do grupo **Gestão** (hoje só "Painel de Indicadores", mas extensível):
-  - Renderiza um wrapper customizado em vez do `SidebarMenuButton` padrão.
-  - Ícone dentro de um círculo `vision-glass-icon` (40×40, borda superior clara, glow coral leve quando ativo).
-  - Texto à direita do círculo, com peso médio.
-  - Estado ativo: o círculo ganha fundo coral translúcido + ring coral suave; texto fica em `text-primary`.
-  - No estado collapsed da sidebar, mostra apenas o círculo (sem texto), mantendo o tooltip.
-- Os outros grupos (`Menu Principal`, `Administração`) continuam como estão para preservar consistência atual.
+### 2.2 Cards e KPIs
+- Padronizar grids: `grid-cols-2 md:grid-cols-3 xl:grid-cols-4` (nunca 1 coluna em mobile para KPIs pequenos; usar `grid-cols-2`).
+- `VisionKpiCard` ganha variante compacta no mobile (ícone menor, valor `text-xl` ao invés de `text-3xl`).
+- Cards de listas (FreelancerCard, MaintenanceList, etc.) revisados para evitar `truncate` sem `min-w-0` no parent flex.
 
-## 4. Gráficos e barras interativos ao toque
+### 2.3 Tabelas (`EntriesTable`, `MaintenanceList`, `EstoqueTab/CatalogoItens`, `Movimentacao`, `Inventarios`)
+- Em mobile usar o padrão já adotado no app: `useIsMobile()` → renderiza lista de cards; desktop mantém `<Table>`.
+- Onde ainda houver `<Table>` exposta no mobile, envolver em `overflow-x-auto` com sombra de scroll.
 
-Padronizar interatividade nos charts existentes do painel (e estendido aos novos componentes):
+### 2.4 Formulários e diálogos
+- `Dialog`/`Sheet`: garantir `max-h-[90vh] overflow-y-auto` e `w-[calc(100vw-1rem)] max-w-md` no mobile.
+- Inputs com `h-11` (44px) para conforto de toque.
+- Botões de ação primários: `w-full sm:w-auto` em footers de modal.
 
-- **Recharts Pie/Line/Bar/Area**:
-  - Tooltip customizado `VisionGlassTooltip` (glass pill com sombra coral, número grande, label discreta) — funciona em hover e em toque (mobile via touch events nativos do Recharts).
-  - Pie: setor sob hover ganha `outerRadius +6` + opacidade 100%, demais caem para opacidade 70%; clique destaca/seleciona um canal e filtra a tabela ao lado.
-  - Line: dots maiores em `activeDot`, linha ganha `strokeWidth +1` no hover; toque no eixo X mostra crosshair vertical com tooltip.
-  - Bar (onde houver): hover/touch acende a barra com cor primary e mostra o valor.
-- **Barra de progresso (`Progress`)**: novo componente `InteractiveProgress` (wrapper) — hover/touch mostra tooltip com valor exato + meta, leve scale-y, e shimmer animado contínuo na faixa preenchida.
-- **Tier badges**: clicáveis — abrem popover com explicação do tier (Ouro/Prata/Bronze/Aceitável) e quais critérios atingiu.
-- Hooks: usar `onMouseEnter`/`onTouchStart` do Recharts e `useState` local para o estado de hover/seleção. Mobile: garantir `touch-action: manipulation` nos charts.
+### 2.5 PainelSidebar (mobile)
+- Quando renderizada dentro do `Sheet` mobile, garantir scroll vertical e fechar o sheet automaticamente ao trocar de meta.
 
-## Arquivos a criar
-- `src/components/painel/VisionGlassTooltip.tsx` — tooltip Recharts unificado
-- `src/components/painel/InteractiveProgress.tsx` — barra de progresso interativa
-- `src/components/painel/VisionAuroraBackdrop.tsx` — fundo aurora exclusivo do painel
-- `src/components/painel/VisionKpiCard.tsx` — substitui o `KpiCard` interno (estilo Vision)
+### 2.6 Espaçamento global
+- Padding do conteúdo principal: `px-3 md:px-6` (hoje varia entre componentes).
+- Bottom padding do `<main>` mobile: `pb-24` para não ficar atrás do dock flutuante (hoje é `pb-20`, insuficiente com o novo dock flutuante + safe-area).
 
-## Arquivos a editar
-- `src/index.css` — adicionar tokens e classes `.vision-glass*`
-- `tailwind.config.ts` — sombras e easings adicionais (se necessário)
-- `src/components/dashboard/PainelMetasTab.tsx` — trocar classes `glass-card` por `vision-glass`, usar novos componentes, aplicar interatividade nos charts e barras
-- `src/components/layout/AppSidebar.tsx` — bloco `gestaoMenuItems` com renderização custom (ícone arredondado em glass)
+---
 
-## Detalhes técnicos
-- Sem novas dependências (Recharts e Radix já cobrem tooltips/popovers).
-- Compatível com light e dark mode — `vision-glass` usa overlays translúcidos sobre `--background` atual.
-- Performance: `backdrop-filter` aplicado apenas a cards visíveis; aurora drift usa `transform`/`opacity` (GPU) e respeita `prefers-reduced-motion`.
-- Mobile: cartões mantêm padding maior (≥16px) e ícones touch target ≥40px.
-- Não altera lógica de dados, RLS ou queries — é puramente UI.
+## 3. CSS / Tokens (`src/index.css`)
 
-## Fora do escopo
-- Reskin global de todos os módulos (escala, CMV, utensílios) — mantém-se Liquid Glass atual.
-- Animação 3D do logo no header (ficou pra fase 2 da motion language).
+Adicionar utilitários:
+- `.vision-dock` — wrapper flutuante (`rounded-full`, `vision-glass`, `px-2 py-2`).
+- `.vision-dock-item` — botão circular 44×44 com transição de width quando ativo.
+- `.vision-dock-item-active` — glow coral + bg `primary/15`.
+- `.scrollbar-none` — `scrollbar-width: none; &::-webkit-scrollbar { display:none }` (caso ainda não exista) para tabs roláveis.
+
+---
+
+## 4. Arquivos afetados
+
+**Editar:**
+- `src/index.css` — tokens do dock + utilitários.
+- `src/components/layout/BottomNavigation.tsx` — refatoração completa.
+- `src/pages/Index.tsx` — `pb-24` no main mobile.
+- `src/components/dashboard/PainelMetasTab.tsx` — tabs roláveis, KPIs 2-col.
+- `src/components/dashboard/BudgetsGerenciaisTab.tsx` — idem.
+- `src/components/dashboard/RemuneracaoVariavelTab.tsx` — idem.
+- `src/components/estoque/EstoqueTab.tsx` + filhos — tabs/grid mobile.
+- `src/components/utensilios/UtensiliosTab.tsx` + `DashboardUtensilios.tsx` — grid 2-col.
+- `src/components/cmv/` — grids e tabs.
+- `src/components/painel/VisionKpiCard.tsx` — variante compacta.
+
+**Sem alteração:** PainelSidebar (já está fiel ao Vision Pro), AppSidebar desktop, lógica de negócio.
+
+---
+
+## 5. Validação visual
+Após implementar, verificarei via screenshots em 375px e 414px:
+- Dock flutuante sem cortar nas bordas.
+- Item ativo com label visível sem empurrar os outros.
+- Painel de Indicadores, Budgets, Pessoas, Auditoria e Estoque sem overflow horizontal.
 
 Posso prosseguir com a implementação?

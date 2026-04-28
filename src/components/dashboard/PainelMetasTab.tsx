@@ -89,6 +89,9 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { VisionGlassTooltip } from "@/components/painel/VisionGlassTooltip";
+import { InteractiveProgress } from "@/components/painel/InteractiveProgress";
+import { VisionAuroraBackdrop } from "@/components/painel/VisionAuroraBackdrop";
 
 interface PainelMetasTabProps {
   selectedUnidadeId: string | null;

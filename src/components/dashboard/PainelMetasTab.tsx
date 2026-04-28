@@ -279,7 +279,7 @@ function VisaoGeral() {
   return (
     <div className="space-y-4">
       {/* BLOCO 1 — Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -308,7 +308,7 @@ function VisaoGeral() {
 
       {/* BLOCO 4 — Banner crítico */}
       {criticalUnits.length > 0 && (
-        <Alert variant="destructive" className="glass-card border-destructive/40">
+        <Alert variant="destructive" className="vision-glass border-destructive/40">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <strong>Atenção:</strong> {criticalUnits.length} unidade
@@ -355,7 +355,7 @@ function VisaoGeral() {
       </div>
 
       {/* BLOCO 3 — Mapa de Calor */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Mapa de Calor por Unidade</CardTitle>
         </CardHeader>
@@ -462,7 +462,7 @@ function KpiCard({ title, icon: Icon, value, loading, showProgress, integer, suf
       : value.toFixed(1);
 
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -710,7 +710,7 @@ function NpsView() {
   return (
     <div className="space-y-4">
       {/* Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -774,7 +774,7 @@ function NpsView() {
       </div>
 
       {/* BLOCO 2 — Ranking */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Ranking por Unidade — Salão</CardTitle>
         </CardHeader>
@@ -846,7 +846,7 @@ function NpsView() {
       {/* BLOCO 3 e 4 — Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* PieChart — canais */}
-        <Card className="glass-card">
+        <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Reclamações por Canal</CardTitle>
           </CardHeader>
@@ -882,7 +882,7 @@ function NpsView() {
         </Card>
 
         {/* LineChart — evolução */}
-        <Card className="glass-card">
+        <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Evolução Mensal — Últimos 6 Meses</CardTitle>
           </CardHeader>
@@ -924,7 +924,7 @@ interface KpiUnitCardProps {
 
 function KpiUnitCard({ title, icon: Icon, loading, unitName, value, tone }: KpiUnitCardProps) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -1110,7 +1110,7 @@ function ConformidadeView() {
   return (
     <div className="space-y-4">
       {/* Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -1136,7 +1136,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO A — Score por Unidade */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Building2 className="h-4 w-4 text-primary" />
@@ -1201,7 +1201,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO B — Por Setor */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Utensils className="h-4 w-4 text-primary" />
@@ -1252,7 +1252,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO C — KDS / Tempo de Prato */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Timer className="h-4 w-4 text-primary" />
@@ -1432,7 +1432,7 @@ function PlanosView() {
     <div className="space-y-4">
       {/* Seletor de mês + ação */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Card className="glass-card flex-1">
+        <Card className="vision-glass flex-1">
           <CardContent className="flex items-center justify-center gap-3 p-3">
             <Button
               variant="ghost"
@@ -1511,7 +1511,7 @@ function PlanosView() {
       </div>
 
       {/* Filtros */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase text-muted-foreground">Status</span>
@@ -1554,7 +1554,7 @@ function PlanosView() {
         {planosQ.isLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
         ) : filteredPlanos.length === 0 ? (
-          <Card className="glass-card">
+          <Card className="vision-glass">
             <CardContent className="flex min-h-[160px] items-center justify-center p-10">
               <p className="text-center text-sm text-muted-foreground">
                 Nenhum plano de ação encontrado para este período.
@@ -1593,7 +1593,7 @@ function PlanoKpiCard({
   loading: boolean;
 }) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <div className="text-xs uppercase tracking-wider text-muted-foreground">{title}</div>
@@ -1633,7 +1633,7 @@ function PlanoCard({
     deadline && plano.status !== "resolved" && deadline.getTime() < Date.now();
 
   return (
-    <Card className="glass-card overflow-hidden">
+    <Card className="vision-glass overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
@@ -1987,7 +1987,7 @@ function NovoPlanoSheet({
 
 function PlaceholderCard({ name }: { name: string }) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex min-h-[280px] items-center justify-center p-10">
         <p className="text-center text-base font-medium text-muted-foreground">
           {name} — em construção
@@ -2014,7 +2014,7 @@ import type { MetaKey } from "./painel-metas/shared/types";
 function PlaceholderView({ metaKey }: { metaKey: MetaKey }) {
   const def = META_DEFINITIONS[metaKey];
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-2 p-10 text-center">
         <p className="text-base font-semibold text-foreground">{def.label}</p>
         <p className="max-w-md text-sm text-muted-foreground">

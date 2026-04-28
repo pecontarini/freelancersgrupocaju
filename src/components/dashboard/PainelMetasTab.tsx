@@ -1379,10 +1379,23 @@ function ConformidadeView() {
 }
 
 function ScoreCell({ score }: { score: number | null }) {
-  const value = score ?? 0;
+  const fillClass =
+    score === null
+      ? "bg-muted-foreground/40"
+      : score >= 90
+      ? "bg-emerald-500"
+      : score >= 75
+      ? "bg-amber-500"
+      : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <Progress value={value} className={cn("h-2 flex-1", progressBarColor(score))} />
+      <InteractiveProgress
+        value={score}
+        fillClass={fillClass}
+        label="Score"
+        suffix="/100"
+        className="flex-1"
+      />
       <span className="w-12 text-right text-xs font-semibold tabular-nums">
         {score !== null ? score.toFixed(1) : "—"}
       </span>
@@ -2145,11 +2158,13 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="vision-painel-root space-y-3">
+      <VisionAuroraBackdrop />
+
       {isMobile && (
         <MetaSheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <MetaSheetTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+            <Button variant="outline" size="sm" className="w-full justify-start gap-2 vision-glass border-0">
               <Menu className="h-4 w-4" />
               <span className="font-semibold uppercase tracking-wide text-xs">
                 Metas — {META_DEFINITIONS[active].label}

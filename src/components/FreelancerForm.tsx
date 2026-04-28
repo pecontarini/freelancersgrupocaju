@@ -230,16 +230,26 @@ export function FreelancerForm() {
   };
 
   return (
-    <Card ref={formRef} className="glass-card fade-in">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Plus className="h-5 w-5 text-primary" />
-          Novo Lançamento
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Plus className="h-4 w-4" />
+          Novo Lançamento Freela
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 uppercase">
+            <Plus className="h-5 w-5 text-primary" />
+            Novo Lançamento
+          </DialogTitle>
+          <DialogDescription>
+            Registre um pagamento de freelancer.
+          </DialogDescription>
+        </DialogHeader>
+        <div ref={formRef}>
         <form key={formKey} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             {/* Loja */}
             <div className="space-y-2">
               <Label htmlFor="loja">Loja</Label>
@@ -484,7 +494,8 @@ export function FreelancerForm() {
             )}
           </Button>
         </form>
-      </CardContent>
-    </Card>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

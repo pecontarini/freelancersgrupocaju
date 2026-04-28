@@ -1722,6 +1722,7 @@ export function ManualScheduleGrid() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </CardContent>

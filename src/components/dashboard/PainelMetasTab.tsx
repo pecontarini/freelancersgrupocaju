@@ -80,6 +80,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Sector,
   Tooltip as RTooltip,
   Legend,
   LineChart,
@@ -894,13 +895,38 @@ function NpsView() {
                     cx="50%"
                     cy="45%"
                     outerRadius={80}
+                    activeIndex={activePieIdx ?? undefined}
+                    activeShape={(p: any) => (
+                      <g>
+                        <Sector
+                          cx={p.cx}
+                          cy={p.cy}
+                          innerRadius={p.innerRadius}
+                          outerRadius={p.outerRadius + 8}
+                          startAngle={p.startAngle}
+                          endAngle={p.endAngle}
+                          fill={p.fill}
+                          style={{ filter: `drop-shadow(0 0 12px ${p.fill}80)` }}
+                        />
+                      </g>
+                    )}
+                    onMouseEnter={(_, i) => setActivePieIdx(i)}
+                    onMouseLeave={() => setActivePieIdx(null)}
+                    onClick={(_, i) =>
+                      setActivePieIdx((prev) => (prev === i ? null : i))
+                    }
                     label={(entry) => `${entry.value}`}
                   >
                     {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      <Cell
+                        key={i}
+                        fill={PIE_COLORS[i % PIE_COLORS.length]}
+                        opacity={activePieIdx === null || activePieIdx === i ? 1 : 0.45}
+                        style={{ transition: "opacity 200ms ease, filter 200ms ease", cursor: "pointer" }}
+                      />
                     ))}
                   </Pie>
-                  <RTooltip />
+                  <RTooltip content={<VisionGlassTooltip />} cursor={false} />
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
@@ -922,10 +948,27 @@ function NpsView() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
                   <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <RTooltip />
+                  <RTooltip
+                    content={<VisionGlassTooltip />}
+                    cursor={{ stroke: "hsl(14 80% 55% / 0.4)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                  />
                   <Legend verticalAlign="bottom" height={28} />
-                  <Line type="monotone" dataKey="Salão" stroke="#D05937" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="Delivery" stroke="#0EA5E9" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="Salão"
+                    stroke="#D05937"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Delivery"
+                    stroke="#0EA5E9"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             )}

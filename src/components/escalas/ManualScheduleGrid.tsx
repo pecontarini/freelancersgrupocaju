@@ -1222,14 +1222,20 @@ export function ManualScheduleGrid() {
                   )}
                 </div>
               ) : (
-                <div
-                  ref={gridContainerRef}
-                  className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
-                  tabIndex={0}
-                  onKeyDown={handleGridKeyDown}
-                  onMouseDown={() => focusGrid()}
-                >
-                  <div className="px-3 pb-2 flex justify-end gap-2">
+                <div className="relative">
+                  {/* Hint de scroll horizontal — sombra na borda direita */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute right-0 top-0 bottom-0 z-30 w-6 bg-gradient-to-l from-background/80 to-transparent md:hidden"
+                  />
+                  <div
+                    ref={gridContainerRef}
+                    className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
+                    tabIndex={0}
+                    onKeyDown={handleGridKeyDown}
+                    onMouseDown={() => focusGrid()}
+                  >
+                    <div className="px-3 pb-2 flex justify-end gap-2">
                     <ScheduleAIGenerator
                       unitId={selectedUnit}
                       sectorId={activeSectorId}

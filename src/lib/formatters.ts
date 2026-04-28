@@ -16,6 +16,18 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Format currency compact: R$ 1,2k / R$ 1,2M (mobile-friendly)
+// For values >= 10.000 returns abbreviated form, else falls back to formatCurrency.
+export function formatCurrencyCompact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs < 10_000) return formatCurrency(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) {
+    return `${sign}R$ ${(abs / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+  }
+  return `${sign}R$ ${(abs / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k`;
+}
+
 // Parse currency input to number
 export function parseCurrencyInput(value: string): number {
   const cleaned = value.replace(/[^\d,]/g, "").replace(",", ".");

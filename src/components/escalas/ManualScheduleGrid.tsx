@@ -965,14 +965,14 @@ export function ManualScheduleGrid() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Editor de Escalas</h2>
-          <p className="text-muted-foreground text-sm">
-            Lançamento único por dia — o POP é calculado automaticamente pelo horário.
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-2xl font-bold tracking-tight">Editor de Escalas</h2>
+          <p className="text-muted-foreground text-xs sm:text-sm">
+            Lançamento único por dia — o POP é calculado automaticamente.
           </p>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap shrink-0">
           {canManage && selectedUnit && sectors.length > 0 && (
             <ClearSchedulesModal
               unitId={selectedUnit}
@@ -1222,14 +1222,20 @@ export function ManualScheduleGrid() {
                   )}
                 </div>
               ) : (
-                <div
-                  ref={gridContainerRef}
-                  className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
-                  tabIndex={0}
-                  onKeyDown={handleGridKeyDown}
-                  onMouseDown={() => focusGrid()}
-                >
-                  <div className="px-3 pb-2 flex justify-end gap-2">
+                <div className="relative">
+                  {/* Hint de scroll horizontal — sombra na borda direita */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute right-0 top-0 bottom-0 z-30 w-6 bg-gradient-to-l from-background/80 to-transparent md:hidden"
+                  />
+                  <div
+                    ref={gridContainerRef}
+                    className="overflow-x-auto outline-none focus:ring-2 focus:ring-primary/30 rounded-md"
+                    tabIndex={0}
+                    onKeyDown={handleGridKeyDown}
+                    onMouseDown={() => focusGrid()}
+                  >
+                    <div className="px-3 pb-2 flex justify-end gap-2">
                     <ScheduleAIGenerator
                       unitId={selectedUnit}
                       sectorId={activeSectorId}
@@ -1305,7 +1311,7 @@ export function ManualScheduleGrid() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="min-w-[160px] sticky left-0 bg-background z-20 border-r">
+                        <TableHead className="min-w-[160px] sticky left-0 bg-card/95 backdrop-blur z-20 border-r-2 border-primary/20">
                           Funcionário
                         </TableHead>
                         {weekDays.map((day, i) => {
@@ -1467,7 +1473,7 @@ export function ManualScheduleGrid() {
                                     : undefined
                                 }
                               >
-                                <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                                <TableCell className="font-medium sticky left-0 bg-card/95 backdrop-blur z-10 border-r-2 border-primary/15">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
                                     {isFreelancer && (
@@ -1688,7 +1694,7 @@ export function ManualScheduleGrid() {
                           </TableRow>
                           {showSectorBase && sortedBase.map((emp) => (
                             <TableRow key={emp.id} className="opacity-60">
-                              <TableCell className="font-medium sticky left-0 bg-background z-10 border-r">
+                              <TableCell className="font-medium sticky left-0 bg-card/95 backdrop-blur z-10 border-r-2 border-primary/15">
                                 <div className="flex items-center gap-1.5">
                                   <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
                                 </div>
@@ -1716,6 +1722,7 @@ export function ManualScheduleGrid() {
                       )}
                     </TableBody>
                   </Table>
+                  </div>
                 </div>
               )}
             </CardContent>

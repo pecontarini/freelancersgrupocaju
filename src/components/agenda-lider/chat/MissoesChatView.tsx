@@ -345,35 +345,35 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
     (input.trim().length > 0 || attachments.length > 0);
 
   return (
-    <div className="flex h-[calc(100vh-220px)] min-h-[500px] flex-col gap-3">
-      <Card className="glass-card-strong flex flex-1 flex-col overflow-hidden border-0 bg-transparent">
-        <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15">
-              <Sparkles className="h-4 w-4 text-primary" />
+    <div className="flex h-[calc(100dvh-260px)] min-h-[480px] flex-col gap-3 sm:h-[calc(100vh-260px)]">
+      <Card className="glass-card-strong flex flex-1 min-h-0 flex-col overflow-hidden border-0 bg-transparent">
+        <div className="flex items-center justify-between border-b border-border/40 px-3 py-2.5 sm:px-4 sm:py-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
+              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
             </div>
-            <div>
-              <p className="text-sm font-semibold">Brain Dump com IA</p>
-              <p className="text-xs text-muted-foreground">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">Brain Dump com IA</p>
+              <p className="hidden sm:block text-xs text-muted-foreground line-clamp-1">
                 Descreva, anexe auditorias ou prints — a IA estrutura em missões delegáveis
               </p>
             </div>
           </div>
           {messages.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={clearChat}>
+            <Button variant="ghost" size="sm" className="shrink-0" onClick={clearChat}>
               Limpar
             </Button>
           )}
         </div>
 
-        <ScrollArea className="flex-1 px-4 py-4">
-          <div className="mx-auto max-w-3xl space-y-4">
+        <ScrollArea className="flex-1 min-h-0 px-3 py-3 sm:px-4 sm:py-4">
+          <div className="mx-auto max-w-3xl space-y-4 scroll-pb-24">
             {messages.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-6 text-center">
+              <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-4 sm:p-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   Comece descrevendo a semana — ou anexe um relatório / print:
                 </p>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <div className="mt-3 flex flex-col sm:flex-row sm:flex-wrap sm:justify-center gap-2">
                   {[
                     "CMV do Caminito está estourando esta semana",
                     "Anexe a auditoria e peça os 3 pontos mais críticos",
@@ -383,7 +383,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                       key={s}
                       size="sm"
                       variant="outline"
-                      className="text-xs"
+                      className="text-xs w-full sm:w-auto justify-start sm:justify-center text-left sm:text-center h-auto py-2 whitespace-normal"
                       onClick={() => setInput(s)}
                     >
                       {s}
@@ -403,13 +403,13 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 >
                   <div
                     className={cn(
-                      "max-w-[85%] space-y-2 rounded-2xl px-4 py-3 text-sm",
+                      "max-w-[92%] sm:max-w-[85%] space-y-2 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm break-words",
                       m.role === "user"
                         ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
                         : "glass-card text-foreground",
                     )}
                   >
-                    <p className="whitespace-pre-wrap">
+                    <p className="whitespace-pre-wrap break-words">
                       {m.content.replace(/<missoes-json>[\s\S]+?<\/missoes-json>/g, "").trim()}
                     </p>
                     {m.missoes && m.missoes.length > 0 && (() => {
@@ -489,7 +489,10 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
           </div>
         </ScrollArea>
 
-        <div className="border-t border-border/40 bg-card/80 p-3">
+        <div
+          className="border-t border-border/40 bg-card/80 px-2 py-2 sm:p-3"
+          style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 8px)" }}
+        >
           <div className="mx-auto flex max-w-3xl flex-col gap-2">
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -505,7 +508,7 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 ))}
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-1.5 sm:gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -518,12 +521,12 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-[60px] w-[60px] shrink-0"
+                className="h-11 w-11 sm:h-[60px] sm:w-[60px] shrink-0 rounded-2xl"
                 onClick={handlePickFiles}
                 disabled={loading || attachments.length >= MAX_FILES}
                 title={`Anexar (até ${MAX_FILES})`}
               >
-                <Paperclip className="h-5 w-5" />
+                <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
               <Textarea
                 value={input}
@@ -535,15 +538,15 @@ export function MissoesChatView({ unidadeNome }: { unidadeNome: string | null })
                   }
                 }}
                 placeholder="Descreva o que precisa fazer essa semana ou anexe um relatório..."
-                className="min-h-[60px] resize-none"
+                className="min-h-11 sm:min-h-[60px] resize-none text-sm rounded-2xl"
               />
               <Button
                 onClick={send}
                 disabled={!canSend}
                 size="icon"
-                className="h-[60px] w-[60px] shrink-0"
+                className="h-11 w-11 sm:h-[60px] sm:w-[60px] shrink-0 rounded-2xl"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                {loading ? <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" /> : <Send className="h-4 w-4 sm:h-5 sm:w-5" />}
               </Button>
             </div>
           </div>

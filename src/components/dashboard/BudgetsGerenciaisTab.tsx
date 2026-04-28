@@ -39,7 +39,7 @@ import { FreelancerFilters, FreelancerFiltersState } from "@/components/Freelanc
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { OperationalExpense } from "@/hooks/useOperationalExpenses";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatCurrencyCompact } from "@/lib/formatters";
 import { useStoreBudgets } from "@/hooks/useStoreBudgets";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
@@ -344,17 +344,22 @@ export function BudgetsGerenciaisTab({
       <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4">
         {/* Freelancers - Accumulated Total */}
         <Card className="rounded-2xl shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-[11px] sm:text-sm font-medium uppercase text-muted-foreground line-clamp-2">
               {hasSearchOrFunctionFilters ? "Freelancers (Filtrados)" : periodDisplayLabel.includes("Acumulado") ? "Freelancers" : "Freelancers (Período)"}
             </CardTitle>
-            <Users className="h-4 w-4 text-primary" />
+            <Users className="h-4 w-4 text-primary shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(filteredFreelancerTotal + checkinBudgetTotal)}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div
+              className="text-lg sm:text-2xl font-bold tabular-nums truncate"
+              title={formatCurrency(filteredFreelancerTotal + checkinBudgetTotal)}
+            >
+              {isMobile
+                ? formatCurrencyCompact(filteredFreelancerTotal + checkinBudgetTotal)
+                : formatCurrency(filteredFreelancerTotal + checkinBudgetTotal)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">
               {filteredFreelancers.length} lançamento(s) manual(is)
               {checkinBudgetEntries.length > 0 && ` + ${checkinBudgetEntries.length} via check-in`}
             </p>
@@ -363,17 +368,20 @@ export function BudgetsGerenciaisTab({
 
         {/* Operational Expenses */}
         <Card className="rounded-2xl shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-[11px] sm:text-sm font-medium uppercase text-muted-foreground line-clamp-2">
               {hasSearchOrFunctionFilters ? "Operacional (Filtrado)" : periodDisplayLabel.includes("Acumulado") ? "Operacional" : "Operacional (Período)"}
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
+            <DollarSign className="h-4 w-4 text-primary shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(filteredExpenseTotal)}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div
+              className="text-lg sm:text-2xl font-bold tabular-nums truncate"
+              title={formatCurrency(filteredExpenseTotal)}
+            >
+              {isMobile ? formatCurrencyCompact(filteredExpenseTotal) : formatCurrency(filteredExpenseTotal)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               {filteredExpenses.length} despesa(s)
             </p>
           </CardContent>
@@ -381,17 +389,20 @@ export function BudgetsGerenciaisTab({
 
         {/* Maintenance */}
         <Card className="rounded-2xl shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-[11px] sm:text-sm font-medium uppercase text-muted-foreground line-clamp-2">
               {hasSearchOrFunctionFilters ? "Manutenção (Filtrada)" : periodDisplayLabel.includes("Acumulado") ? "Manutenção" : "Manutenção (Período)"}
             </CardTitle>
-            <Wrench className="h-4 w-4 text-amber-500" />
+            <Wrench className="h-4 w-4 text-amber-500 shrink-0" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(filteredMaintenanceTotal)}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div
+              className="text-lg sm:text-2xl font-bold tabular-nums truncate"
+              title={formatCurrency(filteredMaintenanceTotal)}
+            >
+              {isMobile ? formatCurrencyCompact(filteredMaintenanceTotal) : formatCurrency(filteredMaintenanceTotal)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               {filteredMaintenance.length} serviço(s)
             </p>
           </CardContent>
@@ -399,21 +410,24 @@ export function BudgetsGerenciaisTab({
 
         {/* Total */}
         <Card className="rounded-2xl shadow-card bg-gradient-to-br from-primary/10 to-primary/5">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium uppercase text-muted-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-6 pt-3 sm:pt-6">
+            <CardTitle className="text-[11px] sm:text-sm font-medium uppercase text-muted-foreground line-clamp-2">
               {hasSearchOrFunctionFilters ? "Total Filtrado" : periodDisplayLabel.includes("Acumulado") ? "Total Acumulado" : "Total (Período)"}
             </CardTitle>
             {filteredTotal > avgDailyBudget * (effectiveDateRange.isCustomRange ? 1 : new Date().getDate()) ? (
-              <TrendingUp className="h-4 w-4 text-destructive" />
+              <TrendingUp className="h-4 w-4 text-destructive shrink-0" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-emerald-500" />
+              <TrendingDown className="h-4 w-4 text-emerald-500 shrink-0" />
             )}
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(filteredTotal)}
+          <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+            <div
+              className="text-lg sm:text-2xl font-bold tabular-nums truncate"
+              title={formatCurrency(filteredTotal)}
+            >
+              {isMobile ? formatCurrencyCompact(filteredTotal) : formatCurrency(filteredTotal)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="hidden sm:block text-xs text-muted-foreground">
               Meta diária: {formatCurrency(avgDailyBudget)}
             </p>
           </CardContent>

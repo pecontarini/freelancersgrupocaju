@@ -447,7 +447,7 @@ function VisaoGeral() {
 
 interface KpiCardProps {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   value: number | null;
   loading: boolean;
   showProgress?: boolean;

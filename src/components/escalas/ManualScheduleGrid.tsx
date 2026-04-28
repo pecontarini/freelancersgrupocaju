@@ -965,14 +965,14 @@ export function ManualScheduleGrid() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Editor de Escalas</h2>
-          <p className="text-muted-foreground text-sm">
-            Lançamento único por dia — o POP é calculado automaticamente pelo horário.
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-2xl font-bold tracking-tight">Editor de Escalas</h2>
+          <p className="text-muted-foreground text-xs sm:text-sm">
+            Lançamento único por dia — o POP é calculado automaticamente.
           </p>
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap shrink-0">
           {canManage && selectedUnit && sectors.length > 0 && (
             <ClearSchedulesModal
               unitId={selectedUnit}

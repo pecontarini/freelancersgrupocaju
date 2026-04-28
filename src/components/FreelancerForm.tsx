@@ -15,7 +15,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -47,6 +54,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export function FreelancerForm() {
   const [formKey, setFormKey] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
   const [cpfValue, setCpfValue] = useState("");
   const [valorValue, setValorValue] = useState("");
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());

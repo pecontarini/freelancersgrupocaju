@@ -2172,13 +2172,21 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
             </Button>
           </MetaSheetTrigger>
           <MetaSheetContent side="left" className="w-[280px] p-3">
-            {sidebar}
+            <PainelSidebar
+              active={active}
+              onSelect={(k) => {
+                handleSelect(k);
+                setDrawerOpen(false);
+              }}
+              showAdmin={showAdmin}
+              forceExpanded
+            />
           </MetaSheetContent>
         </MetaSheet>
       )}
 
-      <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-        {!isMobile && <aside className="sticky top-2 self-start">{sidebar}</aside>}
+      <div className="flex gap-4">
+        {!isMobile && <aside className="sticky top-2 self-start shrink-0">{sidebar}</aside>}
         <div className="min-w-0 space-y-4">
           {renderView()}
           {showSixMonths && (

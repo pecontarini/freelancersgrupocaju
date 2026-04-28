@@ -70,49 +70,51 @@ export function CMVTab() {
 
       {/* Main Content with Tabs */}
       <Tabs defaultValue="operacional" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-9 max-w-5xl">
-          <TabsTrigger value="operacional" className="flex items-center gap-1.5">
-            <ClipboardCheck className="h-4 w-4" />
-            <span className="hidden sm:inline">Operacional</span>
-          </TabsTrigger>
-          <TabsTrigger value="ia" className="flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4" />
-            <span className="hidden sm:inline">IA</span>
-          </TabsTrigger>
-          <TabsTrigger value="kardex" className="flex items-center gap-1.5">
-            <Activity className="h-4 w-4" />
-            <span className="hidden sm:inline">Kardex</span>
-          </TabsTrigger>
-          <TabsTrigger value="auditoria" className="flex items-center gap-1.5">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Auditoria</span>
-          </TabsTrigger>
-          <TabsTrigger value="fechamento" className="flex items-center gap-1.5">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Fechamento</span>
-          </TabsTrigger>
-          <TabsTrigger value="entradas" className="flex items-center gap-1.5">
-            <FileUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Entradas</span>
-          </TabsTrigger>
-          <TabsTrigger value="saidas" className="flex items-center gap-1.5">
-            <ShoppingCart className="h-4 w-4" />
-            <span className="hidden sm:inline">Saídas</span>
-          </TabsTrigger>
-          <TabsTrigger value="vinculos" className="flex items-center gap-1.5 relative">
-            <Link2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Vínculos</span>
-            {unmappedItems.length > 0 && (
-              <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 text-xs px-1">
-                {unmappedItems.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="configuracoes" className="flex items-center gap-1.5">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Config</span>
-          </TabsTrigger>
-        </TabsList>
+        <div className="-mx-3 px-3 overflow-x-auto scrollbar-none md:mx-0 md:px-0 md:overflow-visible">
+          <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-9 md:max-w-5xl">
+            <TabsTrigger value="operacional" className="flex items-center gap-1.5">
+              <ClipboardCheck className="h-4 w-4" />
+              <span className="hidden sm:inline">Operacional</span>
+            </TabsTrigger>
+            <TabsTrigger value="ia" className="flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="kardex" className="flex items-center gap-1.5">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Kardex</span>
+            </TabsTrigger>
+            <TabsTrigger value="auditoria" className="flex items-center gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Auditoria</span>
+            </TabsTrigger>
+            <TabsTrigger value="fechamento" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Fechamento</span>
+            </TabsTrigger>
+            <TabsTrigger value="entradas" className="flex items-center gap-1.5">
+              <FileUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Entradas</span>
+            </TabsTrigger>
+            <TabsTrigger value="saidas" className="flex items-center gap-1.5">
+              <ShoppingCart className="h-4 w-4" />
+              <span className="hidden sm:inline">Saídas</span>
+            </TabsTrigger>
+            <TabsTrigger value="vinculos" className="flex items-center gap-1.5 relative">
+              <Link2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Vínculos</span>
+              {unmappedItems.length > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 min-w-5 text-xs px-1">
+                  {unmappedItems.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="configuracoes" className="flex items-center gap-1.5">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Config</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ====== ABA 1: OPERACIONAL (Abertura + Contagem) ====== */}
         <TabsContent value="operacional" className="space-y-6">

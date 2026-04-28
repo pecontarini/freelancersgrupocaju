@@ -1,79 +1,78 @@
 
-# Plano — Estilo de animação MoneyMQ no Portal CajuPAR
+# Plano — Liquid Glass Vision Pro no Painel de Indicadores
 
-Aplicar a linguagem cinematográfica da referência (aurora difusa, reveals suaves com máscaras, easing longo e elegante, logo "respirando") nas **transições entre rotas** e na **tela de carregamento** do app, preservando a paleta Coral/Terracotta da marca.
+Aplicar a estética glassmorphism imersiva (referência Apple Vision Pro Smart Home Dashboard) ao **Painel de Indicadores**, redesenhar os itens do grupo **Gestão** da sidebar com ícones arredondados em pílula de vidro, e tornar **todos os gráficos e barras de progresso interativos ao toque/hover**.
 
-## O que será criado
+## 1. Sistema visual Liquid Glass (Vision Pro)
 
-### 1. Splash / tela de carregamento cinemática
-Novo componente `src/components/motion/BrandSplash.tsx`:
-- Fundo escuro com gradiente aurora animado (em vez do verde MoneyMQ, usaremos Coral #D05937 + tons quentes da marca) — orbes radiais com `blur(120px)` em drift lento (12–20s).
-- Logo CajuPAR centralizado com:
-  - Entrada por **clip-path reveal** (do centro para fora) + leve scale 0.96 → 1.
-  - Animação contínua de "respiração" (opacity 0.85 ↔ 1, scale 1 ↔ 1.02) em loop suave.
-  - Glow sutil pulsando atrás do logo.
-- Easing assinado: `cubic-bezier(0.65, 0, 0.35, 1)` (cinematic ease) com durações longas (700–1200ms).
-- Substitui o `<Loader2 spinner>` atual em `ProtectedRoute.tsx` e em estados de loading principais (Auth, Index inicial).
+Novos tokens e classes em `src/index.css` + `tailwind.config.ts`:
 
-### 2. Page transition wrapper
-Novo `src/components/motion/PageTransition.tsx` + integração no `App.tsx`:
-- Envolve `<Routes>` e dispara animação ao trocar `location.pathname`.
-- Animação dupla:
-  - **Saída** da rota anterior: fade + leve translate up (-8px) + scale 0.99, 280ms.
-  - **Entrada** da nova rota: clip-path reveal (de uma "fita" horizontal abrindo) + fade-in + translateY(8→0), 480ms.
-- Implementação CSS-only com chaves de animação no Tailwind (sem adicionar Framer Motion, para manter bundle leve). Usa `key={location.pathname}` para remount controlado.
+- `--vision-glass-bg`, `--vision-glass-bg-strong`, `--vision-glass-border-top`, `--vision-glass-border-bottom`, `--vision-glass-shadow`.
+- Classes utilitárias:
+  - `.vision-glass` — superfície vidro escura translúcida com `backdrop-filter: blur(36px) saturate(190%)`, borda superior clara (highlight especular), borda inferior escura, sombra interna sutil, radius 28px.
+  - `.vision-glass-strong` — variante mais opaca para cartões principais (KPIs, ranking).
+  - `.vision-glass-pill` — pílula arredondada para chips/abas internas.
+  - `.vision-glass-icon` — círculo 40px com glass + glow sutil para ícones (será usado na sidebar e dentro de KPIs).
+- `.vision-aurora-bg` — pseudo-fundo do painel com 3 orbes coral/âmbar/azul difusos (usa as keyframes `aurora-drift-*` já existentes do sistema motion).
+- Specular highlight (`::before`) sutil no topo de cada cartão glass para imitar o efeito vidro real da referência.
 
-### 3. Aurora background reutilizável
-Novo `src/components/motion/AuroraBackground.tsx`:
-- Versão refinada do `AppGlassBackground` atual, com 4 orbes em coral/âmbar/terracota, drift mais lento e mais blur — usado por `BrandSplash` e disponível para telas-chave (Auth, Splash inicial).
+## 2. Painel de Indicadores — Reskin
 
-### 4. Micro-transições de UI
-Adicionar utilitários no Tailwind / `index.css`:
-- `.animate-clip-reveal` — clip-path inset de 100% → 0 com easing cinematográfico.
-- `.animate-breathe` — loop suave de scale/opacity para elementos em destaque.
-- `.animate-aurora-drift` — drift lento dos orbes (já parcial em `LiquidBackground`, será padronizado).
-- Padrão de transição em `Card`, `Button` e `Tabs` usando o easing assinado, para que toda a UI "fale a mesma língua".
+Editar `src/components/dashboard/PainelMetasTab.tsx`:
+
+- Wrapper externo do painel: container com `vision-aurora-bg` fixo atrás, conteúdo com `relative z-10`.
+- Substituir todos `glass-card` **dentro do painel** por `vision-glass` (KPI cards, mapa de calor, NPS, conformidade, planos, holding) — mantendo o `glass-card` global intacto para o resto do app.
+- `Tabs` internas (`Visão Geral`, `Diário`, `NPS`, `Conformidade`, `Planos`, `Holding`): TabsList vira pílula glass flutuante (`vision-glass-pill`), TabsTrigger ativo recebe pill sólida coral com leve glow.
+- KPI cards: ícone passa para um `vision-glass-icon` no canto superior direito, número grande com leve text-shadow coral, helper sutil.
+- Tabela "Mapa de Calor" e "Ranking": linhas com hover translúcido, badges de tier com gradient + blur leve.
+- Banner crítico: variante glass destrutiva (vidro com tinge vermelho, em vez de Alert padrão).
+
+## 3. Sidebar — Itens do grupo "Gestão" com ícone arredondado
+
+Editar `src/components/layout/AppSidebar.tsx` (apenas o bloco `gestaoMenuItems`, conforme pedido):
+
+- Cada item do grupo **Gestão** (hoje só "Painel de Indicadores", mas extensível):
+  - Renderiza um wrapper customizado em vez do `SidebarMenuButton` padrão.
+  - Ícone dentro de um círculo `vision-glass-icon` (40×40, borda superior clara, glow coral leve quando ativo).
+  - Texto à direita do círculo, com peso médio.
+  - Estado ativo: o círculo ganha fundo coral translúcido + ring coral suave; texto fica em `text-primary`.
+  - No estado collapsed da sidebar, mostra apenas o círculo (sem texto), mantendo o tooltip.
+- Os outros grupos (`Menu Principal`, `Administração`) continuam como estão para preservar consistência atual.
+
+## 4. Gráficos e barras interativos ao toque
+
+Padronizar interatividade nos charts existentes do painel (e estendido aos novos componentes):
+
+- **Recharts Pie/Line/Bar/Area**:
+  - Tooltip customizado `VisionGlassTooltip` (glass pill com sombra coral, número grande, label discreta) — funciona em hover e em toque (mobile via touch events nativos do Recharts).
+  - Pie: setor sob hover ganha `outerRadius +6` + opacidade 100%, demais caem para opacidade 70%; clique destaca/seleciona um canal e filtra a tabela ao lado.
+  - Line: dots maiores em `activeDot`, linha ganha `strokeWidth +1` no hover; toque no eixo X mostra crosshair vertical com tooltip.
+  - Bar (onde houver): hover/touch acende a barra com cor primary e mostra o valor.
+- **Barra de progresso (`Progress`)**: novo componente `InteractiveProgress` (wrapper) — hover/touch mostra tooltip com valor exato + meta, leve scale-y, e shimmer animado contínuo na faixa preenchida.
+- **Tier badges**: clicáveis — abrem popover com explicação do tier (Ouro/Prata/Bronze/Aceitável) e quais critérios atingiu.
+- Hooks: usar `onMouseEnter`/`onTouchStart` do Recharts e `useState` local para o estado de hover/seleção. Mobile: garantir `touch-action: manipulation` nos charts.
 
 ## Arquivos a criar
-- `src/components/motion/BrandSplash.tsx`
-- `src/components/motion/PageTransition.tsx`
-- `src/components/motion/AuroraBackground.tsx`
-- `src/components/motion/index.ts`
+- `src/components/painel/VisionGlassTooltip.tsx` — tooltip Recharts unificado
+- `src/components/painel/InteractiveProgress.tsx` — barra de progresso interativa
+- `src/components/painel/VisionAuroraBackdrop.tsx` — fundo aurora exclusivo do painel
+- `src/components/painel/VisionKpiCard.tsx` — substitui o `KpiCard` interno (estilo Vision)
 
 ## Arquivos a editar
-- `src/App.tsx` — envolver `<Routes>` com `<PageTransition>`.
-- `src/components/ProtectedRoute.tsx` — trocar spinner pelo `<BrandSplash />`.
-- `src/index.css` — adicionar keyframes (`clip-reveal`, `breathe`, `aurora-drift`, `route-enter`, `route-exit`) e variável `--ease-cinematic`.
-- `tailwind.config.ts` — registrar as novas animações e o easing.
-- `src/pages/Auth.tsx` — usar `AuroraBackground` no fundo (opcional, melhora primeira impressão).
+- `src/index.css` — adicionar tokens e classes `.vision-glass*`
+- `tailwind.config.ts` — sombras e easings adicionais (se necessário)
+- `src/components/dashboard/PainelMetasTab.tsx` — trocar classes `glass-card` por `vision-glass`, usar novos componentes, aplicar interatividade nos charts e barras
+- `src/components/layout/AppSidebar.tsx` — bloco `gestaoMenuItems` com renderização custom (ícone arredondado em glass)
 
 ## Detalhes técnicos
-- Sem novas dependências (sem Framer Motion). CSS + React keys.
-- Respeita `prefers-reduced-motion`: animações longas degradam para fade simples de 150ms.
-- `BrandSplash` aceita `variant="full" | "inline"` para servir tanto como splash de página inteira quanto como loader em painéis.
-- Logo do splash usa `src/lib/logoBase64.ts` (já existente) para evitar flash de carregamento de asset.
-- Page transition exclui rotas públicas sensíveis a performance (`/checkin`, `/estacao-checkin`, `/checklist/*`) — nelas usamos apenas fade rápido.
+- Sem novas dependências (Recharts e Radix já cobrem tooltips/popovers).
+- Compatível com light e dark mode — `vision-glass` usa overlays translúcidos sobre `--background` atual.
+- Performance: `backdrop-filter` aplicado apenas a cards visíveis; aurora drift usa `transform`/`opacity` (GPU) e respeita `prefers-reduced-motion`.
+- Mobile: cartões mantêm padding maior (≥16px) e ícones touch target ≥40px.
+- Não altera lógica de dados, RLS ou queries — é puramente UI.
 
-## Diagrama de fluxo
-
-```text
-Boot do app
-   │
-   ▼
-AuthProvider carregando ──► <BrandSplash variant="full" />  (aurora + logo respirando)
-   │
-   ▼ user pronto
-<PageTransition>
-   ├─ saída: fade + translate-up + scale-down  (280ms)
-   └─ entrada: clip-reveal + fade + translate-up (480ms, ease cinematográfico)
-   │
-   ▼
-Conteúdo da rota
-```
-
-## Fora do escopo (pode virar fase 2)
-- Animações orbitais/morphing do logo (a referência usa After Effects).
-- Transições compartilhadas entre elementos (shared-element) — exigiriam Framer Motion.
-- Loader específico por módulo (CMV, Escalas) — manteremos os atuais por enquanto.
+## Fora do escopo
+- Reskin global de todos os módulos (escala, CMV, utensílios) — mantém-se Liquid Glass atual.
+- Animação 3D do logo no header (ficou pra fase 2 da motion language).
 
 Posso prosseguir com a implementação?

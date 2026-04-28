@@ -73,12 +73,14 @@ import {
   ChevronDown,
   Loader2,
   Send,
+  type LucideIcon,
 } from "lucide-react";
 import {
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
+  Sector,
   Tooltip as RTooltip,
   Legend,
   LineChart,
@@ -89,6 +91,9 @@ import {
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { VisionGlassTooltip } from "@/components/painel/VisionGlassTooltip";
+import { InteractiveProgress } from "@/components/painel/InteractiveProgress";
+import { VisionAuroraBackdrop } from "@/components/painel/VisionAuroraBackdrop";
 
 interface PainelMetasTabProps {
   selectedUnidadeId: string | null;
@@ -279,7 +284,7 @@ function VisaoGeral() {
   return (
     <div className="space-y-4">
       {/* BLOCO 1 — Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -308,7 +313,7 @@ function VisaoGeral() {
 
       {/* BLOCO 4 — Banner crítico */}
       {criticalUnits.length > 0 && (
-        <Alert variant="destructive" className="glass-card border-destructive/40">
+        <Alert variant="destructive" className="vision-glass border-destructive/40">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <strong>Atenção:</strong> {criticalUnits.length} unidade
@@ -355,7 +360,7 @@ function VisaoGeral() {
       </div>
 
       {/* BLOCO 3 — Mapa de Calor */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Mapa de Calor por Unidade</CardTitle>
         </CardHeader>
@@ -444,7 +449,7 @@ function VisaoGeral() {
 
 interface KpiCardProps {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   value: number | null;
   loading: boolean;
   showProgress?: boolean;
@@ -461,30 +466,52 @@ function KpiCard({ title, icon: Icon, value, loading, showProgress, integer, suf
       ? Math.round(value).toString()
       : value.toFixed(1);
 
+  const fillClass =
+    value === null
+      ? "bg-muted-foreground/40"
+      : value >= 90
+      ? "bg-emerald-500"
+      : value >= 75
+      ? "bg-amber-500"
+      : "bg-red-500";
+
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass border-0 shadow-none">
       <CardContent className="p-5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {title}
           </span>
-          <Icon className="h-4 w-4 text-primary/70" />
+          <span className="vision-glass-icon flex h-10 w-10 shrink-0 items-center justify-center">
+            <Icon className="h-[18px] w-[18px] text-primary" strokeWidth={2.2} />
+          </span>
         </div>
         {loading ? (
           <Skeleton className="mt-3 h-9 w-24" />
         ) : (
-          <div className="mt-2 flex items-baseline gap-1">
-            <span className="text-3xl font-bold tabular-nums">{display}</span>
+          <div className="mt-3 flex items-baseline gap-1">
+            <span
+              className="text-3xl font-bold tabular-nums"
+              style={{
+                textShadow: value !== null ? "0 0 24px hsl(14 80% 55% / 0.25)" : undefined,
+              }}
+            >
+              {display}
+            </span>
             {suffix && value !== null && (
               <span className="text-sm font-medium text-muted-foreground">{suffix}</span>
             )}
           </div>
         )}
         {showProgress && !loading && (
-          <Progress
-            value={value ?? 0}
-            className={cn("mt-3 h-1.5", progressBarColor(value))}
-          />
+          <div className="mt-3">
+            <InteractiveProgress
+              value={value}
+              fillClass={fillClass}
+              label={title}
+              suffix={suffix ?? ""}
+            />
+          </div>
         )}
         {helper && !loading && (
           <div className="mt-2 text-xs text-muted-foreground">{helper}</div>
@@ -556,6 +583,7 @@ function faixaBadgeVariant(faixa: FaixaSalao | null): "default" | "secondary" | 
 
 function NpsView() {
   const [mes, setMes] = useState<string>(currentMonth());
+  const [activePieIdx, setActivePieIdx] = useState<number | null>(null);
 
   const reclamQ = useQuery({
     queryKey: ["painel-nps", mes],
@@ -710,7 +738,7 @@ function NpsView() {
   return (
     <div className="space-y-4">
       {/* Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -774,7 +802,7 @@ function NpsView() {
       </div>
 
       {/* BLOCO 2 — Ranking */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Ranking por Unidade — Salão</CardTitle>
         </CardHeader>
@@ -846,7 +874,7 @@ function NpsView() {
       {/* BLOCO 3 e 4 — Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* PieChart — canais */}
-        <Card className="glass-card">
+        <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Reclamações por Canal</CardTitle>
           </CardHeader>
@@ -867,13 +895,38 @@ function NpsView() {
                     cx="50%"
                     cy="45%"
                     outerRadius={80}
+                    activeIndex={activePieIdx ?? undefined}
+                    activeShape={(p: any) => (
+                      <g>
+                        <Sector
+                          cx={p.cx}
+                          cy={p.cy}
+                          innerRadius={p.innerRadius}
+                          outerRadius={p.outerRadius + 8}
+                          startAngle={p.startAngle}
+                          endAngle={p.endAngle}
+                          fill={p.fill}
+                          style={{ filter: `drop-shadow(0 0 12px ${p.fill}80)` }}
+                        />
+                      </g>
+                    )}
+                    onMouseEnter={(_, i) => setActivePieIdx(i)}
+                    onMouseLeave={() => setActivePieIdx(null)}
+                    onClick={(_, i) =>
+                      setActivePieIdx((prev) => (prev === i ? null : i))
+                    }
                     label={(entry) => `${entry.value}`}
                   >
                     {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      <Cell
+                        key={i}
+                        fill={PIE_COLORS[i % PIE_COLORS.length]}
+                        opacity={activePieIdx === null || activePieIdx === i ? 1 : 0.45}
+                        style={{ transition: "opacity 200ms ease, filter 200ms ease", cursor: "pointer" }}
+                      />
                     ))}
                   </Pie>
-                  <RTooltip />
+                  <RTooltip content={<VisionGlassTooltip />} cursor={false} />
                   <Legend verticalAlign="bottom" height={36} />
                 </PieChart>
               </ResponsiveContainer>
@@ -882,7 +935,7 @@ function NpsView() {
         </Card>
 
         {/* LineChart — evolução */}
-        <Card className="glass-card">
+        <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Evolução Mensal — Últimos 6 Meses</CardTitle>
           </CardHeader>
@@ -895,10 +948,27 @@ function NpsView() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" />
                   <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                  <RTooltip />
+                  <RTooltip
+                    content={<VisionGlassTooltip />}
+                    cursor={{ stroke: "hsl(14 80% 55% / 0.4)", strokeWidth: 1, strokeDasharray: "3 3" }}
+                  />
                   <Legend verticalAlign="bottom" height={28} />
-                  <Line type="monotone" dataKey="Salão" stroke="#D05937" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="Delivery" stroke="#0EA5E9" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="Salão"
+                    stroke="#D05937"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Delivery"
+                    stroke="#0EA5E9"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -924,7 +994,7 @@ interface KpiUnitCardProps {
 
 function KpiUnitCard({ title, icon: Icon, loading, unitName, value, tone }: KpiUnitCardProps) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="p-5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -1110,7 +1180,7 @@ function ConformidadeView() {
   return (
     <div className="space-y-4">
       {/* Seletor de mês */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex items-center justify-center gap-3 p-3">
           <Button
             variant="ghost"
@@ -1136,7 +1206,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO A — Score por Unidade */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Building2 className="h-4 w-4 text-primary" />
@@ -1201,7 +1271,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO B — Por Setor */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Utensils className="h-4 w-4 text-primary" />
@@ -1252,7 +1322,7 @@ function ConformidadeView() {
       </Card>
 
       {/* SEÇÃO C — KDS / Tempo de Prato */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Timer className="h-4 w-4 text-primary" />
@@ -1309,10 +1379,23 @@ function ConformidadeView() {
 }
 
 function ScoreCell({ score }: { score: number | null }) {
-  const value = score ?? 0;
+  const fillClass =
+    score === null
+      ? "bg-muted-foreground/40"
+      : score >= 90
+      ? "bg-emerald-500"
+      : score >= 75
+      ? "bg-amber-500"
+      : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <Progress value={value} className={cn("h-2 flex-1", progressBarColor(score))} />
+      <InteractiveProgress
+        value={score}
+        fillClass={fillClass}
+        label="Score"
+        suffix="/100"
+        className="flex-1"
+      />
       <span className="w-12 text-right text-xs font-semibold tabular-nums">
         {score !== null ? score.toFixed(1) : "—"}
       </span>
@@ -1432,7 +1515,7 @@ function PlanosView() {
     <div className="space-y-4">
       {/* Seletor de mês + ação */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Card className="glass-card flex-1">
+        <Card className="vision-glass flex-1">
           <CardContent className="flex items-center justify-center gap-3 p-3">
             <Button
               variant="ghost"
@@ -1511,7 +1594,7 @@ function PlanosView() {
       </div>
 
       {/* Filtros */}
-      <Card className="glass-card">
+      <Card className="vision-glass">
         <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold uppercase text-muted-foreground">Status</span>
@@ -1554,7 +1637,7 @@ function PlanosView() {
         {planosQ.isLoading ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)
         ) : filteredPlanos.length === 0 ? (
-          <Card className="glass-card">
+          <Card className="vision-glass">
             <CardContent className="flex min-h-[160px] items-center justify-center p-10">
               <p className="text-center text-sm text-muted-foreground">
                 Nenhum plano de ação encontrado para este período.
@@ -1593,7 +1676,7 @@ function PlanoKpiCard({
   loading: boolean;
 }) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex items-center justify-between p-4">
         <div>
           <div className="text-xs uppercase tracking-wider text-muted-foreground">{title}</div>
@@ -1633,7 +1716,7 @@ function PlanoCard({
     deadline && plano.status !== "resolved" && deadline.getTime() < Date.now();
 
   return (
-    <Card className="glass-card overflow-hidden">
+    <Card className="vision-glass overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
@@ -1987,7 +2070,7 @@ function NovoPlanoSheet({
 
 function PlaceholderCard({ name }: { name: string }) {
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex min-h-[280px] items-center justify-center p-10">
         <p className="text-center text-base font-medium text-muted-foreground">
           {name} — em construção
@@ -2014,7 +2097,7 @@ import type { MetaKey } from "./painel-metas/shared/types";
 function PlaceholderView({ metaKey }: { metaKey: MetaKey }) {
   const def = META_DEFINITIONS[metaKey];
   return (
-    <Card className="glass-card">
+    <Card className="vision-glass">
       <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-2 p-10 text-center">
         <p className="text-base font-semibold text-foreground">{def.label}</p>
         <p className="max-w-md text-sm text-muted-foreground">
@@ -2075,11 +2158,13 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="vision-painel-root space-y-3">
+      <VisionAuroraBackdrop />
+
       {isMobile && (
         <MetaSheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <MetaSheetTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+            <Button variant="outline" size="sm" className="w-full justify-start gap-2 vision-glass border-0">
               <Menu className="h-4 w-4" />
               <span className="font-semibold uppercase tracking-wide text-xs">
                 Metas — {META_DEFINITIONS[active].label}

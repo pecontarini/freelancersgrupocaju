@@ -21,6 +21,7 @@ import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 import ContagemUtensilios from "./pages/ContagemUtensilios";
 import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
+import { PageTransition } from "@/components/motion";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,7 @@ function App() {
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
+              <PageTransition>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -67,6 +69,7 @@ function App() {
                 <Route path="/liquid-glass-simulator" element={<LiquidGlassSimulator />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </PageTransition>
               </TooltipProvider>
             </UnidadeProvider>
           </AuthProvider>

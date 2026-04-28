@@ -455,3 +455,107 @@
     .mobile-chart-container .recharts-wrapper { @apply w-full !important; }
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MOTION SYSTEM — Cinematic transitions (MoneyMQ-inspired)
+   ───────────────────────────────────────────────────────────── */
+@layer utilities {
+  :root {
+    --ease-cinematic: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Aurora orb drifts */
+  @keyframes aurora-drift-1 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(8vw, 6vh, 0) scale(1.18); }
+  }
+  @keyframes aurora-drift-2 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(-6vw, 8vh, 0) scale(1.12); }
+  }
+  @keyframes aurora-drift-3 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(5vw, -7vh, 0) scale(1.2); }
+  }
+  @keyframes aurora-drift-4 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    100% { transform: translate3d(-4vw, -6vh, 0) scale(1.1); }
+  }
+
+  /* Splash — clip reveal from center, then breathing */
+  @keyframes splash-reveal {
+    0%   { clip-path: inset(50% 50% 50% 50% round 50%); opacity: 0; transform: scale(0.96); }
+    60%  { opacity: 1; }
+    100% { clip-path: inset(0% 0% 0% 0% round 0%); opacity: 1; transform: scale(1); }
+  }
+  @keyframes splash-breathe {
+    0%, 100% { transform: scale(1);     opacity: 1; }
+    50%      { transform: scale(1.025); opacity: 0.88; }
+  }
+  @keyframes splash-glow {
+    0%, 100% { opacity: 0.55; transform: scale(2.1); }
+    50%      { opacity: 0.85; transform: scale(2.35); }
+  }
+  @keyframes splash-fade-up {
+    0%   { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes splash-shimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
+  /* Page transitions */
+  @keyframes page-enter-cinematic {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.992);
+      clip-path: inset(8% 0% 8% 0% round 12px);
+      filter: blur(4px);
+    }
+    60% {
+      opacity: 1;
+      filter: blur(0);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      clip-path: inset(0% 0% 0% 0% round 0px);
+      filter: blur(0);
+    }
+  }
+  @keyframes page-enter-fast {
+    0%   { opacity: 0; transform: translateY(4px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-transition-cinematic {
+    animation: page-enter-cinematic 520ms var(--ease-cinematic) both;
+    will-change: transform, opacity, clip-path, filter;
+  }
+  .page-transition-fast {
+    animation: page-enter-fast 180ms var(--ease-soft) both;
+    will-change: transform, opacity;
+  }
+
+  /* Reusable utilities */
+  .animate-clip-reveal {
+    animation: splash-reveal 900ms var(--ease-cinematic) both;
+  }
+  .animate-breathe {
+    animation: splash-breathe 4.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-transition-cinematic,
+    .page-transition-fast {
+      animation: none !important;
+    }
+    .splash-reveal,
+    .animate-breathe,
+    .animate-clip-reveal {
+      animation: none !important;
+    }
+  }
+}

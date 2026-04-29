@@ -77,17 +77,19 @@ export function useUpsertHoldingStaffing() {
       month_year: string;
       required_count: number;
       extras_count?: number;
+      regime?: RegimeType;
     }) => {
+      const payload: Record<string, unknown> = {
+        ...row,
+        extras_count: row.extras_count ?? 0,
+        updated_at: new Date().toISOString(),
+      };
+      if (row.regime) payload.regime = row.regime;
       const { error } = await supabase
         .from("holding_staffing_config")
-        .upsert(
-          {
-            ...row,
-            extras_count: row.extras_count ?? 0,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "unit_id,sector_key,shift_type,day_of_week,month_year" },
-        );
+        .upsert(payload as never, {
+          onConflict: "unit_id,sector_key,shift_type,day_of_week,month_year",
+        });
       if (error) throw error;
     },
     onSuccess: () => {

@@ -69,8 +69,8 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
         {isAdmin && (
           <TabsTrigger value="escalas-minimas" className="gap-1.5">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Escalas Mínimas</span>
-            <span className="sm:hidden">Mínimas</span>
+            <span className="hidden sm:inline">Configuração Holding</span>
+            <span className="sm:hidden">Holding</span>
           </TabsTrigger>
         )}
         <TabsTrigger value="matrix" className="gap-1.5">

@@ -23,6 +23,8 @@ export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 export const MAX_FILES = 3;
 
 const TEXT_EXT = /\.(txt|md|csv|log|json)$/i;
+const EXCEL_EXT = /\.(xlsx|xls|xlsm)$/i;
+const EXCEL_MIME = /(spreadsheetml|ms-excel)/i;
 
 function isPdf(file: File): boolean {
   return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
@@ -34,6 +36,23 @@ function isImage(file: File): boolean {
 
 function isPlainText(file: File): boolean {
   return file.type.startsWith("text/") || TEXT_EXT.test(file.name);
+}
+
+function isExcel(file: File): boolean {
+  return EXCEL_EXT.test(file.name) || EXCEL_MIME.test(file.type);
+}
+
+async function extractExcelText(file: File): Promise<string> {
+  const XLSX: any = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const parts: string[] = [];
+  for (const name of wb.SheetNames) {
+    const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name], { blankrows: false });
+    parts.push(`--- Aba: ${name} ---\n${csv}`);
+    if (parts.join("\n\n").length > MAX_TEXT_CHARS) break;
+  }
+  return parts.join("\n\n");
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -98,6 +117,20 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
     };
   }
 
+  if (isExcel(file)) {
+    const raw = await extractExcelText(file);
+    const truncated = raw.length > MAX_TEXT_CHARS;
+    return {
+      name: file.name,
+      mime: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: file.size,
+      kind: "text",
+      text: truncated ? raw.slice(0, MAX_TEXT_CHARS) + "\n\n[...conteúdo truncado]" : raw,
+      dataUrl: "",
+      truncated,
+    };
+  }
+
   if (isPlainText(file)) {
     const raw = await file.text();
     const truncated = raw.length > MAX_TEXT_CHARS;
@@ -112,5 +145,6 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
     };
   }
 
-  throw new Error(`Tipo não suportado: ${file.name}. Use PDF, imagem ou texto.`);
+  throw new Error(`Tipo não suportado: ${file.name}. Use PDF, Excel, imagem ou texto.`);
 }
+

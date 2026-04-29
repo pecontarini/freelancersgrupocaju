@@ -64,6 +64,26 @@ function badgeColorForPessoas(n: number): string {
   return "bg-destructive/15 text-destructive";
 }
 
+/**
+ * Parser de célula "X+Y" → { required, extras }.
+ * Aceita: "4", "4+1", "4 + 1", "+2" (=> required=0, extras=2), "" (=> 0+0).
+ * Valores negativos viram 0; decimais são truncados.
+ */
+function parseCellValue(raw: string): { required: number; extras: number } {
+  const s = (raw ?? "").trim();
+  if (!s) return { required: 0, extras: 0 };
+  const m = s.match(/^\s*(-?\d+)?\s*(?:\+\s*(-?\d+))?\s*$/);
+  if (!m) return { required: 0, extras: 0 };
+  const req = Math.max(0, Math.floor(Number(m[1] ?? 0) || 0));
+  const ext = Math.max(0, Math.floor(Number(m[2] ?? 0) || 0));
+  return { required: req, extras: ext };
+}
+
+function formatCellValue(required: number, extras: number): string {
+  if (extras > 0) return `${required}+${extras}`;
+  return String(required);
+}
+
 export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   const { data: rows, isLoading } = useHoldingStaffingConfig(unitId, monthYear);
   const { data: effectiveBySector } = useEffectiveHeadcountBySector(unitId);
@@ -148,6 +168,20 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     persistCell(sector, shift, day, getRequired(sector, shift, day), value);
   };
 
+  /** Edição combinada X+Y na célula principal (ex.: "4+1"). */
+  const handleCombinedBlur = (
+    sector: SectorKey,
+    shift: "almoco" | "jantar",
+    day: number,
+    raw: string,
+  ) => {
+    const { required, extras } = parseCellValue(raw);
+    const curReq = getRequired(sector, shift, day);
+    const curExt = getExtras(sector, shift, day);
+    if (required === curReq && extras === curExt) return;
+    persistCell(sector, shift, day, required, extras);
+  };
+
   /**
    * Persiste o novo regime em TODAS as 7 células daquele setor+turno
    * (mantendo required/extras atuais).
@@ -171,17 +205,25 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     }
   };
 
-  // Cálculos por linha (setor × turno): soma dos 7 dias e dobras nos 2 regimes
+  // Cálculos por linha (setor × turno): soma dos 7 dias (required + extras) e dobras nos 2 regimes
   const rowMetrics = useMemo(() => {
-    const out: Record<string, { soma: number; dobras5x2: number; dobras6x1: number }> = {};
+    const out: Record<
+      string,
+      { soma: number; somaReq: number; somaExt: number; dobras5x2: number; dobras6x1: number }
+    > = {};
     for (const sector of sectors) {
       for (const shift of SHIFT_TYPES) {
-        let soma = 0;
+        let somaReq = 0;
+        let somaExt = 0;
         for (const d of DAYS_OF_WEEK_DISPLAY) {
-          soma += getRequired(sector, shift.key, d.key);
+          somaReq += getRequired(sector, shift.key, d.key);
+          somaExt += getExtras(sector, shift.key, d.key);
         }
+        const soma = somaReq + somaExt;
         out[`${sector}|${shift.key}`] = {
           soma,
+          somaReq,
+          somaExt,
           dobras5x2: calcDobras(soma, "5x2"),
           dobras6x1: calcDobras(soma, "6x1"),
         };
@@ -192,27 +234,29 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   }, [sectors, index]);
 
   // Métrica agregada para Necess./Efet./Gap (uma vez por setor)
+  // Pico semanal considera required + extras por dia/turno.
   const metricsBySector = useMemo(() => {
     const out: Record<string, { necessarias: number; dobras: number }> = {};
     for (const sector of sectors) {
-      let maxReq = 0;
+      let maxTotal = 0;
       let maxExtras = 0;
       for (const d of DAYS_OF_WEEK_DISPLAY) {
-        const a = getRequired(sector, "almoco", d.key);
-        const j = getRequired(sector, "jantar", d.key);
+        const aTot = getRequired(sector, "almoco", d.key) + getExtras(sector, "almoco", d.key);
+        const jTot = getRequired(sector, "jantar", d.key) + getExtras(sector, "jantar", d.key);
         const ea = getExtras(sector, "almoco", d.key);
         const ej = getExtras(sector, "jantar", d.key);
-        maxReq = Math.max(maxReq, a, j);
+        maxTotal = Math.max(maxTotal, aTot, jTot);
         maxExtras = Math.max(maxExtras, ea, ej);
       }
-      out[sector] = { necessarias: maxReq, dobras: maxExtras };
+      out[sector] = { necessarias: maxTotal, dobras: maxExtras };
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectors, index]);
 
-  const renderGap = (necessarias: number, dobras: number, efetivas: number) => {
-    const gap = necessarias + dobras - efetivas;
+  const renderGap = (necessarias: number, _dobras: number, efetivas: number) => {
+    // `necessarias` já inclui extras (pico semanal de required + extras).
+    const gap = necessarias - efetivas;
     if (gap > 0) {
       return (
         <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/20 border-0 font-semibold">
@@ -243,8 +287,8 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
               Mínimo Operacional por Setor / Turno / Dia
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Os valores aqui alimentam o alerta de POP e a IA geradora de escalas.
-              O regime (5x2 ou 6x1) calcula automaticamente nº de dobras e pessoas necessárias.
+              Use o formato <strong>X+Y</strong> em cada célula (ex.: <code>4+1</code> = 4 mínimos + 1 extra fixo).
+              Os extras entram no cálculo de dobras, pessoas necessárias e Gap.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -254,7 +298,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
               onCheckedChange={setShowExtras}
             />
             <Label htmlFor="show-extras" className="text-xs cursor-pointer">
-              Mostrar dobras por célula
+              Editar extras separadamente
             </Label>
           </div>
         </div>
@@ -340,7 +384,10 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
                           </TableCell>
                           {DAYS_OF_WEEK_DISPLAY.map((d) => {
                             const reqVal = getRequired(sector, shift.key, d.key);
-                            const cell = (
+                            const extVal = getExtras(sector, shift.key, d.key);
+                            const combined = formatCellValue(reqVal, extVal);
+                            const cell = showExtras ? (
+                              // Modo "extras separados": dois inputs numéricos puros
                               <div className="flex flex-col items-center gap-0.5">
                                 <Input
                                   type="number"
@@ -352,20 +399,35 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
                                   }
                                   className="h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm"
                                 />
-                                {showExtras && (
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    defaultValue={getExtras(sector, shift.key, d.key)}
-                                    key={`ext-${sector}-${shift.key}-${d.key}-${getExtras(sector, shift.key, d.key)}`}
-                                    onBlur={(e) =>
-                                      handleExtrasBlur(sector, shift.key, d.key, e.target.value)
-                                    }
-                                    placeholder="+0"
-                                    className="h-7 w-16 text-center text-xs tabular-nums text-muted-foreground bg-background/30"
-                                  />
-                                )}
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  defaultValue={extVal}
+                                  key={`ext-${sector}-${shift.key}-${d.key}-${extVal}`}
+                                  onBlur={(e) =>
+                                    handleExtrasBlur(sector, shift.key, d.key, e.target.value)
+                                  }
+                                  placeholder="+0"
+                                  className="h-7 w-16 text-center text-xs tabular-nums text-muted-foreground bg-background/30"
+                                />
                               </div>
+                            ) : (
+                              // Modo padrão: célula única "X+Y"
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                defaultValue={combined}
+                                key={`comb-${sector}-${shift.key}-${d.key}-${combined}`}
+                                onBlur={(e) =>
+                                  handleCombinedBlur(sector, shift.key, d.key, e.target.value)
+                                }
+                                placeholder="0"
+                                title="Formato: X+Y (ex.: 4+1 = 4 mínimos + 1 extra)"
+                                className={cn(
+                                  "h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm",
+                                  extVal > 0 && "ring-1 ring-primary/40",
+                                )}
+                              />
                             );
                             return (
                               <TableCell key={d.key} className="p-1 text-center w-[76px]">
@@ -487,8 +549,9 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
           </TooltipProvider>
         )}
         <p className="text-[10px] text-muted-foreground italic">
+          Célula <strong>X+Y</strong>: X = mínimo CLT, Y = extras pré-definidos pelo COO. Soma semanal usa X+Y.
           Regime: 5x2 → dobras = (soma×2)/10 • 6x1 → dobras = soma/9,5 • Nº Pessoas = arredondamento p/ cima.
-          Necess./Efet./Gap permanecem por setor (pico semanal vs CLT ativos).
+          Gap = pico semanal (mínimo + extras) − CLT efetivos.
         </p>
       </CardContent>
     </Card>

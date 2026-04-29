@@ -468,6 +468,12 @@ export function POPWizardDrawer({
               </p>
             </div>
           </div>
+            </TabsContent>
+
+            <TabsContent value="multi" className="flex flex-1 flex-col overflow-hidden mt-2 data-[state=inactive]:hidden">
+              <POPWizardMultiPanel monthYear={monthYear} />
+            </TabsContent>
+          </Tabs>
         </DrawerPrimitive.Content>
       </DrawerPrimitive.Portal>
     </DrawerPrimitive.Root>

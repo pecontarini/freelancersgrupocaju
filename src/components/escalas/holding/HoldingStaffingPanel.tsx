@@ -549,8 +549,9 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
           </TooltipProvider>
         )}
         <p className="text-[10px] text-muted-foreground italic">
+          Célula <strong>X+Y</strong>: X = mínimo CLT, Y = extras pré-definidos pelo COO. Soma semanal usa X+Y.
           Regime: 5x2 → dobras = (soma×2)/10 • 6x1 → dobras = soma/9,5 • Nº Pessoas = arredondamento p/ cima.
-          Necess./Efet./Gap permanecem por setor (pico semanal vs CLT ativos).
+          Gap = pico semanal (mínimo + extras) − CLT efetivos.
         </p>
       </CardContent>
     </Card>

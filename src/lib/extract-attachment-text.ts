@@ -117,6 +117,20 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
     };
   }
 
+  if (isExcel(file)) {
+    const raw = await extractExcelText(file);
+    const truncated = raw.length > MAX_TEXT_CHARS;
+    return {
+      name: file.name,
+      mime: file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      size: file.size,
+      kind: "text",
+      text: truncated ? raw.slice(0, MAX_TEXT_CHARS) + "\n\n[...conteúdo truncado]" : raw,
+      dataUrl: "",
+      truncated,
+    };
+  }
+
   if (isPlainText(file)) {
     const raw = await file.text();
     const truncated = raw.length > MAX_TEXT_CHARS;
@@ -131,5 +145,6 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
     };
   }
 
-  throw new Error(`Tipo não suportado: ${file.name}. Use PDF, imagem ou texto.`);
+  throw new Error(`Tipo não suportado: ${file.name}. Use PDF, Excel, imagem ou texto.`);
 }
+

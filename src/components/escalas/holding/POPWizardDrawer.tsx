@@ -351,7 +351,60 @@ export function POPWizardDrawer({
 
             {/* Input */}
             <div className="border-t border-border/60 p-3 bg-background/80 backdrop-blur-md">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={ACCEPTED_FILES}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {wizard.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {wizard.attachments.map((a) => {
+                    const Icon = a.kind === "image" ? ImageIcon : FileText;
+                    return (
+                      <div
+                        key={a.name}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-[11px] text-foreground"
+                      >
+                        <Icon className="h-3 w-3 text-primary" />
+                        <span className="font-medium truncate max-w-[180px]">{a.name}</span>
+                        <span className="text-muted-foreground">{formatSize(a.size)}</span>
+                        {a.truncated && (
+                          <span className="text-amber-600 dark:text-amber-400">truncado</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => wizard.removeAttachment(a.name)}
+                          className="ml-0.5 rounded hover:bg-background/60 p-0.5"
+                          aria-label={`Remover ${a.name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleFilePick}
+                  disabled={wizard.isStreaming || extracting}
+                  className="h-11 w-11 shrink-0"
+                  aria-label="Anexar POP"
+                  title="Anexar POP (PDF, Excel, foto, texto)"
+                >
+                  {extracting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                </Button>
                 <Textarea
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -361,13 +414,20 @@ export function POPWizardDrawer({
                       handleSend("wizard");
                     }
                   }}
-                  placeholder="Pergunte ou peça um ajuste…"
+                  placeholder={
+                    wizard.attachments.length > 0
+                      ? "Descreva o que quer (ou envie direto)…"
+                      : "Pergunte, peça um ajuste ou anexe o POP…"
+                  }
                   className="min-h-[44px] max-h-32 resize-none text-sm"
                   disabled={wizard.isStreaming}
                 />
                 <Button
                   onClick={() => handleSend("wizard")}
-                  disabled={wizard.isStreaming || !input.trim()}
+                  disabled={
+                    wizard.isStreaming ||
+                    (!input.trim() && wizard.attachments.length === 0)
+                  }
                   size="icon"
                   className="h-11 w-11 shrink-0"
                 >
@@ -393,8 +453,8 @@ export function POPWizardDrawer({
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground mt-1.5">
-                Enter envia · Shift+Enter quebra linha · As mudanças passam por
-                revisão antes de salvar.
+                Enter envia · Shift+Enter quebra linha · Anexos: PDF, Excel,
+                foto ou texto (até 10 MB) · As mudanças passam por revisão.
               </p>
             </div>
           </div>

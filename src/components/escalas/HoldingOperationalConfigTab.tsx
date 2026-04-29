@@ -110,12 +110,12 @@ export function HoldingOperationalConfigTab() {
                 <Building2 className="h-3.5 w-3.5" /> Marca
               </Label>
               <Select value={brand} onValueChange={(v) => setBrand(v as Brand)}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-10 uppercase tracking-wide">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {ALL_BRANDS.map((b) => (
-                    <SelectItem key={b} value={b}>
+                    <SelectItem key={b} value={b} className="uppercase tracking-wide">
                       {b}
                     </SelectItem>
                   ))}

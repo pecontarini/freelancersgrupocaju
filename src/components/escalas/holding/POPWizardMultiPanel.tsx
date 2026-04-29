@@ -87,6 +87,10 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
   const [collapsedBrands, setCollapsedBrands] = useState<Set<Brand>>(new Set());
   const [autoApply, setAutoApply] = useState(true);
 
+  // Parser determinístico para .xlsx (caminho principal — sem IA)
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
+
   const { data: units = [], isLoading } = useOperationalUnits();
   const batch = usePOPWizardBatch();
 

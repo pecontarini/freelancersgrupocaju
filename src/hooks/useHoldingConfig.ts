@@ -48,13 +48,12 @@ export function useHoldingStaffingConfig(unitId: string | null, monthYear: strin
     queryKey: ["holding_staffing_config", unitId, monthYear],
     queryFn: async () => {
       if (!unitId || !monthYear) return [] as HoldingStaffingConfigRow[];
-      const rows = await fetchAllRows<HoldingStaffingConfigRow>((from, to) =>
+      const rows = await fetchAllRows<HoldingStaffingConfigRow>(() =>
         supabase
           .from("holding_staffing_config")
           .select("*")
           .eq("unit_id", unitId)
-          .eq("month_year", monthYear)
-          .range(from, to),
+          .eq("month_year", monthYear),
       );
       return rows;
     },

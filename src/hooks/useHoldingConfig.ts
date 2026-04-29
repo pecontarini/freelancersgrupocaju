@@ -181,12 +181,11 @@ export function useHoldingFreelancerRates(unitId: string | null) {
     queryKey: ["holding_freelancer_rates", unitId],
     queryFn: async () => {
       if (!unitId) return [] as HoldingFreelancerRateRow[];
-      const rows = await fetchAllRows<HoldingFreelancerRateRow>((from, to) =>
+      const rows = await fetchAllRows<HoldingFreelancerRateRow>(() =>
         supabase
           .from("holding_freelancer_rates")
           .select("*")
-          .eq("unit_id", unitId)
-          .range(from, to),
+          .eq("unit_id", unitId),
       );
       return rows;
     },

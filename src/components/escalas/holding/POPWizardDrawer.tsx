@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +14,35 @@ import {
   Loader2,
   Check,
   Trash2,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePOPWizard, type WizardMode } from "@/hooks/usePOPWizard";
+import { usePOPWizard, type WizardMode, type ChatMessage } from "@/hooks/usePOPWizard";
 import { POPWizardPreview } from "./POPWizardPreview";
 import type { Brand } from "@/lib/holding/sectors";
+import {
+  extractAttachment,
+  MAX_FILE_SIZE,
+} from "@/lib/extract-attachment-text";
 import ReactMarkdown from "react-markdown";
+
+const ACCEPTED_FILES =
+  ".pdf,.xlsx,.xls,.xlsm,.csv,.txt,.md,.png,.jpg,.jpeg,.webp,application/pdf,image/*,text/*";
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function messageToText(content: ChatMessage["content"]): string {
+  if (typeof content === "string") return content;
+  return content
+    .map((part) => (part.type === "text" ? part.text : "[imagem anexada]"))
+    .join("\n");
+}
 
 interface POPWizardDrawerProps {
   open: boolean;

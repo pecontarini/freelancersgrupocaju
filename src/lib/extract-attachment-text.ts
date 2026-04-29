@@ -5,6 +5,11 @@
 
 export type AttachmentKind = "text" | "image";
 
+export interface ExtractedSheet {
+  name: string;
+  text: string;
+}
+
 export interface ExtractedAttachment {
   name: string;
   mime: string;
@@ -16,6 +21,8 @@ export interface ExtractedAttachment {
   dataUrl: string;
   /** True se o texto extraído foi truncado por exceder o limite. */
   truncated: boolean;
+  /** Para Excel: lista de abas separadas, permite roteamento por unidade. */
+  sheets?: ExtractedSheet[];
 }
 
 const MAX_TEXT_CHARS = 50_000;

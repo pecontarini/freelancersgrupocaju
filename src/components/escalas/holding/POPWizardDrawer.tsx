@@ -269,10 +269,10 @@ export function POPWizardDrawer({
                 >
                   {m.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1">
-                      <ReactMarkdown>{m.content || "…"}</ReactMarkdown>
+                      <ReactMarkdown>{messageToText(m.content) || "…"}</ReactMarkdown>
                     </div>
                   ) : (
-                    <span className="whitespace-pre-wrap">{m.content}</span>
+                    <span className="whitespace-pre-wrap">{messageToText(m.content)}</span>
                   )}
                 </div>
               ))}

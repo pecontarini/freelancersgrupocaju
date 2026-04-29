@@ -239,18 +239,7 @@ export function HoldingOperationalConfigTab() {
               <Label className="flex items-center gap-1.5 text-xs">
                 <CalendarRange className="h-3.5 w-3.5" /> Mês de Referência
               </Label>
-              <Select value={monthYear} onValueChange={setMonthYear}>
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MonthYearPicker value={monthYear} onChange={setMonthYear} />
             </div>
           </div>
         </CardContent>

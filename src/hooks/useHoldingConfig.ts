@@ -265,7 +265,7 @@ export function useEffectiveHeadcountBySector(unitId: string | null) {
         .select("sector_id, job_title_id")
         .in("sector_id", sectorIds);
       const jobTitleToSector = new Map<string, SectorKey>();
-      for (const row of (sjt as Array<{ sector_id: string; job_title_id: string }> | null) ?? []) {
+      for (const row of ((sjt as unknown) as Array<{ sector_id: string; job_title_id: string }> | null) ?? []) {
         const k = sectorIdToKey.get(row.sector_id);
         if (k && !jobTitleToSector.has(row.job_title_id)) {
           jobTitleToSector.set(row.job_title_id, k);

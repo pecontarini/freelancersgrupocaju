@@ -1,93 +1,137 @@
-# Otimização Mobile + Bottom Nav Vision Glass
 
-## Objetivo
-Aplicar o mesmo idioma "Apple Vision Pro / Liquid Glass" usado na sidebar do Painel de Indicadores na **barra inferior mobile** e fazer uma passada de **otimização responsiva** nas telas mais críticas do app, garantindo que tudo respeite a largura de 375–414px sem overflow, com tipografia legível e áreas de toque ≥44px.
+# Plano consolidado — Refatoração visual + Efetivos + Integração com IA de escalas
 
----
+Três entregas integradas em uma única implementação:
+1. Refatoração visual da tabela "Mínimo de Pessoas".
+2. Cálculo automático de Pessoas Necessárias × Efetivas Contratadas (CLT) com Gap.
+3. Integração das **dobras** (`extras_count`) no Chat IA gerador de escalas.
 
-## 1. Bottom Navigation — Vision Glass Floating Dock
-
-Refatorar `src/components/layout/BottomNavigation.tsx` para um **dock flutuante arredondado**, fiel ao estilo da `PainelSidebar`.
-
-**Mudanças visuais:**
-- Trocar a barra colada na borda por um **dock flutuante** com margens laterais (`mx-3 mb-3`), `rounded-full`, usando `.vision-glass` (blur 36px + specular highlight + sombra cinematográfica).
-- Cada item vira um **ícone circular** estilo `.vision-glass-icon` (44×44, atende touch target). 
-- Ativo: glow coral (`shadow-[0_0_20px_hsl(var(--primary)/0.5)]`), ícone em `text-primary`, fundo `bg-primary/15`.
-- Label só aparece no item ativo (animação de width/opacity com `cubic-bezier(0.65,0,0.35,1)`), igual ao padrão "rail expansível" da sidebar — economiza espaço horizontal.
-- Badge de notificações (`escalaPending`) ganha estilo glass com ring branco para destacar sobre o blur.
-- Header mobile (topo) também recebe `.vision-glass` no lugar de `glass-header` para consistência.
-
-**Comportamento:**
-- Manter mesma API (`activeTab`, `onTabChange`).
-- Adicionar `safe-area-inset-bottom` no padding do wrapper externo, não dentro do dock.
-- Sheet de Perfil mantida, mas o trigger vira ícone circular igual aos outros.
+Sem mudanças de schema. Sem mexer em `pracas_plano_chao`. Sem mexer no filtro global nem nos painéis de Forecast/Rates.
 
 ---
 
-## 2. Otimização Mobile Geral
+## Parte 1 — Refatoração visual da tabela
 
-Auditoria e correções em telas que hoje quebram ou ficam apertadas em 390px:
+Arquivo: `src/components/escalas/holding/HoldingStaffingPanel.tsx`
 
-### 2.1 Tabs e cabeçalhos (`PainelMetasTab`, `BudgetsGerenciaisTab`, `RemuneracaoVariavelTab`, `EstoqueTab`, `UtensiliosTab`, `CMVTab`)
-- TabsList com `overflow-x-auto scrollbar-none` + `snap-x` no mobile, ao invés de quebrar em grid apertado.
-- Triggers com `text-xs` no mobile, `text-sm` em sm:+, padding reduzido.
-- Títulos de página: `text-xl md:text-2xl`, subtítulo `text-xs md:text-sm`.
+Layout novo:
 
-### 2.2 Cards e KPIs
-- Padronizar grids: `grid-cols-2 md:grid-cols-3 xl:grid-cols-4` (nunca 1 coluna em mobile para KPIs pequenos; usar `grid-cols-2`).
-- `VisionKpiCard` ganha variante compacta no mobile (ícone menor, valor `text-xl` ao invés de `text-3xl`).
-- Cards de listas (FreelancerCard, MaintenanceList, etc.) revisados para evitar `truncate` sem `min-w-0` no parent flex.
+```text
+| Setor | Turno | SEG | TER | QUA | QUI | SEX | SAB | DOM | Necess. | Efet. | Dobras | Gap |
+| (120) |  (56) | (76)| (76)| (76)| (76)| (76)| (76)| (76)|  (72)   | (72)  |  (72)  | (90)|
+```
 
-### 2.3 Tabelas (`EntriesTable`, `MaintenanceList`, `EstoqueTab/CatalogoItens`, `Movimentacao`, `Inventarios`)
-- Em mobile usar o padrão já adotado no app: `useIsMobile()` → renderiza lista de cards; desktop mantém `<Table>`.
-- Onde ainda houver `<Table>` exposta no mobile, envolver em `overflow-x-auto` com sombra de scroll.
-
-### 2.4 Formulários e diálogos
-- `Dialog`/`Sheet`: garantir `max-h-[90vh] overflow-y-auto` e `w-[calc(100vw-1rem)] max-w-md` no mobile.
-- Inputs com `h-11` (44px) para conforto de toque.
-- Botões de ação primários: `w-full sm:w-auto` em footers de modal.
-
-### 2.5 PainelSidebar (mobile)
-- Quando renderizada dentro do `Sheet` mobile, garantir scroll vertical e fechar o sheet automaticamente ao trocar de meta.
-
-### 2.6 Espaçamento global
-- Padding do conteúdo principal: `px-3 md:px-6` (hoje varia entre componentes).
-- Bottom padding do `<main>` mobile: `pb-24` para não ficar atrás do dock flutuante (hoje é `pb-20`, insuficiente com o novo dock flutuante + safe-area).
+- Coluna **Setor**: `w-[120px]` sticky, `text-xs`, badge "Nazo" como ícone pequeno.
+- Coluna **Turno**: `w-14`, `text-[10px] uppercase tracking-wide`.
+- Colunas dos dias: `w-[76px]`, input `w-16 h-9 text-base tabular-nums font-semibold`, fundo `bg-background/50 backdrop-blur-sm`.
+- Ordem dos dias passa para **SEG → DOM** (igual à imagem de referência). Mantemos `day_of_week` 0..6 internos, só reordena a renderização via `DAYS_OF_WEEK_DISPLAY` em `sectors.ts`.
+- Linhas com `h-11`; zebra sutil entre setores.
+- Cabeçalho das 4 colunas finais: `font-semibold uppercase text-[11px] tracking-wide bg-muted/40`.
 
 ---
 
-## 3. CSS / Tokens (`src/index.css`)
+## Parte 2 — Colunas calculadas (Necess. / Efet. / Dobras / Gap)
 
-Adicionar utilitários:
-- `.vision-dock` — wrapper flutuante (`rounded-full`, `vision-glass`, `px-2 py-2`).
-- `.vision-dock-item` — botão circular 44×44 com transição de width quando ativo.
-- `.vision-dock-item-active` — glow coral + bg `primary/15`.
-- `.scrollbar-none` — `scrollbar-width: none; &::-webkit-scrollbar { display:none }` (caso ainda não exista) para tabs roláveis.
+Cada uma das 4 colunas finais aparece **uma vez por setor** (`rowSpan={2}` igual à coluna Setor — métrica é por setor, não por turno).
+
+### Necessárias
+Pico semanal (turno crítico) por setor:
+```
+necessarias[setor] = max sobre os 7 dias de max(almoco_d, jantar_d)
+```
+
+### Dobras (somente leitura, derivada)
+Soma das dobras planejadas no setor, considerando o turno mais carregado:
+```
+dobras[setor] = max sobre os 7 dias de max(extras_almoco_d, extras_jantar_d)
+```
+(Hoje os campos de extras na UI ficam zerados — por isso vamos também adicionar **um segundo input de extras opcional por célula** num modo expandido. Ver Parte 2b abaixo.)
+
+### Efetivas (CLT contratados ativos)
+Novo hook em `src/hooks/useHoldingConfig.ts`: `useEffectiveHeadcountBySector(unitId)`.
+
+Cadeia de junções:
+```
+sectors (unit_id, name == SECTOR_LABELS[sector_key])
+  ← sector_job_titles (sector_id → job_title_id)
+  ← employees (job_title_id, active=true, worker_type='clt')
+```
+Retorna `Record<sector_key, number>`. Empregados com cargo vinculado a múltiplos setores contam apenas no primeiro setor (regra real é 1 cargo → 1 setor).
+
+### Gap
+```
+gap = (necessarias + dobras) − efetivas
+```
+Render como `Badge`:
+- `gap > 0` → `bg-destructive/15 text-destructive` — "Faltam N"
+- `gap == 0` → `bg-emerald-500/15 text-emerald-600` — "OK"
+- `gap < 0` → `bg-amber-500/15 text-amber-700` — "Excedente N"
+
+### Parte 2b — Edição de dobras na própria grade (opcional, mas incluso)
+
+Adiciono um **toggle "Mostrar dobras"** no header do card. Quando ligado, cada célula passa a mostrar 2 inputs empilhados:
+```
+[ 12 ]   ← required_count
+[ +5 ]   ← extras_count (texto cinza, prefixo "+")
+```
+O extras_count salva via mesmo `useUpsertHoldingStaffing` (campo já está no upsert).
+
+Quando desligado (default), só o input principal aparece e a coluna **Dobras** mostra o agregado.
 
 ---
 
-## 4. Arquivos afetados
+## Parte 3 — Integração com o Chat IA gerador de escalas
 
-**Editar:**
-- `src/index.css` — tokens do dock + utilitários.
-- `src/components/layout/BottomNavigation.tsx` — refatoração completa.
-- `src/pages/Index.tsx` — `pb-24` no main mobile.
-- `src/components/dashboard/PainelMetasTab.tsx` — tabs roláveis, KPIs 2-col.
-- `src/components/dashboard/BudgetsGerenciaisTab.tsx` — idem.
-- `src/components/dashboard/RemuneracaoVariavelTab.tsx` — idem.
-- `src/components/estoque/EstoqueTab.tsx` + filhos — tabs/grid mobile.
-- `src/components/utensilios/UtensiliosTab.tsx` + `DashboardUtensilios.tsx` — grid 2-col.
-- `src/components/cmv/` — grids e tabs.
-- `src/components/painel/VisionKpiCard.tsx` — variante compacta.
+### 3a. `src/hooks/useScheduleAIContext.ts`
+- Estender o tipo `staffing` para incluir `extras_count: number`.
+- Adicionar `extras_count` ao `select` da `staffing_matrix`.
 
-**Sem alteração:** PainelSidebar (já está fiel ao Vision Pro), AppSidebar desktop, lógica de negócio.
+### 3b. `supabase/functions/gerar-escala-ia/index.ts`
+Editar `buildSystemPrompt` (linhas 173-177) para incluir dobras:
+```ts
+lines.push("### Tabela Mínima POP (cobertura obrigatória + dobras planejadas)");
+for (const r of ctx.staffing) {
+  const extras = r.extras_count > 0
+    ? ` (+ até ${r.extras_count} dobra(s) se cobertura ficar comprometida)`
+    : "";
+  lines.push(`- ${dowName[r.day_of_week]} ${r.shift_type}: ${r.required_count} pessoa(s)${extras}`);
+}
+```
+E acrescentar uma regra explícita em `POP_RULES` (`src/lib/escalas/popRulesText.ts`):
+> "Dobras (extras_count) são reposições autorizadas. Use **apenas** se faltas/folgas comprometerem o `required_count` do turno. Nunca exceda `required_count + extras_count` no mesmo turno."
+
+Após editar, fazer redeploy da função `gerar-escala-ia`.
+
+### Fluxo end-to-end resultante
+
+```text
+COO digita mínimo + dobras em "Configuração Operacional — Holding"
+          ↓ (UNIQUE: unit_id, sector_key, shift_type, day_of_week, month_year)
+holding_staffing_config
+          ↓ trigger mirror_holding_to_staffing_matrix
+staffing_matrix (required_count + extras_count atualizados)
+          ↓ useScheduleAIContext lê
+Prompt da IA: "Qui almoco: 12 pessoa(s) (+ até 5 dobras se cobertura ficar comprometida)"
+          ↓
+gerar-escala-ia respeita o mínimo e usa dobras como cap superior em caso de falta
+```
 
 ---
 
-## 5. Validação visual
-Após implementar, verificarei via screenshots em 375px e 414px:
-- Dock flutuante sem cortar nas bordas.
-- Item ativo com label visível sem empurrar os outros.
-- Painel de Indicadores, Budgets, Pessoas, Auditoria e Estoque sem overflow horizontal.
+## Arquivos tocados (resumo)
 
-Posso prosseguir com a implementação?
+| Arquivo | Tipo de mudança |
+|---|---|
+| `src/components/escalas/holding/HoldingStaffingPanel.tsx` | Refatoração visual + 4 colunas novas + toggle dobras |
+| `src/hooks/useHoldingConfig.ts` | Novo `useEffectiveHeadcountBySector` |
+| `src/lib/holding/sectors.ts` | Add `DAYS_OF_WEEK_DISPLAY` (SEG→DOM) sem quebrar `DAYS_OF_WEEK` |
+| `src/hooks/useScheduleAIContext.ts` | Incluir `extras_count` em `staffing` |
+| `supabase/functions/gerar-escala-ia/index.ts` | Prompt menciona dobras, redeploy |
+| `src/lib/escalas/popRulesText.ts` | Regra de uso de dobras |
+
+Memória a atualizar: `mem://features/escalas/holding-operational-config` — registrar que extras_count agora alimenta a IA via `staffing_matrix`.
+
+## Não inclui
+- Não muda schema (extras_count já existe em ambas as tabelas).
+- Não toca em Forecast/Rates/filtro global.
+- Não altera o trigger de espelhamento (já espelha extras_count).

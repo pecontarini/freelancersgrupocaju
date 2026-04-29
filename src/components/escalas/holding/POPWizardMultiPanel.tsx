@@ -315,8 +315,25 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
           )}
         </div>
 
-        {/* Mapeamento aba ↔ unidade (apenas Excel multi-aba) */}
-        {matchReport && (
+        {/* Revisão da importação determinística (.xlsx) */}
+        {resolveResult && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              2. Revisão da importação
+            </div>
+            <MinimumScaleImportReview
+              result={resolveResult}
+              monthYear={monthYear}
+              selectedUnitIds={selectedIds}
+              onApplied={() => {
+                /* mantém o painel aberto pra confirmação visual */
+              }}
+            />
+          </div>
+        )}
+
+        {/* Mapeamento aba ↔ unidade — apenas no fluxo IA (PDF/imagem/texto) */}
+        {!resolveResult && matchReport && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

@@ -28,6 +28,15 @@ import { deriveBrand, ALL_BRANDS, type Brand } from "@/lib/holding/sectors";
 import { buildMatchReport } from "@/lib/holding/sheet-matcher";
 import { usePOPWizardBatch, type UnitTarget } from "@/hooks/usePOPWizardBatch";
 import { UnitProposalCard } from "./UnitProposalCard";
+import {
+  parseMinimumScaleWorkbook,
+  type ParseResult,
+} from "@/lib/holding/minimum-scale-parser";
+import {
+  resolveUnitsFromSheets,
+  type ResolveResult,
+} from "@/lib/holding/unit-sheet-resolver";
+import { MinimumScaleImportReview } from "./MinimumScaleImportReview";
 
 const ACCEPTED_FILES =
   ".pdf,.xlsx,.xls,.xlsm,.csv,.txt,.md,.png,.jpg,.jpeg,.webp,application/pdf,image/*,text/*";

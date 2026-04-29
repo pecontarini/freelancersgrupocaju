@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { HoldingStaffingPanel } from "./holding/HoldingStaffingPanel";
 import { HoldingForecastPanel } from "./holding/HoldingForecastPanel";
 import { HoldingRatesPanel } from "./holding/HoldingRatesPanel";
+import { POPWizardButton } from "./holding/POPWizardButton";
+import { POPWizardDrawer } from "./holding/POPWizardDrawer";
 
 interface UnitRow {
   id: string;

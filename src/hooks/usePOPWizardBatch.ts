@@ -5,6 +5,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
@@ -14,6 +15,7 @@ import {
   type SectorKey,
 } from "@/lib/holding/sectors";
 import type { ExtractedAttachment } from "@/lib/extract-attachment-text";
+import { matchSheetToUnit } from "@/lib/holding/sheet-matcher";
 import type { ProposedPayload } from "@/hooks/usePOPWizard";
 import type { HoldingStaffingConfigRow } from "@/hooks/useHoldingConfig";
 

@@ -244,7 +244,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
         setIsStreaming(false);
       }
     },
-    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount, sessionMode],
+    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount, sessionMode, attachments],
   );
 
   const applyProposed = useCallback(async () => {

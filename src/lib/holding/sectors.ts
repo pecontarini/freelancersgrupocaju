@@ -47,17 +47,34 @@ export const SECTOR_LABELS: Record<SectorKey, string> = {
   sushi: "Sushi",
 };
 
-export type Brand = "Nazo" | "Caju Limão" | "Caminito";
+export type Brand = "Caju Limão" | "Caminito" | "Nazo" | "Foster's Burguer";
 
-/** Deriva a marca a partir do nome da unidade. */
-export function deriveBrand(unitName: string | null | undefined): Brand {
-  const name = (unitName ?? "").toLowerCase();
-  if (name.includes("nazo")) return "Nazo";
-  if (name.includes("caju limão") || name.includes("caju limao")) return "Caju Limão";
-  return "Caminito";
+/**
+ * Deriva a marca a partir do nome da unidade, baseado nos prefixos reais
+ * usados em `config_lojas`:
+ *   - CAJU 01, CAJU 03, ...           → Caju Limão
+ *   - FB01, FB02, ...                 → Foster's Burguer
+ *   - MULT XX - NAZO ..., NFE - NAZO  → Nazo
+ *   - MULT XX - CAMINITO ...          → Caminito
+ * Unidades não-operacionais (CPD, RESPONSA) retornam null e são ocultadas
+ * dos seletores.
+ */
+export function deriveBrand(unitName: string | null | undefined): Brand | null {
+  const name = (unitName ?? "").toUpperCase().trim();
+  if (!name) return null;
+  // Não-operacionais
+  if (name.startsWith("CPD") || name.startsWith("RESPONSA")) return null;
+  // Marca por keyword (mais específica primeiro)
+  if (name.includes("NAZO")) return "Nazo";
+  if (name.includes("CAMINITO")) return "Caminito";
+  if (/^CAJU\b/.test(name) || name.includes("CAJU LIMÃO") || name.includes("CAJU LIMAO")) {
+    return "Caju Limão";
+  }
+  if (/^FB\d/.test(name) || name.includes("FOSTER")) return "Foster's Burguer";
+  return null;
 }
 
-export const ALL_BRANDS: Brand[] = ["Caju Limão", "Caminito", "Nazo"];
+export const ALL_BRANDS: Brand[] = ["Caju Limão", "Foster's Burguer", "Caminito", "Nazo"];
 
 /** Setores aplicáveis a uma marca. */
 export function sectorsForBrand(brand: Brand): SectorKey[] {

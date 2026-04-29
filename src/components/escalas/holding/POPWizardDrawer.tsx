@@ -78,7 +78,9 @@ export function POPWizardDrawer({
 }: POPWizardDrawerProps) {
   const wizard = usePOPWizard({ brand, unitId, unitName, monthYear });
   const [input, setInput] = useState("");
+  const [extracting, setExtracting] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -92,11 +94,43 @@ export function POPWizardDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const handleFilePick = () => {
+    if (wizard.isStreaming || extracting) return;
+    fileRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reanexar mesmo arquivo
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(
+        `${file.name} tem ${(file.size / 1024 / 1024).toFixed(1)} MB — limite ${MAX_FILE_SIZE / 1024 / 1024} MB.`,
+      );
+      return;
+    }
+    setExtracting(true);
+    try {
+      const att = await extractAttachment(file);
+      wizard.addAttachment(att);
+      if (!input.trim()) {
+        setInput(
+          "Use este POP anexado para preencher a Tabela Mínima desta unidade. Mapeie cada linha para os setores válidos e gere a proposta.",
+        );
+      }
+      toast.success(`${att.name} pronto para enviar.`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Falha ao ler o arquivo.");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const handleSend = (mode: WizardMode = "wizard") => {
     const text = input.trim();
-    if (!text || wizard.isStreaming) return;
+    if ((!text && wizard.attachments.length === 0) || wizard.isStreaming) return;
     setInput("");
-    wizard.sendMessage(text, mode);
+    wizard.sendMessage(text || "Use o anexo para gerar a proposta.", mode);
   };
 
   const handleQuick = (q: typeof QUICK_PROMPTS[number]) => {

@@ -290,5 +290,10 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
     discardProposed,
     reset,
     currentConfig,
+    attachments,
+    addAttachment,
+    removeAttachment,
+    clearAttachments,
   };
 }
+

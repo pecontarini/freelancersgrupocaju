@@ -49,17 +49,21 @@ function isExcel(file: File): boolean {
   return EXCEL_EXT.test(file.name) || EXCEL_MIME.test(file.type);
 }
 
-async function extractExcelText(file: File): Promise<string> {
+async function extractExcelText(
+  file: File,
+): Promise<{ text: string; sheets: ExtractedSheet[] }> {
   const XLSX: any = await import("xlsx");
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
+  const sheets: ExtractedSheet[] = [];
   const parts: string[] = [];
   for (const name of wb.SheetNames) {
     const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name], { blankrows: false });
+    sheets.push({ name, text: csv });
     parts.push(`--- Aba: ${name} ---\n${csv}`);
     if (parts.join("\n\n").length > MAX_TEXT_CHARS) break;
   }
-  return parts.join("\n\n");
+  return { text: parts.join("\n\n"), sheets };
 }
 
 async function fileToDataUrl(file: File): Promise<string> {

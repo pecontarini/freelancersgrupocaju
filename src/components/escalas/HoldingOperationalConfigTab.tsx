@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { HoldingStaffingPanel } from "./holding/HoldingStaffingPanel";
 import { HoldingForecastPanel } from "./holding/HoldingForecastPanel";
 import { HoldingRatesPanel } from "./holding/HoldingRatesPanel";
+import { POPWizardButton } from "./holding/POPWizardButton";
+import { POPWizardDrawer } from "./holding/POPWizardDrawer";
 
 interface UnitRow {
   id: string;
@@ -140,6 +142,7 @@ export function HoldingOperationalConfigTab() {
   const [brand, setBrand] = useState<Brand>("Caju Limão");
   const [unitId, setUnitId] = useState<string>("");
   const [monthYear, setMonthYear] = useState<string>(currentMonth);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const { data: lojas, isLoading: loadingUnits } = useQuery({
     queryKey: ["holding-config-units"],
@@ -282,6 +285,20 @@ export function HoldingOperationalConfigTab() {
             />
           </TabsContent>
         </Tabs>
+      )}
+
+      {unitId && (
+        <>
+          <POPWizardButton onClick={() => setWizardOpen(true)} />
+          <POPWizardDrawer
+            open={wizardOpen}
+            onOpenChange={setWizardOpen}
+            brand={brand}
+            unitId={unitId}
+            unitName={filteredUnits.find((u) => u.id === unitId)?.nome}
+            monthYear={monthYear}
+          />
+        </>
       )}
     </div>
   );

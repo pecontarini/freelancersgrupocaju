@@ -1,123 +1,65 @@
-# POP Wizard — Assistente IA na Configuração Operacional Holding
-
 ## Objetivo
-Adicionar um assistente conversacional flutuante dentro de `HoldingOperationalConfigTab` que sugere, valida e ajusta os mínimos de pessoas (`holding_staffing_config`) usando Lovable AI (Gemini 2.5 Pro), com preview revisável antes de publicar.
 
-## Escopo (NÃO mexer em mais nada)
-- Edita: `src/components/escalas/HoldingOperationalConfigTab.tsx` (apenas para montar o botão flutuante).
-- Cria: 4 arquivos novos de UI/lógica + 1 edge function.
-- Reusa hooks existentes: `useHoldingStaffingConfig`, `useUpsertHoldingStaffing`, `useEffectiveHeadcountBySector`.
-- Nenhuma alteração de schema. Nenhuma tabela nova.
+Hoje o POP Wizard responde imediatamente à primeira mensagem do usuário, podendo "viajar" na sugestão por falta de contexto. Vamos transformá-lo em uma **entrevista conversacional**: a IA faz UMA pergunta por vez até reunir contexto suficiente, e só então gera a proposta (que continua sendo revisada no painel de diff atual).
 
-## Arquivos a criar / editar
+## Como vai funcionar (do ponto de vista do usuário)
 
-### Novos
-1. `src/components/escalas/holding/POPWizardButton.tsx`
-   - Botão flutuante fixo (bottom-right, `z-40`), ícone `Sparkles`/`Bot` (lucide), estilo liquid-glass coral.
-   - Visível apenas quando `unitId` selecionado.
+1. Usuário abre o wizard e descreve em uma frase o que quer (ex: "Quero refazer os mínimos do salão").
+2. A IA responde com **uma pergunta curta e específica** de cada vez, ex:
+   - "Qual o seu objetivo principal: cobrir furos, otimizar custo ou redimensionar para um movimento novo?"
+   - "Quais setores você quer ajustar? (todos, ou um subconjunto)"
+   - "Quais dias da semana entram no escopo?"
+   - "Almoço, jantar ou ambos?"
+   - "Há restrição de efetivo (ex: não posso aumentar headcount)?"
+   - "Algum dia/turno tem demanda atípica que devo considerar?"
+3. Quando a IA julgar que tem contexto suficiente (mínimo ~3 perguntas respondidas, dependendo do escopo), ela emite a tool `propose_staffing_changes` direto — **sem pedir confirmação extra** — e o painel de diff já existente abre para revisão.
+4. Usuário pode interromper a qualquer momento dizendo "pode propor agora" e a IA gera a proposta com o que tiver.
 
-2. `src/components/escalas/holding/POPWizardDrawer.tsx`
-   - Drawer lateral direito (vaul `direction="right"`), largura 90vw mobile / 720px desktop.
-   - Layout dividido: topo = chat (mensagens + input), base = preview das mudanças sugeridas.
-   - Cabeçalho mostra contexto ativo: marca / unidade / mês.
-   - Botões: "Aplicar mudanças" (publica via upsert loop) e "Descartar".
-   - Estado local (mensagens, sugestões pendentes) — sem store global.
+## Mudanças técnicas
 
-3. `src/components/escalas/holding/POPWizardPreview.tsx`
-   - Tabela compacta: setor × dia × turno mostrando `atual → sugerido` para `required_count` e `extras_count`.
-   - Diff colorido (verde = aumento, vermelho = redução, azul = novo).
-   - Resumo: "X células serão alteradas".
+### 1. `supabase/functions/pop-wizard-chat/index.ts` — reforçar o system prompt
 
-4. `src/hooks/usePOPWizard.ts`
-   - Gerencia: histórico de mensagens, envio para edge function, parsing da resposta estruturada (sugestões), aplicação em lote (chama `useUpsertHoldingStaffing` em loop com Promise.allSettled).
-   - Modos: `wizard` (sugerir do zero), `validate` (revisar config atual), `adjust` (ajuste livre por linguagem natural).
+Adicionar uma seção `## Protocolo de entrevista` que instrua o modelo a:
 
-### Editar
-5. `src/components/escalas/HoldingOperationalConfigTab.tsx`
-   - Adicionar `<POPWizardButton onClick={...} />` e `<POPWizardDrawer ... />` dentro do bloco `unitId ? (...)` — sem tocar no resto.
-   - Passar `brand`, `unitId`, `monthYear` como props.
+- Nunca propor mudanças na primeira resposta, exceto se o usuário pedir explicitamente ("pode propor direto", "gere agora", etc.).
+- Fazer **UMA única pergunta por mensagem**, curta e objetiva.
+- Cobrir, em ordem, estes eixos antes de propor (pular se já estiver claro pelo contexto/mensagens anteriores):
+  1. Objetivo (cobrir furos / reduzir custo / redimensionar / criar do zero)
+  2. Escopo de setores
+  3. Escopo de dias da semana
+  4. Escopo de turnos (almoço/jantar)
+  5. Restrições (não aumentar headcount, manter dobras, etc.)
+  6. Particularidades de demanda (eventos, sazonalidade)
+- Reconhecer atalhos do usuário: "todos", "tudo", "qualquer", "você decide" → marcar o eixo como "livre" e seguir.
+- Quando todos os eixos relevantes estiverem cobertos (ou usuário pedir para propor), chamar a tool `propose_staffing_changes` no MESMO turno em que entrega a proposta — sem pedir "confirma?".
+- Manter regra: NUNCA chamar a tool enquanto ainda estiver perguntando.
 
-### Edge Function
-6. `supabase/functions/pop-wizard-chat/index.ts`
-   - Modelo: `google/gemini-2.5-pro` via Lovable AI Gateway.
-   - System prompt embute: regras POP da casa (ler `src/lib/escalas/popRulesText.ts` e replicar lógica), contexto recebido do front (config atual + headcount efetivo + dobras).
-   - Streaming SSE token-a-token para o chat.
-   - Tool calling estruturado: tool `propose_staffing_changes` com schema `{ changes: [{ sector_key, day_of_week, shift_type, required_count, extras_count, reason }] }`.
-   - Trata 429/402 com mensagens claras.
-   - `verify_jwt = true` (default). CORS headers padrão.
+Também ajustar o modo padrão: quando `mode === "wizard"`, forçar entrevista; em `"adjust"` e `"validate"`, manter comportamento atual (resposta direta) já que o usuário disparou um pedido pontual.
 
-## Fluxo de uso
-```text
-[Usuário clica botão flutuante]
-       ↓
-[Drawer abre — chat vazio + preview vazio]
-       ↓
-[Usuário digita: "sugira mínimo pra um sábado lotado"]
-       ↓
-[Front envia: mensagens + contexto (config atual, headcount, dobras, brand, unit, month)]
-       ↓
-[Edge function → Lovable AI Gemini 2.5 Pro com tool calling]
-       ↓
-[Stream do texto no chat + tool_call com sugestões estruturadas]
-       ↓
-[Preview popula com diff atual→sugerido]
-       ↓
-[Usuário aprova → loop de upsert → invalida queries → painel atualiza]
-```
+### 2. `src/hooks/usePOPWizard.ts` — ajuste mínimo
 
-## Detalhes técnicos
+- Mudar o default de `sendMessage` para `mode: "wizard"` quando `messages.length === 0` (primeira mensagem inicia entrevista). Mensagens subsequentes herdam o modo da primeira interação até `reset()`.
+- Guardar o modo da sessão em estado interno (`sessionMode`) para não alternar no meio da conversa.
 
-### Contexto enviado para a IA (a cada turno)
-- Filtros ativos: `brand`, `unitId`, `unitName`, `monthYear`.
-- Snapshot da `holding_staffing_config` atual (apenas dessa unidade/mês).
-- `effectiveHeadcount` por setor (do hook existente).
-- Regras POP em texto (do `popRulesText.ts`).
+### 3. `src/components/escalas/holding/POPWizardDrawer.tsx` — UX leve
 
-### Tool schema (resposta estruturada)
-```json
-{
-  "name": "propose_staffing_changes",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "summary": { "type": "string" },
-      "changes": {
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "sector_key": { "type": "string" },
-            "day_of_week": { "type": "integer", "minimum": 0, "maximum": 6 },
-            "shift_type": { "type": "string", "enum": ["almoco", "jantar"] },
-            "required_count": { "type": "integer", "minimum": 0 },
-            "extras_count": { "type": "integer", "minimum": 0 },
-            "reason": { "type": "string" }
-          },
-          "required": ["sector_key", "day_of_week", "shift_type", "required_count", "extras_count"]
-        }
-      }
-    },
-    "required": ["summary", "changes"]
-  }
-}
-```
+- Adicionar um texto de boas-vindas inicial (mensagem assistente "fake" inserida no `reset`/abertura) explicando: *"Vou te fazer algumas perguntas curtas para entender o que você precisa antes de propor mudanças. Se quiser pular, diga 'pode propor agora'."*
+- Adicionar um botão discreto **"Propor agora com o que temos"** abaixo do input, visível só durante a entrevista (quando ainda não há `proposed`), que envia a frase `"Pode propor agora com o contexto atual."` automaticamente.
 
-### Aplicação das mudanças
-Loop `Promise.allSettled` chamando `useUpsertHoldingStaffing` para cada item. Toast com sucesso/erro agregado. Invalida `holding_staffing_config` e `staffing_matrix` (já feito pelo hook).
+### 4. Sem mudanças em
 
-### Tratamento de erro
-- Erro de API: toast "Não consegui processar sua solicitação. Tente novamente."
-- 429: "Muitas requisições. Aguarde alguns segundos."
-- 402: "Créditos de IA esgotados. Adicione créditos em Configurações → Workspace."
+- `POPWizardPreview.tsx` (diff continua igual)
+- `POPWizardButton.tsx` (gatilho continua igual)
+- Banco de dados / RLS / migrations (nenhuma)
 
-## Estilo visual
-- Liquid glass coral coerente com o resto do portal (`glass-card`, blur, terracotta `#D05937`).
-- Sem emojis na UI (apenas ícones `lucide-react`).
-- Loading: typing indicator 3 pontos animados.
-- Drawer `z-40` (acima do conteúdo, abaixo de modais Radix `z-50`).
+## Detalhes técnicos relevantes
 
-## Fora do escopo
-- Persistência do histórico de chat (estado local apenas).
-- Aplicação automática sem confirmação humana.
-- Mexer em escalas reais (`schedules`) — wizard só configura mínimos.
-- Qualquer outra página ou tabela.
+- Tool calling continua com `propose_staffing_changes` — não muda o schema, então o painel de diff funciona sem alterações.
+- Modelo continua `google/gemini-2.5-pro` (boa aderência a instruções de protocolo).
+- Streaming SSE permanece igual.
+- Nenhum secret novo necessário.
+
+## O que NÃO vamos fazer (conforme suas respostas)
+
+- Não criar formulário/cards estruturados antes do chat.
+- Não adicionar etapa de "confirma o entendimento?" antes de propor — a IA propõe direto e você revisa no diff existente.

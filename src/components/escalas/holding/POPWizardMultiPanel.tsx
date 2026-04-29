@@ -135,7 +135,7 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
       toast.error("Selecione pelo menos uma unidade.");
       return;
     }
-    await batch.run({ attachment, targets, monthYear, concurrency: 3 });
+    await batch.run({ attachment, targets, monthYear, concurrency: 3, autoApply });
   };
 
   const toggleUnit = (unitId: string) => {

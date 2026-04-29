@@ -1,56 +1,191 @@
-# Diagnóstico
+## Diagnóstico
 
-Olhando o request real (network logs), o fluxo atual está mandando o **Excel inteiro** (`ESCALA MÍNIMA ABRIL.xlsx`, com 16 abas: `CAJULIMÃO - SUDOESTE`, `CAJULIMÃO - ASA NORTE`, `CP ASA NORTE`, `CP - NAZO SIG`, ...) em **cada uma das 16 chamadas** ao Gemini. Em cada chamada eu peço para a IA "encontrar a parte da unidade X". Resultado:
+A planilha enviada não é um POP genérico; ela já é uma base operacional estruturada por abas e, em algumas abas, por mais de uma loja/marca dentro da própria aba.
 
-- A IA confunde abas parecidas (Caju Sudoeste vs Caju Norte) e devolve dados misturados.
-- Cada chamada é lenta (Gemini relê tudo) e pode estourar timeout/contexto.
-- O auto-apply até dispara, mas as propostas chegam erradas/atrasadas, parecendo "não funcional".
+Exemplos encontrados:
 
-Como o Excel **já vem segmentado por aba (uma aba = uma unidade)**, o caminho certo é fazer o matching aba↔unidade no client, **antes** de chamar a IA, e enviar só o pedaço relevante.
+- A planilha tem 12 abas, mas o sistema tem 16 unidades operacionais selecionáveis.
+- Há abas diretas: `CAJULIMÃO - ASA NORTE`, `CP ASA NORTE`, `CP ASA SUL`, `NAZO ASS`, `NAZO GOIANIA`, `CAJU ITAIM`.
+- Há abas compostas/multi-loja:
+  - `CP - NAZO SIG` contém blocos de Caminito SIG e Nazo SIG.
+  - `CP - NAZO ÁGUAS CLARAS` contém blocos de Caminito Águas Claras e Nazo Águas Claras.
+- O matcher atual casa só por nome de aba. Isso causa erro grave: unidades Foster, Nazo ASA Sul e outras podem cair em abas erradas só porque batem região (`ASA SUL`, `ASA NORTE`, `ÁGUAS CLARAS`).
+- A extração atual converte cada aba inteira em CSV e manda para IA. Isso é lento, mistura blocos e ainda depende de a IA interpretar uma estrutura que é melhor lida deterministicamente.
 
-# Plano
+## Objetivo
 
-## 1. Expor abas separadas no extrator (`src/lib/extract-attachment-text.ts`)
+Trocar o fluxo de “IA lendo tudo por unidade” por um fluxo de importação real para esse modelo de planilha:
 
-- Adicionar campo `sheets?: ExtractedSheet[]` em `ExtractedAttachment`, com `{ name, text }` por aba.
-- Em `extractExcelText`, além do texto concatenado, devolver também o array de abas individuais (sem truncar — cada aba isolada é pequena).
+1. O cliente anexa a planilha.
+2. O sistema lê a planilha automaticamente.
+3. O sistema identifica abas, blocos de loja/marca, setores, turnos, dias e valores `X+Y`.
+4. O sistema mostra uma revisão clara: o que será importado, quais lojas foram encontradas, quais não foram, e possíveis conflitos.
+5. O cliente aplica tudo junto, com segurança, ou corrige unidades individualmente antes de aplicar.
 
-## 2. Matcher aba↔unidade (`src/lib/holding/sheet-matcher.ts`, novo)
+## Plano de implementação
 
-- Função `matchSheetToUnit(sheets, unitName, brand)` que normaliza nomes (uppercase, sem acento, sem pontuação) e procura a aba que melhor casa com o nome da unidade.
-- Tokens de marca (`CAJU`, `CAMINITO`/`CP`, `NAZO`, `FOSTER`) + tokens de bairro extraídos do `unitName` (`SUDOESTE`, `ASA NORTE`, `ASA SUL`, `SIG`, etc.).
-- Score por interseção de tokens; threshold mínimo para evitar falso match.
-- Retorna `{ sheet, score }` ou `null`.
+### 1. Criar parser determinístico para “Escala Mínima” em Excel
 
-## 3. Roteamento no batch (`src/hooks/usePOPWizardBatch.ts`)
+Criar um módulo específico para essa planilha, sem depender da IA para ler as células.
 
-- Em `runForUnit`, se o anexo tem `sheets` e há match para a unidade, montar um `ExtractedAttachment` "virtual" só com o texto daquela aba (`text = "--- Aba: X ---\n<csv>"`).
-- Se não houver match, fallback para o anexo inteiro como hoje (com aviso no `assistantText`).
-- Adicionar pré-passo síncrono no `run()` que loga quais unidades casaram com qual aba e quais ficaram sem match — exibir isso na UI antes de disparar a IA, para o COO confirmar.
+Ele vai:
 
-## 4. Auto-apply: garantir que o estado da grade atualiza
+- Ler todas as abas do `.xlsx` com a biblioteca já usada no projeto (`xlsx`).
+- Detectar cabeçalhos de loja dentro de cada aba, não apenas o nome da aba.
+- Detectar blocos de setor pelo padrão:
+  - linha de setor
+  - linha `TURNO | SEGUNDA | TERÇA | ... | DOMINGO`
+  - linha `ALMOÇO`
+  - linha `JANTAR`
+  - opcionalmente `MANHÃ`/`TARDE`, que serão tratados como produção quando aplicável.
+- Converter dias corretamente:
+  - coluna `SEGUNDA` → `day_of_week = 1`
+  - `TERÇA` → `2`
+  - `QUARTA` → `3`
+  - `QUINTA` → `4`
+  - `SEXTA` → `5`
+  - `SÁBADO` → `6`
+  - `DOMINGO` → `0`
+- Converter turnos:
+  - `ALMOÇO`/`MANHÃ` → `almoco`
+  - `JANTAR`/`TARDE` → `jantar`
+- Interpretar células:
+  - `10` → `required_count = 10`, `extras_count = 0`
+  - `10+5` → `required_count = 10`, `extras_count = 5`
+  - vazio/traço/texto não operacional → ignorar ou marcar como alerta
+- Ignorar colunas de orçamento/custo (`Nº pessoas necessárias`, `Nº dobras`, valores em R$, observações), porque a grade precisa dos valores dia × turno.
 
-- Após cada `applyJob` bem-sucedido, invalidar a query `["holding_staffing_config", unitId, monthYear]` (e a chave global `["holding_staffing_config"]`) usando `useQueryClient` no hook. Hoje a invalidação só acontece quando o usuário fecha o drawer.
+### 2. Criar mapeamento seguro entre planilha e unidades do sistema
 
-## 5. UI: mostrar mapeamento aba→unidade antes do run (`POPWizardMultiPanel.tsx`)
+Substituir o matcher atual por um matcher com prioridade e bloqueios.
 
-- Após anexar Excel, exibir uma seção "**3. Mapeamento detectado**" com lista:
-  - `CAJU LIMÃO SUDOESTE` → aba `CAJULIMÃO - SUDOESTE` (pronta)
-  - `FOSTER'S TAGUATINGA` → **sem aba correspondente** (será ignorada)
-- Botão Run desabilita se 0 unidades casarem; aviso se algumas casarem.
+Regras principais:
 
-## 6. Ajuste no edge function (`supabase/functions/pop-wizard-chat/index.ts`)
+- Nunca aceitar match apenas por região se a marca não bater.
+- `CP` pode significar Caminito, mas não pode significar Caju nem Foster.
+- `NAZO ASS` deve mapear para `NFE 01 - NAZO ASA SUL`.
+- `NAZO GYN` deve mapear para `MULT 02 - NAZO GO`.
+- `CAJU ITAM`/`CAJU ITAIM` deve mapear para `CAJU - ITAIM`.
+- Abas compostas precisam gerar sub-blocos:
+  - `CP - NAZO SIG`:
+    - blocos `... CAMINITO` → `MULT 03 - CAMINITO SIG`
+    - blocos `... NAZO` / `SUSHI NAZO` → `NFE 04 - NAZO SIG`
+  - `CP - NAZO ÁGUAS CLARAS`:
+    - blocos sem `NAZO` ou com `CAMINITO` → `MULT 12 - CAMINITO AGUAS CLARAS`
+    - blocos com `NAZO` / `SUSHI NAZO` → `NFE 03 - NAZO AGUAS CLARAS`
+- Unidades sem fonte clara ficam como “não encontradas”, não recebem dados de outra loja por aproximação.
+- Foster’s não deve ser preenchido a partir de abas de Caju/Caminito/Nazo.
 
-- Sem mudança de schema, só refinar o system prompt para o caso "anexo já filtrado por unidade" (sinalizar via `context.sheetMatched: true`) — instruindo a IA a confiar 100% no texto recebido sem procurar outras unidades.
+### 3. Mapear nomes de setores da planilha para `sector_key`
 
-# Resultado esperado
+Criar normalização robusta:
 
-- 16 unidades processam **muito mais rápido** (cada chamada vê só sua aba ~2KB em vez do Excel inteiro 50KB).
-- Zero confusão entre unidades parecidas.
-- Ao terminar de ler cada unidade, a proposta é aplicada automaticamente e a grade já reflete os números no banco.
-- COO vê antes do run quais unidades vão ser processadas e quais foram puladas por falta de aba.
+- `GARÇOM`, `GARÇOM + CHEFIAS`, `ATENDIMENTO`, `ATENDIMENTO CAMINITO`, `ATENDIMENTO NAZO` → conforme regra segura:
+  - quando for apenas atendimento misto, mapear para `garcom`, e manter alerta se incluir chefias agregadas.
+- `CHEFE`, `SUBCHEFE`, `CHEFE E SUBCHEFE DE SALÃO` → `chefe_subchefe_salao`
+- `CUMIN`, `CUMINS`, `CUMINS NAZO`, `CUMINS CAMINITO` → `cumin`
+- `HOSTESS` → `hostess`
+- `CAIXA/DELIVERY`, `DELIVERY` → `caixa_delivery`
+- `PARRILLA` → `parrilla`
+- `COZINHA`, `COZINHA NAZO`, `COZINHA CAMINITO` → `cozinha`
+- `BAR` → `bar`
+- `SERVIÇOS GERAIS`, `SERVIÇO GERAIS`, `ASG` → `servicos_gerais_salao_bar`
+- `PRODUÇÃO`, `PRODUÇÃO 6X1`, `PRODUÇÃO DE SUSHI` → `producao` ou `sushi` quando claramente sushi
+- `SUSHI NAZO` → `sushi`
 
-# Fora de escopo
+Qualquer setor não reconhecido entra em alerta e não é gravado automaticamente.
 
-- Mudanças no formato do POP corporativo PDF/imagem (esses continuam usando o fluxo atual de mandar o anexo inteiro — só Excel ganha o roteamento).
-- Reorganização visual do drawer.
+### 4. Criar uma etapa de revisão com boa usabilidade
+
+No painel Multi-unidade, após anexar a planilha, em vez de ir direto para “processar IA”, mostrar uma prévia de importação:
+
+- Resumo geral:
+  - abas lidas
+  - unidades encontradas
+  - unidades sem dados
+  - quantidade de células válidas
+  - alertas
+- Lista por unidade:
+  - status: encontrada / não encontrada / conflito / pronta
+  - origem: aba + bloco detectado
+  - quantidade de células que serão aplicadas
+  - botão para expandir e ver a prévia da grade
+- Alertas visíveis:
+  - loja não encontrada
+  - setor não reconhecido
+  - célula inválida
+  - aba composta separada em múltiplas unidades
+  - unidade selecionada sem dados na planilha
+
+O cliente deve conseguir entender antes de salvar:
+
+```text
+Planilha lida
+12 abas detectadas
+10 unidades encontradas
+6 unidades sem dados
+1.128 células prontas para aplicar
+8 alertas para revisar
+```
+
+### 5. Aplicação conjunta com segurança
+
+Adicionar um botão principal:
+
+- `Aplicar importação validada`
+
+Comportamento:
+
+- Aplica todas as unidades que estão com status “pronta”.
+- Não aplica unidades com conflito ou sem dados.
+- Mantém a lógica atual de `upsert` em `holding_staffing_config`.
+- Invalida o cache da grade após salvar.
+- Mostra resultado final por unidade:
+  - aplicada
+  - ignorada
+  - falhou
+
+Importante: isso substitui o “puxar automático antes de ler”. O sistema só habilita aplicação depois que a planilha foi lida e validada.
+
+### 6. Manter IA apenas como fallback
+
+A IA/Gemini deve continuar útil para PDF, imagem ou arquivos não estruturados.
+
+Mas para `.xlsx` neste formato:
+
+- caminho principal = parser determinístico
+- IA = fallback opcional, não fluxo principal
+
+Isso melhora:
+
+- velocidade
+- custo
+- precisão
+- previsibilidade
+- confiança do cliente
+
+## Arquivos previstos
+
+Criar:
+
+- `src/lib/holding/minimum-scale-parser.ts`
+- `src/lib/holding/unit-sheet-resolver.ts`
+- `src/components/escalas/holding/MinimumScaleImportReview.tsx`
+
+Editar:
+
+- `src/lib/extract-attachment-text.ts`
+- `src/lib/holding/sheet-matcher.ts` ou substituir seu uso pelo novo resolver seguro
+- `src/hooks/usePOPWizardBatch.ts`
+- `src/components/escalas/holding/POPWizardMultiPanel.tsx`
+- possivelmente `UnitProposalCard.tsx` para exibir origem/alertas da importação
+
+## Resultado esperado
+
+Depois da alteração, ao anexar a planilha enviada:
+
+- O sistema não vai mais tentar preencher Foster com aba de Caminito/Nazo/Caju.
+- O sistema vai separar abas compostas como SIG e Águas Claras por blocos internos.
+- O cliente verá uma revisão antes de aplicar.
+- A aplicação será conjunta, mas somente depois de leitura e validação.
+- As lojas sem dados reais na planilha ficarão claramente marcadas como “sem dados”, em vez de receberem dados errados.

@@ -1929,6 +1929,168 @@ export type Database = {
         }
         Relationships: []
       }
+      holding_freelancer_forecast: {
+        Row: {
+          brand: string
+          created_at: string
+          created_by: string | null
+          forecast_date: string
+          freelancer_count: number
+          id: string
+          reason: string | null
+          sector_key: string
+          shift_type: string
+          unit_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          created_by?: string | null
+          forecast_date: string
+          freelancer_count?: number
+          id?: string
+          reason?: string | null
+          sector_key: string
+          shift_type: string
+          unit_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          forecast_date?: string
+          freelancer_count?: number
+          id?: string
+          reason?: string | null
+          sector_key?: string
+          shift_type?: string
+          unit_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holding_freelancer_forecast_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holding_freelancer_rates: {
+        Row: {
+          brand: string
+          created_at: string
+          created_by: string | null
+          daily_rate: number
+          effective_from: string
+          id: string
+          notes: string | null
+          sector_key: string
+          unit_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number
+          effective_from?: string
+          id?: string
+          notes?: string | null
+          sector_key: string
+          unit_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          daily_rate?: number
+          effective_from?: string
+          id?: string
+          notes?: string | null
+          sector_key?: string
+          unit_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holding_freelancer_rates_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holding_staffing_config: {
+        Row: {
+          brand: string
+          created_at: string
+          created_by: string | null
+          day_of_week: number
+          extras_count: number
+          id: string
+          month_year: string
+          notes: string | null
+          required_count: number
+          sector_key: string
+          shift_type: string
+          unit_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand: string
+          created_at?: string
+          created_by?: string | null
+          day_of_week: number
+          extras_count?: number
+          id?: string
+          month_year?: string
+          notes?: string | null
+          required_count?: number
+          sector_key: string
+          shift_type: string
+          unit_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          day_of_week?: number
+          extras_count?: number
+          id?: string
+          month_year?: string
+          notes?: string | null
+          required_count?: number
+          sector_key?: string
+          shift_type?: string
+          unit_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holding_staffing_config_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_jobs: {
         Row: {
           ai_confianca: number | null
@@ -4542,6 +4704,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      holding_sector_label: { Args: { p_key: string }; Returns: string }
       is_first_user: { Args: never; Returns: boolean }
       is_missao_creator: {
         Args: { _missao_id: string; _user_id: string }

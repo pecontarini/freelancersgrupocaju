@@ -287,8 +287,8 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
               Mínimo Operacional por Setor / Turno / Dia
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Os valores aqui alimentam o alerta de POP e a IA geradora de escalas.
-              O regime (5x2 ou 6x1) calcula automaticamente nº de dobras e pessoas necessárias.
+              Use o formato <strong>X+Y</strong> em cada célula (ex.: <code>4+1</code> = 4 mínimos + 1 extra fixo).
+              Os extras entram no cálculo de dobras, pessoas necessárias e Gap.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -298,7 +298,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
               onCheckedChange={setShowExtras}
             />
             <Label htmlFor="show-extras" className="text-xs cursor-pointer">
-              Mostrar dobras por célula
+              Editar extras separadamente
             </Label>
           </div>
         </div>

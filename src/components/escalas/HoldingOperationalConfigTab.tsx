@@ -27,17 +27,98 @@ interface UnitRow {
   nome: string;
 }
 
-function buildMonthOptions(): { value: string; label: string }[] {
-  const opts: { value: string; label: string }[] = [];
+const MONTH_NAMES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+function formatMonthYearLabel(value: string): string {
+  const [y, m] = value.split("-").map(Number);
+  if (!y || !m) return value;
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+interface MonthYearPickerProps {
+  value: string; // "YYYY-MM"
+  onChange: (v: string) => void;
+}
+
+function MonthYearPicker({ value, onChange }: MonthYearPickerProps) {
   const now = new Date();
-  // 6 meses passados, atual e 6 futuros
-  for (let i = -6; i <= 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-    opts.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
-  }
-  return opts;
+  const currentY = now.getFullYear();
+  const currentM = now.getMonth() + 1; // 1-12
+
+  const [selY, selM] = value.split("-").map(Number);
+  const [viewYear, setViewYear] = useState<number>(selY || currentY);
+  const [open, setOpen] = useState(false);
+
+  const isMonthDisabled = (year: number, monthIdx0: number) => {
+    if (year < currentY) return true;
+    if (year === currentY && monthIdx0 + 1 < currentM) return true;
+    return false;
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "h-10 w-full justify-start text-left font-normal",
+            !value && "text-muted-foreground",
+          )}
+        >
+          <CalendarRange className="mr-2 h-4 w-4 opacity-70" />
+          {value ? formatMonthYearLabel(value) : "Selecione o mês"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3 pointer-events-auto" align="start">
+        <div className="mb-3 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewYear((y) => Math.max(currentY, y - 1))}
+            disabled={viewYear <= currentY}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-semibold">{viewYear}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setViewYear((y) => y + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {MONTH_NAMES.map((name, idx) => {
+            const disabled = isMonthDisabled(viewYear, idx);
+            const isSelected = selY === viewYear && selM === idx + 1;
+            return (
+              <Button
+                key={name}
+                type="button"
+                variant={isSelected ? "default" : "ghost"}
+                size="sm"
+                disabled={disabled}
+                className="h-9 text-xs"
+                onClick={() => {
+                  const v = `${viewYear}-${String(idx + 1).padStart(2, "0")}`;
+                  onChange(v);
+                  setOpen(false);
+                }}
+              >
+                {name.slice(0, 3)}
+              </Button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 /**

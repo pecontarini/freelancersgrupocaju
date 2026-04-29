@@ -214,15 +214,36 @@ export function POPWizardDrawer({
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-foreground/80">
                     <p className="font-semibold text-foreground mb-1">Como funciona</p>
                     <p>
-                      Vou te fazer algumas perguntas curtas para entender o que
-                      você precisa antes de propor mudanças. Se quiser pular
-                      direto, diga <em>"pode propor agora"</em>.
+                      Vou te fazer algumas perguntas curtas antes de propor.
+                      Se quiser, <strong>anexe o arquivo do POP</strong> (PDF,
+                      Excel, foto ou texto) usando o clipe abaixo — eu leio e
+                      gero a Tabela Mínima já preenchida para você só ajustar.
                     </p>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Como quer começar?
                   </p>
                   <div className="grid grid-cols-1 gap-2">
+                    <button
+                      onClick={handleFilePick}
+                      disabled={wizard.isStreaming || extracting}
+                      className={cn(
+                        "flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/5 backdrop-blur-sm",
+                        "p-3 text-left text-sm hover:bg-primary/10 hover:border-primary/60 transition-colors",
+                        "disabled:opacity-50",
+                      )}
+                    >
+                      <Paperclip className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-foreground">
+                          Anexar POP e preencher
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Envie o documento do POP (PDF, Excel, foto). Eu leio
+                          e proponho a Tabela Mínima automaticamente.
+                        </div>
+                      </div>
+                    </button>
                     {QUICK_PROMPTS.map((q) => {
                       const Icon = q.icon;
                       return (

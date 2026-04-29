@@ -21,6 +21,8 @@ import {
 import { cn } from "@/lib/utils";
 import { usePOPWizard, type WizardMode, type ChatMessage } from "@/hooks/usePOPWizard";
 import { POPWizardPreview } from "./POPWizardPreview";
+import { POPWizardMultiPanel } from "./POPWizardMultiPanel";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Brand } from "@/lib/holding/sectors";
 import {
   extractAttachment,

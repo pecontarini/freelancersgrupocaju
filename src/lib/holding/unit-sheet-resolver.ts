@@ -99,7 +99,7 @@ const REGION_ALIASES: Record<string, string[]> = {
   TAGUATINGA: ["TAGUATINGA", "TAG"],
   "AGUAS CLARAS": ["AGUAS CLARAS", "AGUAS"],
   GOIANIA: ["GOIANIA", "GO", "GYN"],
-  ITAIM: ["ITAIM", "ITAM"],
+  ITAIM: ["ITAIM", "ITAM", "ITM"],
   BOSQUE: ["BOSQUE"],
 };
 

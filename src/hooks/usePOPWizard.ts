@@ -46,27 +46,66 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
   const [proposed, setProposed] = useState<ProposedPayload | null>(null);
   const [isApplying, setIsApplying] = useState(false);
   const [sessionMode, setSessionMode] = useState<WizardMode | null>(null);
+  const [attachments, setAttachments] = useState<ExtractedAttachment[]>([]);
 
   const { data: currentConfig = [] } = useHoldingStaffingConfig(unitId, monthYear);
   const { data: headcount } = useEffectiveHeadcountBySector(unitId);
   const upsert = useUpsertHoldingStaffing();
+
+  const addAttachment = useCallback(
+    (a: ExtractedAttachment) => setAttachments((prev) => [...prev, a]),
+    [],
+  );
+  const removeAttachment = useCallback(
+    (name: string) => setAttachments((prev) => prev.filter((a) => a.name !== name)),
+    [],
+  );
+  const clearAttachments = useCallback(() => setAttachments([]), []);
 
   const reset = useCallback(() => {
     setMessages([]);
     setProposed(null);
     setIsStreaming(false);
     setSessionMode(null);
+    setAttachments([]);
   }, []);
 
   const sendMessage = useCallback(
     async (text: string, mode: WizardMode = "adjust") => {
-      // Primeira mensagem define o modo da sessão; mensagens seguintes herdam.
+      // Anexos forçam modo "validate" na primeira mensagem (gera proposta direto, sem entrevista)
+      const hasAttachments = attachments.length > 0;
+      const initialMode: WizardMode = hasAttachments && messages.length === 0 ? "validate" : mode;
       const effectiveMode: WizardMode =
-        sessionMode ?? (messages.length === 0 ? mode : "adjust");
+        sessionMode ?? (messages.length === 0 ? initialMode : "adjust");
       if (!sessionMode) setSessionMode(effectiveMode);
-      const userMsg: ChatMessage = { role: "user", content: text };
+
+      // Constrói o conteúdo da mensagem (multimodal se houver imagens)
+      const textAttachments = attachments.filter((a) => a.kind === "text");
+      const imageAttachments = attachments.filter((a) => a.kind === "image");
+
+      let combinedText = text;
+      if (textAttachments.length > 0) {
+        const blocks = textAttachments
+          .map((a) => `## ANEXO: ${a.name}${a.truncated ? " (truncado)" : ""}\n${a.text}`)
+          .join("\n\n");
+        combinedText = `${blocks}\n\n---\n${text}`;
+      }
+
+      const userContent: ChatMessage["content"] =
+        imageAttachments.length > 0
+          ? [
+              { type: "text", text: combinedText },
+              ...imageAttachments.map((a) => ({
+                type: "image_url" as const,
+                image_url: { url: a.dataUrl },
+              })),
+            ]
+          : combinedText;
+
+      const userMsg: ChatMessage = { role: "user", content: userContent };
       const nextMessages = [...messages, userMsg];
       setMessages(nextMessages);
+      setAttachments([]);
       setIsStreaming(true);
 
       const availableSectors = sectorsForBrand(brand) as SectorKey[];

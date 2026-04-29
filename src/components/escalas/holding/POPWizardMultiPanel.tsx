@@ -136,16 +136,37 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
       return;
     }
     setExtracting(true);
+    setParseResult(null);
+    setResolveResult(null);
     try {
       const att = await extractAttachment(file);
       setAttachment(att);
-      toast.success(`${att.name} pronto.`);
+      // Caminho determinístico para .xlsx — sem IA.
+      const isXlsx = /\.(xlsx|xls|xlsm)$/i.test(file.name);
+      if (isXlsx) {
+        const parsed = await parseMinimumScaleWorkbook(file);
+        setParseResult(parsed);
+        toast.success(
+          `${att.name} lido: ${parsed.totalBlocks} blocos · ${parsed.totalCells} células.`,
+        );
+      } else {
+        toast.success(`${att.name} pronto.`);
+      }
     } catch (err: any) {
       toast.error(err?.message ?? "Falha ao ler arquivo.");
     } finally {
       setExtracting(false);
     }
   };
+
+  // Re-resolve sempre que muda planilha ou seleção de unidades
+  useEffect(() => {
+    if (!parseResult) {
+      setResolveResult(null);
+      return;
+    }
+    setResolveResult(resolveUnitsFromSheets(parseResult.sheets, units));
+  }, [parseResult, units]);
 
   const handleRun = async () => {
     if (!attachment) {

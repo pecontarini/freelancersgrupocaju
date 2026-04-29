@@ -25,6 +25,7 @@ import {
   type ExtractedAttachment,
 } from "@/lib/extract-attachment-text";
 import { deriveBrand, ALL_BRANDS, type Brand } from "@/lib/holding/sectors";
+import { buildMatchReport } from "@/lib/holding/sheet-matcher";
 import { usePOPWizardBatch, type UnitTarget } from "@/hooks/usePOPWizardBatch";
 import { UnitProposalCard } from "./UnitProposalCard";
 

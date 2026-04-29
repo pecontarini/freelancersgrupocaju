@@ -384,7 +384,10 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
                           </TableCell>
                           {DAYS_OF_WEEK_DISPLAY.map((d) => {
                             const reqVal = getRequired(sector, shift.key, d.key);
-                            const cell = (
+                            const extVal = getExtras(sector, shift.key, d.key);
+                            const combined = formatCellValue(reqVal, extVal);
+                            const cell = showExtras ? (
+                              // Modo "extras separados": dois inputs numéricos puros
                               <div className="flex flex-col items-center gap-0.5">
                                 <Input
                                   type="number"
@@ -396,20 +399,35 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
                                   }
                                   className="h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm"
                                 />
-                                {showExtras && (
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    defaultValue={getExtras(sector, shift.key, d.key)}
-                                    key={`ext-${sector}-${shift.key}-${d.key}-${getExtras(sector, shift.key, d.key)}`}
-                                    onBlur={(e) =>
-                                      handleExtrasBlur(sector, shift.key, d.key, e.target.value)
-                                    }
-                                    placeholder="+0"
-                                    className="h-7 w-16 text-center text-xs tabular-nums text-muted-foreground bg-background/30"
-                                  />
-                                )}
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  defaultValue={extVal}
+                                  key={`ext-${sector}-${shift.key}-${d.key}-${extVal}`}
+                                  onBlur={(e) =>
+                                    handleExtrasBlur(sector, shift.key, d.key, e.target.value)
+                                  }
+                                  placeholder="+0"
+                                  className="h-7 w-16 text-center text-xs tabular-nums text-muted-foreground bg-background/30"
+                                />
                               </div>
+                            ) : (
+                              // Modo padrão: célula única "X+Y"
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                defaultValue={combined}
+                                key={`comb-${sector}-${shift.key}-${d.key}-${combined}`}
+                                onBlur={(e) =>
+                                  handleCombinedBlur(sector, shift.key, d.key, e.target.value)
+                                }
+                                placeholder="0"
+                                title="Formato: X+Y (ex.: 4+1 = 4 mínimos + 1 extra)"
+                                className={cn(
+                                  "h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm",
+                                  extVal > 0 && "ring-1 ring-primary/40",
+                                )}
+                              />
                             );
                             return (
                               <TableCell key={d.key} className="p-1 text-center w-[76px]">

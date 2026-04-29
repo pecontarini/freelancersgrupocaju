@@ -32,8 +32,15 @@ interface StaffingRow {
   extras_count: number;
 }
 
+type MessageContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    >;
+
 interface RequestBody {
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: Array<{ role: "user" | "assistant"; content: MessageContent }>;
   context: {
     brand: string;
     unitId: string;

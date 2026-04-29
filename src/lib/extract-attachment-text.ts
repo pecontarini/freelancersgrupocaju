@@ -129,7 +129,7 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
   }
 
   if (isExcel(file)) {
-    const raw = await extractExcelText(file);
+    const { text: raw, sheets } = await extractExcelText(file);
     const truncated = raw.length > MAX_TEXT_CHARS;
     return {
       name: file.name,
@@ -139,6 +139,7 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
       text: truncated ? raw.slice(0, MAX_TEXT_CHARS) + "\n\n[...conteúdo truncado]" : raw,
       dataUrl: "",
       truncated,
+      sheets,
     };
   }
 

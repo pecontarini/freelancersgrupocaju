@@ -142,6 +142,7 @@ export function HoldingOperationalConfigTab() {
   const [brand, setBrand] = useState<Brand>("Caju Limão");
   const [unitId, setUnitId] = useState<string>("");
   const [monthYear, setMonthYear] = useState<string>(currentMonth);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const { data: lojas, isLoading: loadingUnits } = useQuery({
     queryKey: ["holding-config-units"],

@@ -32,9 +32,9 @@ interface POPWizardDrawerProps {
 const QUICK_PROMPTS: Array<{ mode: WizardMode; label: string; icon: any; text: string }> = [
   {
     mode: "wizard",
-    label: "Sugerir do zero",
+    label: "Sugerir do zero (entrevista)",
     icon: Wand2,
-    text: "Monte uma proposta completa de Tabela Mínima para esta unidade considerando a marca, o efetivo CLT atual e os picos típicos de cada dia.",
+    text: "Quero montar uma proposta completa de Tabela Mínima para esta unidade. Me guie com perguntas curtas antes de propor.",
   },
   {
     mode: "validate",
@@ -68,7 +68,7 @@ export function POPWizardDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const handleSend = (mode: WizardMode = "adjust") => {
+  const handleSend = (mode: WizardMode = "wizard") => {
     const text = input.trim();
     if (!text || wizard.isStreaming) return;
     setInput("");
@@ -79,6 +79,17 @@ export function POPWizardDrawer({
     if (wizard.isStreaming) return;
     wizard.sendMessage(q.text, q.mode);
   };
+
+  const handleProposeNow = () => {
+    if (wizard.isStreaming) return;
+    wizard.sendMessage(
+      "Pode propor agora com o contexto atual, sem mais perguntas.",
+      "wizard",
+    );
+  };
+
+  const isInterviewing =
+    wizard.messages.length > 0 && !wizard.proposed && !wizard.isStreaming;
 
   return (
     <DrawerPrimitive.Root
@@ -142,6 +153,14 @@ export function POPWizardDrawer({
             >
               {wizard.messages.length === 0 && (
                 <div className="space-y-3">
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-foreground/80">
+                    <p className="font-semibold text-foreground mb-1">Como funciona</p>
+                    <p>
+                      Vou te fazer algumas perguntas curtas para entender o que
+                      você precisa antes de propor mudanças. Se quiser pular
+                      direto, diga <em>"pode propor agora"</em>.
+                    </p>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Como quer começar?
                   </p>
@@ -260,7 +279,7 @@ export function POPWizardDrawer({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      handleSend("adjust");
+                      handleSend("wizard");
                     }
                   }}
                   placeholder="Pergunte ou peça um ajuste…"
@@ -268,7 +287,7 @@ export function POPWizardDrawer({
                   disabled={wizard.isStreaming}
                 />
                 <Button
-                  onClick={() => handleSend("adjust")}
+                  onClick={() => handleSend("wizard")}
                   disabled={wizard.isStreaming || !input.trim()}
                   size="icon"
                   className="h-11 w-11 shrink-0"
@@ -280,6 +299,20 @@ export function POPWizardDrawer({
                   )}
                 </Button>
               </div>
+              {isInterviewing && (
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleProposeNow}
+                    className="h-7 text-[11px] text-muted-foreground hover:text-primary"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Propor agora com o que temos
+                  </Button>
+                </div>
+              )}
               <p className="text-[10px] text-muted-foreground mt-1.5">
                 Enter envia · Shift+Enter quebra linha · As mudanças passam por
                 revisão antes de salvar.

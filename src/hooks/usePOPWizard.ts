@@ -70,7 +70,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
 
       const payload = {
         messages: nextMessages,
-        mode,
+        mode: effectiveMode,
         context: {
           brand,
           unitId,
@@ -201,7 +201,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
         setIsStreaming(false);
       }
     },
-    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount],
+    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount, sessionMode],
   );
 
   const applyProposed = useCallback(async () => {

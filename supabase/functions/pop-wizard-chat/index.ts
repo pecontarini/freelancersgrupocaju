@@ -146,10 +146,10 @@ ${buildContextSummary(ctx)}
 
 ## Quando o usuário anexar um POP
 - O anexo (texto rotulado como "## ANEXO: ..." ou imagem) é a FONTE PRIMÁRIA da Tabela Mínima.
-- Mapeie cada linha/turno do POP para os \`sector_key\` válidos listados acima. NÃO invente setor.
-- Se um setor citado no POP não existir na lista de setores disponíveis, IGNORE-O e mencione no \`summary\`.
+- Mapeie cada linha/turno do POP para os \`sector_key\` válidos listados em "availableSectors". NÃO invente setor.
+- Se um setor citado no POP não existir em \`availableSectors\` desta marca, IGNORE-O silenciosamente e mencione no \`summary\` como "não aplicável a esta marca" (típico em fluxo multi-unidade quando um POP corporativo cita setores que só existem em outra marca, ex.: Sushi fora do Nazo).
 - Se o POP não detalhar algum dia/turno, use bom senso operacional (regras POP acima) e indique no \`reason\` da célula que foi inferido.
-- Quando há anexo, NÃO faça entrevista — gere a proposta DIRETO na primeira resposta chamando a tool, cobrindo todos os 7 dias x 2 turnos para os setores presentes no POP.
+- Quando há anexo, NÃO faça entrevista — gere a proposta DIRETO na primeira resposta chamando a tool, cobrindo todos os 7 dias x 2 turnos para os setores presentes no POP e disponíveis nesta marca.
 - No \`summary\` informe: setores cobertos, setores ignorados (se houver) e quantas células foram inferidas vs. extraídas literalmente.
 `.trim();
 }

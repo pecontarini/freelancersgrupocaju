@@ -204,6 +204,14 @@ export function POPWizardDrawer({
             </Button>
           </div>
 
+          {/* Tabs: Esta unidade vs. Multi-unidade */}
+          <Tabs defaultValue="single" className="flex flex-1 flex-col overflow-hidden">
+            <TabsList className="mx-3 mt-2 grid grid-cols-2 h-9 shrink-0">
+              <TabsTrigger value="single" className="text-xs">Esta unidade</TabsTrigger>
+              <TabsTrigger value="multi" className="text-xs">Multi-unidade (todas)</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="flex flex-1 flex-col overflow-hidden mt-2 data-[state=inactive]:hidden">
           {/* Body: chat (top) + preview (bottom) */}
           <div className="flex flex-1 flex-col overflow-hidden">
             {/* Chat area */}

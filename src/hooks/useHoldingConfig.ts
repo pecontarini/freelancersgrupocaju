@@ -7,6 +7,8 @@ import { SECTOR_LABELS, type SectorKey } from "@/lib/holding/sectors";
 /* ============================================================
  * Tipos
  * ========================================================== */
+export type RegimeType = "5x2" | "6x1";
+
 export interface HoldingStaffingConfigRow {
   id: string;
   unit_id: string;
@@ -17,6 +19,7 @@ export interface HoldingStaffingConfigRow {
   month_year: string;
   required_count: number;
   extras_count: number;
+  regime: RegimeType;
   notes: string | null;
 }
 

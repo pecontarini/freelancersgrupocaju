@@ -1,137 +1,123 @@
+# POP Wizard — Assistente IA na Configuração Operacional Holding
 
-# Plano consolidado — Refatoração visual + Efetivos + Integração com IA de escalas
+## Objetivo
+Adicionar um assistente conversacional flutuante dentro de `HoldingOperationalConfigTab` que sugere, valida e ajusta os mínimos de pessoas (`holding_staffing_config`) usando Lovable AI (Gemini 2.5 Pro), com preview revisável antes de publicar.
 
-Três entregas integradas em uma única implementação:
-1. Refatoração visual da tabela "Mínimo de Pessoas".
-2. Cálculo automático de Pessoas Necessárias × Efetivas Contratadas (CLT) com Gap.
-3. Integração das **dobras** (`extras_count`) no Chat IA gerador de escalas.
+## Escopo (NÃO mexer em mais nada)
+- Edita: `src/components/escalas/HoldingOperationalConfigTab.tsx` (apenas para montar o botão flutuante).
+- Cria: 4 arquivos novos de UI/lógica + 1 edge function.
+- Reusa hooks existentes: `useHoldingStaffingConfig`, `useUpsertHoldingStaffing`, `useEffectiveHeadcountBySector`.
+- Nenhuma alteração de schema. Nenhuma tabela nova.
 
-Sem mudanças de schema. Sem mexer em `pracas_plano_chao`. Sem mexer no filtro global nem nos painéis de Forecast/Rates.
+## Arquivos a criar / editar
 
----
+### Novos
+1. `src/components/escalas/holding/POPWizardButton.tsx`
+   - Botão flutuante fixo (bottom-right, `z-40`), ícone `Sparkles`/`Bot` (lucide), estilo liquid-glass coral.
+   - Visível apenas quando `unitId` selecionado.
 
-## Parte 1 — Refatoração visual da tabela
+2. `src/components/escalas/holding/POPWizardDrawer.tsx`
+   - Drawer lateral direito (vaul `direction="right"`), largura 90vw mobile / 720px desktop.
+   - Layout dividido: topo = chat (mensagens + input), base = preview das mudanças sugeridas.
+   - Cabeçalho mostra contexto ativo: marca / unidade / mês.
+   - Botões: "Aplicar mudanças" (publica via upsert loop) e "Descartar".
+   - Estado local (mensagens, sugestões pendentes) — sem store global.
 
-Arquivo: `src/components/escalas/holding/HoldingStaffingPanel.tsx`
+3. `src/components/escalas/holding/POPWizardPreview.tsx`
+   - Tabela compacta: setor × dia × turno mostrando `atual → sugerido` para `required_count` e `extras_count`.
+   - Diff colorido (verde = aumento, vermelho = redução, azul = novo).
+   - Resumo: "X células serão alteradas".
 
-Layout novo:
+4. `src/hooks/usePOPWizard.ts`
+   - Gerencia: histórico de mensagens, envio para edge function, parsing da resposta estruturada (sugestões), aplicação em lote (chama `useUpsertHoldingStaffing` em loop com Promise.allSettled).
+   - Modos: `wizard` (sugerir do zero), `validate` (revisar config atual), `adjust` (ajuste livre por linguagem natural).
 
+### Editar
+5. `src/components/escalas/HoldingOperationalConfigTab.tsx`
+   - Adicionar `<POPWizardButton onClick={...} />` e `<POPWizardDrawer ... />` dentro do bloco `unitId ? (...)` — sem tocar no resto.
+   - Passar `brand`, `unitId`, `monthYear` como props.
+
+### Edge Function
+6. `supabase/functions/pop-wizard-chat/index.ts`
+   - Modelo: `google/gemini-2.5-pro` via Lovable AI Gateway.
+   - System prompt embute: regras POP da casa (ler `src/lib/escalas/popRulesText.ts` e replicar lógica), contexto recebido do front (config atual + headcount efetivo + dobras).
+   - Streaming SSE token-a-token para o chat.
+   - Tool calling estruturado: tool `propose_staffing_changes` com schema `{ changes: [{ sector_key, day_of_week, shift_type, required_count, extras_count, reason }] }`.
+   - Trata 429/402 com mensagens claras.
+   - `verify_jwt = true` (default). CORS headers padrão.
+
+## Fluxo de uso
 ```text
-| Setor | Turno | SEG | TER | QUA | QUI | SEX | SAB | DOM | Necess. | Efet. | Dobras | Gap |
-| (120) |  (56) | (76)| (76)| (76)| (76)| (76)| (76)| (76)|  (72)   | (72)  |  (72)  | (90)|
+[Usuário clica botão flutuante]
+       ↓
+[Drawer abre — chat vazio + preview vazio]
+       ↓
+[Usuário digita: "sugira mínimo pra um sábado lotado"]
+       ↓
+[Front envia: mensagens + contexto (config atual, headcount, dobras, brand, unit, month)]
+       ↓
+[Edge function → Lovable AI Gemini 2.5 Pro com tool calling]
+       ↓
+[Stream do texto no chat + tool_call com sugestões estruturadas]
+       ↓
+[Preview popula com diff atual→sugerido]
+       ↓
+[Usuário aprova → loop de upsert → invalida queries → painel atualiza]
 ```
 
-- Coluna **Setor**: `w-[120px]` sticky, `text-xs`, badge "Nazo" como ícone pequeno.
-- Coluna **Turno**: `w-14`, `text-[10px] uppercase tracking-wide`.
-- Colunas dos dias: `w-[76px]`, input `w-16 h-9 text-base tabular-nums font-semibold`, fundo `bg-background/50 backdrop-blur-sm`.
-- Ordem dos dias passa para **SEG → DOM** (igual à imagem de referência). Mantemos `day_of_week` 0..6 internos, só reordena a renderização via `DAYS_OF_WEEK_DISPLAY` em `sectors.ts`.
-- Linhas com `h-11`; zebra sutil entre setores.
-- Cabeçalho das 4 colunas finais: `font-semibold uppercase text-[11px] tracking-wide bg-muted/40`.
+## Detalhes técnicos
 
----
+### Contexto enviado para a IA (a cada turno)
+- Filtros ativos: `brand`, `unitId`, `unitName`, `monthYear`.
+- Snapshot da `holding_staffing_config` atual (apenas dessa unidade/mês).
+- `effectiveHeadcount` por setor (do hook existente).
+- Regras POP em texto (do `popRulesText.ts`).
 
-## Parte 2 — Colunas calculadas (Necess. / Efet. / Dobras / Gap)
-
-Cada uma das 4 colunas finais aparece **uma vez por setor** (`rowSpan={2}` igual à coluna Setor — métrica é por setor, não por turno).
-
-### Necessárias
-Pico semanal (turno crítico) por setor:
-```
-necessarias[setor] = max sobre os 7 dias de max(almoco_d, jantar_d)
-```
-
-### Dobras (somente leitura, derivada)
-Soma das dobras planejadas no setor, considerando o turno mais carregado:
-```
-dobras[setor] = max sobre os 7 dias de max(extras_almoco_d, extras_jantar_d)
-```
-(Hoje os campos de extras na UI ficam zerados — por isso vamos também adicionar **um segundo input de extras opcional por célula** num modo expandido. Ver Parte 2b abaixo.)
-
-### Efetivas (CLT contratados ativos)
-Novo hook em `src/hooks/useHoldingConfig.ts`: `useEffectiveHeadcountBySector(unitId)`.
-
-Cadeia de junções:
-```
-sectors (unit_id, name == SECTOR_LABELS[sector_key])
-  ← sector_job_titles (sector_id → job_title_id)
-  ← employees (job_title_id, active=true, worker_type='clt')
-```
-Retorna `Record<sector_key, number>`. Empregados com cargo vinculado a múltiplos setores contam apenas no primeiro setor (regra real é 1 cargo → 1 setor).
-
-### Gap
-```
-gap = (necessarias + dobras) − efetivas
-```
-Render como `Badge`:
-- `gap > 0` → `bg-destructive/15 text-destructive` — "Faltam N"
-- `gap == 0` → `bg-emerald-500/15 text-emerald-600` — "OK"
-- `gap < 0` → `bg-amber-500/15 text-amber-700` — "Excedente N"
-
-### Parte 2b — Edição de dobras na própria grade (opcional, mas incluso)
-
-Adiciono um **toggle "Mostrar dobras"** no header do card. Quando ligado, cada célula passa a mostrar 2 inputs empilhados:
-```
-[ 12 ]   ← required_count
-[ +5 ]   ← extras_count (texto cinza, prefixo "+")
-```
-O extras_count salva via mesmo `useUpsertHoldingStaffing` (campo já está no upsert).
-
-Quando desligado (default), só o input principal aparece e a coluna **Dobras** mostra o agregado.
-
----
-
-## Parte 3 — Integração com o Chat IA gerador de escalas
-
-### 3a. `src/hooks/useScheduleAIContext.ts`
-- Estender o tipo `staffing` para incluir `extras_count: number`.
-- Adicionar `extras_count` ao `select` da `staffing_matrix`.
-
-### 3b. `supabase/functions/gerar-escala-ia/index.ts`
-Editar `buildSystemPrompt` (linhas 173-177) para incluir dobras:
-```ts
-lines.push("### Tabela Mínima POP (cobertura obrigatória + dobras planejadas)");
-for (const r of ctx.staffing) {
-  const extras = r.extras_count > 0
-    ? ` (+ até ${r.extras_count} dobra(s) se cobertura ficar comprometida)`
-    : "";
-  lines.push(`- ${dowName[r.day_of_week]} ${r.shift_type}: ${r.required_count} pessoa(s)${extras}`);
+### Tool schema (resposta estruturada)
+```json
+{
+  "name": "propose_staffing_changes",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "summary": { "type": "string" },
+      "changes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "sector_key": { "type": "string" },
+            "day_of_week": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "shift_type": { "type": "string", "enum": ["almoco", "jantar"] },
+            "required_count": { "type": "integer", "minimum": 0 },
+            "extras_count": { "type": "integer", "minimum": 0 },
+            "reason": { "type": "string" }
+          },
+          "required": ["sector_key", "day_of_week", "shift_type", "required_count", "extras_count"]
+        }
+      }
+    },
+    "required": ["summary", "changes"]
+  }
 }
 ```
-E acrescentar uma regra explícita em `POP_RULES` (`src/lib/escalas/popRulesText.ts`):
-> "Dobras (extras_count) são reposições autorizadas. Use **apenas** se faltas/folgas comprometerem o `required_count` do turno. Nunca exceda `required_count + extras_count` no mesmo turno."
 
-Após editar, fazer redeploy da função `gerar-escala-ia`.
+### Aplicação das mudanças
+Loop `Promise.allSettled` chamando `useUpsertHoldingStaffing` para cada item. Toast com sucesso/erro agregado. Invalida `holding_staffing_config` e `staffing_matrix` (já feito pelo hook).
 
-### Fluxo end-to-end resultante
+### Tratamento de erro
+- Erro de API: toast "Não consegui processar sua solicitação. Tente novamente."
+- 429: "Muitas requisições. Aguarde alguns segundos."
+- 402: "Créditos de IA esgotados. Adicione créditos em Configurações → Workspace."
 
-```text
-COO digita mínimo + dobras em "Configuração Operacional — Holding"
-          ↓ (UNIQUE: unit_id, sector_key, shift_type, day_of_week, month_year)
-holding_staffing_config
-          ↓ trigger mirror_holding_to_staffing_matrix
-staffing_matrix (required_count + extras_count atualizados)
-          ↓ useScheduleAIContext lê
-Prompt da IA: "Qui almoco: 12 pessoa(s) (+ até 5 dobras se cobertura ficar comprometida)"
-          ↓
-gerar-escala-ia respeita o mínimo e usa dobras como cap superior em caso de falta
-```
+## Estilo visual
+- Liquid glass coral coerente com o resto do portal (`glass-card`, blur, terracotta `#D05937`).
+- Sem emojis na UI (apenas ícones `lucide-react`).
+- Loading: typing indicator 3 pontos animados.
+- Drawer `z-40` (acima do conteúdo, abaixo de modais Radix `z-50`).
 
----
-
-## Arquivos tocados (resumo)
-
-| Arquivo | Tipo de mudança |
-|---|---|
-| `src/components/escalas/holding/HoldingStaffingPanel.tsx` | Refatoração visual + 4 colunas novas + toggle dobras |
-| `src/hooks/useHoldingConfig.ts` | Novo `useEffectiveHeadcountBySector` |
-| `src/lib/holding/sectors.ts` | Add `DAYS_OF_WEEK_DISPLAY` (SEG→DOM) sem quebrar `DAYS_OF_WEEK` |
-| `src/hooks/useScheduleAIContext.ts` | Incluir `extras_count` em `staffing` |
-| `supabase/functions/gerar-escala-ia/index.ts` | Prompt menciona dobras, redeploy |
-| `src/lib/escalas/popRulesText.ts` | Regra de uso de dobras |
-
-Memória a atualizar: `mem://features/escalas/holding-operational-config` — registrar que extras_count agora alimenta a IA via `staffing_matrix`.
-
-## Não inclui
-- Não muda schema (extras_count já existe em ambas as tabelas).
-- Não toca em Forecast/Rates/filtro global.
-- Não altera o trigger de espelhamento (já espelha extras_count).
+## Fora do escopo
+- Persistência do histórico de chat (estado local apenas).
+- Aplicação automática sem confirmação humana.
+- Mexer em escalas reais (`schedules`) — wizard só configura mínimos.
+- Qualquer outra página ou tabela.

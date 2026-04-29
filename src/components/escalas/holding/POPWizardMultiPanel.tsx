@@ -293,7 +293,11 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setAttachment(null)}
+                onClick={() => {
+                  setAttachment(null);
+                  setParseResult(null);
+                  setResolveResult(null);
+                }}
                 disabled={batch.running}
                 className="h-7"
               >

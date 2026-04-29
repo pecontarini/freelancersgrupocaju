@@ -47,6 +47,8 @@ interface RunArgs {
   monthYear: string;
   /** Concurrency cap. Default 3. */
   concurrency?: number;
+  /** When true, apply each proposal automatically as soon as it's ready. Default false. */
+  autoApply?: boolean;
 }
 
 const SECTOR_KEYS_BY_BRAND: Record<Brand, SectorKey[]> = {
@@ -260,8 +262,50 @@ export function usePOPWizardBatch() {
     lastRunRef.current = null;
   }, []);
 
+  const applyJob = useCallback(
+    async (job: UnitJob, monthYearArg: string) => {
+      if (!job?.proposed?.changes?.length) return;
+      updateJob(job.unitId, { status: "applying" });
+      let ok = 0;
+      let fail = 0;
+      for (const c of job.proposed.changes) {
+        const { error } = await supabase
+          .from("holding_staffing_config")
+          .upsert(
+            {
+              unit_id: job.unitId,
+              brand: job.brand,
+              sector_key: c.sector_key,
+              shift_type: c.shift_type,
+              day_of_week: c.day_of_week,
+              month_year: monthYearArg,
+              required_count: c.required_count,
+              extras_count: c.extras_count,
+              updated_at: new Date().toISOString(),
+            } as never,
+            {
+              onConflict: "unit_id,sector_key,shift_type,day_of_week,month_year",
+            },
+          );
+        if (error) fail++;
+        else ok++;
+      }
+      if (fail === 0) {
+        updateJob(job.unitId, { status: "applied", appliedCount: ok });
+        toast.success(`${job.unitName}: ${ok} célula(s) aplicada(s).`);
+      } else {
+        updateJob(job.unitId, {
+          status: "failed",
+          error: `${fail} de ${ok + fail} falharam ao salvar.`,
+        });
+        toast.warning(`${job.unitName}: ${ok} ok, ${fail} com erro.`);
+      }
+    },
+    [updateJob],
+  );
+
   const run = useCallback(
-    async ({ attachment, targets, monthYear, concurrency = 3 }: RunArgs) => {
+    async ({ attachment, targets, monthYear, concurrency = 3, autoApply = false }: RunArgs) => {
       lastRunRef.current = { attachment, monthYear };
       const initial: UnitJob[] = targets.map((t) => ({
         ...t,
@@ -286,6 +330,16 @@ export function usePOPWizardBatch() {
               (txt) => updateJob(t.unitId, { assistantText: txt }),
             );
             updateJob(t.unitId, { status: "ready", proposed, currentConfig });
+            if (autoApply) {
+              const readyJob: UnitJob = {
+                ...t,
+                status: "ready",
+                assistantText: "",
+                proposed,
+                currentConfig,
+              };
+              await applyJob(readyJob, monthYear);
+            }
           } catch (err: any) {
             const msg = err?.message ?? "Falha ao gerar proposta.";
             updateJob(t.unitId, { status: "failed", error: msg });
@@ -296,51 +350,17 @@ export function usePOPWizardBatch() {
       await Promise.all(workers);
       setRunning(false);
     },
-    [updateJob],
+    [updateJob, applyJob],
   );
 
   const applyOne = useCallback(
     async (unitId: string) => {
       const ctx = lastRunRef.current;
       const job = jobs.find((j) => j.unitId === unitId);
-      if (!job?.proposed?.changes?.length || !ctx) return;
-      updateJob(unitId, { status: "applying" });
-      let ok = 0;
-      let fail = 0;
-      for (const c of job.proposed.changes) {
-        const { error } = await supabase
-          .from("holding_staffing_config")
-          .upsert(
-            {
-              unit_id: job.unitId,
-              brand: job.brand,
-              sector_key: c.sector_key,
-              shift_type: c.shift_type,
-              day_of_week: c.day_of_week,
-              month_year: ctx.monthYear,
-              required_count: c.required_count,
-              extras_count: c.extras_count,
-              updated_at: new Date().toISOString(),
-            } as never,
-            {
-              onConflict: "unit_id,sector_key,shift_type,day_of_week,month_year",
-            },
-          );
-        if (error) fail++;
-        else ok++;
-      }
-      if (fail === 0) {
-        updateJob(unitId, { status: "applied", appliedCount: ok });
-        toast.success(`${job.unitName}: ${ok} célula(s) aplicada(s).`);
-      } else {
-        updateJob(unitId, {
-          status: "failed",
-          error: `${fail} de ${ok + fail} falharam ao salvar.`,
-        });
-        toast.warning(`${job.unitName}: ${ok} ok, ${fail} com erro.`);
-      }
+      if (!job || !ctx) return;
+      await applyJob(job, ctx.monthYear);
     },
-    [jobs, updateJob],
+    [jobs, applyJob],
   );
 
   const applyAllReady = useCallback(async () => {

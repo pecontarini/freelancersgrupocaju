@@ -3,7 +3,7 @@
 // (setores disponíveis na marca, headcount, configuração atual) e devolve
 // uma proposta via tool calling. O COO revisa e aplica unidade por unidade.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
@@ -14,10 +14,7 @@ import {
   type SectorKey,
 } from "@/lib/holding/sectors";
 import type { ExtractedAttachment } from "@/lib/extract-attachment-text";
-import type {
-  ProposedPayload,
-  ProposedChange,
-} from "@/hooks/usePOPWizard";
+import type { ProposedPayload } from "@/hooks/usePOPWizard";
 import type { HoldingStaffingConfigRow } from "@/hooks/useHoldingConfig";
 
 export type UnitJobStatus =
@@ -39,6 +36,7 @@ export interface UnitJob extends UnitTarget {
   status: UnitJobStatus;
   assistantText: string;
   proposed?: ProposedPayload;
+  currentConfig?: HoldingStaffingConfigRow[];
   error?: string;
   appliedCount?: number;
 }
@@ -58,11 +56,6 @@ const SECTOR_KEYS_BY_BRAND: Record<Brand, SectorKey[]> = {
   Nazo: sectorsForBrand("Nazo"),
 };
 
-/**
- * Carrega contexto por unidade em paralelo: configuração atual + headcount efetivo.
- * Mantemos as chamadas leves (selects) e tolerantes a erro — se uma falhar,
- * passamos arrays vazios e a IA segue sem o detalhe.
- */
 async function loadUnitContext(unitId: string, monthYear: string) {
   const [cfg, headcount] = await Promise.all([
     fetchAllRows<HoldingStaffingConfigRow>(() =>
@@ -122,21 +115,15 @@ async function loadHeadcount(unitId: string): Promise<Record<string, number>> {
   return counts;
 }
 
-/**
- * Executa uma única chamada ao pop-wizard-chat e devolve a proposta capturada.
- * Não usa streaming "ao vivo" para a UI — apenas acumula e devolve no final
- * (não há texto incremental visível por unidade na lista).
- */
 async function runForUnit(
   target: UnitTarget,
   attachment: ExtractedAttachment,
   monthYear: string,
   setText: (t: string) => void,
-): Promise<ProposedPayload> {
+): Promise<{ proposed: ProposedPayload; currentConfig: HoldingStaffingConfigRow[] }> {
   const { cfg, headcount } = await loadUnitContext(target.unitId, monthYear);
   const availableSectors = SECTOR_KEYS_BY_BRAND[target.brand];
 
-  // Bloco do anexo: texto extraído ou imagem multimodal
   const userInstruction =
     `Use o POP corporativo abaixo como FONTE PRIMÁRIA para gerar a Tabela ` +
     `Mínima COMPLETA da unidade "${target.unitName}" (${target.brand}). ` +
@@ -249,16 +236,19 @@ async function runForUnit(
       "A IA não devolveu uma proposta estruturada. Tente novamente ou troque o anexo.",
     );
   }
-  const parsed = JSON.parse(toolArgs) as ProposedPayload;
-  if (!Array.isArray(parsed.changes)) {
+  const proposed = JSON.parse(toolArgs) as ProposedPayload;
+  if (!Array.isArray(proposed.changes)) {
     throw new Error("Formato de proposta inválido.");
   }
-  return parsed;
+  return { proposed, currentConfig: cfg };
 }
 
 export function usePOPWizardBatch() {
   const [jobs, setJobs] = useState<UnitJob[]>([]);
   const [running, setRunning] = useState(false);
+
+  // Mantém a referência do anexo + monthYear para retry posterior
+  const lastRunRef = useRef<{ attachment: ExtractedAttachment; monthYear: string } | null>(null);
 
   const updateJob = useCallback((unitId: string, patch: Partial<UnitJob>) => {
     setJobs((prev) => prev.map((j) => (j.unitId === unitId ? { ...j, ...patch } : j)));
@@ -267,10 +257,12 @@ export function usePOPWizardBatch() {
   const reset = useCallback(() => {
     setJobs([]);
     setRunning(false);
+    lastRunRef.current = null;
   }, []);
 
   const run = useCallback(
     async ({ attachment, targets, monthYear, concurrency = 3 }: RunArgs) => {
+      lastRunRef.current = { attachment, monthYear };
       const initial: UnitJob[] = targets.map((t) => ({
         ...t,
         status: "queued",
@@ -279,7 +271,6 @@ export function usePOPWizardBatch() {
       setJobs(initial);
       setRunning(true);
 
-      // Pool de promessas com concurrency limitada
       const queue = [...targets];
       const workers: Promise<void>[] = [];
       const worker = async () => {
@@ -288,13 +279,13 @@ export function usePOPWizardBatch() {
           if (!t) return;
           updateJob(t.unitId, { status: "streaming" });
           try {
-            const proposed = await runForUnit(
+            const { proposed, currentConfig } = await runForUnit(
               t,
               attachment,
               monthYear,
               (txt) => updateJob(t.unitId, { assistantText: txt }),
             );
-            updateJob(t.unitId, { status: "ready", proposed });
+            updateJob(t.unitId, { status: "ready", proposed, currentConfig });
           } catch (err: any) {
             const msg = err?.message ?? "Falha ao gerar proposta.";
             updateJob(t.unitId, { status: "failed", error: msg });
@@ -310,8 +301,9 @@ export function usePOPWizardBatch() {
 
   const applyOne = useCallback(
     async (unitId: string) => {
+      const ctx = lastRunRef.current;
       const job = jobs.find((j) => j.unitId === unitId);
-      if (!job?.proposed?.changes?.length) return;
+      if (!job?.proposed?.changes?.length || !ctx) return;
       updateJob(unitId, { status: "applying" });
       let ok = 0;
       let fail = 0;
@@ -325,9 +317,7 @@ export function usePOPWizardBatch() {
               sector_key: c.sector_key,
               shift_type: c.shift_type,
               day_of_week: c.day_of_week,
-              month_year:
-                jobs.find((j) => j.unitId === unitId)?.proposed && // monthYear vem do payload original
-                (window as any).__pop_wizard_batch_month_year,
+              month_year: ctx.monthYear,
               required_count: c.required_count,
               extras_count: c.extras_count,
               updated_at: new Date().toISOString(),
@@ -345,7 +335,7 @@ export function usePOPWizardBatch() {
       } else {
         updateJob(unitId, {
           status: "failed",
-          error: `${fail} de ${ok + fail} falharam.`,
+          error: `${fail} de ${ok + fail} falharam ao salvar.`,
         });
         toast.warning(`${job.unitName}: ${ok} ok, ${fail} com erro.`);
       }
@@ -353,24 +343,34 @@ export function usePOPWizardBatch() {
     [jobs, updateJob],
   );
 
+  const applyAllReady = useCallback(async () => {
+    const readyIds = jobs.filter((j) => j.status === "ready").map((j) => j.unitId);
+    for (const id of readyIds) {
+      // sequencial para feedback claro e evitar burst no banco
+      // eslint-disable-next-line no-await-in-loop
+      await applyOne(id);
+    }
+  }, [jobs, applyOne]);
+
   const discardOne = useCallback(
     (unitId: string) => updateJob(unitId, { status: "discarded" }),
     [updateJob],
   );
 
   const retryOne = useCallback(
-    async (unitId: string, attachment: ExtractedAttachment, monthYear: string) => {
+    async (unitId: string) => {
+      const ctx = lastRunRef.current;
       const job = jobs.find((j) => j.unitId === unitId);
-      if (!job) return;
+      if (!job || !ctx) return;
       updateJob(unitId, { status: "streaming", error: undefined, assistantText: "" });
       try {
-        const proposed = await runForUnit(
+        const { proposed, currentConfig } = await runForUnit(
           job,
-          attachment,
-          monthYear,
+          ctx.attachment,
+          ctx.monthYear,
           (txt) => updateJob(unitId, { assistantText: txt }),
         );
-        updateJob(unitId, { status: "ready", proposed });
+        updateJob(unitId, { status: "ready", proposed, currentConfig });
       } catch (err: any) {
         updateJob(unitId, { status: "failed", error: err?.message ?? "Falha." });
       }
@@ -383,7 +383,9 @@ export function usePOPWizardBatch() {
     const ready = jobs.filter((j) => j.status === "ready").length;
     const failed = jobs.filter((j) => j.status === "failed").length;
     const applied = jobs.filter((j) => j.status === "applied").length;
-    const streaming = jobs.filter((j) => j.status === "streaming" || j.status === "applying").length;
+    const streaming = jobs.filter(
+      (j) => j.status === "streaming" || j.status === "applying",
+    ).length;
     return { total, ready, failed, applied, streaming };
   }, [jobs]);
 
@@ -393,6 +395,7 @@ export function usePOPWizardBatch() {
     summary,
     run,
     applyOne,
+    applyAllReady,
     discardOne,
     retryOne,
     reset,

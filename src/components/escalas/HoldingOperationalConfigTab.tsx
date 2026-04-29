@@ -10,11 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, MapPin, CalendarRange } from "lucide-react";
+import { Building2, MapPin, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ALL_BRANDS, deriveBrand, type Brand } from "@/lib/holding/sectors";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { HoldingStaffingPanel } from "./holding/HoldingStaffingPanel";
 import { HoldingForecastPanel } from "./holding/HoldingForecastPanel";
 import { HoldingRatesPanel } from "./holding/HoldingRatesPanel";

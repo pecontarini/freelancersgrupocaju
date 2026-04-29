@@ -75,6 +75,7 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
   const [extracting, setExtracting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedBrands, setCollapsedBrands] = useState<Set<Brand>>(new Set());
+  const [autoApply, setAutoApply] = useState(true);
 
   const { data: units = [], isLoading } = useOperationalUnits();
   const batch = usePOPWizardBatch();

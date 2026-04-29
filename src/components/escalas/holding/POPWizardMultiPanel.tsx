@@ -531,35 +531,36 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
         )}
       </div>
 
-      {/* Footer fixo: Run button */}
-      <div className="border-t border-border/60 p-3 bg-background/80 backdrop-blur-md flex items-center justify-between gap-2">
-        {hasJobs && !batch.running && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={batch.reset}
-            className="h-9 text-xs"
-          >
-            <RotateCcw className="h-3.5 w-3.5 mr-1" />
-            Limpar resultados
-          </Button>
-        )}
-        <Button
-          onClick={handleRun}
-          disabled={!attachment || totalSelected === 0 || batch.running || extracting}
-          className="ml-auto h-9"
-        >
-          {batch.running ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              Processando {batch.summary.streaming}/{batch.summary.total}...
-            </>
-          ) : (
-            <>
-              <PlayCircle className="h-4 w-4 mr-1.5" />
-              Aplicar a {totalSelected} unidade{totalSelected === 1 ? "" : "s"}
-            </>
+      {/* Footer fixo: Run button (apenas para PDF/imagem/texto — Excel usa o botão da revisão) */}
+      {!resolveResult && (
+        <div className="border-t border-border/60 p-3 bg-background/80 backdrop-blur-md flex items-center justify-between gap-2">
+          {hasJobs && !batch.running && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={batch.reset}
+              className="h-9 text-xs"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Limpar resultados
+            </Button>
           )}
+          <Button
+            onClick={handleRun}
+            disabled={!attachment || totalSelected === 0 || batch.running || extracting}
+            className="ml-auto h-9"
+          >
+            {batch.running ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                Processando {batch.summary.streaming}/{batch.summary.total}...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4 mr-1.5" />
+                Aplicar a {totalSelected} unidade{totalSelected === 1 ? "" : "s"}
+              </>
+            )}
         </Button>
       </div>
     </div>

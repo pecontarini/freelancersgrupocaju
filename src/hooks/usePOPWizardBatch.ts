@@ -319,8 +319,10 @@ export function usePOPWizardBatch() {
         });
         toast.warning(`${job.unitName}: ${ok} ok, ${fail} com erro.`);
       }
+      // Invalida cache para a grade refletir os números aplicados imediatamente.
+      qc.invalidateQueries({ queryKey: ["holding_staffing_config"] });
     },
-    [updateJob],
+    [updateJob, qc],
   );
 
   const run = useCallback(

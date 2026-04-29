@@ -64,6 +64,26 @@ function badgeColorForPessoas(n: number): string {
   return "bg-destructive/15 text-destructive";
 }
 
+/**
+ * Parser de célula "X+Y" → { required, extras }.
+ * Aceita: "4", "4+1", "4 + 1", "+2" (=> required=0, extras=2), "" (=> 0+0).
+ * Valores negativos viram 0; decimais são truncados.
+ */
+function parseCellValue(raw: string): { required: number; extras: number } {
+  const s = (raw ?? "").trim();
+  if (!s) return { required: 0, extras: 0 };
+  const m = s.match(/^\s*(-?\d+)?\s*(?:\+\s*(-?\d+))?\s*$/);
+  if (!m) return { required: 0, extras: 0 };
+  const req = Math.max(0, Math.floor(Number(m[1] ?? 0) || 0));
+  const ext = Math.max(0, Math.floor(Number(m[2] ?? 0) || 0));
+  return { required: req, extras: ext };
+}
+
+function formatCellValue(required: number, extras: number): string {
+  if (extras > 0) return `${required}+${extras}`;
+  return String(required);
+}
+
 export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   const { data: rows, isLoading } = useHoldingStaffingConfig(unitId, monthYear);
   const { data: effectiveBySector } = useEffectiveHeadcountBySector(unitId);

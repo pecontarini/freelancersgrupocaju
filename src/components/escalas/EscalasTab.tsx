@@ -105,7 +105,7 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       </TabsContent>
       {isAdmin && (
         <TabsContent value="escalas-minimas">
-          <MinimumStaffingTab />
+          <HoldingOperationalConfigTab />
         </TabsContent>
       )}
       <TabsContent value="matrix">

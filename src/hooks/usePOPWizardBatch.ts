@@ -5,6 +5,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
@@ -14,6 +15,7 @@ import {
   type SectorKey,
 } from "@/lib/holding/sectors";
 import type { ExtractedAttachment } from "@/lib/extract-attachment-text";
+import { matchSheetToUnit } from "@/lib/holding/sheet-matcher";
 import type { ProposedPayload } from "@/hooks/usePOPWizard";
 import type { HoldingStaffingConfigRow } from "@/hooks/useHoldingConfig";
 
@@ -126,12 +128,26 @@ async function runForUnit(
   const { cfg, headcount } = await loadUnitContext(target.unitId, monthYear);
   const availableSectors = SECTOR_KEYS_BY_BRAND[target.brand];
 
-  const userInstruction =
-    `Use o POP corporativo abaixo como FONTE PRIMÁRIA para gerar a Tabela ` +
-    `Mínima COMPLETA da unidade "${target.unitName}" (${target.brand}). ` +
-    `Cubra todos os 7 dias da semana × 2 turnos para cada setor disponível. ` +
-    `Setores citados no POP que não estão na lista de "availableSectors" desta marca ` +
-    `devem ser silenciosamente ignorados (mencione-os em summary como não aplicáveis).`;
+  // Roteamento aba → unidade (Excel multi-aba): manda só o pedaço da unidade.
+  const sheetMatch = attachment.sheets
+    ? matchSheetToUnit(attachment.sheets, target.unitName, target.brand)
+    : null;
+
+  const focusedText = sheetMatch
+    ? `--- Aba: ${sheetMatch.sheet.name} ---\n${sheetMatch.sheet.text}`
+    : attachment.text;
+
+  const userInstruction = sheetMatch
+    ? `O ANEXO abaixo já está FILTRADO para a unidade "${target.unitName}" ` +
+      `(${target.brand}) — aba "${sheetMatch.sheet.name}". Use APENAS esses ` +
+      `números para gerar a Tabela Mínima COMPLETA (7 dias × 2 turnos × cada setor disponível). ` +
+      `Setores citados na aba que não estão em "availableSectors" devem ser ignorados ` +
+      `(mencione em summary).`
+    : `Use o POP corporativo abaixo como FONTE PRIMÁRIA para gerar a Tabela ` +
+      `Mínima COMPLETA da unidade "${target.unitName}" (${target.brand}). ` +
+      `Cubra todos os 7 dias da semana × 2 turnos para cada setor disponível. ` +
+      `Setores citados no POP que não estão na lista de "availableSectors" desta marca ` +
+      `devem ser silenciosamente ignorados (mencione-os em summary como não aplicáveis).`;
 
   let userContent: any;
   if (attachment.kind === "image") {
@@ -140,7 +156,7 @@ async function runForUnit(
       { type: "image_url", image_url: { url: attachment.dataUrl } },
     ];
   } else {
-    const block = `## ANEXO: ${attachment.name}${attachment.truncated ? " (truncado)" : ""}\n${attachment.text}`;
+    const block = `## ANEXO: ${attachment.name}${attachment.truncated ? " (truncado)" : ""}\n${focusedText}`;
     userContent = `${block}\n\n---\n${userInstruction}`;
   }
 
@@ -161,6 +177,8 @@ async function runForUnit(
       })),
       effectiveHeadcount: headcount,
       availableSectors,
+      sheetMatched: !!sheetMatch,
+      sheetName: sheetMatch?.sheet.name ?? null,
     },
   };
 
@@ -246,6 +264,7 @@ async function runForUnit(
 }
 
 export function usePOPWizardBatch() {
+  const qc = useQueryClient();
   const [jobs, setJobs] = useState<UnitJob[]>([]);
   const [running, setRunning] = useState(false);
 
@@ -300,8 +319,10 @@ export function usePOPWizardBatch() {
         });
         toast.warning(`${job.unitName}: ${ok} ok, ${fail} com erro.`);
       }
+      // Invalida cache para a grade refletir os números aplicados imediatamente.
+      qc.invalidateQueries({ queryKey: ["holding_staffing_config"] });
     },
-    [updateJob],
+    [updateJob, qc],
   );
 
   const run = useCallback(

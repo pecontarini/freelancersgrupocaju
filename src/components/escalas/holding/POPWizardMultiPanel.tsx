@@ -25,6 +25,7 @@ import {
   type ExtractedAttachment,
 } from "@/lib/extract-attachment-text";
 import { deriveBrand, ALL_BRANDS, type Brand } from "@/lib/holding/sectors";
+import { buildMatchReport } from "@/lib/holding/sheet-matcher";
 import { usePOPWizardBatch, type UnitTarget } from "@/hooks/usePOPWizardBatch";
 import { UnitProposalCard } from "./UnitProposalCard";
 
@@ -98,6 +99,13 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
     () => units.filter((u) => selectedIds.has(u.unitId)),
     [units, selectedIds],
   );
+
+  // Mapeamento aba→unidade (só Excel multi-aba). Calculado em tempo real.
+  const matchReport = useMemo(() => {
+    if (!attachment?.sheets?.length || !targets.length) return null;
+    return buildMatchReport(attachment.sheets, targets);
+  }, [attachment, targets]);
+  const matchedCount = matchReport?.filter((m) => m.match).length ?? 0;
 
   const handleFilePick = () => {
     if (extracting || batch.running) return;
@@ -259,7 +267,55 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
               </Button>
             </div>
           )}
+          {attachment?.sheets && attachment.sheets.length > 0 && (
+            <div className="rounded-md border border-border/40 bg-background/40 p-2 text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {attachment.sheets.length} aba(s) detectada(s):
+              </span>{" "}
+              {attachment.sheets.map((s) => s.name).join(" · ")}
+            </div>
+          )}
         </div>
+
+        {/* Mapeamento aba ↔ unidade (apenas Excel multi-aba) */}
+        {matchReport && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Mapeamento detectado
+              </div>
+              <Badge
+                variant={matchedCount === targets.length ? "default" : "secondary"}
+                className="text-[10px]"
+              >
+                {matchedCount}/{targets.length} com aba
+              </Badge>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background/40 p-2 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                {matchReport.map((r) => (
+                  <div key={r.unitId} className="flex items-center gap-1.5 truncate">
+                    {r.match ? (
+                      <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+                    ) : (
+                      <X className="h-3 w-3 text-amber-600 shrink-0" />
+                    )}
+                    <span className="font-medium uppercase truncate">{r.unitName}</span>
+                    <span className="text-muted-foreground truncate">
+                      {r.match ? `→ ${r.match.sheet.name}` : "→ POP global"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {matchedCount < targets.length && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                Unidades sem aba específica receberão o anexo inteiro como POP
+                global (mais lento, menos preciso).
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Unidades */}
         <div className="space-y-2">

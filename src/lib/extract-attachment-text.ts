@@ -5,6 +5,11 @@
 
 export type AttachmentKind = "text" | "image";
 
+export interface ExtractedSheet {
+  name: string;
+  text: string;
+}
+
 export interface ExtractedAttachment {
   name: string;
   mime: string;
@@ -16,6 +21,8 @@ export interface ExtractedAttachment {
   dataUrl: string;
   /** True se o texto extraído foi truncado por exceder o limite. */
   truncated: boolean;
+  /** Para Excel: lista de abas separadas, permite roteamento por unidade. */
+  sheets?: ExtractedSheet[];
 }
 
 const MAX_TEXT_CHARS = 50_000;
@@ -42,17 +49,21 @@ function isExcel(file: File): boolean {
   return EXCEL_EXT.test(file.name) || EXCEL_MIME.test(file.type);
 }
 
-async function extractExcelText(file: File): Promise<string> {
+async function extractExcelText(
+  file: File,
+): Promise<{ text: string; sheets: ExtractedSheet[] }> {
   const XLSX: any = await import("xlsx");
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
+  const sheets: ExtractedSheet[] = [];
   const parts: string[] = [];
   for (const name of wb.SheetNames) {
     const csv = XLSX.utils.sheet_to_csv(wb.Sheets[name], { blankrows: false });
+    sheets.push({ name, text: csv });
     parts.push(`--- Aba: ${name} ---\n${csv}`);
     if (parts.join("\n\n").length > MAX_TEXT_CHARS) break;
   }
-  return parts.join("\n\n");
+  return { text: parts.join("\n\n"), sheets };
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -118,7 +129,7 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
   }
 
   if (isExcel(file)) {
-    const raw = await extractExcelText(file);
+    const { text: raw, sheets } = await extractExcelText(file);
     const truncated = raw.length > MAX_TEXT_CHARS;
     return {
       name: file.name,
@@ -128,6 +139,7 @@ export async function extractAttachment(file: File): Promise<ExtractedAttachment
       text: truncated ? raw.slice(0, MAX_TEXT_CHARS) + "\n\n[...conteúdo truncado]" : raw,
       dataUrl: "",
       truncated,
+      sheets,
     };
   }
 

@@ -49,6 +49,8 @@ interface RequestBody {
     currentConfig: StaffingRow[];
     effectiveHeadcount: Record<string, number>;
     availableSectors: string[];
+    sheetMatched?: boolean;
+    sheetName?: string | null;
   };
   mode?: "wizard" | "validate" | "adjust";
 }
@@ -150,7 +152,17 @@ ${buildContextSummary(ctx)}
 - Se um setor citado no POP não existir em \`availableSectors\` desta marca, IGNORE-O silenciosamente e mencione no \`summary\` como "não aplicável a esta marca" (típico em fluxo multi-unidade quando um POP corporativo cita setores que só existem em outra marca, ex.: Sushi fora do Nazo).
 - Se o POP não detalhar algum dia/turno, use bom senso operacional (regras POP acima) e indique no \`reason\` da célula que foi inferido.
 - Quando há anexo, NÃO faça entrevista — gere a proposta DIRETO na primeira resposta chamando a tool, cobrindo todos os 7 dias x 2 turnos para os setores presentes no POP e disponíveis nesta marca.
-- No \`summary\` informe: setores cobertos, setores ignorados (se houver) e quantas células foram inferidas vs. extraídas literalmente.
+- No \`summary\` informe: setores cobertos, setores ignorados (se houver) e quantas células foram inferidas vs. extraídas literalmente.${
+    ctx.sheetMatched
+      ? `
+
+## ATENÇÃO: ANEXO JÁ FILTRADO PARA ESTA UNIDADE
+- O anexo foi pré-roteado client-side para a aba "${ctx.sheetName}" desta unidade.
+- Confie 100% no conteúdo do anexo — NÃO procure por outras unidades nele.
+- Os números desta aba são EXCLUSIVAMENTE da unidade "${ctx.unitName}".
+- Notação "X+Y" em uma célula = X = required_count (CLT), Y = extras_count (dobra/freelancer planejado).`
+      : ""
+  }
 `.trim();
 }
 

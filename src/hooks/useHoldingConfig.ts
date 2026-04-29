@@ -110,14 +110,13 @@ export function useHoldingFreelancerForecast(
       const [y, m] = monthYear.split("-").map(Number);
       const lastDay = new Date(y, m, 0).getDate();
       const end = `${monthYear}-${String(lastDay).padStart(2, "0")}`;
-      const rows = await fetchAllRows<HoldingFreelancerForecastRow>((from, to) =>
+      const rows = await fetchAllRows<HoldingFreelancerForecastRow>(() =>
         supabase
           .from("holding_freelancer_forecast")
           .select("*")
           .eq("unit_id", unitId)
           .gte("forecast_date", start)
-          .lte("forecast_date", end)
-          .range(from, to),
+          .lte("forecast_date", end),
       );
       return rows;
     },

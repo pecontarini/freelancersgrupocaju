@@ -99,7 +99,7 @@ const REGION_ALIASES: Record<string, string[]> = {
   TAGUATINGA: ["TAGUATINGA", "TAG"],
   "AGUAS CLARAS": ["AGUAS CLARAS", "AGUAS"],
   GOIANIA: ["GOIANIA", "GO", "GYN"],
-  ITAIM: ["ITAIM", "ITAM"],
+  ITAIM: ["ITAIM", "ITAM", "ITM"],
   BOSQUE: ["BOSQUE"],
 };
 
@@ -122,13 +122,16 @@ function unitRegionCanon(unitName: string): string {
   return n;
 }
 
-/** Retorna conjunto de regiões reconhecidas presentes em um texto qualquer. */
+/** Retorna conjunto de regiões reconhecidas presentes em um texto qualquer.
+ *  IMPORTANTE: usa word boundaries reais — aliases curtos como "AS"/"AN"/"GO"
+ *  NÃO podem casar dentro de palavras (ex.: "BRASILIA", "GOIANIA"). */
 function regionsIn(text: string): Set<string> {
   const n = " " + norm(text) + " ";
   const out = new Set<string>();
   for (const [canon, aliases] of Object.entries(REGION_ALIASES)) {
     for (const a of aliases) {
-      if (n.includes(" " + a + " ") || n.includes(a)) {
+      // exige fronteira de palavra dos dois lados
+      if (n.includes(" " + a + " ")) {
         out.add(canon);
         break;
       }
@@ -231,6 +234,7 @@ export function resolveUnitsFromSheets(
 
       // escolhe melhor candidato por região
       let best: { unit: UnitTarget; score: number } | null = null;
+      let secondBestScore = -1;
       for (const u of candidates) {
         const uRegion = unitRegionCanon(u.unitName);
         const uRegions = regionsIn(u.unitName);
@@ -243,13 +247,29 @@ export function resolveUnitsFromSheets(
         // se só existe UMA unidade da marca, ela ganha por padrão
         if (candidates.length === 1) score += 3;
 
-        if (best === null || score > best.score) best = { unit: u, score };
+        if (best === null || score > best.score) {
+          secondBestScore = best?.score ?? -1;
+          best = { unit: u, score };
+        } else if (score > secondBestScore) {
+          secondBestScore = score;
+        }
       }
 
+      // SEM região reconhecida na aba → não pode escolher por desempate cego
+      // entre múltiplas unidades da mesma marca (ex.: Caju Itaim vs Caju SIG).
       if (!best || best.score === 0) {
         orphanSheets.push({
           sheetName: sheet.sheetName,
-          reason: `Bloco "${block.rawSectorLabel}" (${effectiveBrand}) sem unidade-alvo clara.`,
+          reason: `Bloco "${block.rawSectorLabel}" (${effectiveBrand}) sem região reconhecida na aba — ambíguo entre ${candidates.map((c) => c.unitName).join(", ")}.`,
+        });
+        continue;
+      }
+
+      // Empate de score entre 2+ candidatos da mesma marca → ambíguo, descartar.
+      if (candidates.length > 1 && best.score === secondBestScore) {
+        orphanSheets.push({
+          sheetName: sheet.sheetName,
+          reason: `Bloco "${block.rawSectorLabel}" (${effectiveBrand}) empatou entre múltiplas unidades — região indecidível na aba "${sheet.sheetName}".`,
         });
         continue;
       }

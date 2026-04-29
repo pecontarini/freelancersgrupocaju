@@ -286,6 +286,20 @@ export function HoldingOperationalConfigTab() {
           </TabsContent>
         </Tabs>
       )}
+
+      {unitId && (
+        <>
+          <POPWizardButton onClick={() => setWizardOpen(true)} />
+          <POPWizardDrawer
+            open={wizardOpen}
+            onOpenChange={setWizardOpen}
+            brand={brand}
+            unitId={unitId}
+            unitName={filteredUnits.find((u) => u.id === unitId)?.nome}
+            monthYear={monthYear}
+          />
+        </>
+      )}
     </div>
   );
 }

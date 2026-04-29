@@ -49,6 +49,8 @@ interface RequestBody {
     currentConfig: StaffingRow[];
     effectiveHeadcount: Record<string, number>;
     availableSectors: string[];
+    sheetMatched?: boolean;
+    sheetName?: string | null;
   };
   mode?: "wizard" | "validate" | "adjust";
 }

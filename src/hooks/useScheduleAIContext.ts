@@ -20,6 +20,7 @@ export type AIScheduleContext = {
     day_of_week: number; // 0=Dom..6=Sab (JS)
     shift_type: string;
     required_count: number;
+    extras_count: number;
   }>;
   existingShifts: Array<{
     employee_id: string;
@@ -84,7 +85,7 @@ export function useScheduleAIContext(params: {
       // Tabela mínima POP do setor
       const { data: matrix } = await supabase
         .from("staffing_matrix")
-        .select("sector_id, day_of_week, shift_type, required_count")
+        .select("sector_id, day_of_week, shift_type, required_count, extras_count")
         .eq("sector_id", sectorId!);
       const { data: sec } = await supabase
         .from("sectors")
@@ -99,6 +100,7 @@ export function useScheduleAIContext(params: {
           day_of_week: r.day_of_week as number,
           shift_type: r.shift_type as string,
           required_count: r.required_count as number,
+          extras_count: (r.extras_count as number | null) ?? 0,
         })) ?? [];
 
       // Escalas existentes (semana anterior + atual + posterior, p/ interjornada)

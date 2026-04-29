@@ -9,7 +9,7 @@ import { SectorJobTitleMapping } from "./SectorJobTitleMapping";
 import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
 import { PracasConfig } from "./PracasConfig";
-import { MinimumStaffingTab } from "./MinimumStaffingTab";
+import { HoldingOperationalConfigTab } from "./HoldingOperationalConfigTab";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";

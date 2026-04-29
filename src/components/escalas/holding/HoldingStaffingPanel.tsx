@@ -168,6 +168,20 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     persistCell(sector, shift, day, getRequired(sector, shift, day), value);
   };
 
+  /** Edição combinada X+Y na célula principal (ex.: "4+1"). */
+  const handleCombinedBlur = (
+    sector: SectorKey,
+    shift: "almoco" | "jantar",
+    day: number,
+    raw: string,
+  ) => {
+    const { required, extras } = parseCellValue(raw);
+    const curReq = getRequired(sector, shift, day);
+    const curExt = getExtras(sector, shift, day);
+    if (required === curReq && extras === curExt) return;
+    persistCell(sector, shift, day, required, extras);
+  };
+
   /**
    * Persiste o novo regime em TODAS as 7 células daquele setor+turno
    * (mantendo required/extras atuais).
@@ -191,17 +205,25 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     }
   };
 
-  // Cálculos por linha (setor × turno): soma dos 7 dias e dobras nos 2 regimes
+  // Cálculos por linha (setor × turno): soma dos 7 dias (required + extras) e dobras nos 2 regimes
   const rowMetrics = useMemo(() => {
-    const out: Record<string, { soma: number; dobras5x2: number; dobras6x1: number }> = {};
+    const out: Record<
+      string,
+      { soma: number; somaReq: number; somaExt: number; dobras5x2: number; dobras6x1: number }
+    > = {};
     for (const sector of sectors) {
       for (const shift of SHIFT_TYPES) {
-        let soma = 0;
+        let somaReq = 0;
+        let somaExt = 0;
         for (const d of DAYS_OF_WEEK_DISPLAY) {
-          soma += getRequired(sector, shift.key, d.key);
+          somaReq += getRequired(sector, shift.key, d.key);
+          somaExt += getExtras(sector, shift.key, d.key);
         }
+        const soma = somaReq + somaExt;
         out[`${sector}|${shift.key}`] = {
           soma,
+          somaReq,
+          somaExt,
           dobras5x2: calcDobras(soma, "5x2"),
           dobras6x1: calcDobras(soma, "6x1"),
         };
@@ -212,20 +234,21 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   }, [sectors, index]);
 
   // Métrica agregada para Necess./Efet./Gap (uma vez por setor)
+  // Pico semanal considera required + extras por dia/turno.
   const metricsBySector = useMemo(() => {
     const out: Record<string, { necessarias: number; dobras: number }> = {};
     for (const sector of sectors) {
-      let maxReq = 0;
+      let maxTotal = 0;
       let maxExtras = 0;
       for (const d of DAYS_OF_WEEK_DISPLAY) {
-        const a = getRequired(sector, "almoco", d.key);
-        const j = getRequired(sector, "jantar", d.key);
+        const aTot = getRequired(sector, "almoco", d.key) + getExtras(sector, "almoco", d.key);
+        const jTot = getRequired(sector, "jantar", d.key) + getExtras(sector, "jantar", d.key);
         const ea = getExtras(sector, "almoco", d.key);
         const ej = getExtras(sector, "jantar", d.key);
-        maxReq = Math.max(maxReq, a, j);
+        maxTotal = Math.max(maxTotal, aTot, jTot);
         maxExtras = Math.max(maxExtras, ea, ej);
       }
-      out[sector] = { necessarias: maxReq, dobras: maxExtras };
+      out[sector] = { necessarias: maxTotal, dobras: maxExtras };
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -96,3 +96,18 @@ export const DAYS_OF_WEEK = [
   { key: 5, label: "SEX" },
   { key: 6, label: "SAB" },
 ] as const;
+
+/**
+ * Ordem de exibição preferida para o gestor: SEG → DOM.
+ * As keys (0..6) seguem o padrão JS (0=Dom). Use isto APENAS para render —
+ * a persistência continua usando `day_of_week` original.
+ */
+export const DAYS_OF_WEEK_DISPLAY = [
+  { key: 1, label: "SEG" },
+  { key: 2, label: "TER" },
+  { key: 3, label: "QUA" },
+  { key: 4, label: "QUI" },
+  { key: 5, label: "SEX" },
+  { key: 6, label: "SAB" },
+  { key: 0, label: "DOM" },
+] as const;

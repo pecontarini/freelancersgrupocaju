@@ -12,7 +12,10 @@ desse piso. Não se pode "completar a qualquer custo": freelancer só depois
 de tentar realocação interna e banco de horas (POP 3.3.2 e 5.1.3).
 
 ## Tabela Mínima (POP 4.1)
-- Define o efetivo mínimo por setor + dia da semana + turno (almoço/jantar).
+- Define o efetivo mínimo (required_count) por setor + dia da semana + turno (almoço/jantar).
+- Cada turno pode ter dobras planejadas (extras_count): reposição autorizada pela liderança.
+  Use APENAS quando faltas/folgas impedirem cumprir o required_count. Nunca exceda
+  (required_count + extras_count) no mesmo turno.
 - É piso obrigatório; reduzir é proibido. Aumentar emergencial só com Diretor Geral.
 - A montagem da escala parte SEMPRE da Tabela Mínima.
 

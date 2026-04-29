@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { SECTOR_LABELS, type SectorKey } from "@/lib/holding/sectors";
 
 /* ============================================================
  * Tipos
@@ -218,5 +219,74 @@ export function useUpsertHoldingRate() {
       qc.invalidateQueries({ queryKey: ["holding_freelancer_rates"] });
     },
     onError: (e: Error) => toast.error("Erro ao salvar diária: " + e.message),
+  });
+}
+
+/* ============================================================
+ * EFFECTIVE HEADCOUNT POR SETOR (CLT contratados ativos)
+ * Usado para calcular Necess. × Efet. × Gap no painel de mínimos.
+ * Cadeia: sectors (unit_id, name) ← sector_job_titles ← employees
+ * ========================================================== */
+export function useEffectiveHeadcountBySector(unitId: string | null) {
+  return useQuery({
+    queryKey: ["effective_headcount_by_sector", unitId],
+    enabled: !!unitId,
+    queryFn: async (): Promise<Record<SectorKey, number>> => {
+      const empty = Object.fromEntries(
+        (Object.keys(SECTOR_LABELS) as SectorKey[]).map((k) => [k, 0]),
+      ) as Record<SectorKey, number>;
+      if (!unitId) return empty;
+
+      // 1) setores da unidade, filtrando por nome canônico (SECTOR_LABELS)
+      const labels = Object.values(SECTOR_LABELS);
+      const { data: secs } = await supabase
+        .from("sectors")
+        .select("id, name")
+        .eq("unit_id", unitId)
+        .in("name", labels);
+      const sectorList = (secs as Array<{ id: string; name: string }> | null) ?? [];
+      if (sectorList.length === 0) return empty;
+
+      // mapa: sector_id -> SectorKey
+      const labelToKey = new Map<string, SectorKey>();
+      for (const [k, label] of Object.entries(SECTOR_LABELS)) {
+        labelToKey.set(label, k as SectorKey);
+      }
+      const sectorIdToKey = new Map<string, SectorKey>();
+      for (const s of sectorList) {
+        const k = labelToKey.get(s.name);
+        if (k) sectorIdToKey.set(s.id, k);
+      }
+
+      // 2) job_titles vinculados a cada setor
+      const sectorIds = sectorList.map((s) => s.id);
+      const { data: sjt } = await supabase
+        .from("sector_job_titles" as any)
+        .select("sector_id, job_title_id")
+        .in("sector_id", sectorIds);
+      const jobTitleToSector = new Map<string, SectorKey>();
+      for (const row of ((sjt as unknown) as Array<{ sector_id: string; job_title_id: string }> | null) ?? []) {
+        const k = sectorIdToKey.get(row.sector_id);
+        if (k && !jobTitleToSector.has(row.job_title_id)) {
+          jobTitleToSector.set(row.job_title_id, k);
+        }
+      }
+
+      // 3) employees CLT ativos da unidade
+      const { data: emps } = await supabase
+        .from("employees")
+        .select("id, job_title_id, worker_type, active, unit_id")
+        .eq("unit_id", unitId)
+        .eq("active", true)
+        .eq("worker_type", "clt");
+
+      const counts: Record<SectorKey, number> = { ...empty };
+      for (const e of (emps as Array<{ job_title_id: string | null }> | null) ?? []) {
+        if (!e.job_title_id) continue;
+        const k = jobTitleToSector.get(e.job_title_id);
+        if (k) counts[k] += 1;
+      }
+      return counts;
+    },
   });
 }

@@ -19,9 +19,13 @@ A escala existe para garantir o número MÍNIMO de colaboradores por setor/turno
 da Tabela Mínima (POP 4.1). Nenhuma escala pode ficar abaixo desse piso.
 Freelancer só depois de tentar realocação interna e banco de horas (POP 3.3.2 / 5.1.3).
 
-## Tabela Mínima (POP 4.1) — piso obrigatório
-- Define efetivo mínimo por setor + dia + turno (almoço/jantar).
-- Reduzir é proibido. A escala parte SEMPRE da Tabela Mínima.
+## Tabela Mínima (POP 4.1) — piso obrigatório + dobras planejadas
+- Define efetivo mínimo (required_count) por setor + dia + turno (almoço/jantar).
+- Cada turno também pode ter "dobras" (extras_count): reposição autorizada pela liderança
+  quando faltas/folgas comprometerem o mínimo. Use dobras APENAS se o mínimo não puder
+  ser atingido com o efetivo regular. NUNCA escale mais que (required_count + extras_count)
+  pessoas no mesmo turno.
+- Reduzir abaixo de required_count é proibido. A escala parte SEMPRE da Tabela Mínima.
 
 ## Montagem (POP 4.2.5)
 - Não escalar quem está em férias/aviso prévio/atestado/afastamento.
@@ -75,6 +79,7 @@ interface ContextStaffing {
   day_of_week: number;
   shift_type: string;
   required_count: number;
+  extras_count?: number;
 }
 interface ContextShift {
   employee_id: string;
@@ -170,10 +175,13 @@ function buildSystemPrompt(ctx: RequestBody["context"]): string {
     );
   }
   lines.push("");
-  lines.push("### Tabela Mínima POP (cobertura obrigatória)");
+  lines.push("### Tabela Mínima POP (cobertura obrigatória + dobras planejadas)");
   const dowName = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   for (const r of ctx.staffing) {
-    lines.push(`- ${dowName[r.day_of_week]} ${r.shift_type}: ${r.required_count} pessoa(s)`);
+    const extras = (r.extras_count ?? 0) > 0
+      ? ` (+ até ${r.extras_count} dobra(s) se cobertura ficar comprometida)`
+      : "";
+    lines.push(`- ${dowName[r.day_of_week]} ${r.shift_type}: ${r.required_count} pessoa(s)${extras}`);
   }
   if (ctx.absences.length > 0) {
     lines.push("");

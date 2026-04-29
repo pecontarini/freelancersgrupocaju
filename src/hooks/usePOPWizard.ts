@@ -7,12 +7,16 @@ import {
   useEffectiveHeadcountBySector,
 } from "@/hooks/useHoldingConfig";
 import { sectorsForBrand, type Brand, type SectorKey } from "@/lib/holding/sectors";
+import type { ExtractedAttachment } from "@/lib/extract-attachment-text";
 
 export type WizardMode = "wizard" | "validate" | "adjust";
 
 export interface ChatMessage {
   role: "user" | "assistant";
-  content: string;
+  content: string | Array<
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } }
+  >;
 }
 
 export interface ProposedChange {

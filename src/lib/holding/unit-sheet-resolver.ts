@@ -122,13 +122,16 @@ function unitRegionCanon(unitName: string): string {
   return n;
 }
 
-/** Retorna conjunto de regiões reconhecidas presentes em um texto qualquer. */
+/** Retorna conjunto de regiões reconhecidas presentes em um texto qualquer.
+ *  IMPORTANTE: usa word boundaries reais — aliases curtos como "AS"/"AN"/"GO"
+ *  NÃO podem casar dentro de palavras (ex.: "BRASILIA", "GOIANIA"). */
 function regionsIn(text: string): Set<string> {
   const n = " " + norm(text) + " ";
   const out = new Set<string>();
   for (const [canon, aliases] of Object.entries(REGION_ALIASES)) {
     for (const a of aliases) {
-      if (n.includes(" " + a + " ") || n.includes(a)) {
+      // exige fronteira de palavra dos dois lados
+      if (n.includes(" " + a + " ")) {
         out.add(canon);
         break;
       }

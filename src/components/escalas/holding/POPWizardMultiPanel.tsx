@@ -28,6 +28,15 @@ import { deriveBrand, ALL_BRANDS, type Brand } from "@/lib/holding/sectors";
 import { buildMatchReport } from "@/lib/holding/sheet-matcher";
 import { usePOPWizardBatch, type UnitTarget } from "@/hooks/usePOPWizardBatch";
 import { UnitProposalCard } from "./UnitProposalCard";
+import {
+  parseMinimumScaleWorkbook,
+  type ParseResult,
+} from "@/lib/holding/minimum-scale-parser";
+import {
+  resolveUnitsFromSheets,
+  type ResolveResult,
+} from "@/lib/holding/unit-sheet-resolver";
+import { MinimumScaleImportReview } from "./MinimumScaleImportReview";
 
 const ACCEPTED_FILES =
   ".pdf,.xlsx,.xls,.xlsm,.csv,.txt,.md,.png,.jpg,.jpeg,.webp,application/pdf,image/*,text/*";
@@ -78,6 +87,10 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
   const [collapsedBrands, setCollapsedBrands] = useState<Set<Brand>>(new Set());
   const [autoApply, setAutoApply] = useState(true);
 
+  // Parser determinístico para .xlsx (caminho principal — sem IA)
+  const [parseResult, setParseResult] = useState<ParseResult | null>(null);
+  const [resolveResult, setResolveResult] = useState<ResolveResult | null>(null);
+
   const { data: units = [], isLoading } = useOperationalUnits();
   const batch = usePOPWizardBatch();
 
@@ -123,16 +136,37 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
       return;
     }
     setExtracting(true);
+    setParseResult(null);
+    setResolveResult(null);
     try {
       const att = await extractAttachment(file);
       setAttachment(att);
-      toast.success(`${att.name} pronto.`);
+      // Caminho determinístico para .xlsx — sem IA.
+      const isXlsx = /\.(xlsx|xls|xlsm)$/i.test(file.name);
+      if (isXlsx) {
+        const parsed = await parseMinimumScaleWorkbook(file);
+        setParseResult(parsed);
+        toast.success(
+          `${att.name} lido: ${parsed.totalBlocks} blocos · ${parsed.totalCells} células.`,
+        );
+      } else {
+        toast.success(`${att.name} pronto.`);
+      }
     } catch (err: any) {
       toast.error(err?.message ?? "Falha ao ler arquivo.");
     } finally {
       setExtracting(false);
     }
   };
+
+  // Re-resolve sempre que muda planilha ou seleção de unidades
+  useEffect(() => {
+    if (!parseResult) {
+      setResolveResult(null);
+      return;
+    }
+    setResolveResult(resolveUnitsFromSheets(parseResult.sheets, units));
+  }, [parseResult, units]);
 
   const handleRun = async () => {
     if (!attachment) {
@@ -259,7 +293,11 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setAttachment(null)}
+                onClick={() => {
+                  setAttachment(null);
+                  setParseResult(null);
+                  setResolveResult(null);
+                }}
                 disabled={batch.running}
                 className="h-7"
               >
@@ -277,8 +315,25 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
           )}
         </div>
 
-        {/* Mapeamento aba ↔ unidade (apenas Excel multi-aba) */}
-        {matchReport && (
+        {/* Revisão da importação determinística (.xlsx) */}
+        {resolveResult && (
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              2. Revisão da importação
+            </div>
+            <MinimumScaleImportReview
+              result={resolveResult}
+              monthYear={monthYear}
+              selectedUnitIds={selectedIds}
+              onApplied={() => {
+                /* mantém o painel aberto pra confirmação visual */
+              }}
+            />
+          </div>
+        )}
+
+        {/* Mapeamento aba ↔ unidade — apenas no fluxo IA (PDF/imagem/texto) */}
+        {!resolveResult && matchReport && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -410,29 +465,31 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
           )}
         </div>
 
-        {/* Auto-apply toggle */}
-        <label
-          className={cn(
-            "flex items-start gap-2.5 rounded-lg border border-border/60 bg-background/40 p-2.5 cursor-pointer",
-            "hover:bg-primary/5 transition-colors",
-            batch.running && "cursor-not-allowed opacity-60",
-          )}
-        >
-          <Checkbox
-            checked={autoApply}
-            onCheckedChange={(v) => setAutoApply(!!v)}
-            disabled={batch.running}
-            className="mt-0.5"
-          />
-          <div className="text-xs">
-            <div className="font-semibold text-foreground">Aplicar automaticamente</div>
-            <div className="text-muted-foreground mt-0.5">
-              Salva cada proposta no banco assim que a IA termina de gerar — sem
-              precisar revisar uma por uma. Desligue para revisar manualmente
-              antes de aplicar.
+        {/* Auto-apply toggle (apenas no fluxo IA — Excel já tem revisão própria) */}
+        {!resolveResult && (
+          <label
+            className={cn(
+              "flex items-start gap-2.5 rounded-lg border border-border/60 bg-background/40 p-2.5 cursor-pointer",
+              "hover:bg-primary/5 transition-colors",
+              batch.running && "cursor-not-allowed opacity-60",
+            )}
+          >
+            <Checkbox
+              checked={autoApply}
+              onCheckedChange={(v) => setAutoApply(!!v)}
+              disabled={batch.running}
+              className="mt-0.5"
+            />
+            <div className="text-xs">
+              <div className="font-semibold text-foreground">Aplicar automaticamente</div>
+              <div className="text-muted-foreground mt-0.5">
+                Salva cada proposta no banco assim que a IA termina de gerar — sem
+                precisar revisar uma por uma. Desligue para revisar manualmente
+                antes de aplicar.
+              </div>
             </div>
-          </div>
-        </label>
+          </label>
+        )}
 
         {hasJobs && (
           <div className="space-y-2 pt-2 border-t border-border/40">
@@ -474,37 +531,39 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
         )}
       </div>
 
-      {/* Footer fixo: Run button */}
-      <div className="border-t border-border/60 p-3 bg-background/80 backdrop-blur-md flex items-center justify-between gap-2">
-        {hasJobs && !batch.running && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={batch.reset}
-            className="h-9 text-xs"
-          >
-            <RotateCcw className="h-3.5 w-3.5 mr-1" />
-            Limpar resultados
-          </Button>
-        )}
-        <Button
-          onClick={handleRun}
-          disabled={!attachment || totalSelected === 0 || batch.running || extracting}
-          className="ml-auto h-9"
-        >
-          {batch.running ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              Processando {batch.summary.streaming}/{batch.summary.total}...
-            </>
-          ) : (
-            <>
-              <PlayCircle className="h-4 w-4 mr-1.5" />
-              Aplicar a {totalSelected} unidade{totalSelected === 1 ? "" : "s"}
-            </>
+      {/* Footer fixo: Run button (apenas para PDF/imagem/texto — Excel usa o botão da revisão) */}
+      {!resolveResult && (
+        <div className="border-t border-border/60 p-3 bg-background/80 backdrop-blur-md flex items-center justify-between gap-2">
+          {hasJobs && !batch.running && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={batch.reset}
+              className="h-9 text-xs"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1" />
+              Limpar resultados
+            </Button>
           )}
-        </Button>
-      </div>
+          <Button
+            onClick={handleRun}
+            disabled={!attachment || totalSelected === 0 || batch.running || extracting}
+            className="ml-auto h-9"
+          >
+            {batch.running ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                Processando {batch.summary.streaming}/{batch.summary.total}...
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4 mr-1.5" />
+                Aplicar a {totalSelected} unidade{totalSelected === 1 ? "" : "s"}
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

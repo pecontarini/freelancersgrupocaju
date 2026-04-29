@@ -47,6 +47,8 @@ interface RunArgs {
   monthYear: string;
   /** Concurrency cap. Default 3. */
   concurrency?: number;
+  /** When true, apply each proposal automatically as soon as it's ready. Default false. */
+  autoApply?: boolean;
 }
 
 const SECTOR_KEYS_BY_BRAND: Record<Brand, SectorKey[]> = {

@@ -143,6 +143,14 @@ ${buildContextSummary(ctx)}
 3. day_of_week: 0=Domingo, 1=Segunda, ..., 6=Sábado.
 4. shift_type: "almoco" ou "jantar".
 5. Se for só pergunta ou conversa, responda no chat sem chamar a tool.
+
+## Quando o usuário anexar um POP
+- O anexo (texto rotulado como "## ANEXO: ..." ou imagem) é a FONTE PRIMÁRIA da Tabela Mínima.
+- Mapeie cada linha/turno do POP para os \`sector_key\` válidos listados acima. NÃO invente setor.
+- Se um setor citado no POP não existir na lista de setores disponíveis, IGNORE-O e mencione no \`summary\`.
+- Se o POP não detalhar algum dia/turno, use bom senso operacional (regras POP acima) e indique no \`reason\` da célula que foi inferido.
+- Quando há anexo, NÃO faça entrevista — gere a proposta DIRETO na primeira resposta chamando a tool, cobrindo todos os 7 dias x 2 turnos para os setores presentes no POP.
+- No \`summary\` informe: setores cobertos, setores ignorados (se houver) e quantas células foram inferidas vs. extraídas literalmente.
 `.trim();
 }
 

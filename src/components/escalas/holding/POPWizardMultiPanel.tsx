@@ -100,6 +100,13 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
     [units, selectedIds],
   );
 
+  // Mapeamento aba→unidade (só Excel multi-aba). Calculado em tempo real.
+  const matchReport = useMemo(() => {
+    if (!attachment?.sheets?.length || !targets.length) return null;
+    return buildMatchReport(attachment.sheets, targets);
+  }, [attachment, targets]);
+  const matchedCount = matchReport?.filter((m) => m.match).length ?? 0;
+
   const handleFilePick = () => {
     if (extracting || batch.running) return;
     fileRef.current?.click();

@@ -264,6 +264,7 @@ async function runForUnit(
 }
 
 export function usePOPWizardBatch() {
+  const qc = useQueryClient();
   const [jobs, setJobs] = useState<UnitJob[]>([]);
   const [running, setRunning] = useState(false);
 

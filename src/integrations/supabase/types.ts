@@ -2042,6 +2042,7 @@ export type Database = {
           id: string
           month_year: string
           notes: string | null
+          regime: string
           required_count: number
           sector_key: string
           shift_type: string
@@ -2058,6 +2059,7 @@ export type Database = {
           id?: string
           month_year?: string
           notes?: string | null
+          regime?: string
           required_count?: number
           sector_key: string
           shift_type: string
@@ -2074,6 +2076,7 @@ export type Database = {
           id?: string
           month_year?: string
           notes?: string | null
+          regime?: string
           required_count?: number
           sector_key?: string
           shift_type?: string

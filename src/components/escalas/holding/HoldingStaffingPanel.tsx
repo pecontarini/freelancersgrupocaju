@@ -254,8 +254,9 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectors, index]);
 
-  const renderGap = (necessarias: number, dobras: number, efetivas: number) => {
-    const gap = necessarias + dobras - efetivas;
+  const renderGap = (necessarias: number, _dobras: number, efetivas: number) => {
+    // `necessarias` já inclui extras (pico semanal de required + extras).
+    const gap = necessarias - efetivas;
     if (gap > 0) {
       return (
         <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/20 border-0 font-semibold">

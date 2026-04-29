@@ -560,6 +560,7 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
                 <PlayCircle className="h-4 w-4 mr-1.5" />
                 Aplicar a {totalSelected} unidade{totalSelected === 1 ? "" : "s"}
               </>
+            )}
           </Button>
         </div>
       )}

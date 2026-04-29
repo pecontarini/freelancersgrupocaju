@@ -354,7 +354,30 @@ export function POPWizardMultiPanel({ monthYear }: POPWizardMultiPanelProps) {
           )}
         </div>
 
-        {/* Lista de propostas */}
+        {/* Auto-apply toggle */}
+        <label
+          className={cn(
+            "flex items-start gap-2.5 rounded-lg border border-border/60 bg-background/40 p-2.5 cursor-pointer",
+            "hover:bg-primary/5 transition-colors",
+            batch.running && "cursor-not-allowed opacity-60",
+          )}
+        >
+          <Checkbox
+            checked={autoApply}
+            onCheckedChange={(v) => setAutoApply(!!v)}
+            disabled={batch.running}
+            className="mt-0.5"
+          />
+          <div className="text-xs">
+            <div className="font-semibold text-foreground">Aplicar automaticamente</div>
+            <div className="text-muted-foreground mt-0.5">
+              Salva cada proposta no banco assim que a IA termina de gerar — sem
+              precisar revisar uma por uma. Desligue para revisar manualmente
+              antes de aplicar.
+            </div>
+          </div>
+        </label>
+
         {hasJobs && (
           <div className="space-y-2 pt-2 border-t border-border/40">
             <div className="flex items-center justify-between">

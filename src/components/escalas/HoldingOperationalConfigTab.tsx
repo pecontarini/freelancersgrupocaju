@@ -289,7 +289,9 @@ export function HoldingOperationalConfigTab() {
 
       {unitId && (
         <>
-          <POPWizardButton onClick={() => setWizardOpen(true)} />
+          <div className="flex justify-end pt-2">
+            <POPWizardButton onClick={() => setWizardOpen(true)} />
+          </div>
           <POPWizardDrawer
             open={wizardOpen}
             onOpenChange={setWizardOpen}

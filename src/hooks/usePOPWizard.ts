@@ -41,6 +41,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
   const [isStreaming, setIsStreaming] = useState(false);
   const [proposed, setProposed] = useState<ProposedPayload | null>(null);
   const [isApplying, setIsApplying] = useState(false);
+  const [sessionMode, setSessionMode] = useState<WizardMode | null>(null);
 
   const { data: currentConfig = [] } = useHoldingStaffingConfig(unitId, monthYear);
   const { data: headcount } = useEffectiveHeadcountBySector(unitId);
@@ -50,10 +51,15 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
     setMessages([]);
     setProposed(null);
     setIsStreaming(false);
+    setSessionMode(null);
   }, []);
 
   const sendMessage = useCallback(
     async (text: string, mode: WizardMode = "adjust") => {
+      // Primeira mensagem define o modo da sessão; mensagens seguintes herdam.
+      const effectiveMode: WizardMode =
+        sessionMode ?? (messages.length === 0 ? mode : "adjust");
+      if (!sessionMode) setSessionMode(effectiveMode);
       const userMsg: ChatMessage = { role: "user", content: text };
       const nextMessages = [...messages, userMsg];
       setMessages(nextMessages);
@@ -64,7 +70,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
 
       const payload = {
         messages: nextMessages,
-        mode,
+        mode: effectiveMode,
         context: {
           brand,
           unitId,
@@ -195,7 +201,7 @@ export function usePOPWizard({ brand, unitId, unitName, monthYear }: UsePOPWizar
         setIsStreaming(false);
       }
     },
-    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount],
+    [messages, brand, unitId, unitName, monthYear, currentConfig, headcount, sessionMode],
   );
 
   const applyProposed = useCallback(async () => {

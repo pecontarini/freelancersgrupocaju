@@ -1,94 +1,56 @@
-## Objetivo
+# Diagnóstico
 
-Estender o POP Wizard para que o COO anexe **um único POP** (PDF, imagem, Excel ou texto) e a IA gere automaticamente a proposta de Tabela Mínima para **todas as unidades operacionais** (Caju Limão, Caminito, Nazo, Foster's Burguer) de uma vez. A revisão final acontece em um diff por unidade, com Aplicar/Descartar individuais.
+Olhando o request real (network logs), o fluxo atual está mandando o **Excel inteiro** (`ESCALA MÍNIMA ABRIL.xlsx`, com 16 abas: `CAJULIMÃO - SUDOESTE`, `CAJULIMÃO - ASA NORTE`, `CP ASA NORTE`, `CP - NAZO SIG`, ...) em **cada uma das 16 chamadas** ao Gemini. Em cada chamada eu peço para a IA "encontrar a parte da unidade X". Resultado:
 
-## Como vai funcionar (visão do usuário)
+- A IA confunde abas parecidas (Caju Sudoeste vs Caju Norte) e devolve dados misturados.
+- Cada chamada é lenta (Gemini relê tudo) e pode estourar timeout/contexto.
+- O auto-apply até dispara, mas as propostas chegam erradas/atrasadas, parecendo "não funcional".
 
-1. No POP Wizard, o COO clica em **"Anexar POP global"** e seleciona o arquivo.
-2. Aparece uma faixa de seleção das unidades-alvo (todas marcadas por padrão), com contagem (ex.: "12 unidades selecionadas").
-3. Clica em **"Aplicar a todas as unidades"** — a IA processa cada unidade em paralelo.
-4. A tela mostra um **acordeão de propostas por unidade**, cada uma com:
-   - Resumo da IA (setores cobertos, células inferidas, alertas)
-   - Tabela de diffs (atual → proposto) por setor/dia/turno
-   - Botões **Aplicar nesta unidade** e **Descartar**
-   - Status: pendente, aplicada, com erro
-5. Botão global **"Aplicar em todas pendentes"** para o COO confirmar de uma vez no final.
+Como o Excel **já vem segmentado por aba (uma aba = uma unidade)**, o caminho certo é fazer o matching aba↔unidade no client, **antes** de chamar a IA, e enviar só o pedaço relevante.
 
-## Arquitetura
+# Plano
 
-```text
-POPWizardDrawer (UI)
-   └─ aba "Multi-unidade"  ← novo
-        ├─ Anexo único + lista de unidades-alvo
-        ├─ Botão "Aplicar a todas"
-        └─ Lista <UnitProposalCard /> por unidade
-              ├─ usePOPWizardBatch (novo hook)
-              └─ chama pop-wizard-chat (existente)
-                  passando context.unitId/brand/setores/efetivo
-                  por unidade, em paralelo (concurrency 3)
-```
+## 1. Expor abas separadas no extrator (`src/lib/extract-attachment-text.ts`)
 
-A edge function `pop-wizard-chat` **não muda o contrato** — só refinamos o system prompt para reconhecer o cenário "POP global aplicado a esta unidade específica" e tolerar setores ausentes na marca.
+- Adicionar campo `sheets?: ExtractedSheet[]` em `ExtractedAttachment`, com `{ name, text }` por aba.
+- Em `extractExcelText`, além do texto concatenado, devolver também o array de abas individuais (sem truncar — cada aba isolada é pequena).
 
-## Mudanças por arquivo
+## 2. Matcher aba↔unidade (`src/lib/holding/sheet-matcher.ts`, novo)
 
-### 1. `src/lib/holding/sectors.ts`
-- Adicionar helper `getOperationalUnits()` que consulta `config_lojas` filtrando por `deriveBrand(nome) !== null` (já existe lógica). Reaproveitado pelo novo hook.
+- Função `matchSheetToUnit(sheets, unitName, brand)` que normaliza nomes (uppercase, sem acento, sem pontuação) e procura a aba que melhor casa com o nome da unidade.
+- Tokens de marca (`CAJU`, `CAMINITO`/`CP`, `NAZO`, `FOSTER`) + tokens de bairro extraídos do `unitName` (`SUDOESTE`, `ASA NORTE`, `ASA SUL`, `SIG`, etc.).
+- Score por interseção de tokens; threshold mínimo para evitar falso match.
+- Retorna `{ sheet, score }` ou `null`.
 
-### 2. `src/hooks/usePOPWizardBatch.ts` (novo)
-- Recebe `attachment: ExtractedAttachment` + `targetUnits: Array<{ unitId, unitName, brand, monthYear }>`.
-- Para cada unidade, em paralelo (Promise pool de 3):
-  - Monta payload igual ao Wizard atual (com `availableSectors = sectorsForBrand(brand)`, `effectiveHeadcount`, `currentConfig`).
-  - Mensagem do usuário: anexo + instrução fixa "Gere a Tabela Mínima completa para esta unidade com base no POP anexado".
-  - Modo `validate` (já existente) — pula entrevista e chama tool direto.
-  - Faz parse de SSE até capturar `propose_staffing_changes`.
-- Estado por unidade: `'queued' | 'streaming' | 'ready' | 'failed' | 'applied' | 'discarded'`, com `proposed?: ProposedPayload`, `error?: string`, e `assistantText` para o cabeçalho.
-- Função `applyOne(unitId)`: chama `useUpsertHoldingStaffing` para cada change. Marca unidade como `applied`.
-- Função `applyAllReady()`: aplica todas as `ready`.
+## 3. Roteamento no batch (`src/hooks/usePOPWizardBatch.ts`)
 
-### 3. `src/components/escalas/holding/POPWizardDrawer.tsx`
-- Adicionar duas abas no topo: **"Esta unidade"** (fluxo atual intacto) e **"Multi-unidade (todas)"** (novo).
-- Aba multi-unidade contém:
-  - Bloco de anexo (reaproveita `extractAttachment`, mesmo dropzone do single).
-  - Lista checkable de unidades operacionais, agrupadas por marca, com "Selecionar todas / nenhuma".
-  - Botão primário **"Aplicar a todas (N unidades)"**.
-  - `<UnitProposalList />` (componente novo abaixo).
+- Em `runForUnit`, se o anexo tem `sheets` e há match para a unidade, montar um `ExtractedAttachment` "virtual" só com o texto daquela aba (`text = "--- Aba: X ---\n<csv>"`).
+- Se não houver match, fallback para o anexo inteiro como hoje (com aviso no `assistantText`).
+- Adicionar pré-passo síncrono no `run()` que loga quais unidades casaram com qual aba e quais ficaram sem match — exibir isso na UI antes de disparar a IA, para o COO confirmar.
 
-### 4. `src/components/escalas/holding/UnitProposalCard.tsx` (novo)
-- Card por unidade mostrando: nome + marca, status (badge), resumo da IA (markdown), tabela compacta de diff usando o `POPWizardPreview` existente (refatorar para aceitar `currentConfig` e `proposedChanges` como props).
-- Ações: **Aplicar** / **Descartar** / **Re-gerar** (opcional).
-- Indicador de progresso (skeleton) enquanto `streaming`.
+## 4. Auto-apply: garantir que o estado da grade atualiza
 
-### 5. `src/components/escalas/holding/POPWizardPreview.tsx`
-- Refatorar para aceitar `currentConfig` opcional (hoje pega via hook ligado à unidade ativa). Quando passado por prop, ignora o hook. Permite reutilizar para qualquer unidade.
+- Após cada `applyJob` bem-sucedido, invalidar a query `["holding_staffing_config", unitId, monthYear]` (e a chave global `["holding_staffing_config"]`) usando `useQueryClient` no hook. Hoje a invalidação só acontece quando o usuário fecha o drawer.
 
-### 6. `supabase/functions/pop-wizard-chat/index.ts`
-- Pequeno ajuste no system prompt: adicionar bloco "Quando o anexo for um POP corporativo aplicado a esta unidade específica, considere apenas os setores listados em `availableSectors`. Setores citados no POP que não existem nesta marca devem ser silenciosamente omitidos e listados em `summary` como 'não aplicáveis a esta marca'."
-- Sem mudança de contrato/payload.
+## 5. UI: mostrar mapeamento aba→unidade antes do run (`POPWizardMultiPanel.tsx`)
 
-## Limites e segurança
+- Após anexar Excel, exibir uma seção "**3. Mapeamento detectado**" com lista:
+  - `CAJU LIMÃO SUDOESTE` → aba `CAJULIMÃO - SUDOESTE` (pronta)
+  - `FOSTER'S TAGUATINGA` → **sem aba correspondente** (será ignorada)
+- Botão Run desabilita se 0 unidades casarem; aviso se algumas casarem.
 
-- **Concurrency 3** para não saturar Lovable AI Gateway nem disparar 429.
-- **Trata 429/402** por unidade individualmente — se uma falhar com 429, fica como `failed` e oferece botão "Tentar novamente"; outras seguem.
-- **Apenas admins** veem a aba multi-unidade (checagem via `useUserProfile().isAdmin`, padrão já usado em `MinimumStaffingTab`).
-- **Sem auto-aplicar**: nada vai pro banco sem o COO clicar Aplicar (alinhado ao memo `data-import-confirmation-standard`).
-- Mês de referência: usa o `monthYear` atualmente selecionado no painel. Mostra um aviso "Aplicando ao mês X/AAAA em todas as unidades".
+## 6. Ajuste no edge function (`supabase/functions/pop-wizard-chat/index.ts`)
 
-## Custos / IA
+- Sem mudança de schema, só refinar o system prompt para o caso "anexo já filtrado por unidade" (sinalizar via `context.sheetMatched: true`) — instruindo a IA a confiar 100% no texto recebido sem procurar outras unidades.
 
-- Modelo: mantém `google/gemini-2.5-pro` (multimodal, já configurado). 1 chamada por unidade. ~12 unidades operacionais × ~1 chamada = aceitável.
-- Anexo (texto extraído ou imagem em base64) é reenviado a cada chamada — necessário porque o gateway não reaproveita contexto entre requests.
+# Resultado esperado
 
-## Fora de escopo desta entrega
+- 16 unidades processam **muito mais rápido** (cada chamada vê só sua aba ~2KB em vez do Excel inteiro 50KB).
+- Zero confusão entre unidades parecidas.
+- Ao terminar de ler cada unidade, a proposta é aplicada automaticamente e a grade já reflete os números no banco.
+- COO vê antes do run quais unidades vão ser processadas e quais foram puladas por falta de aba.
 
-- Histórico/auditoria das aplicações multi-unidade (pode virar follow-up se necessário).
-- Edição inline do diff antes de aplicar (hoje o COO descarta e ajusta na grade, mantemos isso).
-- OCR offline com Tesseract — ficou de fora conforme decisão; usamos o multimodal nativo do Gemini.
+# Fora de escopo
 
-## Aceite
-
-- COO anexa um POP único, escolhe unidades, aplica a todas.
-- Cada unidade gera seu próprio diff respeitando seus setores disponíveis.
-- COO pode aprovar/descartar individualmente ou em lote.
-- Erros em uma unidade não bloqueiam as outras.
-- A grade de cada unidade é atualizada via `useUpsertHoldingStaffing` existente (preserva trigger `mirror_holding_to_staffing_matrix`).
+- Mudanças no formato do POP corporativo PDF/imagem (esses continuam usando o fluxo atual de mandar o anexo inteiro — só Excel ganha o roteamento).
+- Reorganização visual do drawer.

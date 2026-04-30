@@ -24,6 +24,7 @@ import {
   type Brand,
   type SectorKey,
 } from "@/lib/holding/sectors";
+import { useHoldingFreelancerBudgetCalc } from "@/hooks/useHoldingFreelancerBudgetCalc";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -77,6 +78,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   const upsert = useUpsertHoldingStaffing();
   const sectors = sectorsForBrand(brand);
   const [showExtras, setShowExtras] = useState(false);
+  const budgetCalc = useHoldingFreelancerBudgetCalc(unitId, monthYear, brand);
 
   // Regime override local (até persistir): `${sector}|${shift}` -> regime
   const [regimeOverride, setRegimeOverride] = useState<Record<string, RegimeType>>({});
@@ -865,7 +867,27 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
         </div>
       </div>
 
-      {/* CARDS DE SETOR */}
+      {/* CHIP DE BUDGET PREVISTO (auto-calculado) */}
+      <div
+        className="flex items-center justify-between gap-2 rounded-full px-3.5 py-2 text-xs"
+        style={{
+          background: "rgba(255,255,255,0.55)",
+          backdropFilter: "blur(16px) saturate(180%)",
+          WebkitBackdropFilter: "blur(16px) saturate(180%)",
+          border: "0.5px solid var(--glass-border)",
+        }}
+      >
+        <span className="text-muted-foreground">
+          Budget de freelancers previsto deste mês
+        </span>
+        <span className="font-semibold tabular-nums text-primary">
+          {budgetCalc.totalBudget.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          <span className="ml-2 font-normal text-muted-foreground">
+            · {budgetCalc.totalDiarias} diárias ({budgetCalc.totalGapDiarias} gap + {budgetCalc.totalPontuaisDiarias} pontuais)
+          </span>
+        </span>
+      </div>
+
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
       ) : (

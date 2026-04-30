@@ -45,6 +45,14 @@
     --glass-blur-strong: 40px;
     --glass-saturate: 180%;
 
+    /* Liquid Glass — extra structural tokens (no new colors) */
+    --glass-bg-deep: rgba(255, 255, 255, 0.38);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.10), 0 1.5px 4px rgba(0,0,0,0.06);
+    --radius-card: 20px;
+    --radius-inner: 12px;
+    --radius-pill: 100px;
+    --radius-cell: 8px;
+
     /* Shadows — Apple style, colorized */
     --shadow-xs: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
     --shadow-sm: 0 2px 8px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);

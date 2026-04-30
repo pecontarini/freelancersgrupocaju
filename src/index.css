@@ -555,17 +555,17 @@
    * animation only — once the animation ends, the property is dropped and
    * fixed children behave normally again.
    */
+  /*
+   * No `animation-fill-mode` (default: none). After the animation ends, the
+   * element reverts to its natural state (no transform / clip-path / filter)
+   * so it stops creating a containing block for `position: fixed` descendants.
+   * `will-change` is also kept off by default for the same reason.
+   */
   .page-transition-cinematic {
-    animation: page-enter-cinematic 520ms var(--ease-cinematic) both;
-  }
-  .page-transition-cinematic.is-animating {
-    will-change: transform, opacity, clip-path, filter;
+    animation: page-enter-cinematic 520ms var(--ease-cinematic);
   }
   .page-transition-fast {
-    animation: page-enter-fast 180ms var(--ease-soft) both;
-  }
-  .page-transition-fast.is-animating {
-    will-change: transform, opacity;
+    animation: page-enter-fast 180ms var(--ease-soft);
   }
 
   /* Reusable utilities */

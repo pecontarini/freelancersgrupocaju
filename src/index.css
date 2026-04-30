@@ -519,6 +519,19 @@
   }
 
   /* Page transitions */
+  /*
+   * IMPORTANT: Do NOT use `animation-fill-mode: both` (or `forwards`) with
+   * properties that create a containing block (transform, clip-path, filter).
+   * If the final frame keeps `transform: translateY(0)` applied, it
+   * permanently establishes a containing block on the page wrapper, which
+   * breaks `position: fixed` for any descendant (notably the shadcn Sidebar,
+   * which becomes scroll-bound and disappears when the page is scrolled).
+   *
+   * The keyframes below ramp those properties back to their initial values
+   * (the 100% step is implicit), so once the animation completes the element
+   * has no inline transform/clip-path/filter and `position: fixed` works
+   * normally for all children.
+   */
   @keyframes page-enter-cinematic {
     0% {
       opacity: 0;
@@ -530,25 +543,29 @@
       opacity: 1;
       filter: blur(0);
     }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      clip-path: inset(0% 0% 0% 0% round 0px);
-      filter: blur(0);
-    }
   }
   @keyframes page-enter-fast {
-    0%   { opacity: 0; transform: translateY(4px); }
-    100% { opacity: 1; transform: translateY(0); }
+    0% { opacity: 0; transform: translateY(4px); }
   }
 
+  /*
+   * NOTE: `will-change` creates a new containing block, which invalidates
+   * `position: fixed` for descendants (the shadcn Sidebar uses fixed
+   * positioning to stay glued to the viewport). We scope it to the running
+   * animation only — once the animation ends, the property is dropped and
+   * fixed children behave normally again.
+   */
+  /*
+   * No `animation-fill-mode` (default: none). After the animation ends, the
+   * element reverts to its natural state (no transform / clip-path / filter)
+   * so it stops creating a containing block for `position: fixed` descendants.
+   * `will-change` is also kept off by default for the same reason.
+   */
   .page-transition-cinematic {
-    animation: page-enter-cinematic 520ms var(--ease-cinematic) both;
-    will-change: transform, opacity, clip-path, filter;
+    animation: page-enter-cinematic 520ms var(--ease-cinematic);
   }
   .page-transition-fast {
-    animation: page-enter-fast 180ms var(--ease-soft) both;
-    will-change: transform, opacity;
+    animation: page-enter-fast 180ms var(--ease-soft);
   }
 
   /* Reusable utilities */

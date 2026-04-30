@@ -213,6 +213,7 @@ export function HoldingForecastPanel({ brand, unitId, monthYear }: Props) {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 

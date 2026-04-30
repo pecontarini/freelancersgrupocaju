@@ -1,25 +1,14 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ChevronDown } from "lucide-react";
 import {
   useHoldingStaffingConfig,
   useUpsertHoldingStaffing,
@@ -43,32 +32,18 @@ interface Props {
   monthYear: string;
 }
 
-/** Padrão inicial de regime quando ainda não há registro salvo. */
+/* ─────────── helpers (lógica intocada) ─────────── */
+
 function defaultRegimeFor(sector: SectorKey): RegimeType {
   return sector === "sushi" ? "6x1" : "5x2";
 }
-
-/** Cálculo das fórmulas de dobras conforme regime. */
 function calcDobras(soma: number, regime: RegimeType): number {
   if (regime === "5x2") return (soma * 2) / 10;
   return soma / 9.5;
 }
-
 function pessoasFromDobras(dobras: number): number {
   return Math.ceil(dobras);
 }
-
-function badgeColorForPessoas(n: number): string {
-  if (n <= 4) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
-  if (n <= 8) return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
-  return "bg-destructive/15 text-destructive";
-}
-
-/**
- * Parser de célula "X+Y" → { required, extras }.
- * Aceita: "4", "4+1", "4 + 1", "+2" (=> required=0, extras=2), "" (=> 0+0).
- * Valores negativos viram 0; decimais são truncados.
- */
 function parseCellValue(raw: string): { required: number; extras: number } {
   const s = (raw ?? "").trim();
   if (!s) return { required: 0, extras: 0 };
@@ -78,11 +53,23 @@ function parseCellValue(raw: string): { required: number; extras: number } {
   const ext = Math.max(0, Math.floor(Number(m[2] ?? 0) || 0));
   return { required: req, extras: ext };
 }
-
 function formatCellValue(required: number, extras: number): string {
   if (extras > 0) return `${required}+${extras}`;
   return String(required);
 }
+
+/* ─────────── estilos compartilhados (Liquid Glass — sem cores novas) ─────────── */
+
+const glassCardStyle: React.CSSProperties = {
+  background: "var(--glass-bg)",
+  backdropFilter: "var(--glass-blur, blur(24px)) saturate(180%)",
+  WebkitBackdropFilter: "blur(24px) saturate(180%)",
+  border: "0.5px solid var(--glass-border)",
+  borderRadius: "var(--radius-card)",
+  boxShadow: "var(--glass-shadow)",
+};
+
+const glassPillBg = "rgba(255,255,255,0.55)";
 
 export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   const { data: rows, isLoading } = useHoldingStaffingConfig(unitId, monthYear);
@@ -93,6 +80,11 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
 
   // Regime override local (até persistir): `${sector}|${shift}` -> regime
   const [regimeOverride, setRegimeOverride] = useState<Record<string, RegimeType>>({});
+
+  // Estado de colapso por setor (todos abertos por padrão)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleCollapsed = (sector: SectorKey) =>
+    setCollapsed((p) => ({ ...p, [sector]: !p[sector] }));
 
   // index: `${sector_key}|${shift_type}|${day}` -> row
   const index = useMemo(() => {
@@ -105,16 +97,9 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
 
   const getRequired = (sector: SectorKey, shift: "almoco" | "jantar", day: number) =>
     index.get(`${sector}|${shift}|${day}`)?.required_count ?? 0;
-
   const getExtras = (sector: SectorKey, shift: "almoco" | "jantar", day: number) =>
     index.get(`${sector}|${shift}|${day}`)?.extras_count ?? 0;
 
-  /**
-   * Regime efetivo da linha (sector + shift):
-   * 1) override local recém clicado
-   * 2) qualquer registro persistido daquela linha (qualquer dia) com regime salvo
-   * 3) default (sushi=6x1, demais=5x2)
-   */
   const getRegime = (sector: SectorKey, shift: "almoco" | "jantar"): RegimeType => {
     const k = `${sector}|${shift}`;
     if (regimeOverride[k]) return regimeOverride[k];
@@ -156,7 +141,6 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     if (value === getRequired(sector, shift, day)) return;
     persistCell(sector, shift, day, value, getExtras(sector, shift, day));
   };
-
   const handleExtrasBlur = (
     sector: SectorKey,
     shift: "almoco" | "jantar",
@@ -167,8 +151,6 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     if (value === getExtras(sector, shift, day)) return;
     persistCell(sector, shift, day, getRequired(sector, shift, day), value);
   };
-
-  /** Edição combinada X+Y na célula principal (ex.: "4+1"). */
   const handleCombinedBlur = (
     sector: SectorKey,
     shift: "almoco" | "jantar",
@@ -182,10 +164,6 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     persistCell(sector, shift, day, required, extras);
   };
 
-  /**
-   * Persiste o novo regime em TODAS as 7 células daquele setor+turno
-   * (mantendo required/extras atuais).
-   */
   const handleRegimeChange = (
     sector: SectorKey,
     shift: "almoco" | "jantar",
@@ -205,7 +183,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     }
   };
 
-  // Cálculos por linha (setor × turno): soma dos 7 dias (required + extras) e dobras nos 2 regimes
+  // Métricas por linha (setor × turno)
   const rowMetrics = useMemo(() => {
     const out: Record<
       string,
@@ -233,8 +211,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectors, index]);
 
-  // Métrica agregada para Necess./Efet./Gap (uma vez por setor)
-  // Pico semanal considera required + extras por dia/turno.
+  // Pico semanal por setor (req+ext) p/ Necess./Efet./Gap
   const metricsBySector = useMemo(() => {
     const out: Record<string, { necessarias: number; dobras: number }> = {};
     for (const sector of sectors) {
@@ -254,306 +231,654 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectors, index]);
 
-  const renderGap = (necessarias: number, _dobras: number, efetivas: number) => {
-    // `necessarias` já inclui extras (pico semanal de required + extras).
-    const gap = necessarias - efetivas;
-    if (gap > 0) {
-      return (
-        <Badge className="bg-destructive/15 text-destructive hover:bg-destructive/20 border-0 font-semibold">
-          Faltam {gap}
-        </Badge>
-      );
+  // Soma agregada para o summary bar
+  const summary = useMemo(() => {
+    let necessarias = 0;
+    let efetivas = 0;
+    let setoresOk = 0;
+    let setoresGap = 0;
+    for (const sector of sectors) {
+      const m = metricsBySector[sector] ?? { necessarias: 0, dobras: 0 };
+      const ef = effectiveBySector?.[sector] ?? 0;
+      necessarias += m.necessarias;
+      efetivas += ef;
+      const gap = m.necessarias - ef;
+      if (gap <= 0) setoresOk += 1;
+      else setoresGap += 1;
     }
-    if (gap === 0) {
-      return (
-        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 border-0 font-semibold">
-          OK
-        </Badge>
-      );
+    const gapTotal = necessarias - efetivas;
+    return { necessarias, efetivas, gapTotal, setoresOk, setoresGap, total: sectors.length };
+  }, [sectors, metricsBySector, effectiveBySector]);
+
+  /* ─────────── renderizadores auxiliares ─────────── */
+
+  const renderGapPill = (gap: number) => {
+    let bg = "hsl(var(--muted) / 0.7)";
+    let color = "hsl(var(--muted-foreground))";
+    let label = "OK";
+    if (gap > 0) {
+      bg = "hsl(var(--destructive) / 0.15)";
+      color = "hsl(var(--destructive))";
+      label = `Faltam ${gap}`;
+    } else if (gap < 0) {
+      bg = "hsl(38 92% 50% / 0.15)";
+      color = "hsl(38 92% 35%)";
+      label = `Excedente ${Math.abs(gap)}`;
+    } else {
+      bg = "hsl(142 71% 45% / 0.15)";
+      color = "hsl(142 71% 30%)";
+      label = "OK";
     }
     return (
-      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 border-0 font-semibold">
-        Excedente {Math.abs(gap)}
-      </Badge>
+      <span
+        className="inline-flex items-center font-semibold tabular-nums"
+        style={{
+          background: bg,
+          color,
+          borderRadius: "var(--radius-pill)",
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 12px",
+          letterSpacing: "0.01em",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
     );
   };
 
-  return (
-    <Card className="glass-card">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <CardTitle className="text-base">
-              Mínimo Operacional por Setor / Turno / Dia
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Use o formato <strong>X+Y</strong> em cada célula (ex.: <code>4+1</code> = 4 mínimos + 1 extra fixo).
-              Os extras entram no cálculo de dobras, pessoas necessárias e Gap.
-            </p>
+  const renderRegimeToggle = (
+    sector: SectorKey,
+    shift: "almoco" | "jantar",
+    active: RegimeType,
+  ) => {
+    const Btn = ({ value }: { value: RegimeType }) => {
+      const isActive = active === value;
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRegimeChange(sector, shift, value);
+          }}
+          style={{
+            background: isActive ? "hsl(var(--primary))" : "transparent",
+            color: isActive ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+            opacity: isActive ? 1 : 0.45,
+            fontSize: 11,
+            fontWeight: 600,
+            padding: "4px 10px",
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+            boxShadow: isActive ? "0 1px 4px hsl(var(--primary) / 0.35)" : "none",
+            letterSpacing: "0.01em",
+          }}
+        >
+          {value}
+        </button>
+      );
+    };
+    return (
+      <div
+        className="inline-flex items-center"
+        style={{
+          background: "rgba(0,0,0,0.07)",
+          borderRadius: 8,
+          padding: 2,
+          gap: 2,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Btn value="5x2" />
+        <Btn value="6x1" />
+      </div>
+    );
+  };
+
+  /* ─────────── grade interna de um turno ─────────── */
+
+  const renderShiftGrid = (sector: SectorKey, shift: "almoco" | "jantar") => {
+    const regime = getRegime(sector, shift);
+    const rm = rowMetrics[`${sector}|${shift}`] ?? {
+      soma: 0,
+      somaReq: 0,
+      somaExt: 0,
+      dobras5x2: 0,
+      dobras6x1: 0,
+    };
+    const dobrasAtivas = regime === "5x2" ? rm.dobras5x2 : rm.dobras6x1;
+    const pessoas = pessoasFromDobras(dobrasAtivas);
+
+    return (
+      <div className="space-y-1">
+        {/* Label de turno */}
+        <div
+          className="uppercase tracking-wide"
+          style={{ fontSize: 10, fontWeight: 500, opacity: 0.4, letterSpacing: "0.06em" }}
+        >
+          {SHIFT_TYPES.find((s) => s.key === shift)?.label}
+        </div>
+
+        {/* Cabeçalho de dias + 1ª linha de inputs */}
+        <div
+          className="grid items-center"
+          style={{
+            gridTemplateColumns: "64px repeat(7, 1fr) 90px",
+            gap: 4,
+          }}
+        >
+          {/* Coluna vazia (alinha com input) */}
+          <div />
+          {DAYS_OF_WEEK_DISPLAY.map((d) => {
+            const isWeekend = d.key === 5 || d.key === 6 || d.key === 0; // Sex/Sáb/Dom
+            return (
+              <div
+                key={`hd-${d.key}`}
+                className="text-center uppercase"
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  color: "hsl(var(--foreground))",
+                  opacity: isWeekend ? 1 : 0.35,
+                }}
+              >
+                {d.label}
+              </div>
+            );
+          })}
+          <div
+            className="text-center uppercase"
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              opacity: 0.55,
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            Pessoas
           </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="show-extras"
-              checked={showExtras}
-              onCheckedChange={setShowExtras}
-            />
-            <Label htmlFor="show-extras" className="text-xs cursor-pointer">
-              Editar extras separadamente
-            </Label>
+
+          {/* Label "Mín." na coluna fixa */}
+          <div
+            className="text-center uppercase"
+            style={{
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              opacity: 0.5,
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            {showExtras ? "Mín." : "Mín+Ext"}
+          </div>
+
+          {/* Inputs Seg–Dom */}
+          {DAYS_OF_WEEK_DISPLAY.map((d) => {
+            const isWeekend = d.key === 5 || d.key === 6 || d.key === 0;
+            const reqVal = getRequired(sector, shift, d.key);
+            const extVal = getExtras(sector, shift, d.key);
+            const combined = formatCellValue(reqVal, extVal);
+
+            const baseStyle: React.CSSProperties = {
+              background: isWeekend
+                ? "hsl(var(--primary) / 0.08)"
+                : "rgba(255,255,255,0.52)",
+              border: isWeekend
+                ? "0.5px solid hsl(var(--primary) / 0.25)"
+                : "0.5px solid var(--glass-border-subtle)",
+              borderRadius: "var(--radius-cell)",
+              textAlign: "center",
+              fontSize: 12,
+              fontWeight: 500,
+              padding: "5px 2px",
+              outline: "none",
+              transition: "all 0.15s ease",
+              width: "100%",
+              color: "hsl(var(--foreground))",
+            };
+
+            const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.88)";
+              e.currentTarget.style.borderColor = "hsl(var(--primary) / 0.5)";
+              e.currentTarget.style.boxShadow = "0 0 0 3px hsl(var(--primary) / 0.14)";
+            };
+            const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+              e.currentTarget.style.background = baseStyle.background as string;
+              e.currentTarget.style.borderColor = isWeekend
+                ? "hsl(var(--primary) / 0.25)"
+                : "var(--glass-border-subtle)";
+              e.currentTarget.style.boxShadow = "none";
+            };
+
+            const cell = showExtras ? (
+              <div className="flex flex-col items-center gap-0.5">
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={reqVal}
+                  key={`req-${sector}-${shift}-${d.key}-${reqVal}`}
+                  onFocus={onFocus}
+                  onBlur={(e) => {
+                    onBlur(e);
+                    handleRequiredBlur(sector, shift, d.key, e.target.value);
+                  }}
+                  style={baseStyle}
+                  className="tabular-nums max-lg:text-[9px]"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={extVal}
+                  key={`ext-${sector}-${shift}-${d.key}-${extVal}`}
+                  onFocus={onFocus}
+                  onBlur={(e) => {
+                    onBlur(e);
+                    handleExtrasBlur(sector, shift, d.key, e.target.value);
+                  }}
+                  placeholder="+0"
+                  style={{ ...baseStyle, fontSize: 10, opacity: 0.7, padding: "3px 2px" }}
+                  className="tabular-nums max-lg:text-[9px]"
+                />
+              </div>
+            ) : (
+              <input
+                type="text"
+                inputMode="numeric"
+                defaultValue={combined}
+                key={`comb-${sector}-${shift}-${d.key}-${combined}`}
+                onFocus={onFocus}
+                onBlur={(e) => {
+                  onBlur(e);
+                  handleCombinedBlur(sector, shift, d.key, e.target.value);
+                }}
+                placeholder="0"
+                title="Formato: X+Y (ex.: 4+1 = 4 mínimos + 1 extra)"
+                style={{
+                  ...baseStyle,
+                  fontWeight: extVal > 0 ? 700 : 500,
+                }}
+                className="tabular-nums max-lg:text-[9px]"
+              />
+            );
+
+            return (
+              <Tooltip key={`cell-${d.key}`}>
+                <TooltipTrigger asChild>
+                  <div className="w-full">{cell}</div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  <div className="space-y-0.5">
+                    <div>
+                      Soma semanal: <strong>{rm.soma}</strong>
+                    </div>
+                    <div className={cn(regime === "5x2" && "font-semibold text-primary")}>
+                      5x2: {rm.dobras5x2.toFixed(1)} dobras → {pessoasFromDobras(rm.dobras5x2)} pessoas
+                    </div>
+                    <div className={cn(regime === "6x1" && "font-semibold text-primary")}>
+                      6x1: {rm.dobras6x1.toFixed(1)} dobras → {pessoasFromDobras(rm.dobras6x1)} pessoas
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+
+          {/* Célula resultado */}
+          <div
+            className="flex flex-col items-center justify-center"
+            style={{
+              background: "rgba(255,255,255,0.35)",
+              border: "0.5px solid rgba(255,255,255,0.60)",
+              borderRadius: "var(--radius-cell)",
+              padding: "4px 6px",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            <span
+              className="tabular-nums"
+              style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.3px", lineHeight: 1.1 }}
+            >
+              {pessoas}
+            </span>
+            <span style={{ fontSize: 9, opacity: 0.4, lineHeight: 1.1 }}>
+              {regime} · {dobrasAtivas.toFixed(1)}d
+            </span>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {isLoading ? (
-          <Skeleton className="h-64 w-full" />
-        ) : (
-          <TooltipProvider delayDuration={150}>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="sticky left-0 z-10 bg-card/95 backdrop-blur w-[120px] text-xs uppercase tracking-wide">
-                      Setor
-                    </TableHead>
-                    <TableHead className="w-14 text-center text-[10px] uppercase tracking-wide">
-                      Turno
-                    </TableHead>
-                    {DAYS_OF_WEEK_DISPLAY.map((d) => (
-                      <TableHead
-                        key={d.key}
-                        className="w-[76px] text-center text-[11px] uppercase tracking-wide"
-                      >
-                        {d.label}
-                      </TableHead>
-                    ))}
-                    <TableHead className="w-[80px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Regime
-                    </TableHead>
-                    <TableHead className="hidden xl:table-cell w-[140px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Nº Dobras
-                    </TableHead>
-                    <TableHead className="hidden xl:table-cell w-[100px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Nº Pessoas
-                    </TableHead>
-                    <TableHead className="w-[72px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Necess.
-                    </TableHead>
-                    <TableHead className="w-[72px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Efet.
-                    </TableHead>
-                    <TableHead className="w-[100px] text-center text-[11px] uppercase tracking-wide bg-muted/40">
-                      Gap
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sectors.map((sector, sIdx) => {
-                    const metrics = metricsBySector[sector] ?? { necessarias: 0, dobras: 0 };
-                    const efetivas = effectiveBySector?.[sector] ?? 0;
-                    const zebra = sIdx % 2 === 1 ? "bg-muted/10" : "";
-                    return SHIFT_TYPES.map((shift) => {
-                      const regime = getRegime(sector, shift.key);
-                      const rm = rowMetrics[`${sector}|${shift.key}`] ?? {
-                        soma: 0,
-                        dobras5x2: 0,
-                        dobras6x1: 0,
-                      };
-                      const dobrasAtivas = regime === "5x2" ? rm.dobras5x2 : rm.dobras6x1;
-                      const pessoas = pessoasFromDobras(dobrasAtivas);
-                      return (
-                        <TableRow key={`${sector}-${shift.key}`} className={`h-11 ${zebra}`}>
-                          {shift.key === "almoco" && (
-                            <TableCell
-                              rowSpan={2}
-                              className={`sticky left-0 z-10 bg-card/95 backdrop-blur align-middle font-medium w-[120px] ${zebra}`}
-                            >
-                              <div className="flex flex-col gap-1">
-                                <span className="text-xs uppercase tracking-wide">
-                                  {SECTOR_LABELS[sector]}
-                                </span>
-                                {sector === "sushi" && (
-                                  <Badge variant="secondary" className="w-fit text-[9px]">
-                                    Nazo
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                          )}
-                          <TableCell className="text-center text-[10px] uppercase tracking-wide text-muted-foreground w-14">
-                            {shift.label}
-                          </TableCell>
-                          {DAYS_OF_WEEK_DISPLAY.map((d) => {
-                            const reqVal = getRequired(sector, shift.key, d.key);
-                            const extVal = getExtras(sector, shift.key, d.key);
-                            const combined = formatCellValue(reqVal, extVal);
-                            const cell = showExtras ? (
-                              // Modo "extras separados": dois inputs numéricos puros
-                              <div className="flex flex-col items-center gap-0.5">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  defaultValue={reqVal}
-                                  key={`req-${sector}-${shift.key}-${d.key}-${reqVal}`}
-                                  onBlur={(e) =>
-                                    handleRequiredBlur(sector, shift.key, d.key, e.target.value)
-                                  }
-                                  className="h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm"
-                                />
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  defaultValue={extVal}
-                                  key={`ext-${sector}-${shift.key}-${d.key}-${extVal}`}
-                                  onBlur={(e) =>
-                                    handleExtrasBlur(sector, shift.key, d.key, e.target.value)
-                                  }
-                                  placeholder="+0"
-                                  className="h-7 w-16 text-center text-xs tabular-nums text-muted-foreground bg-background/30"
-                                />
-                              </div>
-                            ) : (
-                              // Modo padrão: célula única "X+Y"
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                defaultValue={combined}
-                                key={`comb-${sector}-${shift.key}-${d.key}-${combined}`}
-                                onBlur={(e) =>
-                                  handleCombinedBlur(sector, shift.key, d.key, e.target.value)
-                                }
-                                placeholder="0"
-                                title="Formato: X+Y (ex.: 4+1 = 4 mínimos + 1 extra)"
-                                className={cn(
-                                  "h-9 w-16 text-center text-base tabular-nums font-semibold bg-background/60 backdrop-blur-sm",
-                                  extVal > 0 && "ring-1 ring-primary/40",
-                                )}
-                              />
-                            );
-                            return (
-                              <TableCell key={d.key} className="p-1 text-center w-[76px]">
-                                {/* Em telas <1280px, tooltip com cálculos no hover do required */}
-                                <span className="xl:hidden">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div>{cell}</div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="text-xs">
-                                      <div className="space-y-0.5">
-                                        <div>Soma semanal: <strong>{rm.soma}</strong></div>
-                                        <div className={cn(regime === "5x2" && "font-semibold text-primary")}>
-                                          5x2: {rm.dobras5x2.toFixed(1)} dobras → {pessoasFromDobras(rm.dobras5x2)} pessoas
-                                        </div>
-                                        <div className={cn(regime === "6x1" && "font-semibold text-primary")}>
-                                          6x1: {rm.dobras6x1.toFixed(1)} dobras → {pessoasFromDobras(rm.dobras6x1)} pessoas
-                                        </div>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </span>
-                                <span className="hidden xl:block">{cell}</span>
-                              </TableCell>
-                            );
-                          })}
+      </div>
+    );
+  };
 
-                          {/* Regime toggle (sempre visível) */}
-                          <TableCell className="p-1 text-center w-[80px] bg-muted/20">
-                            <div className="inline-flex rounded-md border border-border/60 overflow-hidden">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={regime === "5x2" ? "default" : "ghost"}
-                                className="h-7 px-2 text-[10px] rounded-none"
-                                onClick={() => handleRegimeChange(sector, shift.key, "5x2")}
-                              >
-                                5x2
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={regime === "6x1" ? "default" : "ghost"}
-                                className="h-7 px-2 text-[10px] rounded-none"
-                                onClick={() => handleRegimeChange(sector, shift.key, "6x1")}
-                              >
-                                6x1
-                              </Button>
-                            </div>
-                          </TableCell>
+  /* ─────────── card de setor ─────────── */
 
-                          {/* Nº Dobras (≥ xl) */}
-                          <TableCell className="hidden xl:table-cell text-center align-middle w-[140px] bg-muted/20">
-                            <div className="flex flex-col leading-tight tabular-nums">
-                              <span
-                                className={cn(
-                                  "text-xs",
-                                  regime === "5x2"
-                                    ? "font-bold text-primary"
-                                    : "text-muted-foreground/70",
-                                )}
-                              >
-                                5x2: {rm.dobras5x2.toFixed(1)}
-                              </span>
-                              <span
-                                className={cn(
-                                  "text-xs",
-                                  regime === "6x1"
-                                    ? "font-bold text-primary"
-                                    : "text-muted-foreground/70",
-                                )}
-                              >
-                                6x1: {rm.dobras6x1.toFixed(1)}
-                              </span>
-                            </div>
-                          </TableCell>
+  const renderSectorCard = (sector: SectorKey) => {
+    const isCollapsed = !!collapsed[sector];
+    const m = metricsBySector[sector] ?? { necessarias: 0, dobras: 0 };
+    const efetivas = effectiveBySector?.[sector] ?? 0;
+    const gap = m.necessarias - efetivas;
 
-                          {/* Nº Pessoas Necessárias (≥ xl) */}
-                          <TableCell className="hidden xl:table-cell text-center align-middle w-[100px] bg-muted/20">
-                            <Badge
-                              className={cn(
-                                "border-0 font-semibold tabular-nums",
-                                badgeColorForPessoas(pessoas),
-                              )}
-                            >
-                              {pessoas}
-                            </Badge>
-                          </TableCell>
+    // Para o Nº pessoas no header: usamos o pico (almoço × jantar) com regime ativo
+    const rmA = rowMetrics[`${sector}|almoco`] ?? { dobras5x2: 0, dobras6x1: 0 };
+    const rmJ = rowMetrics[`${sector}|jantar`] ?? { dobras5x2: 0, dobras6x1: 0 };
+    const regimeA = getRegime(sector, "almoco");
+    const regimeJ = getRegime(sector, "jantar");
+    const pessA = pessoasFromDobras(regimeA === "5x2" ? rmA.dobras5x2 : rmA.dobras6x1);
+    const pessJ = pessoasFromDobras(regimeJ === "5x2" ? rmJ.dobras5x2 : rmJ.dobras6x1);
+    const headerPessoas = Math.max(pessA, pessJ);
 
-                          {shift.key === "almoco" && (
-                            <>
-                              <TableCell
-                                rowSpan={2}
-                                className={`text-center align-middle font-semibold tabular-nums bg-muted/20 ${zebra}`}
-                              >
-                                {metrics.necessarias}
-                              </TableCell>
-                              <TableCell
-                                rowSpan={2}
-                                className={`text-center align-middle font-semibold tabular-nums bg-muted/20 ${zebra}`}
-                              >
-                                {efetivas}
-                              </TableCell>
-                              <TableCell
-                                rowSpan={2}
-                                className={`text-center align-middle bg-muted/20 ${zebra}`}
-                              >
-                                {renderGap(metrics.necessarias, metrics.dobras, efetivas)}
-                              </TableCell>
-                            </>
-                          )}
-                        </TableRow>
-                      );
-                    });
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </TooltipProvider>
-        )}
-        <p className="text-[10px] text-muted-foreground italic">
-          Célula <strong>X+Y</strong>: X = mínimo CLT, Y = extras pré-definidos pelo COO. Soma semanal usa X+Y.
-          Regime: 5x2 → dobras = (soma×2)/10 • 6x1 → dobras = soma/9,5 • Nº Pessoas = arredondamento p/ cima.
-          Gap = pico semanal (mínimo + extras) − CLT efetivos.
-        </p>
-      </CardContent>
-    </Card>
+    // Dobras header (somar almoço + jantar para visão geral)
+    const totalDobras5x2 = rmA.dobras5x2 + rmJ.dobras5x2;
+    const totalDobras6x1 = rmA.dobras6x1 + rmJ.dobras6x1;
+    // Regime "ativo" no header: o predominante (almoço); usa-se para destacar
+    const headerRegime = regimeA;
+
+    return (
+      <div
+        key={sector}
+        style={{ ...glassCardStyle, marginBottom: 10, overflow: "hidden", transition: "box-shadow 0.2s ease" }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLDivElement).style.boxShadow =
+            "0 12px 40px rgba(0,0,0,0.13)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLDivElement).style.boxShadow = "var(--glass-shadow)";
+        }}
+      >
+        {/* HEADER */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => toggleCollapsed(sector)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              toggleCollapsed(sector);
+            }
+          }}
+          className="flex items-center"
+          style={{
+            padding: "13px 18px",
+            gap: 10,
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          {/* Nome */}
+          <span
+            className="uppercase max-lg:text-[12px]"
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              letterSpacing: "-0.2px",
+              minWidth: 150,
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            {SECTOR_LABELS[sector]}
+          </span>
+
+          {/* Nº pessoas */}
+          <span
+            className="tabular-nums"
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              letterSpacing: "-0.5px",
+              color: "hsl(var(--foreground))",
+              minWidth: 36,
+            }}
+          >
+            {headerPessoas}
+          </span>
+
+          {/* Dobras sobrepostas */}
+          <div className="flex flex-col leading-tight" style={{ minWidth: 70 }}>
+            <span
+              className="tabular-nums"
+              style={{
+                fontSize: 11,
+                fontWeight: headerRegime === "5x2" ? 600 : 400,
+                opacity: headerRegime === "5x2" ? 1 : 0.4,
+                color: "hsl(var(--muted-foreground))",
+              }}
+            >
+              5×2: {totalDobras5x2.toFixed(1)}
+            </span>
+            <span
+              className="tabular-nums"
+              style={{
+                fontSize: 11,
+                fontWeight: headerRegime === "6x1" ? 600 : 400,
+                opacity: headerRegime === "6x1" ? 1 : 0.4,
+                color: "hsl(var(--muted-foreground))",
+              }}
+            >
+              6×1: {totalDobras6x1.toFixed(1)}
+            </span>
+          </div>
+
+          {/* Toggle 5x2 / 6x1 (aplica em ambos os turnos via almoço — mantém UX) */}
+          <div style={{ marginLeft: "auto" }} className="flex items-center gap-2.5">
+            {/* Mostramos um único toggle visual; ele troca o regime de "almoco" como referência principal. 
+                Cada turno mantém regime independente — para granularidade fina, expandir o card. */}
+            {renderRegimeToggle(sector, "almoco", regimeA)}
+
+            {/* Gap pill */}
+            {renderGapPill(gap)}
+
+            {/* Chevron */}
+            <ChevronDown
+              size={14}
+              style={{
+                opacity: 0.4,
+                transition: "transform 0.2s ease",
+                transform: isCollapsed ? "rotate(0deg)" : "rotate(180deg)",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* BODY */}
+        <div
+          style={{
+            background: "rgba(255,255,255,0.18)",
+            borderTop: isCollapsed ? "none" : "0.5px solid rgba(255,255,255,0.50)",
+            maxHeight: isCollapsed ? 0 : 600,
+            opacity: isCollapsed ? 0 : 1,
+            overflow: "hidden",
+            transition: "max-height 0.25s ease, opacity 0.2s ease, border-top-color 0.2s ease",
+            padding: isCollapsed ? "0 18px" : "12px 18px 16px",
+          }}
+        >
+          {renderShiftGrid(sector, "almoco")}
+
+          {/* Separador */}
+          <div
+            style={{
+              height: "0.5px",
+              background: "rgba(255,255,255,0.50)",
+              margin: "10px 0",
+            }}
+          />
+
+          {renderShiftGrid(sector, "jantar")}
+
+          {/* Mini-resumo (Necess. / Efet.) */}
+          <div
+            className="flex items-center justify-end gap-4 mt-3 text-[11px]"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            <span>
+              Necessárias: <strong className="tabular-nums" style={{ color: "hsl(var(--foreground))" }}>{m.necessarias}</strong>
+            </span>
+            <span>
+              Efetivas: <strong className="tabular-nums" style={{ color: "hsl(var(--foreground))" }}>{efetivas}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* ─────────── summary bar ─────────── */
+
+  const SummaryCard = ({
+    label,
+    value,
+    sub,
+    valueColor,
+  }: {
+    label: string;
+    value: string | number;
+    sub?: string;
+    valueColor?: string;
+  }) => (
+    <div style={{ ...glassCardStyle, padding: "14px 18px" }}>
+      <div
+        className="uppercase"
+        style={{
+          fontSize: 10,
+          letterSpacing: "0.06em",
+          opacity: 0.55,
+          color: "hsl(var(--foreground))",
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="tabular-nums max-lg:text-[22px]"
+        style={{
+          fontSize: 28,
+          fontWeight: 700,
+          letterSpacing: "-1px",
+          color: valueColor ?? "hsl(var(--foreground))",
+          lineHeight: 1.1,
+          marginTop: 4,
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "hsl(var(--muted-foreground))",
+            marginTop: 2,
+          }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Cabeçalho descritivo + switch */}
+      <div
+        className="flex items-start justify-between flex-wrap gap-3"
+        style={{ ...glassCardStyle, padding: "12px 20px" }}
+      >
+        <div>
+          <div
+            className="uppercase"
+            style={{
+              fontSize: 10,
+              letterSpacing: "0.06em",
+              opacity: 0.55,
+              color: "hsl(var(--foreground))",
+              fontWeight: 600,
+            }}
+          >
+            Mínimo Operacional
+          </div>
+          <div style={{ fontSize: 13, color: "hsl(var(--muted-foreground))", marginTop: 2 }}>
+            Use <strong>X+Y</strong> em cada célula (ex.: <code>4+1</code> = 4 mínimos + 1 extra fixo).
+          </div>
+        </div>
+        <div
+          className="flex items-center gap-2"
+          style={{
+            background: glassPillBg,
+            border: "0.5px solid var(--glass-border-subtle)",
+            borderRadius: "var(--radius-inner)",
+            padding: "6px 10px",
+          }}
+        >
+          <Switch id="show-extras" checked={showExtras} onCheckedChange={setShowExtras} />
+          <Label htmlFor="show-extras" className="text-xs cursor-pointer">
+            Editar extras separadamente
+          </Label>
+        </div>
+      </div>
+
+      {/* SUMMARY BAR */}
+      <div
+        className="grid gap-2.5"
+        style={{
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        }}
+      >
+        <div className="contents max-lg:hidden">
+          <SummaryCard label="Necessárias (pico)" value={summary.necessarias} sub="Soma dos picos por setor" />
+          <SummaryCard label="Efetivas (CLT)" value={summary.efetivas} sub="Headcount efetivo atual" />
+          <SummaryCard
+            label="Gap total"
+            value={summary.gapTotal > 0 ? `-${summary.gapTotal}` : summary.gapTotal === 0 ? "0" : `+${Math.abs(summary.gapTotal)}`}
+            sub={summary.gapTotal > 0 ? "Faltam pessoas" : summary.gapTotal === 0 ? "Equilibrado" : "Excedente"}
+            valueColor={
+              summary.gapTotal > 0
+                ? "hsl(var(--destructive))"
+                : summary.gapTotal === 0
+                ? "hsl(142 71% 30%)"
+                : "hsl(38 92% 35%)"
+            }
+          />
+          <SummaryCard
+            label="Setores OK"
+            value={`${summary.setoresOk}/${summary.total}`}
+            sub={summary.setoresGap > 0 ? `${summary.setoresGap} com gap` : "Todos cobertos"}
+          />
+        </div>
+        {/* Mobile: 2x2 grid */}
+        <div className="lg:hidden col-span-4 grid grid-cols-2 gap-2.5">
+          <SummaryCard label="Necessárias" value={summary.necessarias} />
+          <SummaryCard label="Efetivas" value={summary.efetivas} />
+          <SummaryCard
+            label="Gap"
+            value={summary.gapTotal}
+            valueColor={
+              summary.gapTotal > 0
+                ? "hsl(var(--destructive))"
+                : summary.gapTotal === 0
+                ? "hsl(142 71% 30%)"
+                : "hsl(38 92% 35%)"
+            }
+          />
+          <SummaryCard label="Setores OK" value={`${summary.setoresOk}/${summary.total}`} />
+        </div>
+      </div>
+
+      {/* CARDS DE SETOR */}
+      {isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : (
+        <TooltipProvider delayDuration={150}>
+          <div>{sectors.map((s) => renderSectorCard(s))}</div>
+        </TooltipProvider>
+      )}
+
+      <p className="text-[10px] text-muted-foreground italic px-1">
+        Célula <strong>X+Y</strong>: X = mínimo CLT, Y = extras pré-definidos pelo COO. Soma semanal usa X+Y.
+        Regime: 5x2 → dobras = (soma×2)/10 • 6x1 → dobras = soma/9,5 • Nº Pessoas = arredondamento p/ cima.
+        Gap = pico semanal (mínimo + extras) − CLT efetivos.
+      </p>
+    </div>
   );
 }

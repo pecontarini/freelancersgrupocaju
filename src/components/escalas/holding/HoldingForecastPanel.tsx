@@ -34,6 +34,7 @@ import {
   useHoldingFreelancerForecast,
   useUpsertHoldingForecast,
 } from "@/hooks/useHoldingConfig";
+import { useHoldingFreelancerBudgetCalc } from "@/hooks/useHoldingFreelancerBudgetCalc";
 import {
   SECTOR_LABELS,
   SHIFT_TYPES,

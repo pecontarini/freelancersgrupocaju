@@ -24,6 +24,7 @@ import {
   type Brand,
   type SectorKey,
 } from "@/lib/holding/sectors";
+import { useHoldingFreelancerBudgetCalc } from "@/hooks/useHoldingFreelancerBudgetCalc";
 import { cn } from "@/lib/utils";
 
 interface Props {

@@ -114,6 +114,10 @@
     --glass-blur: 24px;
     --glass-blur-strong: 40px;
 
+    /* Liquid Glass — extra structural tokens (dark) */
+    --glass-bg-deep: rgba(30, 30, 40, 0.45);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 1.5px 4px rgba(0,0,0,0.25);
+
     --shadow-xs: 0 1px 3px rgba(0,0,0,0.2);
     --shadow-sm: 0 2px 8px rgba(0,0,0,0.25);
     --shadow-md: 0 4px 20px rgba(0,0,0,0.3);

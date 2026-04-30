@@ -59,6 +59,7 @@ export function HoldingForecastPanel({ brand, unitId, monthYear }: Props) {
   const remove = useDeleteHoldingForecast();
   const sectors = sectorsForBrand(brand);
   const [open, setOpen] = useState(false);
+  const calc = useHoldingFreelancerBudgetCalc(unitId, monthYear, brand);
 
   const sortedRows = useMemo(() => {
     return [...(data ?? [])].sort((a, b) => {
@@ -75,14 +76,67 @@ export function HoldingForecastPanel({ brand, unitId, monthYear }: Props) {
   );
 
   return (
-    <Card className="glass-card">
+    <div className="space-y-3">
+      <Card className="glass-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Resumo do Mês — Diárias Previstas</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Cruzamento automático: <strong>Gap</strong> (mínimo dimensionado − CLT efetivo,
+            multiplicado pelos dias do mês) + <strong>Pontuais</strong> (cadastros abaixo).
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Setor</TableHead>
+                  <TableHead className="text-right">Gap (estrutural)</TableHead>
+                  <TableHead className="text-right">Pontuais</TableHead>
+                  <TableHead className="text-right">Total Diárias</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {calc.perSector.map((row) => (
+                  <TableRow key={row.sector}>
+                    <TableCell className="font-medium">{row.label}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {row.gapDiarias}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {row.pontuaisDiarias}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-semibold">
+                      {row.totalDiarias}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-primary/5">
+                  <TableCell className="font-semibold">Total</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {calc.totalGapDiarias}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {calc.totalPontuaisDiarias}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-bold text-primary">
+                    {calc.totalDiarias}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-card">
       <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
         <div>
           <CardTitle className="text-base">
-            Previsão de Freelancers — {monthYear}
+            Previsão Pontual — {monthYear}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Total previsto no mês:{" "}
+            Reforços por data específica (eventos, feriados). Total pontual:{" "}
             <strong className="text-foreground">{totalCount}</strong>{" "}
             freelancer(s).
           </p>

@@ -542,12 +542,23 @@
     100% { opacity: 1; transform: translateY(0); }
   }
 
+  /*
+   * NOTE: `will-change` creates a new containing block, which invalidates
+   * `position: fixed` for descendants (the shadcn Sidebar uses fixed
+   * positioning to stay glued to the viewport). We scope it to the running
+   * animation only — once the animation ends, the property is dropped and
+   * fixed children behave normally again.
+   */
   .page-transition-cinematic {
     animation: page-enter-cinematic 520ms var(--ease-cinematic) both;
+  }
+  .page-transition-cinematic.is-animating {
     will-change: transform, opacity, clip-path, filter;
   }
   .page-transition-fast {
     animation: page-enter-fast 180ms var(--ease-soft) both;
+  }
+  .page-transition-fast.is-animating {
     will-change: transform, opacity;
   }
 

@@ -78,6 +78,7 @@ export function HoldingStaffingPanel({ brand, unitId, monthYear }: Props) {
   const upsert = useUpsertHoldingStaffing();
   const sectors = sectorsForBrand(brand);
   const [showExtras, setShowExtras] = useState(false);
+  const budgetCalc = useHoldingFreelancerBudgetCalc(unitId, monthYear, brand);
 
   // Regime override local (até persistir): `${sector}|${shift}` -> regime
   const [regimeOverride, setRegimeOverride] = useState<Record<string, RegimeType>>({});

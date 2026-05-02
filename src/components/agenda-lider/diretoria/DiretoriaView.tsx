@@ -12,10 +12,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 export function DiretoriaView() {
   const { data: missoes = [], isLoading } = useMissoes({ unidadeId: null });
   const { data: membros = [] } = useUnidadeMembros(null);
+  const isMobile = useIsMobile();
 
   const [responsaveisMap, setResponsaveisMap] = useState<Record<string, string>>({});
   const [openId, setOpenId] = useState<string | null>(null);
   const [lojas, setLojas] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<"all" | "andamento" | "concluido">("all");
 
   useEffect(() => {
     supabase

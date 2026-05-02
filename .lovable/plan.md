@@ -1,60 +1,62 @@
-## Diagnóstico
+## Objetivo
 
-A edge function `extract-utensilios-pdf` aparece nos logs **apenas como "booted"** — nenhuma requisição HTTP completa foi registrada no edge_logs. Combinado com a UI presa em "Extraindo com IA…", isso indica que **a requisição nem está chegando à função** ou está travando antes da resposta. Causas mais prováveis:
+Aproveitar as fotos que já existem dentro do PDF da matriz e usá-las como imagem de identificação (`foto_url`) de cada utensílio criado, eliminando (ou reduzindo) a necessidade de gerar imagem por IA depois.
 
-1. **Payload excede o limite (~6MB) de body em Edge Functions.** O PDF do usuário tem 21 páginas. Convertido para base64 e embrulhado em JSON, facilmente passa de 8-15MB. O Supabase Functions Gateway corta antes de invocar a função — por isso vemos "booted" mas nenhum log de execução.
-2. **Gemini 2.5 Pro processando 21 páginas** pode levar 90-180s. Mesmo se o payload passar, a função pode estourar o timeout padrão (60s) do edge runtime, e o cliente fica preso indefinidamente.
-3. **Sem timeout client-side** — `supabase.functions.invoke` não tem timeout, então a UI roda para sempre.
+## Como vai funcionar (visão do usuário)
 
-## Solução
+1. Você sobe o PDF normalmente em **Importar via PDF (IA)**.
+2. A IA extrai os itens **e** as fotos lado a lado de cada item.
+3. Cada linha do modal de revisão já aparece com a foto recortada do próprio PDF.
+4. Ao confirmar, a foto é salva no bucket público de utensílios e vinculada ao item.
+5. O botão "Gerar imagem com IA" continua disponível como fallback para itens onde a extração falhou.
 
-### 1. Mudar transporte do PDF: Storage em vez de base64 inline
-- Criar bucket privado `utensilios-imports` (ou reutilizar um existente).
-- No client: upload do PDF para Storage → obter `path`.
-- Passar para a edge function apenas `{ pdf_path: "<path>" }` (payload < 1KB).
-- Edge function baixa o PDF do Storage com Service Role e converte para base64 internamente para enviar ao Gemini.
+## Como vai funcionar (técnico)
 
-### 2. Trocar modelo para `gemini-2.5-flash` + processar em chunks
-- Gemini 2.5 Flash é 5-8x mais rápido e suficiente para extração tabular estruturada.
-- Para PDFs > 10 páginas: dividir em chunks de 10 páginas (usando `pdf-lib` no Deno) e processar em paralelo.
-- Mesclar resultados e deduplicar por nome+setor.
+### 1. Edge Function `extract-utensilios-pdf` — passa a renderizar páginas
 
-### 3. Logs e timeouts robustos
-- Adicionar `console.log` em cada etapa-chave da edge function (download size, chunk count, AI response status, items extraídos).
-- No client: `Promise.race` com timeout de 180s + mensagem de erro clara.
-- Toast de progresso ("Página X de Y processada") via polling opcional ou apenas mensagens intermediárias.
+Hoje envia o PDF "cru" para o Gemini. Vamos mudar para:
 
-### 4. Correção de config
-- Manter `verify_jwt = true` (default) — admins já estão autenticados, e essa é a postura segura.
-- Confirmar que `LOVABLE_API_KEY` está disponível (já está, pela `generate-utensilio-image` ter funcionado).
+- Renderizar cada página do PDF como **imagem PNG em alta resolução** usando `pdfium` (via `pdfium-deno` ou rasterização com `pdf-lib`+`canvas` no Deno). Alternativa robusta: `https://esm.sh/@pdf-lib/pdfium` ou usar a API `pdf.js-extract`. Avaliação: **usar `pdfium-deno`** (nativo, rápido, já roda em edge runtime).
+- Mandar para o Gemini Flash a **imagem da página** (não mais o PDF) com instruções para retornar para cada item:
+  ```
+  { nome, qtd_minima, custo_unitario, fornecedor, setor,
+    bbox: { x, y, w, h, page_index } }   // bbox em coordenadas normalizadas 0..1 da imagem
+  ```
+- Após receber a resposta, **recortar o bbox** de cada item da imagem renderizada (usando `Image` API do Deno ou `imagescript`) e fazer upload para o bucket `utensilios-photos` com o nome `imports/<uuid>.png`.
+- Retornar para o frontend a `foto_url` pública já preenchida no campo existente da resposta.
+
+### 2. Frontend (`UtensiliosImportPDFDialog.tsx`)
+
+- O campo `foto_url` já existe em `ExtractedRow` e já é renderizado (linha 368-369). **Nenhuma mudança visual necessária** — basta receber o valor já preenchido pela edge function.
+- Manter o botão "Gerar com IA" para itens cujo `foto_url` veio vazio.
+- No `bulkImport`, a foto extraída já é gravada (linhas 211 e 231).
+
+### 3. Bucket
+
+`utensilios-photos` já existe e é público (visto no código de `generate-utensilio-image`). Sem migração necessária.
+
+### 4. Observações de performance/custo
+
+- Renderizar páginas em ~150 DPI mantém qualidade suficiente para fotos de produto pequenas e fica abaixo de 1MB por página.
+- Mantém o paralelismo de 4 chunks. Cada chunk envia agora 6 imagens (uma por página) em vez de 1 PDF.
+- O Gemini Flash multimodal aceita múltiplas imagens em uma chamada (`type: "image_url"`) — usaremos esse formato.
+- Dedup atual por `nome+setor` continua válido; quando há duplicatas, mantemos a primeira foto encontrada.
 
 ## Arquivos afetados
 
-- **`supabase/functions/extract-utensilios-pdf/index.ts`** — refatorar para receber `pdf_path`, baixar do Storage, dividir em chunks, processar paralelo, logs detalhados, modelo flash.
-- **`src/components/utensilios/UtensiliosImportPDFDialog.tsx`** — `handleExtract` faz upload para Storage primeiro, depois chama a function com `pdf_path`. Adicionar timeout de 180s e mensagens de progresso.
-- **Migration nova** — criar bucket `utensilios-imports` (privado) com policy permitindo apenas admins fazerem upload e a service role ler.
-
-## Como vai ficar o fluxo
-
 ```text
-[Client]
-  1. Upload PDF -> Storage (utensilios-imports/{uuid}.pdf)
-  2. invoke('extract-utensilios-pdf', { pdf_path })   [payload <1KB]
-
-[Edge Function]
-  3. Service-role client baixa PDF do Storage
-  4. pdf-lib divide em chunks de 10 páginas
-  5. Para cada chunk: chama Gemini 2.5 Flash com tool-call estruturada
-  6. Mescla + deduplica itens
-  7. (Opcional) deleta o PDF do bucket
-  8. Retorna { items: [...] }
-
-[Client]
-  9. Mostra revisão (passo 2 do wizard)
+supabase/functions/extract-utensilios-pdf/index.ts   (refactor: render → crop → upload)
+src/components/utensilios/UtensiliosImportPDFDialog.tsx   (nenhuma mudança esperada — já consome foto_url)
 ```
 
-## Verificação pós-deploy
+## Riscos / fallback
 
-- Testar com o PDF de 21 páginas que o usuário tentou.
-- Conferir logs da edge function via `supabase--edge_function_logs` (devem mostrar download size, chunk count, item count).
-- Confirmar que a UI sai do estado "Extraindo…" em < 90s.
+- Se a renderização do PDF falhar em alguma página, fazemos fallback para o fluxo atual (mandar PDF inteiro para a IA, sem foto).
+- Se o bbox vier inválido (fora de 0..1), simplesmente deixamos `foto_url=null` e o usuário pode gerar via IA depois.
+
+## O que você poderá testar logo após aprovar
+
+1. Zerar Caju Itaim (já feito).
+2. Subir o PDF novamente.
+3. Cada item deve aparecer com foto **real do PDF** no modal de revisão.
+4. Confirmar importação → fotos persistem no catálogo da unidade.

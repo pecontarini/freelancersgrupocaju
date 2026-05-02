@@ -45,11 +45,9 @@ export function useSheetData(sheetKey: SheetKey, autoRefreshMinutes = 5): UseShe
       if (!res.ok) throw new Error(`Erro ${res.status}`);
 
       const csvText = await res.text();
-      if (["nps_base", "base_avaliacoes"].includes(sheetKey)) {
-        console.log(`\n=== RAW [${sheetKey}] — primeiras 25 linhas ===`);
-        csvText.split("\n").slice(0, 25).forEach((l, i) =>
-          console.log(`L${String(i+1).padStart(2,"0")}: ${l}`)
-        );
+      if (["nps_base", "base_avaliacoes", "nps_dashboard"].includes(sheetKey)) {
+        console.log(`\n=== RAW CSV [${sheetKey}] primeiras 20 linhas ===`);
+        console.log(csvText.split("\n").slice(0, 20).join("\n"));
       }
       setRaw(csvText);
 

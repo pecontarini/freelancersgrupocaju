@@ -83,6 +83,19 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
   // ── Google Sheets integration (additive) ──────────────────────
   const { raw: rawGeral, loading: loadingGeral } = useSheetData("checklist_geral");
   const { raw: rawChefias, loading: loadingChefias } = useSheetData("checklist_chefias");
+  const { raw: rawNps } = useSheetData("nps_dashboard");
+  const { raw: rawFat } = useSheetData("avaliacoes_fat");
+  const { raw: rawBase } = useSheetData("base_avaliacoes");
+
+  const npsData = useMemo(() => (rawNps ? parseNpsCSV(rawNps) : []), [rawNps]);
+  const fatData = useMemo(
+    () => (rawFat ? parseFaturamentoCSV(rawFat) : null),
+    [rawFat]
+  );
+  const baseData = useMemo(
+    () => (rawBase ? parseBaseAvaliacoesCSV(rawBase) : []),
+    [rawBase]
+  );
 
   const rankingGeral = useMemo(
     () => (rawGeral ? parseChecklistCSV(rawGeral) : []),

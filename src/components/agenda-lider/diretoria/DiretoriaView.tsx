@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 import { PrioridadeBadge, StatusBadge } from "../shared/Badges";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function DiretoriaView() {
   const { data: missoes = [], isLoading } = useMissoes({ unidadeId: null });

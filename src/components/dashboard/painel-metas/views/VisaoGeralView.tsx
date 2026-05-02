@@ -262,26 +262,26 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
         <KpiByStoreCard
           label="Back Score Médio"
           value={
-            overview.data?.avgBack !== null && overview.data?.avgBack !== undefined
-              ? `${formatNumberPt(overview.data.avgBack, 1)}`
+            displayAvgBack !== null && displayAvgBack !== undefined
+              ? `${formatNumberPt(displayAvgBack, 2)}%`
               : "—"
           }
-          progress={overview.data?.avgBack ?? 0}
-          tone={tierToTone(overview.data?.avgBack ?? null)}
+          progress={displayAvgBack ?? 0}
+          tone={tierToTone(displayAvgBack ?? null)}
           icon={TrendingDown}
-          loading={overview.isLoading}
+          loading={isLoadingKpis}
         />
         <KpiByStoreCard
           label="Front Score Médio"
           value={
-            overview.data?.avgFront !== null && overview.data?.avgFront !== undefined
-              ? `${formatNumberPt(overview.data.avgFront, 1)}`
+            displayAvgFront !== null && displayAvgFront !== undefined
+              ? `${formatNumberPt(displayAvgFront, 2)}%`
               : "—"
           }
-          progress={overview.data?.avgFront ?? 0}
-          tone={tierToTone(overview.data?.avgFront ?? null)}
+          progress={displayAvgFront ?? 0}
+          tone={tierToTone(displayAvgFront ?? null)}
           icon={TrendingUp}
-          loading={overview.isLoading}
+          loading={isLoadingKpis}
         />
         <KpiByStoreCard
           label="Reclamações no Mês"

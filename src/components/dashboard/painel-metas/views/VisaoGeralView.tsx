@@ -20,13 +20,23 @@ import {
   MessageCircle,
   Trophy,
   Building2,
+  Check,
+  X,
+  Star,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { MetaPageHeader } from "../shared/MetaPageHeader";
 import { KpiByStoreCard, KpiByStoreGrid } from "../shared/KpiByStoreGrid";
 import { currentMonth, formatNumberPt, monthRange } from "../shared/dateUtils";
 import { useSheetData } from "@/hooks/useSheetData";
-import { parseChecklistCSV } from "@/utils/parseSheetData";
+import {
+  parseChecklistCSV,
+  parseNpsCSV,
+  parseFaturamentoCSV,
+  parseBaseAvaliacoesCSV,
+} from "@/utils/parseSheetData";
 
 interface VisaoGeralViewProps {
   defaultMes?: string;

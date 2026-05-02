@@ -409,6 +409,15 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
           </div>
         </CardContent>
       </Card>
+
+      {/* ── SEÇÕES A + B (NPS + Distribuição de Notas) ── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <NpsCard data={npsData} loading={!rawNps} />
+        <DistribuicaoCard data={baseData} loading={!rawBase} />
+      </div>
+
+      {/* ── SEÇÃO C (Avaliações 1-3 × Faturamento) ── */}
+      <FatVsAvalCard data={fatData} loading={!rawFat} />
     </div>
   );
 }

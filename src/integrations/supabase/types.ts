@@ -2321,6 +2321,8 @@ export type Database = {
           code: string | null
           created_at: string
           family: string | null
+          fornecedor_sugerido: string | null
+          foto_url: string | null
           grande_grupo: string | null
           grupo: string | null
           id: string
@@ -2336,6 +2338,8 @@ export type Database = {
           code?: string | null
           created_at?: string
           family?: string | null
+          fornecedor_sugerido?: string | null
+          foto_url?: string | null
           grande_grupo?: string | null
           grupo?: string | null
           id?: string
@@ -2351,6 +2355,8 @@ export type Database = {
           code?: string | null
           created_at?: string
           family?: string | null
+          fornecedor_sugerido?: string | null
+          foto_url?: string | null
           grande_grupo?: string | null
           grupo?: string | null
           id?: string

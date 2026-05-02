@@ -67,8 +67,49 @@ function tierToTone(score: number | null): "excelente" | "bom" | "regular" | "re
   return "redflag";
 }
 
-export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
+export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralViewProps) {
   const [mes, setMes] = useState(defaultMes ?? currentMonth());
+
+  // ── Google Sheets integration (additive) ──────────────────────
+  const { raw: rawGeral, loading: loadingGeral } = useSheetData("checklist_geral");
+  const { raw: rawChefias, loading: loadingChefias } = useSheetData("checklist_chefias");
+
+  const rankingGeral = useMemo(
+    () => (rawGeral ? parseChecklistCSV(rawGeral) : []),
+    [rawGeral]
+  );
+  const rankingChefias = useMemo(
+    () => (rawChefias ? parseChecklistCSV(rawChefias) : []),
+    [rawChefias]
+  );
+
+  const rkGeral = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("- GERAL"))?.rows ?? [],
+    [rankingGeral]
+  );
+  const rkGerenteFront = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("FRONT"))?.rows ?? [],
+    [rankingGeral]
+  );
+  const rkGerenteBack = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("BACK"))?.rows ?? [],
+    [rankingGeral]
+  );
+
+  const sheetAvgFront = useMemo(
+    () => avg(rkGerenteFront.map((r) => r.media)),
+    [rkGerenteFront]
+  );
+  const sheetAvgBack = useMemo(
+    () => avg(rkGerenteBack.map((r) => r.media)),
+    [rkGerenteBack]
+  );
+  // sheetAvgGeral kept for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const sheetAvgGeral = useMemo(
+    () => avg(rkGeral.map((r) => r.media)),
+    [rkGeral]
+  );
 
   const overview = useQuery({
     queryKey: ["painel-overview", mes],

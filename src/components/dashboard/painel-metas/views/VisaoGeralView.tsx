@@ -97,7 +97,7 @@ function tierLabel(t: string | null | undefined): string {
 // Score → cor (sistema novo)
 function scoreColor(score: number | null | undefined): { bg: string; fg: string; dot: string } {
   if (score === null || score === undefined || isNaN(score)) {
-    return { bg: "rgba(255,255,255,0.04)", fg: "rgba(255,255,255,0.55)", dot: "rgba(255,255,255,0.35)" };
+    return { bg: "hsl(var(--muted))", fg: "hsl(var(--muted-foreground))", dot: "hsl(var(--muted-foreground) / 0.6)" };
   }
   if (score >= 85) return { bg: "rgba(16,185,129,0.12)", fg: "#10B981", dot: "#10B981" };
   if (score >= 70) return { bg: "rgba(234,179,8,0.12)", fg: "#EAB308", dot: "#EAB308" };
@@ -192,13 +192,13 @@ function KpiCard({ label, value, score, icon: Icon, loading, trendBadge, onClick
                 ? "rgba(16,185,129,0.12)"
                 : trendBadge.tone === "down"
                 ? "rgba(239,68,68,0.12)"
-                : "rgba(255,255,255,0.06)",
+                : "hsl(var(--muted))",
             color:
               trendBadge.tone === "up"
                 ? "#10B981"
                 : trendBadge.tone === "down"
                 ? "#EF4444"
-                : "rgba(255,255,255,0.6)",
+                : "hsl(var(--muted-foreground))",
           }}
         >
           {trendBadge.text}
@@ -925,7 +925,7 @@ function ComparisonChart({ rows }: { rows: any[] }) {
         <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
-            stroke="rgba(255,255,255,0.04)"
+            stroke="hsl(var(--border))"
             vertical={false}
           />
           <XAxis
@@ -953,16 +953,17 @@ function ComparisonChart({ rows }: { rows: any[] }) {
           />
           <RTooltip
             contentStyle={{
-              background: "#161616",
-              border: "0.5px solid rgba(255,255,255,0.1)",
+              background: "hsl(var(--popover))",
+              border: "0.5px solid hsl(var(--border))",
               borderRadius: "8px",
               fontSize: "12px",
+              color: "hsl(var(--popover-foreground))",
             }}
-            labelStyle={{ color: "#888", marginBottom: "6px" }}
+            labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: "6px" }}
             formatter={(value: any, name: any) => [`${Number(value).toFixed(1)}%`, name]}
           />
           <Legend
-            wrapperStyle={{ fontSize: "11px", color: "#666", marginTop: "12px" }}
+            wrapperStyle={{ fontSize: "11px", color: "hsl(var(--muted-foreground))", marginTop: "12px" }}
             iconType="circle"
             iconSize={6}
           />
@@ -1179,7 +1180,7 @@ function NpsCard({ data, loading }: { data: { loja: string; media: number }[]; l
   const barColor = (v: number) => {
     if (v >= 4.8) return "#10B981";
     if (v >= 4.5) return "#84cc16";
-    return "rgba(255,255,255,0.3)";
+    return "hsl(var(--muted-foreground) / 0.5)";
   };
   return (
     <div className={cn(NEW_CARD)}>
@@ -1310,7 +1311,7 @@ function DistribuicaoCard({
                   <Badge
                     key={p}
                     variant="outline"
-                    className="text-[10px] font-medium uppercase tracking-wide border-white/[0.1] text-muted-foreground"
+                    className="text-[10px] font-medium uppercase tracking-wide border-border text-muted-foreground"
                   >
                     {p}
                   </Badge>

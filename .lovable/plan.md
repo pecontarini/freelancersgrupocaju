@@ -1,29 +1,54 @@
 ## Problema
 
-A tabela `utensilios_items` do Caju Itaim **já está zerada** (0 vínculos). Os 250 itens "UT-ADJD-*" que aparecem na tela com badge "Sem mínimo" vêm do `items_catalog` (catálogo global compartilhado pelas 16 lojas).
+A função `extract-utensilios-pdf` está crashando no boot com:
 
-A tela `ContagemSemanal` (aba ativa na captura) lista **todo o catálogo** independentemente da loja ter configurado mínimo, então sempre mostra os 250 itens.
+```
+event loop error: The argument 'filename' must be a file URL object...
+Received https://esm.sh/mupdf@1.3.0/denonext/mupdf.mjs
+at createRequire (node:module:852:13)
+```
+
+Causa: o pacote `mupdf` (importado de `esm.sh`) usa internamente `node:module createRequire` passando uma URL remota — operação não suportada pelo runtime do Supabase Edge Functions (Deno). Por isso o frontend recebe **"Failed to send a request to the Edge Function"** ao clicar em importar o PDF.
 
 ## Solução
 
-Filtrar a lista de Contagem Semanal para mostrar **apenas itens vinculados à loja atual** (que têm registro em `utensilios_items` com `estoque_minimo > 0`), com um toggle opcional "Mostrar todos os itens do catálogo" para o caso de admin precisar configurar novos itens.
+Substituir `mupdf` pelo **`pdfium-deno`** (`https://deno.land/x/pdfium/...`) — uma binding WASM do PDFium que **roda nativamente no Deno** sem `createRequire`. Já vi o comentário no topo do próprio arquivo dizer "Renders each page to PNG via pdfium-deno" — a intenção original era essa, mas a implementação acabou usando mupdf.
 
-### Mudanças
+Alternativa de fallback caso pdfium-deno tenha problemas: usar `pdf-lib` + renderização por canvas WASM, ou enviar o PDF diretamente como `application/pdf` para o Gemini (que aceita PDFs nativamente como input multimodal) — eliminando totalmente a etapa de rasterização local.
 
-**`src/components/utensilios/ContagemSemanal.tsx`**
-- Adicionar estado `showCatalogOnly` (default: `true` = só itens da loja).
-- No `useMemo` `displayItems` (linha 67-87), adicionar filtro: se `showCatalogOnly`, manter apenas itens onde `storeMap[c.id]` existe E `estoque_minimo > 0`.
-- Adicionar Switch na barra de filtros: "Mostrar itens não configurados" (off por padrão).
-- Mostrar contador: "X itens configurados nesta loja" vs "Y no catálogo global".
+### Plano recomendado: enviar PDF direto ao Gemini
 
-### Resultado
+Mais simples, mais robusto e elimina a dependência problemática:
 
-- **Caju Itaim agora**: lista vazia (0 vínculos) → mensagem "Nenhum utensílio configurado nesta loja. Importe o PDF para começar."
-- **Após upload do PDF**: itens reconhecidos pela IA são vinculados em `utensilios_items` e aparecem normalmente.
-- **Outras lojas**: continuam vendo apenas seus itens configurados (sem regressão).
+1. **Remover** o import de `mupdf` e a função `renderAllPages`.
+2. **Enviar o PDF diretamente** ao Gemini como `image_url` com `data:application/pdf;base64,...` (o gateway Lovable + Gemini 2.5 Flash aceita PDFs como input).
+3. **Manter o fluxo de bbox**: pedir à IA bbox normalizado por página + `page_index`.
+4. **Para o crop das fotos**: como não temos mais o raster local, renderizar **somente as páginas que têm itens com bbox válido** usando `pdfium-deno` (lazy + apenas as necessárias). Se o pdfium-deno também falhar, fazer fallback para pular o crop e usar `generate-utensilio-image` (já existe no projeto) para gerar imagens via IA.
 
-### Não muda
+### Plano alternativo (se quiser manter raster + fotos cortadas)
 
-- Banco de dados (catálogo global preservado, conforme escolhido).
-- Outras telas (Dashboard, Controle de Compras, Histórico, contagem pública via PIN).
-- Dialog "Definir Estoque Inicial" da `UtensiliosTab` — esse continua mostrando o catálogo completo (correto: é onde você configura).
+Trocar `mupdf` por:
+```ts
+import { PDFiumLibrary } from "https://deno.land/x/pdfium@v1.x/mod.ts";
+```
+e adaptar `renderAllPages` para usar essa API (`library.loadDocument`, `document.getPage(i).render({ scale })`).
+
+## Arquivos a alterar
+
+- `supabase/functions/extract-utensilios-pdf/index.ts` — substituir mupdf, ajustar `renderAllPages` ou remover e enviar PDF direto à IA.
+
+## Validação
+
+1. Deploy da função.
+2. Verificar logs (`supabase--edge_function_logs extract-utensilios-pdf`) — não deve mais aparecer o erro de `createRequire`.
+3. Testar upload do PDF do Caju Itaim na UI — modal deve avançar para a etapa "2. Revisar" com a lista de itens extraídos.
+
+## Recomendação
+
+Sigo com o **plano recomendado** (enviar PDF direto ao Gemini) porque:
+- Elimina a dependência problemática que já falhou duas vezes.
+- Reduz tempo de processamento (sem rasterização local).
+- Gemini 2.5 Flash tem suporte nativo a PDFs e geralmente extrai melhor de PDFs vetoriais do que de imagens rasterizadas.
+- Mantém o crop de fotos via lazy-render só quando necessário.
+
+Confirma para eu implementar?

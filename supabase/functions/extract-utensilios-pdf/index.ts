@@ -1,14 +1,16 @@
 // Extracts utensils from a PDF stored in `utensilios-imports` bucket.
-// 1) Renders each page to PNG via pdfium-deno.
-// 2) Sends page images to Gemini Flash and asks for items WITH normalized bbox of their photo.
-// 3) Crops bbox out of the rendered page and uploads to public `utensilios-photos` bucket.
-// 4) Returns items with `foto_url` pre-filled.
+// Strategy:
+// 1) Send the full PDF directly to Gemini (multimodal — accepts application/pdf).
+//    Ask for items + normalized bbox of their photo per page.
+// 2) Lazy-render only pages that have items with valid bbox using pdfjs-serverless
+//    (Deno-compatible PDF.js fork) and crop the photos.
+// 3) Upload crops to public `utensilios-photos` bucket.
 //
 // Request body: { pdf_path: string }   (path inside `utensilios-imports` bucket)
 // Response:     { items: ExtractedItem[], pages: number, took_ms: number }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import * as mupdf from "https://esm.sh/mupdf@1.3.0";
+import { getDocument } from "https://esm.sh/pdfjs-serverless@0.5.0";
 import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {
@@ -17,9 +19,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const PAGES_PER_CALL = 2;       // imagens por chamada à IA
-const MAX_PARALLEL = 4;         // chamadas concorrentes à IA
-const RENDER_DPI = 144;         // qualidade do raster (px = pt * dpi/72)
+const RENDER_SCALE = 2.0;       // raster scale for cropping (higher = sharper crops)
 const MODEL = "google/gemini-2.5-flash";
 const PHOTO_BUCKET = "utensilios-photos";
 
@@ -34,7 +34,7 @@ interface ExtractedItem {
   foto_url?: string | null;
 }
 
-const SYSTEM_PROMPT = `Você é um extrator de matrizes de estoque mínimo de restaurantes a partir de IMAGENS de páginas.
+const SYSTEM_PROMPT = `Você é um extrator de matrizes de estoque mínimo de restaurantes a partir de PDF.
 Cada página tem cards/células com:
 - Foto/imagem do utensílio
 - Nome do utensílio (ex: "COPO AMER. 140ml", "PINÇA 30CM")
@@ -50,7 +50,7 @@ Para CADA item visível, retorne também o bounding box NORMALIZADO da FOTO/IMAG
   bbox: { x, y, w, h, page_index }
 - (x,y) = canto superior esquerdo da foto
 - (w,h) = largura e altura da foto
-- page_index = índice 0-based da imagem na sequência enviada
+- page_index = índice 0-based da página no PDF (página 1 = 0)
 
 Se a foto não estiver clara, retorne bbox=null. Use null para campos ausentes.
 Ignore página de "RESUMO FINANCEIRO POR SETOR".`;
@@ -64,40 +64,12 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-async function renderAllPages(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
-  // mupdf-wasm: open document, render each page to PNG at desired DPI
-  const doc = mupdf.Document.openDocument(pdfBytes, "application/pdf");
-  const out: Uint8Array[] = [];
-  const matrix = mupdf.Matrix.scale(RENDER_DPI / 72, RENDER_DPI / 72);
-  const pageCount = doc.countPages();
-  for (let i = 0; i < pageCount; i++) {
-    const page = doc.loadPage(i);
-    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false);
-    const png = pixmap.asPNG();
-    out.push(new Uint8Array(png));
-    pixmap.destroy?.();
-    page.destroy?.();
-  }
-  doc.destroy?.();
-  return out;
-}
-
-async function callAI(
+async function callAIWithPdf(
   apiKey: string,
-  pageImages: Uint8Array[],
-  startIndex: number,
-  label: string,
+  pdfBytes: Uint8Array,
 ): Promise<ExtractedItem[]> {
   const t0 = Date.now();
-  const content: any[] = [
-    { type: "text", text: `Extraia todos os utensílios destas ${pageImages.length} páginas (${label}). page_index 0 = primeira imagem desta lista.` },
-  ];
-  for (const png of pageImages) {
-    content.push({
-      type: "image_url",
-      image_url: { url: `data:image/png;base64,${bytesToBase64(png)}` },
-    });
-  }
+  const pdfBase64 = bytesToBase64(pdfBytes);
 
   const aiResp = await fetch(
     "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -108,7 +80,16 @@ async function callAI(
         model: MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extraia TODOS os utensílios deste PDF. Para cada um, inclua page_index (0-based) e bbox da foto." },
+              {
+                type: "image_url",
+                image_url: { url: `data:application/pdf;base64,${pdfBase64}` },
+              },
+            ],
+          },
         ],
         tools: [{
           type: "function",
@@ -158,7 +139,7 @@ async function callAI(
 
   if (!aiResp.ok) {
     const txt = await aiResp.text();
-    console.error(`[${label}] AI ${aiResp.status}:`, txt.slice(0, 300));
+    console.error(`AI ${aiResp.status}:`, txt.slice(0, 500));
     if (aiResp.status === 429) throw new Error("RATE_LIMIT");
     if (aiResp.status === 402) throw new Error("NO_CREDITS");
     throw new Error(`AI_ERROR_${aiResp.status}`);
@@ -167,23 +148,40 @@ async function callAI(
   const data = await aiResp.json();
   const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) {
-    console.warn(`[${label}] no tool call`);
+    console.warn("no tool call in AI response");
     return [];
   }
   try {
     const parsed = JSON.parse(toolCall.function.arguments);
     const items = (parsed.items || []) as ExtractedItem[];
-    // re-base page_index para o índice global
-    for (const it of items) {
-      if (it.bbox && Number.isFinite(it.bbox.page_index)) {
-        it.bbox.page_index = startIndex + Math.max(0, Math.floor(it.bbox.page_index));
-      }
-    }
-    console.log(`[${label}] ${items.length} items in ${Date.now() - t0}ms`);
+    console.log(`[AI] ${items.length} items in ${Date.now() - t0}ms`);
     return items;
   } catch (e) {
-    console.error(`[${label}] JSON parse failed`, e);
+    console.error("JSON parse failed", e);
     return [];
+  }
+}
+
+// Render a single PDF page to PNG bytes (only pages we need for cropping)
+async function renderPage(pdfDoc: any, pageIndex: number): Promise<Uint8Array | null> {
+  try {
+    const page = await pdfDoc.getPage(pageIndex + 1); // pdfjs is 1-based
+    const viewport = page.getViewport({ scale: RENDER_SCALE });
+    const w = Math.ceil(viewport.width);
+    const h = Math.ceil(viewport.height);
+
+    // pdfjs-serverless doesn't ship a canvas — we render to an OffscreenCanvas-like API
+    // via the @napi-rs/canvas polyfill it bundles. If render fails, return null.
+    // Lazy import to avoid top-level cost when no crops are needed.
+    const { createCanvas } = await import("https://esm.sh/@napi-rs/canvas@0.1.53");
+    const canvas: any = createCanvas(w, h);
+    const ctx = canvas.getContext("2d");
+    await page.render({ canvasContext: ctx as any, viewport }).promise;
+    const png = canvas.toBuffer("image/png");
+    return new Uint8Array(png);
+  } catch (e) {
+    console.warn(`renderPage(${pageIndex}) failed:`, (e as Error).message);
+    return null;
   }
 }
 
@@ -208,20 +206,17 @@ async function processInPool<T, R>(
 
 async function cropAndUpload(
   admin: ReturnType<typeof createClient>,
-  pageImages: Uint8Array[],
-  item: ExtractedItem,
+  pageImage: Uint8Array,
+  bbox: BBox,
 ): Promise<string | null> {
-  const b = item.bbox;
-  if (!b) return null;
-  if (b.page_index < 0 || b.page_index >= pageImages.length) return null;
-  const x = Math.max(0, Math.min(1, b.x));
-  const y = Math.max(0, Math.min(1, b.y));
-  let w = Math.max(0, Math.min(1 - x, b.w));
-  let h = Math.max(0, Math.min(1 - y, b.h));
-  if (w < 0.02 || h < 0.02) return null; // bbox degenerado
+  const x = Math.max(0, Math.min(1, bbox.x));
+  const y = Math.max(0, Math.min(1, bbox.y));
+  const w = Math.max(0, Math.min(1 - x, bbox.w));
+  const h = Math.max(0, Math.min(1 - y, bbox.h));
+  if (w < 0.02 || h < 0.02) return null;
 
   try {
-    const img = await Image.decode(pageImages[b.page_index]);
+    const img = await Image.decode(pageImage);
     const px = Math.floor(x * img.width);
     const py = Math.floor(y * img.height);
     const pw = Math.max(8, Math.floor(w * img.width));
@@ -276,58 +271,73 @@ Deno.serve(async (req: Request) => {
     const pdfBytes = new Uint8Array(await blob.arrayBuffer());
     console.log(`[downloaded] size=${(pdfBytes.length / 1024).toFixed(1)}KB`);
 
-    // Render all pages first (used for both AI input and cropping)
-    let pageImages: Uint8Array[] = [];
-    try {
-      pageImages = await renderAllPages(pdfBytes);
-      console.log(`[rendered] pages=${pageImages.length} dpi=${RENDER_DPI}`);
-    } catch (e) {
-      console.error("pdfium render failed:", (e as Error).message);
-      return new Response(JSON.stringify({ error: "Falha ao rasterizar PDF." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (pdfBytes.length > 20 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: "PDF muito grande (limite 20MB)." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Group pages into AI calls
-    const groups: { start: number; pages: Uint8Array[]; label: string }[] = [];
-    for (let s = 0; s < pageImages.length; s += PAGES_PER_CALL) {
-      const slice = pageImages.slice(s, s + PAGES_PER_CALL);
-      groups.push({ start: s, pages: slice, label: `pp ${s + 1}-${s + slice.length}` });
-    }
-    console.log(`[groups] count=${groups.length} pagesPerCall=${PAGES_PER_CALL}`);
+    // 1) Send PDF directly to Gemini
+    const allItems = await callAIWithPdf(LOVABLE_API_KEY, pdfBytes);
 
-    const allResults = await processInPool(
-      groups,
-      (g) => callAI(LOVABLE_API_KEY, g.pages, g.start, g.label).catch((e) => {
-        console.error(`group ${g.label} failed:`, e?.message || e);
-        if (e?.message === "RATE_LIMIT" || e?.message === "NO_CREDITS") throw e;
-        return [] as ExtractedItem[];
-      }),
-      MAX_PARALLEL,
-    );
-    const allItems = allResults.flat();
-
-    // Deduplicate by normalized name + setor (chunks may overlap content visually)
+    // Deduplicate
     const seen = new Map<string, ExtractedItem>();
     for (const it of allItems) {
       const key = `${(it.nome || "").trim().toLowerCase()}|${(it.setor || "").trim().toLowerCase()}`;
       const prev = seen.get(key);
       if (!prev) { seen.set(key, it); continue; }
-      // prefer the one with a bbox
       if (!prev.bbox && it.bbox) seen.set(key, it);
     }
     const dedup = Array.from(seen.values());
     console.log(`[dedup] ${allItems.length} -> ${dedup.length}`);
 
-    // Crop & upload photos in parallel (bounded)
-    await processInPool(
-      dedup,
-      async (it) => {
-        const url = await cropAndUpload(admin, pageImages, it);
-        it.foto_url = url;
-        delete it.bbox;
-      },
-      6,
-    );
+    // 2) Lazy-render only pages with valid bboxes for crops
+    const neededPages = new Set<number>();
+    for (const it of dedup) {
+      if (it.bbox && Number.isFinite(it.bbox.page_index)) {
+        neededPages.add(Math.max(0, Math.floor(it.bbox.page_index)));
+      }
+    }
+
+    let pageCount = 0;
+    let pageImageMap = new Map<number, Uint8Array>();
+    if (neededPages.size > 0) {
+      try {
+        const pdfDoc = await getDocument({ data: pdfBytes, useSystemFonts: true }).promise;
+        pageCount = pdfDoc.numPages;
+        const renders = await processInPool(
+          Array.from(neededPages),
+          async (pIdx) => {
+            const png = await renderPage(pdfDoc, pIdx);
+            if (png) pageImageMap.set(pIdx, png);
+            return null;
+          },
+          3,
+        );
+        void renders;
+      } catch (e) {
+        console.warn("pdfjs render setup failed (skipping crops):", (e as Error).message);
+      }
+    }
+
+    // 3) Crop & upload photos
+    if (pageImageMap.size > 0) {
+      await processInPool(
+        dedup,
+        async (it) => {
+          if (!it.bbox) { delete it.bbox; return; }
+          const pageImg = pageImageMap.get(it.bbox.page_index);
+          if (pageImg) {
+            const url = await cropAndUpload(admin, pageImg, it.bbox);
+            it.foto_url = url;
+          }
+          delete it.bbox;
+        },
+        6,
+      );
+    } else {
+      // No renders available — strip bboxes anyway
+      for (const it of dedup) delete it.bbox;
+    }
     const withPhotos = dedup.filter(d => d.foto_url).length;
     console.log(`[photos] uploaded=${withPhotos}/${dedup.length}`);
 
@@ -338,7 +348,7 @@ Deno.serve(async (req: Request) => {
     const took = Date.now() - t0;
     console.log(`[done] items=${dedup.length} photos=${withPhotos} tookMs=${took}`);
     return new Response(
-      JSON.stringify({ items: dedup, pages: pageImages.length, took_ms: took }),
+      JSON.stringify({ items: dedup, pages: pageCount, took_ms: took }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e: any) {

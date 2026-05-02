@@ -122,7 +122,7 @@ const COMPARE_COLORS = ["#10B981", "#3B82F6", "#F97316", "#A855F7", "#EAB308", "
 // Card base style (substitui visual liquid glass para o novo padrão)
 // ──────────────────────────────────────────────────────────────
 const NEW_CARD =
-  "rounded-[14px] bg-[#111111] border-[0.5px] border-white/[0.06] text-card-foreground";
+  "rounded-[14px] bg-card border-[0.5px] border-border text-card-foreground";
 
 // ──────────────────────────────────────────────────────────────
 // Score Pill (novo padrão) – ponto + número
@@ -162,11 +162,11 @@ function KpiCard({ label, value, score, icon: Icon, loading, trendBadge, onClick
       className={cn(
         NEW_CARD,
         "relative flex w-full flex-col items-start gap-3 p-4 text-left transition-all",
-        onClick && "hover:border-white/20 hover:bg-[#161616] active:scale-[0.99] cursor-pointer",
+        onClick && "hover:border-border hover:bg-muted active:scale-[0.99] cursor-pointer",
       )}
     >
       <div className="flex w-full items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/55">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
           {label}
         </span>
         <span
@@ -180,7 +180,7 @@ function KpiCard({ label, value, score, icon: Icon, loading, trendBadge, onClick
       {loading ? (
         <Skeleton className="h-8 w-24" />
       ) : (
-        <span className="text-2xl font-bold tabular-nums text-white">{value}</span>
+        <span className="text-2xl font-bold tabular-nums text-foreground">{value}</span>
       )}
 
       {trendBadge && !loading && (
@@ -428,7 +428,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
             <strong className="text-[#EF4444]">
               {criticalUnits.length} unidade{criticalUnits.length > 1 ? "s" : ""} em alerta
             </strong>{" "}
-            <span className="text-white/70">
+            <span className="text-muted-foreground">
               ({criticalUnits.map((u: any) => u.nome).join(", ")}) — clique para abrir plano de ação
             </span>
           </span>
@@ -492,7 +492,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
         >
           <div className="flex items-center gap-3 text-sm">
             <BarChart3 className="h-4 w-4 text-[#10B981]" />
-            <span className="text-white/85">
+            <span className="text-foreground">
               <strong className="text-[#10B981]">Comparando {comparisonIds.length} unidades:</strong>{" "}
               {comparisonRows.map((r: any) => r.nome).join(", ")}
             </span>
@@ -501,7 +501,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 text-xs text-white/60 hover:text-white"
+              className="h-8 text-xs text-muted-foreground hover:text-foreground"
               onClick={() => setComparisonIds([])}
             >
               Limpar
@@ -519,18 +519,18 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
 
       {/* ── TABS ── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="bg-[#111111] border-[0.5px] border-white/[0.06] rounded-[14px] p-1 h-auto">
-          <TabsTrigger value="mapa" className="text-xs rounded-[10px] data-[state=active]:bg-white/10">
+        <TabsList className="bg-card border-[0.5px] border-border rounded-[14px] p-1 h-auto">
+          <TabsTrigger value="mapa" className="text-xs rounded-[10px] data-[state=active]:bg-accent">
             Mapa de Calor
           </TabsTrigger>
-          <TabsTrigger value="nps" className="text-xs rounded-[10px] data-[state=active]:bg-white/10">
+          <TabsTrigger value="nps" className="text-xs rounded-[10px] data-[state=active]:bg-accent">
             NPS por Loja
           </TabsTrigger>
-          <TabsTrigger value="faturamento" className="text-xs rounded-[10px] data-[state=active]:bg-white/10">
+          <TabsTrigger value="faturamento" className="text-xs rounded-[10px] data-[state=active]:bg-accent">
             Faturamento
           </TabsTrigger>
           {comparisonIds.length >= 2 && (
-            <TabsTrigger value="comparativo" className="text-xs rounded-[10px] data-[state=active]:bg-white/10">
+            <TabsTrigger value="comparativo" className="text-xs rounded-[10px] data-[state=active]:bg-accent">
               Comparativo ({comparisonIds.length})
             </TabsTrigger>
           )}
@@ -539,38 +539,38 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
         {/* ─ TAB: MAPA ─ */}
         <TabsContent value="mapa" className="mt-3 space-y-4">
           <div className={cn(NEW_CARD)}>
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/[0.06]">
-              <Building2 className="h-4 w-4 text-white/70" />
-              <span className="text-xs font-bold uppercase tracking-widest text-white/85">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-bold uppercase tracking-widest text-foreground">
                 Mapa de Calor — Metas por Unidade
               </span>
             </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/[0.06] hover:bg-transparent">
-                    <TableHead className="text-white/55 text-[11px] uppercase tracking-wider">Unidade</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Front</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Back</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Geral</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Reclam.</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Tier</TableHead>
-                    <TableHead className="text-center text-white/55 text-[11px] uppercase tracking-wider">Class.</TableHead>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="text-muted-foreground text-[11px] uppercase tracking-wider">Unidade</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Front</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Back</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Geral</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Reclam.</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Tier</TableHead>
+                    <TableHead className="text-center text-muted-foreground text-[11px] uppercase tracking-wider">Class.</TableHead>
                     <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(heatmap.isLoading || loadingGeral) && heatmapRows.length === 0 ? (
                     Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i} className="border-white/[0.06]">
+                      <TableRow key={i} className="border-border">
                         {Array.from({ length: 8 }).map((__, j) => (
                           <TableCell key={j}><Skeleton className="h-6 w-full" /></TableCell>
                         ))}
                       </TableRow>
                     ))
                   ) : heatmapRows.length === 0 ? (
-                    <TableRow className="border-white/[0.06]">
-                      <TableCell colSpan={8} className="py-8 text-center text-sm text-white/55">
+                    <TableRow className="border-border">
+                      <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                         Nenhuma unidade disponível para este mês
                       </TableCell>
                     </TableRow>
@@ -585,14 +585,14 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                           <TableRow
                             key={row.id}
                             className={cn(
-                              "group cursor-pointer border-white/[0.06] transition-colors hover:bg-white/[0.03]",
-                              isExpanded && "bg-white/[0.04]",
+                              "group cursor-pointer border-border transition-colors hover:bg-muted/40",
+                              isExpanded && "bg-muted/60",
                               isComparing && "bg-[rgba(16,185,129,0.04)]",
                             )}
                             style={isCritical ? { borderLeft: "2px solid #EF4444" } : undefined}
                             onClick={() => setExpandedRow(isExpanded ? null : row.id)}
                           >
-                            <TableCell className="font-medium text-white/90">{row.nome}</TableCell>
+                            <TableCell className="font-medium text-foreground">{row.nome}</TableCell>
                             <TableCell className="text-center"><ScorePill score={row.front_score} /></TableCell>
                             <TableCell className="text-center"><ScorePill score={row.back_score} /></TableCell>
                             <TableCell className="text-center"><ScorePill score={row.general_score} /></TableCell>
@@ -602,7 +602,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                                   "inline-flex h-6 min-w-[2rem] items-center justify-center rounded-md px-2 text-xs font-semibold",
                                   row.reclamacoes >= 5
                                     ? "bg-red-500/20 text-red-400"
-                                    : "bg-white/[0.06] text-white/70",
+                                    : "bg-muted text-muted-foreground",
                                 )}
                               >
                                 {row.reclamacoes}
@@ -628,7 +628,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                                   {tierC.letter}
                                 </span>
                               ) : (
-                                <span className="text-white/40">—</span>
+                                <span className="text-muted-foreground/70">—</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
@@ -643,7 +643,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                                     "rounded-md px-2 py-1 text-[10px] font-bold uppercase transition-all",
                                     isComparing
                                       ? "bg-[#10B981]/20 text-[#10B981]"
-                                      : "opacity-0 group-hover:opacity-100 bg-white/[0.06] text-white/70 hover:bg-white/[0.12]",
+                                      : "opacity-0 group-hover:opacity-100 bg-muted text-muted-foreground hover:bg-muted",
                                   )}
                                   title={isComparing ? "Remover da comparação" : "Adicionar à comparação"}
                                 >
@@ -652,8 +652,8 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                                 </button>
                                 <ChevronDown
                                   className={cn(
-                                    "h-4 w-4 text-white/40 transition-transform",
-                                    isExpanded && "rotate-180 text-white/80",
+                                    "h-4 w-4 text-muted-foreground/70 transition-transform",
+                                    isExpanded && "rotate-180 text-foreground/90",
                                   )}
                                 />
                               </div>
@@ -661,8 +661,8 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                           </TableRow>
 
                           {isExpanded && (
-                            <TableRow key={`${row.id}-exp`} className="border-white/[0.06] hover:bg-transparent">
-                              <TableCell colSpan={8} className="bg-[#0A0A0A] p-4">
+                            <TableRow key={`${row.id}-exp`} className="border-border hover:bg-transparent">
+                              <TableCell colSpan={8} className="bg-background p-4">
                                 <ExpandedDetail
                                   row={row}
                                   onGeneratePlan={() =>
@@ -712,13 +712,13 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
 
       {/* ── ALERT SHEET (unidades críticas) ── */}
       <Sheet open={alertOpen} onOpenChange={setAlertOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-[#0A0A0A] border-white/[0.06] text-white">
+        <SheetContent side="right" className="w-full sm:max-w-md bg-background border-border text-foreground">
           <SheetHeader>
-            <SheetTitle className="text-white flex items-center gap-2">
+            <SheetTitle className="text-foreground flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-[#EF4444]" />
               Unidades em alerta
             </SheetTitle>
-            <SheetDescription className="text-white/55">
+            <SheetDescription className="text-muted-foreground">
               {criticalUnits.length} unidade{criticalUnits.length > 1 ? "s" : ""} com Geral abaixo de 70%.
             </SheetDescription>
           </SheetHeader>
@@ -729,15 +729,15 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                 className={cn(NEW_CARD, "flex items-center justify-between gap-3 p-3")}
               >
                 <div>
-                  <div className="text-sm font-semibold text-white">{u.nome}</div>
+                  <div className="text-sm font-semibold text-foreground">{u.nome}</div>
                   <div className="mt-1 flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase text-white/50">Geral</span>
+                    <span className="text-[10px] uppercase text-muted-foreground">Geral</span>
                     <ScorePill score={u.general_score} />
                   </div>
                 </div>
                 <Button
                   size="sm"
-                  className="bg-[#D05937] text-white hover:bg-[#D05937]/90"
+                  className="bg-[#D05937] text-foreground hover:bg-[#D05937]/90"
                   onClick={() => {
                     setAlertOpen(false);
                     setIaSheet({
@@ -759,10 +759,10 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
 
       {/* ── KPI BREAKDOWN SHEET ── */}
       <Sheet open={!!kpiBreakdown} onOpenChange={(v) => !v && setKpiBreakdown(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-md bg-[#0A0A0A] border-white/[0.06] text-white">
+        <SheetContent side="right" className="w-full sm:max-w-md bg-background border-border text-foreground">
           <SheetHeader>
-            <SheetTitle className="text-white">Breakdown — {kpiBreakdown?.label}</SheetTitle>
-            <SheetDescription className="text-white/55">
+            <SheetTitle className="text-foreground">Breakdown — {kpiBreakdown?.label}</SheetTitle>
+            <SheetDescription className="text-muted-foreground">
               Desempenho por unidade no mês {mes}
             </SheetDescription>
           </SheetHeader>
@@ -784,7 +784,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                   key={r.nome}
                   className={cn(NEW_CARD, "flex items-center justify-between p-3")}
                 >
-                  <span className="text-sm text-white/85">{r.nome}</span>
+                  <span className="text-sm text-foreground">{r.nome}</span>
                   <ScorePill score={r.value as number} />
                 </div>
               ))}
@@ -835,7 +835,7 @@ function ExpandedDetail({
               className="rounded-[10px] p-3"
               style={{ backgroundColor: c.bg, border: `0.5px solid ${c.fg}33` }}
             >
-              <div className="text-[10px] uppercase tracking-widest text-white/55">{m.label}</div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{m.label}</div>
               <div className="mt-1 text-2xl font-bold tabular-nums" style={{ color: c.fg }}>
                 {typeof m.value === "number" ? `${m.value.toFixed(0)}%` : "—"}
               </div>
@@ -850,8 +850,8 @@ function ExpandedDetail({
           const pct = typeof b.value === "number" ? Math.min(100, Math.max(0, b.value)) : 0;
           return (
             <div key={b.label} className="flex items-center gap-3">
-              <span className="w-12 shrink-0 text-[11px] font-semibold uppercase text-white/55">{b.label}</span>
-              <div className="relative flex-1 h-2 rounded-full bg-white/[0.06] overflow-hidden">
+              <span className="w-12 shrink-0 text-[11px] font-semibold uppercase text-muted-foreground">{b.label}</span>
+              <div className="relative flex-1 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${pct}%`, backgroundColor: c.fg }}
@@ -872,7 +872,7 @@ function ExpandedDetail({
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
-          className="bg-[#D05937] text-white hover:bg-[#D05937]/90"
+          className="bg-[#D05937] text-foreground hover:bg-[#D05937]/90"
           onClick={onGeneratePlan}
         >
           <Sparkles className="mr-1.5 h-3.5 w-3.5" />
@@ -882,7 +882,7 @@ function ExpandedDetail({
           size="sm"
           variant="outline"
           className={cn(
-            "border-white/15 text-white/85 hover:bg-white/10 hover:text-white",
+            "border-border text-foreground hover:bg-accent hover:text-foreground",
             isComparing && "border-[#10B981]/40 text-[#10B981]",
           )}
           onClick={onCompare}
@@ -1105,14 +1105,14 @@ function PlanoAcaoSheet({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[600px] bg-[#0A0A0A] border-white/[0.06] text-white overflow-y-auto"
+        className="w-full sm:max-w-[600px] bg-background border-border text-foreground overflow-y-auto"
       >
         <SheetHeader>
-          <SheetTitle className="text-white flex items-center gap-2">
+          <SheetTitle className="text-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#D05937]" />
             Plano de ação — {data?.unidade}
           </SheetTitle>
-          <SheetDescription className="text-white/55">
+          <SheetDescription className="text-muted-foreground">
             Gerado por IA com base nos indicadores de Front, Back e Geral.
           </SheetDescription>
         </SheetHeader>
@@ -1121,7 +1121,7 @@ function PlanoAcaoSheet({
           <Button
             size="sm"
             variant="outline"
-            className="border-white/15 text-white/85 hover:bg-white/10 hover:text-white"
+            className="border-border text-foreground hover:bg-accent hover:text-foreground"
             onClick={handleCopy}
             disabled={!content || loading}
           >
@@ -1140,7 +1140,7 @@ function PlanoAcaoSheet({
           <Button
             size="sm"
             variant="ghost"
-            className="ml-auto text-white/60 hover:text-white"
+            className="ml-auto text-muted-foreground hover:text-foreground"
             onClick={startStream}
             disabled={loading}
           >
@@ -1148,7 +1148,7 @@ function PlanoAcaoSheet({
           </Button>
         </div>
 
-        <div className="mt-4 rounded-[12px] border-[0.5px] border-white/[0.06] bg-[#111] p-4">
+        <div className="mt-4 rounded-[12px] border-[0.5px] border-border bg-card p-4">
           {loading && !content ? (
             <div className="space-y-2">
               <Skeleton className="h-4 w-3/4" />
@@ -1158,12 +1158,12 @@ function PlanoAcaoSheet({
               <Skeleton className="h-4 w-full" />
             </div>
           ) : content ? (
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-white/85">
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
               {content}
               {loading && <span className="ml-1 inline-block h-4 w-1.5 animate-pulse bg-[#D05937]" />}
             </pre>
           ) : (
-            <p className="text-sm text-white/50">Nenhum conteúdo gerado.</p>
+            <p className="text-sm text-muted-foreground">Nenhum conteúdo gerado.</p>
           )}
         </div>
       </SheetContent>
@@ -1183,35 +1183,35 @@ function NpsCard({ data, loading }: { data: { loja: string; media: number }[]; l
   };
   return (
     <div className={cn(NEW_CARD)}>
-      <div className="px-4 py-3 border-b border-white/[0.06]">
+      <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <Star className="h-4 w-4 text-white/70" />
-          <span className="text-xs font-bold uppercase tracking-widest text-white/85">
+          <Star className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-bold uppercase tracking-widest text-foreground">
             NPS — Média de Notas
           </span>
         </div>
-        <p className="mt-1 text-[11px] text-white/50">Google + TripAdvisor · meta ≥ 4,80</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">Google + TripAdvisor · meta ≥ 4,80</p>
       </div>
       <div className="space-y-2.5 p-4">
         {loading ? (
           Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-6 w-full animate-pulse" />)
         ) : data.length === 0 ? (
-          <p className="py-4 text-center text-xs text-white/50">Sem dados disponíveis</p>
+          <p className="py-4 text-center text-xs text-muted-foreground">Sem dados disponíveis</p>
         ) : (
           data.map((row) => {
             const pct = Math.min(100, Math.max(0, (row.media / 5) * 100));
             const passed = row.media >= META;
             return (
               <div key={row.loja} className="flex items-center gap-2">
-                <span className="w-20 shrink-0 truncate text-right text-[11px] font-medium text-white/55">
+                <span className="w-20 shrink-0 truncate text-right text-[11px] font-medium text-muted-foreground">
                   {row.loja}
                 </span>
-                <div className="relative flex-1 h-5 rounded-md bg-white/[0.06] overflow-hidden">
+                <div className="relative flex-1 h-5 rounded-md bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-md transition-all"
                     style={{ width: `${pct}%`, backgroundColor: barColor(row.media) }}
                   />
-                  <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-bold text-white/90 tabular-nums">
+                  <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-bold text-foreground tabular-nums">
                     {row.media.toFixed(3).replace(".", ",")}
                   </span>
                 </div>
@@ -1251,14 +1251,14 @@ function DistribuicaoCard({
 
   return (
     <div className={cn(NEW_CARD)}>
-      <div className="px-4 py-3 border-b border-white/[0.06]">
+      <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
-          <Star className="h-4 w-4 text-white/70" />
-          <span className="text-xs font-bold uppercase tracking-widest text-white/85">
+          <Star className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs font-bold uppercase tracking-widest text-foreground">
             Distribuição de Notas
           </span>
         </div>
-        <p className="mt-1 text-[11px] text-white/50">todas as plataformas</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">todas as plataformas</p>
       </div>
       <div className="space-y-3 p-4">
         {loading ? (
@@ -1269,14 +1269,14 @@ function DistribuicaoCard({
             ))}
           </div>
         ) : data.length === 0 ? (
-          <p className="py-4 text-center text-xs text-white/50">Sem dados disponíveis</p>
+          <p className="py-4 text-center text-xs text-muted-foreground">Sem dados disponíveis</p>
         ) : (
           <>
             <div>
               <div className="text-3xl font-bold tabular-nums" style={{ color: "#10B981" }}>
                 {total5 ? `${total5.pct.toFixed(2).replace(".", ",")}%` : "—"}
               </div>
-              <div className="text-[11px] uppercase tracking-wider text-white/55">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
                 de avaliações 5 estrelas
               </div>
             </div>
@@ -1285,19 +1285,19 @@ function DistribuicaoCard({
                 const pct = Math.min(100, Math.max(0, row.pct));
                 return (
                   <div key={row.nota} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-[11px] font-bold tabular-nums text-white/85">
+                    <span className="w-8 shrink-0 text-[11px] font-bold tabular-nums text-foreground">
                       {row.nota}★
                     </span>
-                    <div className="relative flex-1 h-4 rounded-md bg-white/[0.06] overflow-hidden">
+                    <div className="relative flex-1 h-4 rounded-md bg-muted overflow-hidden">
                       <div
                         className="h-full rounded-md transition-all"
                         style={{ width: `${pct}%`, backgroundColor: colorByNota(row.nota) }}
                       />
                     </div>
-                    <span className="w-14 shrink-0 text-right text-[11px] font-semibold tabular-nums text-white/85">
+                    <span className="w-14 shrink-0 text-right text-[11px] font-semibold tabular-nums text-foreground">
                       {row.pct.toFixed(2).replace(".", ",")}%
                     </span>
-                    <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-white/55">
+                    <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                       {row.total.toLocaleString("pt-BR")}
                     </span>
                   </div>
@@ -1305,12 +1305,12 @@ function DistribuicaoCard({
               })}
             </div>
             {totalAll > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/[0.06]">
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border">
                 {["iFood", "Google", "TripAdvisor", "Get In", "Instagram", "WhatsApp"].map((p) => (
                   <Badge
                     key={p}
                     variant="outline"
-                    className="text-[10px] font-medium uppercase tracking-wide border-white/[0.1] text-white/70"
+                    className="text-[10px] font-medium uppercase tracking-wide border-white/[0.1] text-muted-foreground"
                   >
                     {p}
                   </Badge>
@@ -1353,18 +1353,18 @@ function FatVsAvalCard({
 
   return (
     <div className={cn(NEW_CARD)}>
-      <div className="flex flex-col gap-3 px-4 py-3 border-b border-white/[0.06] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 px-4 py-3 border-b border-border sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-white/70" />
-            <span className="text-xs font-bold uppercase tracking-widest text-white/85">
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs font-bold uppercase tracking-widest text-foreground">
               Avaliações 1-3 × Faturamento
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-white/50">Abril 2026</p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Abril 2026</p>
         </div>
         <Tabs value={tab} onValueChange={(v) => setTab(v as "salao" | "delivery")}>
-          <TabsList className="h-8 bg-white/[0.06]">
+          <TabsList className="h-8 bg-muted">
             <TabsTrigger value="salao" className="text-xs">Salão</TabsTrigger>
             <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
           </TabsList>
@@ -1373,27 +1373,27 @@ function FatVsAvalCard({
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="border-white/[0.06] hover:bg-transparent">
-              <TableHead className="text-white/55 text-[11px] uppercase">Loja</TableHead>
-              <TableHead className="text-center text-white/55 text-[11px] uppercase">Aval. 1-3</TableHead>
-              <TableHead className="text-center text-white/55 text-[11px] uppercase">Total</TableHead>
-              <TableHead className="text-center text-white/55 text-[11px] uppercase">%</TableHead>
-              <TableHead className="text-right text-white/55 text-[11px] uppercase">Faturamento</TableHead>
-              <TableHead className="text-right text-white/55 text-[11px] uppercase">R$/Avaliação</TableHead>
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground text-[11px] uppercase">Loja</TableHead>
+              <TableHead className="text-center text-muted-foreground text-[11px] uppercase">Aval. 1-3</TableHead>
+              <TableHead className="text-center text-muted-foreground text-[11px] uppercase">Total</TableHead>
+              <TableHead className="text-center text-muted-foreground text-[11px] uppercase">%</TableHead>
+              <TableHead className="text-right text-muted-foreground text-[11px] uppercase">Faturamento</TableHead>
+              <TableHead className="text-right text-muted-foreground text-[11px] uppercase">R$/Avaliação</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <TableRow key={i} className="border-white/[0.06]">
+                <TableRow key={i} className="border-border">
                   {Array.from({ length: 6 }).map((__, j) => (
                     <TableCell key={j}><Skeleton className="h-5 w-full animate-pulse" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : rows.length === 0 ? (
-              <TableRow className="border-white/[0.06]">
-                <TableCell colSpan={6} className="py-8 text-center text-xs text-white/50">
+              <TableRow className="border-border">
+                <TableCell colSpan={6} className="py-8 text-center text-xs text-muted-foreground">
                   Sem dados disponíveis
                 </TableCell>
               </TableRow>
@@ -1401,14 +1401,14 @@ function FatVsAvalCard({
               rows.map((row) => {
                 const st = rPorAvStyle(row.rPorAv);
                 return (
-                  <TableRow key={row.loja} className="border-white/[0.06]">
-                    <TableCell className="font-medium text-white/90">{row.loja}</TableCell>
-                    <TableCell className="text-center tabular-nums text-white/85">{fmtNum(row.av13)}</TableCell>
-                    <TableCell className="text-center tabular-nums text-white/85">{fmtNum(row.totalAv)}</TableCell>
-                    <TableCell className="text-center tabular-nums text-white/85">
+                  <TableRow key={row.loja} className="border-border">
+                    <TableCell className="font-medium text-foreground">{row.loja}</TableCell>
+                    <TableCell className="text-center tabular-nums text-foreground">{fmtNum(row.av13)}</TableCell>
+                    <TableCell className="text-center tabular-nums text-foreground">{fmtNum(row.totalAv)}</TableCell>
+                    <TableCell className="text-center tabular-nums text-foreground">
                       {row.pctAv13.toFixed(2).replace(".", ",")}%
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-white/85">{fmtBRL(row.faturamento)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-foreground">{fmtBRL(row.faturamento)}</TableCell>
                     <TableCell className="text-right tabular-nums">
                       <span
                         className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold"
@@ -1425,7 +1425,7 @@ function FatVsAvalCard({
         </Table>
       </div>
 
-      <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-white/[0.06]">
+      <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-border">
         {[
           { label: "≥ R$ 120k", bg: "rgba(16,185,129,.15)", color: "#10B981" },
           { label: "≥ R$ 95k", bg: "rgba(234,179,8,.15)", color: "#EAB308" },

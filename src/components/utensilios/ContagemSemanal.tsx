@@ -195,6 +195,13 @@ export function ContagemSemanal() {
           <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30">
+          <Switch id="show-unconfigured" checked={showUnconfigured} onCheckedChange={setShowUnconfigured} disabled={showHidden} />
+          <Label htmlFor="show-unconfigured" className="text-xs cursor-pointer">
+            Mostrar não configurados
+            <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-1">{configuredCount}/{catalogTotal}</Badge>
+          </Label>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30">
           <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
           <Label htmlFor="show-hidden" className="text-xs cursor-pointer flex items-center gap-1">
             <EyeOff className="h-3.5 w-3.5" />

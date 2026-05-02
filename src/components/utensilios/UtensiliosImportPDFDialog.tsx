@@ -136,17 +136,17 @@ export function UtensiliosImportPDFDialog({ open, onOpenChange }: Props) {
       }
 
       // Match against catalog
-      const catalogNames = catalog.map((c: any) => c.name);
+      const catalogOptions = catalog.map((c: any) => ({ id: c.id, nome: c.name }));
       const reviewRows: ReviewRow[] = items.map(it => {
-        const match = findBestMatch(it.nome, catalogNames);
-        const matched = match.bestMatch && match.bestScore >= 0.78
-          ? catalog.find((c: any) => c.name === match.bestMatch.target) : null;
+        const match = findBestMatch(it.nome, catalogOptions);
+        const matched = match.matchId && match.similarity >= 0.78
+          ? catalog.find((c: any) => c.id === match.matchId) : null;
         return {
           ...it,
           catalog_item_id: matched?.id ?? null,
           setor_aplicado: inferArea(it.setor),
           isNew: !matched,
-          matchScore: match.bestScore || 0,
+          matchScore: match.similarity || 0,
           foto_url: matched?.foto_url ?? null,
         };
       });

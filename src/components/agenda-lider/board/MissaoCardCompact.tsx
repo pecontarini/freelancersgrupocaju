@@ -13,6 +13,7 @@ export function MissaoCardCompact({
   onClick,
   variant = "default",
   isLanding = false,
+  asPresentation = false,
 }: {
   missao: Missao;
   responsavelNome?: string | null;
@@ -20,16 +21,18 @@ export function MissaoCardCompact({
   onClick?: () => void;
   variant?: Variant;
   isLanding?: boolean;
+  /** When true, no draggable behavior — used by SortableMissaoCard wrapper */
+  asPresentation?: boolean;
 }) {
-  // Em modo overlay, não usamos o draggable (já está dentro do DragOverlay).
+  // Em modo overlay ou presentation, não usamos o draggable interno.
   const draggable = useDraggable({
     id: missao.id,
     data: { missao },
-    disabled: variant === "overlay",
+    disabled: variant === "overlay" || asPresentation,
   });
 
   const isOverlay = variant === "overlay";
-  const isDragging = !isOverlay && draggable.isDragging;
+  const isDragging = !isOverlay && !asPresentation && draggable.isDragging;
 
   const content = (
     <>
@@ -71,6 +74,20 @@ export function MissaoCardCompact({
       <div
         className={cn(
           "glass-card-strong drag-overlay-card relative w-[260px] space-y-2 overflow-hidden p-3 pl-4",
+        )}
+      >
+        {content}
+      </div>
+    );
+  }
+
+  if (asPresentation) {
+    return (
+      <div
+        onClick={onClick}
+        className={cn(
+          "glass-card hover-lift relative cursor-grab active:cursor-grabbing space-y-2 overflow-hidden p-3 pl-4 transition-shadow duration-200",
+          isLanding && "drag-landing",
         )}
       >
         {content}

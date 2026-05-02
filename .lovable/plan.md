@@ -1,96 +1,64 @@
-# Otimização Mobile — Agenda do Líder
+# Board de Missões — Drag & Drop fluido e responsivo
 
-## Problemas observados nos prints
+Objetivo: deixar o quadro Kanban de missões mais "vivo" — pegada imediata no desktop, suporte real a touch no mobile, animações de reordenação suaves (FLIP), feedback tátil e visual mais refinado, e drop mais inteligente (entre cards, não só na coluna).
 
-**Print 1 — aba Diretoria (`DiretoriaView.tsx`)**
-- A tabela "Todas as missões" é renderizada com `overflow-x-auto`, mas no mobile colapsa em colunas estreitíssimas: "MISSÃO" trunca cedo, "UNIDADE" empilha letra-por-letra (`MULT 02 - NAZO GO`) e as colunas Responsável/Prioridade/Status/Prazo ficam escondidas atrás de scroll horizontal pouco descobrível.
-- Os cards "Execução por unidade/responsável" funcionam mas barras de progresso são muito finas (h-2) e e-mails longos quebram o alinhamento.
+## O que muda na experiência
 
-**Print 2 — aba Agenda → Semana (`AgendaUnificadaView.tsx`)**
-- Vista "Semana" força 7 colunas num viewport de 440px → cada coluna fica com ~50px e os títulos das missões/eventos viram letras verticais (`P / C / 0`, `S / F / D / I / E / N…`) — completamente ilegíveis.
-- Vista "Mês" tem o mesmo problema (7 colunas × `min-h-[110px]`), com chips compactos cortados.
-- Header de controles (Hoje/Mês/Semana/Lista/Atualizar) quebra em 2-3 linhas e ocupa muito espaço acima do conteúdo.
-- Botões de navegação (chevrons) têm 28px — abaixo do mínimo de toque (44px) da memória "Portal mobile optimization".
+- **Pickup imediato no desktop**: drag começa após apenas 4px de movimento (hoje são 8px). Clique simples continua abrindo o card sem disparar drag.
+- **Drag funcional no mobile**: hoje só desktop arrasta. Adiciona `TouchSensor` com long-press de 200ms + tolerância de 8px (não rouba scroll vertical).
+- **Drop posicional**: hoje você só solta "na coluna". Passa a usar `SortableContext` por coluna — pode reordenar dentro da mesma coluna e inserir em qualquer posição na coluna alvo, com placeholder mostrando o slot exato.
+- **Animação de reordenação (FLIP)**: cards vizinhos deslizam suavemente quando outro card entra/sai (via `useSortable` + `CSS.Transform`). Hoje os cards "pulam" instantaneamente.
+- **Auto-scroll inteligente**: ao arrastar perto da borda da coluna ou da viewport, rola automaticamente (built-in do dnd-kit, hoje desligado implicitamente por config).
+- **Overlay refinado**: rotação reduzida (-1.5°), escala 1.03, sombra mais limpa, e o cursor original "afunda" (scale 0.94 + blur leve) em vez do tracejado atual — sensação de "pegou na mão".
+- **Feedback tátil mobile**: `navigator.vibrate(8)` no pickup e `vibrate([4,40,4])` no drop válido (quando suportado).
+- **Drop inválido**: animação de "snap back" para a posição original em vez de simplesmente sumir.
+- **Landing animation refinada**: substitui o `landingPulse` por um destaque sutil de borda (ring primary fade-out 600ms) — menos "bouncy", mais Apple.
+- **Estado otimista + reconciliação**: enquanto o `update.mutate` roda, o card já aparece na nova posição/coluna; se falhar, volta com animação reversa.
+- **Acessibilidade**: mantém `KeyboardSensor` do dnd-kit (setas + espaço) com anúncios em PT-BR via `accessibility.announcements`.
 
-## Estratégia
+## Mudanças técnicas
 
-Princípio: **no mobile, calendário em grid de 7 colunas não funciona** — substituir por padrões nativos mobile (single-day com swipe + agenda agrupada). Tabelas viram cards. Tudo respeitando `useIsMobile()` e o liquid-glass design system.
+**`MissoesBoardView.tsx`**
+- Sensores: `PointerSensor` (distance: 4), `TouchSensor` (delay: 200, tolerance: 8), `KeyboardSensor` com `sortableKeyboardCoordinates`.
+- Envolver o grid com lógica de colisão `closestCorners` (melhor para Kanban com sortables).
+- Estado local `localGrouped` derivado de `grouped` para suportar update otimista (movimentação visual antes do round-trip ao Supabase).
+- `handleDragOver` para mover o card entre colunas em tempo real (visual). `handleDragEnd` confirma e dispara `update.mutate`; em erro, reverte `localGrouped`.
+- `accessibility={{ announcements: { onDragStart, onDragOver, onDragEnd, onDragCancel } }}` em PT-BR.
 
----
+**Nova `SortableMissaoCard.tsx`** (wrapper)
+- Usa `useSortable({ id: missao.id, data: { missao, status } })`.
+- Aplica `transform`, `transition` do dnd-kit no wrapper (FLIP automático).
+- Repassa props para `MissaoCardCompact` (mantém o componente atual sem regressão).
 
-## Mudanças
+**`MissaoColumn.tsx`**
+- Envolver os filhos com `<SortableContext items={ids} strategy={verticalListSortingStrategy}>`.
+- `useDroppable` continua para coluna vazia (drop direto).
+- Placeholder agora vem do próprio `useSortable` (gap reservado), removendo o `drop-placeholder` artificial.
 
-### 1. `AgendaUnificadaView.tsx` — vistas responsivas
+**`MissaoCardCompact.tsx`**
+- Remover o `useDraggable` interno (passa a vir do wrapper sortable).
+- Manter `variant="overlay"` para o `DragOverlay`.
+- `onClick` só dispara se `!isDragging` (já é o comportamento padrão do sortable).
 
-**Header de controles (mobile)**
-- Compactar em **uma linha**: chevron ←, label do período (truncável), chevron →, e um botão "Hoje" pequeno à direita.
-- Trocar o `Tabs` Mês/Semana/Lista por um **segmented control** abaixo do título, em largura cheia, com touch targets de 44px.
-- Botão "Atualizar" vira ícone-only no mobile (44×44).
-- Legenda (bolinha Missão / Google) e badge "Conecte sua conta" continuam, mas em chips menores.
+**`src/index.css`**
+- Refinar `.drag-overlay-card`: `rotate(-1.5deg) scale(1.03)`, sombra mais sutil.
+- Substituir `.drag-ghost` por: `opacity: 0.5; transform: scale(0.94); filter: blur(1px);` sem borda tracejada.
+- Substituir `landingPulse` por `landingGlow` (ring de cor primary que fade-out em 600ms).
+- Remover `.drop-placeholder` (não usado mais — o gap vem do sortable).
+- Manter media query `prefers-reduced-motion`.
 
-**Vista "Mês" no mobile**
-- Manter grid 7×N, mas:
-  - Reduzir células para `min-h-[64px]` mostrando **apenas o número do dia + pontinhos coloridos** (até 4 dots: laranja=missão, azul=google) em vez de chips com texto.
-  - Tap na célula → abre **bottom sheet** com a lista do dia (reusa o componente `CalendarChip` em modo `large`).
-  - Hoje fica destacado como hoje em apps nativos (círculo preenchido).
+**Hook utilitário** — `useHapticFeedback.ts` (3 linhas, opcional): wrapper para `navigator.vibrate` com guard de suporte.
 
-**Vista "Semana" no mobile**
-- Substituir o grid 7-col por **vista de UM dia por vez** com swipe horizontal:
-  - Header com ←  `Sex, 02/05` (dia atual da semana)  →  e indicador de pontos abaixo (7 dots para os 7 dias).
-  - Conteúdo: lista vertical dos itens daquele dia em chips `large` (full-width), com hora, ícone, prioridade.
-  - Suporte a swipe via gesto horizontal (`framer-motion` drag) — já é dependência do projeto.
-- Em ≥`md` mantém o grid 7×col atual.
+## Fora de escopo
 
-**Vista "Lista"**
-- Já é a melhor pra mobile. Apenas:
-  - Aumentar padding vertical dos chips para 12px (touch target).
-  - Header do dia sticky dentro do scroll.
+- Persistência de ordem dentro da coluna (ainda não há coluna `posicao` em `missoes`). A reordenação dentro da coluna funciona visualmente na sessão, mas não persiste — adicionar isso requer migração SQL (posso fazer em seguida se você quiser).
+- Multi-seleção / drag em lote.
 
-### 2. `DiretoriaView.tsx` — cards no lugar de tabela
+## Arquivos
 
-**Cards "Execução por unidade/responsável"**
-- Aumentar barras de `h-2` → `h-2.5` e adicionar contagem grande à direita.
-- Truncar e-mails longos com `truncate` + `title`.
-
-**"Todas as missões"**
-- No desktop: manter tabela atual.
-- No mobile (`useIsMobile()`): renderizar **lista de cards**, cada um com:
-  - Linha 1: título da missão (font-semibold, 2 linhas máx)
-  - Linha 2: chips de Prioridade + Status + Prazo formatado (`02/05`)
-  - Linha 3: unidade · responsável (text-xs muted)
-  - Card inteiro clicável → abre `MissaoDetailDialog` (mesma ação atual).
-- Header da seção mostra contador e um filtro rápido por status (Todas / Em andamento / Concluídas) num segmented control horizontal scrollável.
-
-### 3. `AgendaLiderTab.tsx` — TabsList
-
-- A `TabsList` (Chat IA / Board / Agenda / Meu Painel / Diretoria) usa `flex-wrap` e empilha em 2 linhas no mobile.
-- Trocar para **scroll horizontal** com snap (sem wrap), 44px de altura, ícone+label sempre visíveis. Padrão "tabs sliding" usado em apps nativos.
-
-### 4. Detalhes técnicos compartilhados
-
-- Usar `useIsMobile()` (já existe em `src/hooks/use-mobile.tsx`) como gate.
-- Bottom sheets: usar `Sheet` do shadcn (`side="bottom"`) — já presente em `components/ui/sheet.tsx`.
-- Touch targets ≥44px conforme memória `portal-mobile-optimization`.
-- Sem emojis (memória `iconography-and-status-standard`) — já está limpo.
-
----
-
-## Arquivos a editar
-
-- `src/components/agenda-lider/agenda/AgendaUnificadaView.tsx` — refator de header + `MesView` + `SemanaView` mobile + chip touch sizes.
-- `src/components/agenda-lider/diretoria/DiretoriaView.tsx` — cards mobile + filtro rápido + barras maiores.
-- `src/components/agenda-lider/AgendaLiderTab.tsx` — TabsList scroll horizontal mobile.
-
-## Sem mudanças
-
-- Lógica de dados (hooks `useMissoes`, `useGoogleCalendarEvents`).
-- Comportamento desktop — todas as melhorias são gated por breakpoint mobile.
-- `MissaoDetailDialog`, `CalendarChip` (apenas reuso).
-
-## Critérios de pronto
-
-1. Em 390px de largura, a vista "Semana" mostra **um dia por vez** com títulos legíveis, navegação por swipe + chevrons.
-2. Vista "Mês" mobile mostra calendário com pontinhos, e tap abre bottom sheet do dia.
-3. Aba "Diretoria" no mobile mostra missões como cards (sem scroll horizontal escondido).
-4. TabsList do Agenda do Líder não quebra em duas linhas; rola horizontalmente.
-5. Todos os botões de toque ≥44px.
+- `src/components/agenda-lider/board/MissoesBoardView.tsx` (editar)
+- `src/components/agenda-lider/board/MissaoColumn.tsx` (editar)
+- `src/components/agenda-lider/board/MissaoCardCompact.tsx` (editar)
+- `src/components/agenda-lider/board/SortableMissaoCard.tsx` (criar)
+- `src/hooks/useHapticFeedback.ts` (criar)
+- `src/index.css` (refinar bloco DRAG & DROP)

@@ -1,15 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   defaultDropAnimationSideEffects,
   type DropAnimation,
+  closestCorners,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
+import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,43 +25,53 @@ import { useUnidadeMembros } from "@/hooks/useUnidadeMembros";
 import { supabase } from "@/integrations/supabase/client";
 import { MissaoColumn } from "./MissaoColumn";
 import { MissaoCardCompact } from "./MissaoCardCompact";
+import { SortableMissaoCard } from "./SortableMissaoCard";
 import { MissaoDetailDialog } from "../card/MissaoDetailDialog";
 import { NovaMissaoDialog } from "../card/NovaMissaoDialog";
 import { STATUS_ORDER } from "../shared/Badges";
-import { useAuth } from "@/contexts/AuthContext";
+import { useHapticFeedback } from "@/hooks/useHapticFeedback";
 
 const dropAnimation: DropAnimation = {
-  duration: 220,
+  duration: 260,
   easing: "cubic-bezier(0.16, 1, 0.3, 1)",
   sideEffects: defaultDropAnimationSideEffects({
-    styles: { active: { opacity: "0.4" } },
+    styles: { active: { opacity: "0.35" } },
   }),
 };
 
+type Grouped = Record<MissaoStatus, Missao[]>;
+
 export function MissoesBoardView() {
-  const { user } = useAuth();
   const { effectiveUnidadeId } = useUnidade();
   const { data: missoes = [], update } = useMissoes({ unidadeId: effectiveUnidadeId });
   const { data: membros = [] } = useUnidadeMembros(effectiveUnidadeId);
+  const haptic = useHapticFeedback();
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [openNew, setOpenNew] = useState(false);
   const [activeMissao, setActiveMissao] = useState<Missao | null>(null);
   const [landingId, setLandingId] = useState<string | null>(null);
+  const [overColumn, setOverColumn] = useState<MissaoStatus | null>(null);
   const [responsaveis, setResponsaveis] = useState<Record<string, { nome: string; total: number }>>(
     {},
   );
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  // Local optimistic state — overlays the server data while dragging.
+  const [localGrouped, setLocalGrouped] = useState<Grouped | null>(null);
+  const initialStatusRef = useRef<MissaoStatus | null>(null);
 
-  // Body class durante drag — cursor grabbing global + dim das outras colunas
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
   useEffect(() => {
     if (activeMissao) document.body.classList.add("is-dragging");
     else document.body.classList.remove("is-dragging");
     return () => document.body.classList.remove("is-dragging");
   }, [activeMissao]);
 
-  // Carrega membros pra todas as missões visíveis (1 query)
   useEffect(() => {
     if (missoes.length === 0) {
       setResponsaveis({});
@@ -84,44 +100,123 @@ export function MissoesBoardView() {
       });
   }, [missoes, membros]);
 
-  const grouped = useMemo(() => {
-    const out: Record<MissaoStatus, Missao[]> = {
-      a_fazer: [],
-      em_andamento: [],
-      aguardando: [],
-      concluido: [],
-    };
+  const serverGrouped = useMemo<Grouped>(() => {
+    const out: Grouped = { a_fazer: [], em_andamento: [], aguardando: [], concluido: [] };
     missoes.forEach((m) => out[m.status].push(m));
     return out;
   }, [missoes]);
 
+  const grouped = localGrouped ?? serverGrouped;
+
+  function findContainer(id: string): MissaoStatus | null {
+    if (id.startsWith("col-")) return id.slice(4) as MissaoStatus;
+    for (const s of STATUS_ORDER) {
+      if (grouped[s].some((m) => m.id === id)) return s;
+    }
+    return null;
+  }
+
   function handleDragStart(e: DragStartEvent) {
     const m = (e.active.data.current as any)?.missao as Missao | undefined;
-    if (m) setActiveMissao(m);
+    if (!m) return;
+    setActiveMissao(m);
+    initialStatusRef.current = m.status;
+    setLocalGrouped(serverGrouped);
+    haptic.pickup();
+  }
+
+  function handleDragOver(e: DragOverEvent) {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const fromCol = findContainer(activeId);
+    const toCol = findContainer(overId);
+    if (!fromCol || !toCol) return;
+    setOverColumn(toCol);
+    if (fromCol === toCol) return;
+
+    setLocalGrouped((prev) => {
+      const base = prev ?? serverGrouped;
+      const next: Grouped = {
+        a_fazer: [...base.a_fazer],
+        em_andamento: [...base.em_andamento],
+        aguardando: [...base.aguardando],
+        concluido: [...base.concluido],
+      };
+      const idx = next[fromCol].findIndex((m) => m.id === activeId);
+      if (idx === -1) return prev;
+      const [moved] = next[fromCol].splice(idx, 1);
+      const overIdx = next[toCol].findIndex((m) => m.id === overId);
+      const insertAt = overIdx === -1 ? next[toCol].length : overIdx;
+      next[toCol].splice(insertAt, 0, { ...moved, status: toCol });
+      return next;
+    });
   }
 
   function handleDragCancel() {
     setActiveMissao(null);
+    setOverColumn(null);
+    setLocalGrouped(null);
+    initialStatusRef.current = null;
+    haptic.cancel();
   }
 
   function handleDragEnd(e: DragEndEvent) {
-    const overId = e.over?.id;
-    const missaoId = e.active.id as string;
+    const { active, over } = e;
+    const missaoId = String(active.id);
     const dragged = activeMissao;
     setActiveMissao(null);
+    setOverColumn(null);
 
-    if (!overId || typeof overId !== "string" || !overId.startsWith("col-")) return;
-    const newStatus = overId.slice(4) as MissaoStatus;
-    if (!dragged || dragged.status === newStatus) return;
+    if (!over || !dragged) {
+      setLocalGrouped(null);
+      return;
+    }
 
+    const toCol = findContainer(String(over.id));
+    const fromCol = initialStatusRef.current;
+    initialStatusRef.current = null;
+
+    if (!toCol) {
+      setLocalGrouped(null);
+      return;
+    }
+
+    // Reorder within same column (visual only; not persisted yet)
+    if (toCol === fromCol) {
+      const overId = String(over.id);
+      if (overId !== missaoId && !overId.startsWith("col-")) {
+        setLocalGrouped((prev) => {
+          const base = prev ?? serverGrouped;
+          const arr = base[toCol];
+          const oldIdx = arr.findIndex((m) => m.id === missaoId);
+          const newIdx = arr.findIndex((m) => m.id === overId);
+          if (oldIdx === -1 || newIdx === -1) return prev;
+          return { ...base, [toCol]: arrayMove(arr, oldIdx, newIdx) };
+        });
+        // No DB persistence — drop the local override after a beat to re-sync
+        setTimeout(() => setLocalGrouped(null), 1200);
+      } else {
+        setLocalGrouped(null);
+      }
+      return;
+    }
+
+    // Status change → persist
+    haptic.drop();
     update.mutate(
-      { id: missaoId, status: newStatus },
+      { id: missaoId, status: toCol },
       {
         onSuccess: () => {
           setLandingId(missaoId);
-          window.setTimeout(() => setLandingId(null), 420);
+          window.setTimeout(() => setLandingId(null), 600);
+          setLocalGrouped(null);
         },
-        onError: (err: any) => toast.error(err?.message ?? "Falha ao mover."),
+        onError: (err: any) => {
+          toast.error(err?.message ?? "Falha ao mover.");
+          setLocalGrouped(null);
+        },
       },
     );
   }
@@ -139,35 +234,54 @@ export function MissoesBoardView() {
 
       <DndContext
         sensors={sensors}
+        collisionDetection={closestCorners}
+        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
+        accessibility={{
+          announcements: {
+            onDragStart: ({ active }) => `Pegou a missão ${String(active.id)}`,
+            onDragOver: ({ active, over }) =>
+              over ? `Missão sobre ${String(over.id)}` : `Missão fora de área`,
+            onDragEnd: ({ active, over }) =>
+              over ? `Missão solta em ${String(over.id)}` : `Drag cancelado`,
+            onDragCancel: () => "Drag cancelado",
+          },
+          screenReaderInstructions: {
+            draggable:
+              "Use espaço para pegar a missão, setas para mover entre colunas, espaço para soltar.",
+          },
+        }}
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
           {STATUS_ORDER.map((status) => {
-            const showPlaceholder =
-              !!activeMissao && activeMissao.status !== status;
+            const items = grouped[status];
+            const isActiveTarget = !!activeMissao && overColumn === status;
             return (
               <MissaoColumn
                 key={status}
                 status={status}
-                count={grouped[status].length}
-                showPlaceholder={showPlaceholder}
+                count={items.length}
+                itemIds={items.map((m) => m.id)}
+                isActiveTarget={isActiveTarget}
                 isDragInProgress={!!activeMissao}
               >
-                {grouped[status].map((m) => (
-                  <MissaoCardCompact
+                {items.map((m) => (
+                  <SortableMissaoCard
                     key={m.id}
                     missao={m}
+                    status={status}
                     responsavelNome={responsaveis[m.id]?.nome}
                     membrosCount={responsaveis[m.id]?.total}
                     onClick={() => setOpenId(m.id)}
                     isLanding={landingId === m.id}
                   />
                 ))}
-                {grouped[status].length === 0 && !showPlaceholder && (
+                {items.length === 0 && (
                   <div className="rounded-md border border-dashed border-border/40 p-4 text-center text-xs text-muted-foreground">
-                    Nenhuma missão
+                    {isActiveTarget ? "Soltar aqui" : "Nenhuma missão"}
                   </div>
                 )}
               </MissaoColumn>

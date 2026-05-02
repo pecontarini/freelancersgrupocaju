@@ -311,8 +311,18 @@ export function ContagemSemanal() {
           </Card>
         )
       ) : (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">
-          {showHidden ? "Nenhum item oculto." : "Nenhum utensílio encontrado."}
+        <Card><CardContent className="py-10 text-center text-muted-foreground space-y-2">
+          {showHidden ? (
+            <p>Nenhum item oculto.</p>
+          ) : configuredCount === 0 ? (
+            <>
+              <p className="font-medium text-foreground">Nenhum utensílio configurado nesta loja.</p>
+              <p className="text-xs">Use "Importar PDF (IA)" ou "Definir Estoque Inicial" para começar.</p>
+              <p className="text-xs">Ou ative "Mostrar não configurados" para ver o catálogo completo ({catalogTotal} itens).</p>
+            </>
+          ) : (
+            <p>Nenhum utensílio encontrado com esses filtros.</p>
+          )}
         </CardContent></Card>
       )}
     </div>

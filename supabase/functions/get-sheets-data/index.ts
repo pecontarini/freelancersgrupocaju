@@ -5,6 +5,7 @@ const SHEETS: Record<string, string> = {
   nps_fechamento: "https://docs.google.com/spreadsheets/d/138MkoGLwTM10q8I_9hQCyOpeVQy2UhcB/export?format=csv&gid=214546988",
   avaliacoes_fat: "https://docs.google.com/spreadsheets/d/1E1eJiNPVp5x-JWxgXd0KWRhhLpVUZd-VeoLKq52UFgQ/gviz/tq?tqx=out:csv&sheet=01%2F04%20-%2030%2F04",
   base_avaliacoes: "https://docs.google.com/spreadsheets/d/1uLYveHZ1iNkbIo0z6r-zS6iWIk7qSuc-/export?format=csv&gid=1923524717",
+  nps_base: "https://docs.google.com/spreadsheets/d/138MkoGLwTM10q8I_9hQCyOpeVQy2UhcB/export?format=csv&gid=899334411",
 };
 
 const corsHeaders: Record<string, string> = {

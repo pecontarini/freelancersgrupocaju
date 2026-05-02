@@ -8,7 +8,8 @@ type SheetKey =
   | "nps_dashboard"
   | "nps_fechamento"
   | "avaliacoes_fat"
-  | "base_avaliacoes";
+  | "base_avaliacoes"
+  | "nps_base";
 
 interface UseSheetDataResult {
   data: Record<string, string>[];

@@ -45,6 +45,12 @@ export function useSheetData(sheetKey: SheetKey, autoRefreshMinutes = 5): UseShe
       if (!res.ok) throw new Error(`Erro ${res.status}`);
 
       const csvText = await res.text();
+      if (["nps_base", "base_avaliacoes"].includes(sheetKey)) {
+        console.log(`\n=== RAW [${sheetKey}] — primeiras 25 linhas ===`);
+        csvText.split("\n").slice(0, 25).forEach((l, i) =>
+          console.log(`L${String(i+1).padStart(2,"0")}: ${l}`)
+        );
+      }
       setRaw(csvText);
 
       const parsed = Papa.parse<Record<string, string>>(csvText, {

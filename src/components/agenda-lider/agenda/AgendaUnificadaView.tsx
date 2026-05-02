@@ -179,67 +179,65 @@ export function AgendaUnificadaView() {
     <div className="space-y-4">
       {/* Header / Controles */}
       <div className="glass-card-strong p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-              <CalendarRange className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-display text-base font-semibold leading-tight">
-                Agenda unificada
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Missões da liderança + Google Agenda em um só lugar.
-              </p>
-            </div>
+        {/* Título */}
+        <div className="flex items-start gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
+            <CalendarRange className="h-4 w-4 text-primary" />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-md border bg-card p-0.5">
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={goPrev}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={goToday}>
-                Hoje
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={goNext}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Tabs value={modo} onValueChange={(v) => setModo(v as ModoVisualizacao)}>
-              <TabsList className="h-8">
-                <TabsTrigger value="mes" className="h-7 gap-1 px-2 text-xs">
-                  <CalendarDays className="h-3.5 w-3.5" /> Mês
-                </TabsTrigger>
-                <TabsTrigger value="semana" className="h-7 gap-1 px-2 text-xs">
-                  <CalendarRange className="h-3.5 w-3.5" /> Semana
-                </TabsTrigger>
-                <TabsTrigger value="lista" className="h-7 gap-1 px-2 text-xs">
-                  <List className="h-3.5 w-3.5" /> Lista
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5"
-              onClick={() => refetchGoogle()}
-              disabled={fetchingGoogle}
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", fetchingGoogle && "animate-spin")} />
-              Atualizar
-            </Button>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-base font-semibold leading-tight">
+              Agenda unificada
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Missões + Google Agenda em um só lugar.
+            </p>
           </div>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-9 w-9 shrink-0"
+            onClick={() => refetchGoogle()}
+            disabled={fetchingGoogle}
+            title="Atualizar"
+          >
+            <RefreshCw className={cn("h-4 w-4", fetchingGoogle && "animate-spin")} />
+          </Button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-          <div className="text-sm font-medium capitalize">{periodoLabel}</div>
-          <div className="ml-auto flex flex-wrap items-center gap-3 text-muted-foreground">
-            <LegendDot className="bg-primary" label="Missão" />
-            <LegendDot className="bg-blue-500" label="Google Agenda" />
+        {/* Navegação período */}
+        <div className="mt-3 flex items-center gap-2">
+          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={goPrev}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center">
+            <div className="text-sm font-semibold capitalize leading-tight">{periodoLabel}</div>
           </div>
+          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={goNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="ghost" className="h-10 px-3 text-xs" onClick={goToday}>
+            Hoje
+          </Button>
+        </div>
+
+        {/* Segmented control de modo */}
+        <Tabs value={modo} onValueChange={(v) => setModo(v as ModoVisualizacao)} className="mt-3">
+          <TabsList className="grid h-10 w-full grid-cols-3">
+            <TabsTrigger value="mes" className="h-8 gap-1.5 text-xs">
+              <CalendarDays className="h-3.5 w-3.5" /> Mês
+            </TabsTrigger>
+            <TabsTrigger value="semana" className="h-8 gap-1.5 text-xs">
+              <CalendarRange className="h-3.5 w-3.5" /> Semana
+            </TabsTrigger>
+            <TabsTrigger value="lista" className="h-8 gap-1.5 text-xs">
+              <List className="h-3.5 w-3.5" /> Lista
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <LegendDot className="bg-primary" label="Missão" />
+          <LegendDot className="bg-blue-500" label="Google Agenda" />
         </div>
 
         {needsGoogleConnect && (
@@ -251,7 +249,7 @@ export function AgendaUnificadaView() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5"
+              className="h-8 gap-1.5"
               onClick={() => {
                 startGoogleOAuth("/?tab=agenda-lider").catch((e) =>
                   toast.error(e?.message ?? "Falha ao iniciar conexão Google."),
@@ -270,9 +268,17 @@ export function AgendaUnificadaView() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando agenda…
         </div>
       ) : modo === "mes" ? (
-        <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        isMobile ? (
+          <MesViewMobile refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        ) : (
+          <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        )
       ) : modo === "semana" ? (
-        <SemanaView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        isMobile ? (
+          <SemanaViewMobile refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        ) : (
+          <SemanaView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        )
       ) : (
         <ListaView items={items} onOpenMissao={setOpenMissao} />
       )}

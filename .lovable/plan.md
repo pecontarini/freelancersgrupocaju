@@ -1,82 +1,96 @@
-## Objetivo
+# Otimização Mobile — Agenda do Líder
 
-Permitir vincular fotos aos utensílios depois da importação, de três formas:
+## Problemas observados nos prints
 
-1. **Segunda leitura do mesmo PDF** focada apenas em extrair imagens e cruzar com os nomes do catálogo.
-2. **Galeria/Gerenciador de Fotos** — uma tela onde você vê todos os utensílios sem foto, pode subir manualmente ou gerar com IA (individual ou em lote).
-3. **Botão "Gerar com IA"** já existe item-a-item; vamos adicionar **geração em massa** (todas as faltantes).
+**Print 1 — aba Diretoria (`DiretoriaView.tsx`)**
+- A tabela "Todas as missões" é renderizada com `overflow-x-auto`, mas no mobile colapsa em colunas estreitíssimas: "MISSÃO" trunca cedo, "UNIDADE" empilha letra-por-letra (`MULT 02 - NAZO GO`) e as colunas Responsável/Prioridade/Status/Prazo ficam escondidas atrás de scroll horizontal pouco descobrível.
+- Os cards "Execução por unidade/responsável" funcionam mas barras de progresso são muito finas (h-2) e e-mails longos quebram o alinhamento.
+
+**Print 2 — aba Agenda → Semana (`AgendaUnificadaView.tsx`)**
+- Vista "Semana" força 7 colunas num viewport de 440px → cada coluna fica com ~50px e os títulos das missões/eventos viram letras verticais (`P / C / 0`, `S / F / D / I / E / N…`) — completamente ilegíveis.
+- Vista "Mês" tem o mesmo problema (7 colunas × `min-h-[110px]`), com chips compactos cortados.
+- Header de controles (Hoje/Mês/Semana/Lista/Atualizar) quebra em 2-3 linhas e ocupa muito espaço acima do conteúdo.
+- Botões de navegação (chevrons) têm 28px — abaixo do mínimo de toque (44px) da memória "Portal mobile optimization".
+
+## Estratégia
+
+Princípio: **no mobile, calendário em grid de 7 colunas não funciona** — substituir por padrões nativos mobile (single-day com swipe + agenda agrupada). Tabelas viram cards. Tudo respeitando `useIsMobile()` e o liquid-glass design system.
 
 ---
 
-## 1. Nova edge function: `extract-utensilios-pdf-images`
+## Mudanças
 
-Reutiliza o PDF já no bucket `utensilios-imports` (ou aceita upload novo) e roda o Gemini 2.5 Flash em modo multimodal pedindo apenas para mapear:
+### 1. `AgendaUnificadaView.tsx` — vistas responsivas
 
-```
-[
-  { "nome": "Faca do Chef 8\"", "page": 3, "bbox": [x,y,w,h] | null, "image_b64": "..." }
-]
-```
+**Header de controles (mobile)**
+- Compactar em **uma linha**: chevron ←, label do período (truncável), chevron →, e um botão "Hoje" pequeno à direita.
+- Trocar o `Tabs` Mês/Semana/Lista por um **segmented control** abaixo do título, em largura cheia, com touch targets de 44px.
+- Botão "Atualizar" vira ícone-only no mobile (44×44).
+- Legenda (bolinha Missão / Google) e badge "Conecte sua conta" continuam, mas em chips menores.
 
-Estratégia:
-- Envia o PDF inteiro (`application/pdf` base64) para o gateway com prompt: *"Extraia cada item visível, retorne o nome impresso e os bytes da foto recortada como base64 PNG"*. Caso o modelo não devolva crops confiáveis, fallback para gerar imagem por IA (mesmo fluxo do `generate-utensilio-image`).
-- Para cada item retornado, faz **fuzzy match** (mesmo `findBestMatch` já usado) contra `items_catalog` filtrado por `is_utensilio = true`.
-- Faz upload do PNG no bucket `utensilios-photos` (já existe) e devolve a lista para revisão no front.
+**Vista "Mês" no mobile**
+- Manter grid 7×N, mas:
+  - Reduzir células para `min-h-[64px]` mostrando **apenas o número do dia + pontinhos coloridos** (até 4 dots: laranja=missão, azul=google) em vez de chips com texto.
+  - Tap na célula → abre **bottom sheet** com a lista do dia (reusa o componente `CalendarChip` em modo `large`).
+  - Hoje fica destacado como hoje em apps nativos (círculo preenchido).
 
-Saída: array `{ catalog_item_id, nome_pdf, foto_url, score }`.
+**Vista "Semana" no mobile**
+- Substituir o grid 7-col por **vista de UM dia por vez** com swipe horizontal:
+  - Header com ←  `Sex, 02/05` (dia atual da semana)  →  e indicador de pontos abaixo (7 dots para os 7 dias).
+  - Conteúdo: lista vertical dos itens daquele dia em chips `large` (full-width), com hora, ícone, prioridade.
+  - Suporte a swipe via gesto horizontal (`framer-motion` drag) — já é dependência do projeto.
+- Em ≥`md` mantém o grid 7×col atual.
 
-## 2. Nova tela: "Galeria de Fotos" (aba dentro do módulo Utensílios)
+**Vista "Lista"**
+- Já é a melhor pra mobile. Apenas:
+  - Aumentar padding vertical dos chips para 12px (touch target).
+  - Header do dia sticky dentro do scroll.
 
-Arquivo: `src/components/utensilios/GaleriaFotos.tsx` + entrada em `UtensiliosTab.tsx`.
+### 2. `DiretoriaView.tsx` — cards no lugar de tabela
 
-Layout grid (cards):
-- Filtro: "Sem foto" / "Com foto" / "Todos" + busca por nome + filtro por loja.
-- Cada card: thumbnail (ou placeholder), nome, fornecedor, e três ações:
-  - **Upload manual** (input file → bucket `utensilios-photos` → atualiza `items_catalog.foto_url`).
-  - **Gerar com IA** (chama `generate-utensilio-image` existente).
-  - **Substituir** (se já tem).
-- Barra superior com 2 botões de ação em massa:
-  - **"Importar fotos do PDF"** → abre dialog que sobe o PDF e chama `extract-utensilios-pdf-images`. Resultado entra em modal de revisão (similar ao import atual): preview lado a lado (foto extraída ↔ utensílio do catálogo), com toggle aceitar/rejeitar e seletor de match alternativo. Confirmar → bulk update em `items_catalog.foto_url`.
-  - **"Gerar todas faltantes com IA"** → confirmação (`GERAR`), processa em fila com concorrência 3, barra de progresso, atualiza catálogo conforme termina. Trata erros 429/402 do gateway com toast.
+**Cards "Execução por unidade/responsável"**
+- Aumentar barras de `h-2` → `h-2.5` e adicionar contagem grande à direita.
+- Truncar e-mails longos com `truncate` + `title`.
 
-## 3. Pequenos ajustes de suporte
+**"Todas as missões"**
+- No desktop: manter tabela atual.
+- No mobile (`useIsMobile()`): renderizar **lista de cards**, cada um com:
+  - Linha 1: título da missão (font-semibold, 2 linhas máx)
+  - Linha 2: chips de Prioridade + Status + Prazo formatado (`02/05`)
+  - Linha 3: unidade · responsável (text-xs muted)
+  - Card inteiro clicável → abre `MissaoDetailDialog` (mesma ação atual).
+- Header da seção mostra contador e um filtro rápido por status (Todas / Em andamento / Concluídas) num segmented control horizontal scrollável.
 
-- Hook `useUtensilios.ts`: adicionar `useUpdateUtensilioFoto(itemId, foto_url)` e `useBulkUpdateUtensilioFotos(payload[])`.
-- `UtensiliosImportPDFDialog`: adicionar checkbox "Tentar extrair fotos do PDF" no Step 1 (chama a nova função em paralelo no Step 2 só para preencher `foto_url` antes da revisão). Opcional, sem bloquear.
+### 3. `AgendaLiderTab.tsx` — TabsList
 
-## 4. Detalhes técnicos
+- A `TabsList` (Chat IA / Board / Agenda / Meu Painel / Diretoria) usa `flex-wrap` e empilha em 2 linhas no mobile.
+- Trocar para **scroll horizontal** com snap (sem wrap), 44px de altura, ícone+label sempre visíveis. Padrão "tabs sliding" usado em apps nativos.
 
-```text
-Fluxo Galeria:
-[Listar items_catalog WHERE is_utensilio=true]
-         │
-   ┌─────┴─────────────────────────┐
-   ▼                               ▼
-[Upload manual]            [Importar PDF de fotos]
-   │                               │
-   ▼                               ▼
-storage.utensilios-photos    edge: extract-utensilios-pdf-images
-   │                               │
-   ▼                               ▼
-update items_catalog.foto_url    Modal revisão → bulk update
-```
+### 4. Detalhes técnicos compartilhados
 
-- Bucket `utensilios-photos` já é público — manter.
-- RLS de `items_catalog`: já permite update para admin/gestor; nenhuma migração necessária.
-- Sem alteração de schema.
+- Usar `useIsMobile()` (já existe em `src/hooks/use-mobile.tsx`) como gate.
+- Bottom sheets: usar `Sheet` do shadcn (`side="bottom"`) — já presente em `components/ui/sheet.tsx`.
+- Touch targets ≥44px conforme memória `portal-mobile-optimization`.
+- Sem emojis (memória `iconography-and-status-standard`) — já está limpo.
 
-## Arquivos a criar/editar
+---
 
-- **Criar** `supabase/functions/extract-utensilios-pdf-images/index.ts`
-- **Criar** `src/components/utensilios/GaleriaFotos.tsx`
-- **Criar** `src/components/utensilios/PdfPhotosReviewDialog.tsx`
-- **Editar** `src/components/utensilios/UtensiliosTab.tsx` (nova aba "Fotos")
-- **Editar** `src/components/utensilios/index.ts`
-- **Editar** `src/hooks/useUtensilios.ts` (mutations de foto)
-- **Editar** `src/components/utensilios/UtensiliosImportPDFDialog.tsx` (checkbox opcional de extrair fotos)
+## Arquivos a editar
 
-## Resultado esperado
+- `src/components/agenda-lider/agenda/AgendaUnificadaView.tsx` — refator de header + `MesView` + `SemanaView` mobile + chip touch sizes.
+- `src/components/agenda-lider/diretoria/DiretoriaView.tsx` — cards mobile + filtro rápido + barras maiores.
+- `src/components/agenda-lider/AgendaLiderTab.tsx` — TabsList scroll horizontal mobile.
 
-- Você poderá importar o PDF de novo (somente para fotos) e o sistema cruza com o catálogo já existente.
-- Ou abrir a aba "Fotos", clicar em **"Gerar todas faltantes com IA"** e em poucos minutos todos os utensílios sem imagem ganham uma foto.
-- Ou subir manualmente foto a foto pelos cards.
+## Sem mudanças
+
+- Lógica de dados (hooks `useMissoes`, `useGoogleCalendarEvents`).
+- Comportamento desktop — todas as melhorias são gated por breakpoint mobile.
+- `MissaoDetailDialog`, `CalendarChip` (apenas reuso).
+
+## Critérios de pronto
+
+1. Em 390px de largura, a vista "Semana" mostra **um dia por vez** com títulos legíveis, navegação por swipe + chevrons.
+2. Vista "Mês" mobile mostra calendário com pontinhos, e tap abre bottom sheet do dia.
+3. Aba "Diretoria" no mobile mostra missões como cards (sem scroll horizontal escondido).
+4. TabsList do Agenda do Líder não quebra em duas linhas; rola horizontalmente.
+5. Todos os botões de toque ≥44px.

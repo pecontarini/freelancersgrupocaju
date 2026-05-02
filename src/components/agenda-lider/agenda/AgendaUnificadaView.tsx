@@ -33,7 +33,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useMissoes, type Missao } from "@/hooks/useMissoes";
@@ -63,7 +65,8 @@ interface UnifiedItem {
 // =====================================================================
 export function AgendaUnificadaView() {
   const { effectiveUnidadeId } = useUnidade();
-  const [modo, setModo] = useState<ModoVisualizacao>("mes");
+  const isMobile = useIsMobile();
+  const [modo, setModo] = useState<ModoVisualizacao>(isMobile ? "lista" : "mes");
   const [refDate, setRefDate] = useState<Date>(new Date());
   const [openMissao, setOpenMissao] = useState<string | null>(null);
 
@@ -176,67 +179,65 @@ export function AgendaUnificadaView() {
     <div className="space-y-4">
       {/* Header / Controles */}
       <div className="glass-card-strong p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15">
-              <CalendarRange className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-display text-base font-semibold leading-tight">
-                Agenda unificada
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Missões da liderança + Google Agenda em um só lugar.
-              </p>
-            </div>
+        {/* Título */}
+        <div className="flex items-start gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
+            <CalendarRange className="h-4 w-4 text-primary" />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-md border bg-card p-0.5">
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={goPrev}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={goToday}>
-                Hoje
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={goNext}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Tabs value={modo} onValueChange={(v) => setModo(v as ModoVisualizacao)}>
-              <TabsList className="h-8">
-                <TabsTrigger value="mes" className="h-7 gap-1 px-2 text-xs">
-                  <CalendarDays className="h-3.5 w-3.5" /> Mês
-                </TabsTrigger>
-                <TabsTrigger value="semana" className="h-7 gap-1 px-2 text-xs">
-                  <CalendarRange className="h-3.5 w-3.5" /> Semana
-                </TabsTrigger>
-                <TabsTrigger value="lista" className="h-7 gap-1 px-2 text-xs">
-                  <List className="h-3.5 w-3.5" /> Lista
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5"
-              onClick={() => refetchGoogle()}
-              disabled={fetchingGoogle}
-            >
-              <RefreshCw className={cn("h-3.5 w-3.5", fetchingGoogle && "animate-spin")} />
-              Atualizar
-            </Button>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-display text-base font-semibold leading-tight">
+              Agenda unificada
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Missões + Google Agenda em um só lugar.
+            </p>
           </div>
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-9 w-9 shrink-0"
+            onClick={() => refetchGoogle()}
+            disabled={fetchingGoogle}
+            title="Atualizar"
+          >
+            <RefreshCw className={cn("h-4 w-4", fetchingGoogle && "animate-spin")} />
+          </Button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-          <div className="text-sm font-medium capitalize">{periodoLabel}</div>
-          <div className="ml-auto flex flex-wrap items-center gap-3 text-muted-foreground">
-            <LegendDot className="bg-primary" label="Missão" />
-            <LegendDot className="bg-blue-500" label="Google Agenda" />
+        {/* Navegação período */}
+        <div className="mt-3 flex items-center gap-2">
+          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={goPrev}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 text-center">
+            <div className="text-sm font-semibold capitalize leading-tight">{periodoLabel}</div>
           </div>
+          <Button size="icon" variant="outline" className="h-10 w-10 shrink-0" onClick={goNext}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button size="sm" variant="ghost" className="h-10 px-3 text-xs" onClick={goToday}>
+            Hoje
+          </Button>
+        </div>
+
+        {/* Segmented control de modo */}
+        <Tabs value={modo} onValueChange={(v) => setModo(v as ModoVisualizacao)} className="mt-3">
+          <TabsList className="grid h-10 w-full grid-cols-3">
+            <TabsTrigger value="mes" className="h-8 gap-1.5 text-xs">
+              <CalendarDays className="h-3.5 w-3.5" /> Mês
+            </TabsTrigger>
+            <TabsTrigger value="semana" className="h-8 gap-1.5 text-xs">
+              <CalendarRange className="h-3.5 w-3.5" /> Semana
+            </TabsTrigger>
+            <TabsTrigger value="lista" className="h-8 gap-1.5 text-xs">
+              <List className="h-3.5 w-3.5" /> Lista
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <LegendDot className="bg-primary" label="Missão" />
+          <LegendDot className="bg-blue-500" label="Google Agenda" />
         </div>
 
         {needsGoogleConnect && (
@@ -248,7 +249,7 @@ export function AgendaUnificadaView() {
             <Button
               size="sm"
               variant="outline"
-              className="h-7 gap-1.5"
+              className="h-8 gap-1.5"
               onClick={() => {
                 startGoogleOAuth("/?tab=agenda-lider").catch((e) =>
                   toast.error(e?.message ?? "Falha ao iniciar conexão Google."),
@@ -267,9 +268,17 @@ export function AgendaUnificadaView() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando agenda…
         </div>
       ) : modo === "mes" ? (
-        <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        isMobile ? (
+          <MesViewMobile refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        ) : (
+          <MesView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        )
       ) : modo === "semana" ? (
-        <SemanaView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        isMobile ? (
+          <SemanaViewMobile refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        ) : (
+          <SemanaView refDate={refDate} itemsByDay={itemsByDay} onOpenMissao={setOpenMissao} />
+        )
       ) : (
         <ListaView items={items} onOpenMissao={setOpenMissao} />
       )}
@@ -616,5 +625,226 @@ function CalendarChip({
         </div>
       )}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------
+// VISTA: MÊS — MOBILE (calendário com pontinhos + bottom sheet do dia)
+// ---------------------------------------------------------------------
+function MesViewMobile({
+  refDate,
+  itemsByDay,
+  onOpenMissao,
+}: {
+  refDate: Date;
+  itemsByDay: Map<string, UnifiedItem[]>;
+  onOpenMissao: (id: string) => void;
+}) {
+  const [openDay, setOpenDay] = useState<string | null>(null);
+
+  const days = useMemo(() => {
+    const start = startOfWeek(startOfMonth(refDate), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(refDate), { weekStartsOn: 0 });
+    const out: Date[] = [];
+    let d = start;
+    while (d <= end) {
+      out.push(d);
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+    return out;
+  }, [refDate]);
+
+  const weekDayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const openDayItems = openDay ? itemsByDay.get(openDay) ?? [] : [];
+  const openDayDate = openDay ? parseISO(openDay + "T12:00:00") : null;
+
+  return (
+    <>
+      <div className="glass-card overflow-hidden p-0">
+        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {weekDayLabels.map((w, i) => (
+            <div key={i} className="py-2">
+              {w}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {days.map((day) => {
+            const k = format(day, "yyyy-MM-dd");
+            const dayItems = itemsByDay.get(k) ?? [];
+            const missaoCount = dayItems.filter((i) => i.type === "missao").length;
+            const googleCount = dayItems.filter((i) => i.type === "google").length;
+            const isToday = isSameDay(day, new Date());
+            const inMonth = isSameMonth(day, refDate);
+            return (
+              <button
+                type="button"
+                key={k}
+                onClick={() => dayItems.length > 0 && setOpenDay(k)}
+                className={cn(
+                  "relative flex min-h-[56px] flex-col items-center justify-center gap-1 border-b border-r p-1 text-xs transition active:bg-primary/10",
+                  !inMonth && "bg-muted/20 text-muted-foreground/50",
+                  isToday && "bg-primary/5",
+                  dayItems.length === 0 && "cursor-default",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                    isToday && "bg-primary text-primary-foreground",
+                  )}
+                >
+                  {format(day, "d")}
+                </span>
+                <div className="flex h-1.5 items-center gap-0.5">
+                  {missaoCount > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
+                  {googleCount > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Sheet open={!!openDay} onOpenChange={(o) => !o && setOpenDay(null)}>
+        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle className="capitalize">
+              {openDayDate && format(openDayDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-2">
+            {openDayItems.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum compromisso neste dia.
+              </p>
+            )}
+            {openDayItems.map((it) => (
+              <CalendarChip
+                key={it.key}
+                item={it}
+                large
+                onClick={() => {
+                  if (it.type === "missao" && it.missao) {
+                    setOpenDay(null);
+                    onOpenMissao(it.missao.id);
+                  } else if (it.type === "google" && it.event?.html_link) {
+                    window.open(it.event.html_link, "_blank");
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------
+// VISTA: SEMANA — MOBILE (um dia por vez, navegação por chevrons + dots)
+// ---------------------------------------------------------------------
+function SemanaViewMobile({
+  refDate,
+  itemsByDay,
+  onOpenMissao,
+}: {
+  refDate: Date;
+  itemsByDay: Map<string, UnifiedItem[]>;
+  onOpenMissao: (id: string) => void;
+}) {
+  const days = useMemo(() => {
+    const start = startOfWeek(refDate, { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  }, [refDate]);
+
+  const todayIndex = days.findIndex((d) => isSameDay(d, new Date()));
+  const [activeIdx, setActiveIdx] = useState<number>(todayIndex >= 0 ? todayIndex : 0);
+
+  // Reset ao mudar a semana
+  const weekKey = format(days[0], "yyyy-MM-dd");
+  const lastWeekRef = (SemanaViewMobile as any)._lastWeek;
+  if (lastWeekRef !== weekKey) {
+    (SemanaViewMobile as any)._lastWeek = weekKey;
+  }
+
+  const activeDay = days[activeIdx] ?? days[0];
+  const k = format(activeDay, "yyyy-MM-dd");
+  const dayItems = itemsByDay.get(k) ?? [];
+  const isToday = isSameDay(activeDay, new Date());
+
+  return (
+    <div className="glass-card overflow-hidden p-0">
+      {/* Strip de dias */}
+      <div className="grid grid-cols-7 border-b bg-muted/40">
+        {days.map((d, idx) => {
+          const dk = format(d, "yyyy-MM-dd");
+          const has = (itemsByDay.get(dk) ?? []).length > 0;
+          const active = idx === activeIdx;
+          const isT = isSameDay(d, new Date());
+          return (
+            <button
+              type="button"
+              key={dk}
+              onClick={() => setActiveIdx(idx)}
+              className={cn(
+                "flex flex-col items-center gap-0.5 py-2 text-xs transition",
+                active && "bg-primary/10",
+              )}
+            >
+              <span className="text-[10px] uppercase text-muted-foreground">
+                {format(d, "EEEEE", { locale: ptBR })}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                  isT && "bg-primary text-primary-foreground",
+                  active && !isT && "bg-foreground/10",
+                )}
+              >
+                {format(d, "d")}
+              </span>
+              <span className="h-1 w-1 rounded-full bg-primary" style={{ opacity: has ? 1 : 0 }} />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Conteúdo do dia ativo */}
+      <div className={cn("min-h-[300px] space-y-2 p-3", isToday && "bg-primary/5")}>
+        <div className="flex items-baseline gap-2 pb-1">
+          <h4 className={cn("font-display text-sm font-bold capitalize", isToday && "text-primary")}>
+            {format(activeDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+          </h4>
+          {isToday && (
+            <Badge variant="outline" className="h-5 border-primary/30 bg-primary/10 text-[10px] uppercase text-primary">
+              Hoje
+            </Badge>
+          )}
+        </div>
+        {dayItems.length === 0 ? (
+          <div className="pt-10 text-center text-sm text-muted-foreground/70">
+            Nenhum compromisso neste dia.
+          </div>
+        ) : (
+          dayItems.map((it) => (
+            <CalendarChip
+              key={it.key}
+              item={it}
+              large
+              onClick={() => {
+                if (it.type === "missao" && it.missao) onOpenMissao(it.missao.id);
+                else if (it.type === "google" && it.event?.html_link)
+                  window.open(it.event.html_link, "_blank");
+              }}
+            />
+          ))
+        )}
+      </div>
+    </div>
   );
 }

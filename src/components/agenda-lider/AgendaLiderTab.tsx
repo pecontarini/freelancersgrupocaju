@@ -57,30 +57,32 @@ export function AgendaLiderTab() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="chat" className="gap-1.5">
-            <MessagesSquare className="h-4 w-4" />
-            Chat IA
-          </TabsTrigger>
-          <TabsTrigger value="board" className="gap-1.5">
-            <KanbanSquare className="h-4 w-4" />
-            Board
-          </TabsTrigger>
-          <TabsTrigger value="agenda" className="gap-1.5">
-            <CalendarRange className="h-4 w-4" />
-            Agenda
-          </TabsTrigger>
-          <TabsTrigger value="meu-painel" className="gap-1.5">
-            <User className="h-4 w-4" />
-            Meu Painel
-          </TabsTrigger>
-          {podeVerDiretoria && (
-            <TabsTrigger value="diretoria" className="gap-1.5">
-              <ShieldCheck className="h-4 w-4" />
-              Diretoria
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="inline-flex h-11 w-max gap-1 sm:w-auto">
+            <TabsTrigger value="chat" className="h-9 gap-1.5 px-3 whitespace-nowrap">
+              <MessagesSquare className="h-4 w-4" />
+              Chat IA
             </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="board" className="h-9 gap-1.5 px-3 whitespace-nowrap">
+              <KanbanSquare className="h-4 w-4" />
+              Board
+            </TabsTrigger>
+            <TabsTrigger value="agenda" className="h-9 gap-1.5 px-3 whitespace-nowrap">
+              <CalendarRange className="h-4 w-4" />
+              Agenda
+            </TabsTrigger>
+            <TabsTrigger value="meu-painel" className="h-9 gap-1.5 px-3 whitespace-nowrap">
+              <User className="h-4 w-4" />
+              Meu Painel
+            </TabsTrigger>
+            {podeVerDiretoria && (
+              <TabsTrigger value="diretoria" className="h-9 gap-1.5 px-3 whitespace-nowrap">
+                <ShieldCheck className="h-4 w-4" />
+                Diretoria
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="chat">
           <MissoesChatView unidadeNome={unidadeNome ?? null} />

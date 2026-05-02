@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { GlobalMinimumStockMatrix } from "./GlobalMinimumStockMatrix";
 import { UtensiliosImportPDFDialog } from "./UtensiliosImportPDFDialog";
+import { GaleriaFotos } from "./GaleriaFotos";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");

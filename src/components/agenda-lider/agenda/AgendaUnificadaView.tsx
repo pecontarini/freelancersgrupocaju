@@ -65,7 +65,8 @@ interface UnifiedItem {
 // =====================================================================
 export function AgendaUnificadaView() {
   const { effectiveUnidadeId } = useUnidade();
-  const [modo, setModo] = useState<ModoVisualizacao>("mes");
+  const isMobile = useIsMobile();
+  const [modo, setModo] = useState<ModoVisualizacao>(isMobile ? "lista" : "mes");
   const [refDate, setRefDate] = useState<Date>(new Date());
   const [openMissao, setOpenMissao] = useState<string | null>(null);
 

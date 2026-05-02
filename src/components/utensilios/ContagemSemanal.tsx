@@ -40,6 +40,7 @@ export function ContagemSemanal() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
+  const [showUnconfigured, setShowUnconfigured] = useState(false);
 
   const activeSemana = semanaRef || "";
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);

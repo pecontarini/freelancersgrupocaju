@@ -627,3 +627,224 @@ function CalendarChip({
     </button>
   );
 }
+
+// ---------------------------------------------------------------------
+// VISTA: MÊS — MOBILE (calendário com pontinhos + bottom sheet do dia)
+// ---------------------------------------------------------------------
+function MesViewMobile({
+  refDate,
+  itemsByDay,
+  onOpenMissao,
+}: {
+  refDate: Date;
+  itemsByDay: Map<string, UnifiedItem[]>;
+  onOpenMissao: (id: string) => void;
+}) {
+  const [openDay, setOpenDay] = useState<string | null>(null);
+
+  const days = useMemo(() => {
+    const start = startOfWeek(startOfMonth(refDate), { weekStartsOn: 0 });
+    const end = endOfWeek(endOfMonth(refDate), { weekStartsOn: 0 });
+    const out: Date[] = [];
+    let d = start;
+    while (d <= end) {
+      out.push(d);
+      d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    }
+    return out;
+  }, [refDate]);
+
+  const weekDayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const openDayItems = openDay ? itemsByDay.get(openDay) ?? [] : [];
+  const openDayDate = openDay ? parseISO(openDay + "T12:00:00") : null;
+
+  return (
+    <>
+      <div className="glass-card overflow-hidden p-0">
+        <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {weekDayLabels.map((w, i) => (
+            <div key={i} className="py-2">
+              {w}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {days.map((day) => {
+            const k = format(day, "yyyy-MM-dd");
+            const dayItems = itemsByDay.get(k) ?? [];
+            const missaoCount = dayItems.filter((i) => i.type === "missao").length;
+            const googleCount = dayItems.filter((i) => i.type === "google").length;
+            const isToday = isSameDay(day, new Date());
+            const inMonth = isSameMonth(day, refDate);
+            return (
+              <button
+                type="button"
+                key={k}
+                onClick={() => dayItems.length > 0 && setOpenDay(k)}
+                className={cn(
+                  "relative flex min-h-[56px] flex-col items-center justify-center gap-1 border-b border-r p-1 text-xs transition active:bg-primary/10",
+                  !inMonth && "bg-muted/20 text-muted-foreground/50",
+                  isToday && "bg-primary/5",
+                  dayItems.length === 0 && "cursor-default",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                    isToday && "bg-primary text-primary-foreground",
+                  )}
+                >
+                  {format(day, "d")}
+                </span>
+                <div className="flex h-1.5 items-center gap-0.5">
+                  {missaoCount > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
+                  {googleCount > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Sheet open={!!openDay} onOpenChange={(o) => !o && setOpenDay(null)}>
+        <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader className="text-left">
+            <SheetTitle className="capitalize">
+              {openDayDate && format(openDayDate, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-2">
+            {openDayItems.length === 0 && (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhum compromisso neste dia.
+              </p>
+            )}
+            {openDayItems.map((it) => (
+              <CalendarChip
+                key={it.key}
+                item={it}
+                large
+                onClick={() => {
+                  if (it.type === "missao" && it.missao) {
+                    setOpenDay(null);
+                    onOpenMissao(it.missao.id);
+                  } else if (it.type === "google" && it.event?.html_link) {
+                    window.open(it.event.html_link, "_blank");
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------
+// VISTA: SEMANA — MOBILE (um dia por vez, navegação por chevrons + dots)
+// ---------------------------------------------------------------------
+function SemanaViewMobile({
+  refDate,
+  itemsByDay,
+  onOpenMissao,
+}: {
+  refDate: Date;
+  itemsByDay: Map<string, UnifiedItem[]>;
+  onOpenMissao: (id: string) => void;
+}) {
+  const days = useMemo(() => {
+    const start = startOfWeek(refDate, { weekStartsOn: 0 });
+    return Array.from({ length: 7 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  }, [refDate]);
+
+  const todayIndex = days.findIndex((d) => isSameDay(d, new Date()));
+  const [activeIdx, setActiveIdx] = useState<number>(todayIndex >= 0 ? todayIndex : 0);
+
+  // Reset ao mudar a semana
+  const weekKey = format(days[0], "yyyy-MM-dd");
+  const lastWeekRef = (SemanaViewMobile as any)._lastWeek;
+  if (lastWeekRef !== weekKey) {
+    (SemanaViewMobile as any)._lastWeek = weekKey;
+  }
+
+  const activeDay = days[activeIdx] ?? days[0];
+  const k = format(activeDay, "yyyy-MM-dd");
+  const dayItems = itemsByDay.get(k) ?? [];
+  const isToday = isSameDay(activeDay, new Date());
+
+  return (
+    <div className="glass-card overflow-hidden p-0">
+      {/* Strip de dias */}
+      <div className="grid grid-cols-7 border-b bg-muted/40">
+        {days.map((d, idx) => {
+          const dk = format(d, "yyyy-MM-dd");
+          const has = (itemsByDay.get(dk) ?? []).length > 0;
+          const active = idx === activeIdx;
+          const isT = isSameDay(d, new Date());
+          return (
+            <button
+              type="button"
+              key={dk}
+              onClick={() => setActiveIdx(idx)}
+              className={cn(
+                "flex flex-col items-center gap-0.5 py-2 text-xs transition",
+                active && "bg-primary/10",
+              )}
+            >
+              <span className="text-[10px] uppercase text-muted-foreground">
+                {format(d, "EEEEE", { locale: ptBR })}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                  isT && "bg-primary text-primary-foreground",
+                  active && !isT && "bg-foreground/10",
+                )}
+              >
+                {format(d, "d")}
+              </span>
+              <span className="h-1 w-1 rounded-full bg-primary" style={{ opacity: has ? 1 : 0 }} />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Conteúdo do dia ativo */}
+      <div className={cn("min-h-[300px] space-y-2 p-3", isToday && "bg-primary/5")}>
+        <div className="flex items-baseline gap-2 pb-1">
+          <h4 className={cn("font-display text-sm font-bold capitalize", isToday && "text-primary")}>
+            {format(activeDay, "EEEE, dd 'de' MMMM", { locale: ptBR })}
+          </h4>
+          {isToday && (
+            <Badge variant="outline" className="h-5 border-primary/30 bg-primary/10 text-[10px] uppercase text-primary">
+              Hoje
+            </Badge>
+          )}
+        </div>
+        {dayItems.length === 0 ? (
+          <div className="pt-10 text-center text-sm text-muted-foreground/70">
+            Nenhum compromisso neste dia.
+          </div>
+        ) : (
+          dayItems.map((it) => (
+            <CalendarChip
+              key={it.key}
+              item={it}
+              large
+              onClick={() => {
+                if (it.type === "missao" && it.missao) onOpenMissao(it.missao.id);
+                else if (it.type === "google" && it.event?.html_link)
+                  window.open(it.event.html_link, "_blank");
+              }}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

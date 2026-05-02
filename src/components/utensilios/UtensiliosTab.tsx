@@ -16,13 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock, Network } from "lucide-react";
+import { Settings2, Save, Search, Package, Link2, Copy, Share2, Lock, Network, FileUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SETORES_UTENSILIOS } from "./SectorFilter";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { GlobalMinimumStockMatrix } from "./GlobalMinimumStockMatrix";
+import { UtensiliosImportPDFDialog } from "./UtensiliosImportPDFDialog";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -38,6 +39,7 @@ export function UtensiliosTab() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [matrixOpen, setMatrixOpen] = useState(false);
+  const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [minimums, setMinimums] = useState<Record<string, number>>({});
   const [sectors, setSectors] = useState<Record<string, string>>({});
@@ -218,9 +220,18 @@ export function UtensiliosTab() {
                   Edite os mínimos de todas as unidades em uma matriz visual, ou use a planilha para importação em massa.
                 </p>
               </div>
-              <div className={isMobile ? "flex flex-col gap-2 w-full" : "flex items-center gap-2 shrink-0"}>
+              <div className={isMobile ? "flex flex-col gap-2 w-full" : "flex items-center gap-2 shrink-0 flex-wrap"}>
+                <Button
+                  onClick={() => setPdfImportOpen(true)}
+                  variant="default"
+                  className={isMobile ? "w-full" : ""}
+                >
+                  <FileUp className="h-4 w-4 mr-2" />
+                  Importar PDF (IA)
+                </Button>
                 <Button
                   onClick={() => setMatrixOpen(true)}
+                  variant="outline"
                   className={isMobile ? "w-full" : ""}
                 >
                   <Network className="h-4 w-4 mr-2" />
@@ -317,6 +328,11 @@ export function UtensiliosTab() {
       {/* Matriz Global Loja x Item — admin only */}
       {isAdmin && (
         <GlobalMinimumStockMatrix open={matrixOpen} onOpenChange={setMatrixOpen} />
+      )}
+
+      {/* PDF Import (IA) — admin only */}
+      {isAdmin && (
+        <UtensiliosImportPDFDialog open={pdfImportOpen} onOpenChange={setPdfImportOpen} />
       )}
     </div>
   );

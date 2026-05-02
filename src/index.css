@@ -315,31 +315,31 @@
 
   /* Card "fantasma" deixado na origem enquanto arrasta */
   .drag-ghost {
-    opacity: 0.35;
-    transform: scale(0.97);
-    filter: blur(0.5px) saturate(0.7);
-    border-style: dashed !important;
-    border-color: hsl(var(--primary) / 0.4) !important;
+    opacity: 0.45;
+    transform: scale(0.96);
+    filter: blur(1px);
     box-shadow: none !important;
-    transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
-                transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+                filter 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
+  .drag-ghost > * { pointer-events: none; }
 
   /* Card flutuante renderizado dentro do DragOverlay */
   .drag-overlay-card {
     cursor: grabbing !important;
-    transform: rotate(-2deg) scale(1.04);
+    transform: rotate(-1.5deg) scale(1.03);
     box-shadow:
-      0 24px 48px -12px hsl(var(--primary) / 0.35),
-      0 8px 24px -8px rgba(0, 0, 0, 0.18),
-      0 0 0 1px hsl(var(--primary) / 0.25),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    animation: overlayPickup 220ms cubic-bezier(0.16, 1, 0.3, 1);
+      0 20px 40px -12px hsl(var(--primary) / 0.28),
+      0 6px 18px -6px rgba(0, 0, 0, 0.16),
+      0 0 0 1px hsl(var(--primary) / 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    animation: overlayPickup 180ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @keyframes overlayPickup {
     from { transform: rotate(0deg) scale(1); box-shadow: var(--shadow-card); }
-    to   { transform: rotate(-2deg) scale(1.04); }
+    to   { transform: rotate(-1.5deg) scale(1.03); }
   }
 
   /* Coluna alvo em estado de drop */
@@ -391,15 +391,15 @@
     50%      { background-position: 100% 50%; }
   }
 
-  /* Card aterrissando após drop */
+  /* Card aterrissando após drop — destaque sutil de borda */
   .drag-landing {
-    animation: landingPulse 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: landingGlow 600ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  @keyframes landingPulse {
-    0%   { transform: scale(1.06); box-shadow: 0 12px 24px -8px hsl(var(--primary) / 0.4); }
-    60%  { transform: scale(0.98); }
-    100% { transform: scale(1); box-shadow: var(--shadow-card); }
+  @keyframes landingGlow {
+    0%   { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.55), 0 8px 24px -10px hsl(var(--primary) / 0.4); }
+    60%  { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.25), var(--shadow-card); }
+    100% { box-shadow: var(--shadow-card); }
   }
 
   /* Estado global durante drag */

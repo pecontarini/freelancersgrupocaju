@@ -41,13 +41,6 @@ const dropAnimation: DropAnimation = {
 
 type Grouped = Record<MissaoStatus, Missao[]>;
 
-const STATUS_LABEL_PT: Record<MissaoStatus, string> = {
-  a_fazer: "A fazer",
-  em_andamento: "Em andamento",
-  aguardando: "Aguardando",
-  concluido: "Concluído",
-};
-
 export function MissoesBoardView() {
   const { effectiveUnidadeId } = useUnidade();
   const { data: missoes = [], update } = useMissoes({ unidadeId: effectiveUnidadeId });

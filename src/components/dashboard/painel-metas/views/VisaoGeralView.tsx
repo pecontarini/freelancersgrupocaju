@@ -25,9 +25,12 @@ import { cn } from "@/lib/utils";
 import { MetaPageHeader } from "../shared/MetaPageHeader";
 import { KpiByStoreCard, KpiByStoreGrid } from "../shared/KpiByStoreGrid";
 import { currentMonth, formatNumberPt, monthRange } from "../shared/dateUtils";
+import { useSheetData } from "@/hooks/useSheetData";
+import { parseChecklistCSV } from "@/utils/parseSheetData";
 
 interface VisaoGeralViewProps {
   defaultMes?: string;
+  selectedUnidadeId?: string | null;
 }
 
 function avg(values: Array<number | null | undefined>): number | null {
@@ -64,8 +67,49 @@ function tierToTone(score: number | null): "excelente" | "bom" | "regular" | "re
   return "redflag";
 }
 
-export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
+export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralViewProps) {
   const [mes, setMes] = useState(defaultMes ?? currentMonth());
+
+  // ── Google Sheets integration (additive) ──────────────────────
+  const { raw: rawGeral, loading: loadingGeral } = useSheetData("checklist_geral");
+  const { raw: rawChefias, loading: loadingChefias } = useSheetData("checklist_chefias");
+
+  const rankingGeral = useMemo(
+    () => (rawGeral ? parseChecklistCSV(rawGeral) : []),
+    [rawGeral]
+  );
+  const rankingChefias = useMemo(
+    () => (rawChefias ? parseChecklistCSV(rawChefias) : []),
+    [rawChefias]
+  );
+
+  const rkGeral = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("- GERAL"))?.rows ?? [],
+    [rankingGeral]
+  );
+  const rkGerenteFront = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("FRONT"))?.rows ?? [],
+    [rankingGeral]
+  );
+  const rkGerenteBack = useMemo(
+    () => rankingGeral.find((r) => r.titulo.toUpperCase().includes("BACK"))?.rows ?? [],
+    [rankingGeral]
+  );
+
+  const sheetAvgFront = useMemo(
+    () => avg(rkGerenteFront.map((r) => r.media)),
+    [rkGerenteFront]
+  );
+  const sheetAvgBack = useMemo(
+    () => avg(rkGerenteBack.map((r) => r.media)),
+    [rkGerenteBack]
+  );
+  // sheetAvgGeral kept for future use
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const sheetAvgGeral = useMemo(
+    () => avg(rkGeral.map((r) => r.media)),
+    [rkGeral]
+  );
 
   const overview = useQuery({
     queryKey: ["painel-overview", mes],
@@ -141,10 +185,63 @@ export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
     },
   });
 
+  // ── Unidades lookup (for selectedUnidadeId → nome) ────────────
+  const unidades = useQuery({
+    queryKey: ["painel-unidades-lookup"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("config_lojas")
+        .select("id, nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const selectedUnidadeNome = useMemo(() => {
+    if (!selectedUnidadeId || selectedUnidadeId === "all") return null;
+    const found = (unidades.data ?? []).find((u: any) => u.id === selectedUnidadeId);
+    return found?.nome ?? null;
+  }, [selectedUnidadeId, unidades.data]);
+
+  // ── Heatmap from Sheets (additive fallback over Supabase) ─────
+  const heatmapFromSheet = useMemo(() => {
+    return rkGeral.map((row) => {
+      const front = rkGerenteFront.find((r) => r.unidade === row.unidade);
+      const back = rkGerenteBack.find((r) => r.unidade === row.unidade);
+      return {
+        id: row.unidade,
+        nome: row.unidade,
+        general_score: row.media,
+        front_score: front?.media ?? null,
+        back_score: back?.media ?? null,
+        front_tier: null as string | null,
+        back_tier: null as string | null,
+        general_tier: null as string | null,
+        reclamacoes: 0,
+      };
+    });
+  }, [rkGeral, rkGerenteFront, rkGerenteBack]);
+
+  const heatmapRowsBase = heatmapFromSheet.length > 0 ? heatmapFromSheet : (heatmap.data ?? []);
+
+  const heatmapRows = useMemo(() => {
+    if (!selectedUnidadeNome) return heatmapRowsBase;
+    const target = selectedUnidadeNome.toUpperCase().trim();
+    return heatmapRowsBase.filter(
+      (r: any) => (r.nome ?? "").toUpperCase().trim() === target
+    );
+  }, [heatmapRowsBase, selectedUnidadeNome]);
+
   const criticalUnits = useMemo(
-    () => (heatmap.data ?? []).filter((r) => r.general_tier === "aceitavel"),
-    [heatmap.data]
+    () => heatmapRows.filter((r: any) => r.general_tier === "aceitavel"),
+    [heatmapRows]
   );
+
+  // ── Display KPI values: Sheets first, Supabase fallback ───────
+  const displayAvgFront = sheetAvgFront ?? overview.data?.avgFront ?? null;
+  const displayAvgBack = sheetAvgBack ?? overview.data?.avgBack ?? null;
+  const isLoadingKpis = overview.isLoading || loadingGeral || loadingChefias;
 
   return (
     <div className="space-y-4">
@@ -165,26 +262,26 @@ export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
         <KpiByStoreCard
           label="Back Score Médio"
           value={
-            overview.data?.avgBack !== null && overview.data?.avgBack !== undefined
-              ? `${formatNumberPt(overview.data.avgBack, 1)}`
+            displayAvgBack !== null && displayAvgBack !== undefined
+              ? `${formatNumberPt(displayAvgBack, 2)}%`
               : "—"
           }
-          progress={overview.data?.avgBack ?? 0}
-          tone={tierToTone(overview.data?.avgBack ?? null)}
+          progress={displayAvgBack ?? 0}
+          tone={tierToTone(displayAvgBack ?? null)}
           icon={TrendingDown}
-          loading={overview.isLoading}
+          loading={isLoadingKpis}
         />
         <KpiByStoreCard
           label="Front Score Médio"
           value={
-            overview.data?.avgFront !== null && overview.data?.avgFront !== undefined
-              ? `${formatNumberPt(overview.data.avgFront, 1)}`
+            displayAvgFront !== null && displayAvgFront !== undefined
+              ? `${formatNumberPt(displayAvgFront, 2)}%`
               : "—"
           }
-          progress={overview.data?.avgFront ?? 0}
-          tone={tierToTone(overview.data?.avgFront ?? null)}
+          progress={displayAvgFront ?? 0}
+          tone={tierToTone(displayAvgFront ?? null)}
           icon={TrendingUp}
-          loading={overview.isLoading}
+          loading={isLoadingKpis}
         />
         <KpiByStoreCard
           label="Reclamações no Mês"
@@ -229,7 +326,7 @@ export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {heatmap.isLoading ? (
+                {(heatmap.isLoading || loadingGeral) && heatmapRows.length === 0 ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       {Array.from({ length: 6 }).map((__, j) => (
@@ -239,14 +336,14 @@ export function VisaoGeralView({ defaultMes }: VisaoGeralViewProps) {
                       ))}
                     </TableRow>
                   ))
-                ) : (heatmap.data ?? []).length === 0 ? (
+                ) : heatmapRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                       Nenhuma unidade disponível para este mês
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (heatmap.data ?? []).map((row) => (
+                  heatmapRows.map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{row.nome}</TableCell>
                       <TableCell className="text-center">

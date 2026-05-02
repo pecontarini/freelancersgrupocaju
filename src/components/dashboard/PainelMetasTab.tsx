@@ -2133,7 +2133,7 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   const renderView = () => {
     switch (active) {
       case "visao-geral":
-        return <VisaoGeralView />;
+        return <VisaoGeralView selectedUnidadeId={selectedUnidadeId} />;
       case "nps":
         return <NpsView />;
       case "conformidade":

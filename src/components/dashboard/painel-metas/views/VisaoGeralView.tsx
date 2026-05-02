@@ -440,3 +440,340 @@ function ScoreDot({ score }: { score: number | null }) {
     </div>
   );
 }
+
+// ──────────────────────────────────────────────────────────────
+// SEÇÃO A — NPS: Média de Notas por Loja
+// ──────────────────────────────────────────────────────────────
+function NpsCard({
+  data,
+  loading,
+}: {
+  data: { loja: string; media: number }[];
+  loading: boolean;
+}) {
+  const META = 4.8;
+
+  const barColor = (v: number) => {
+    if (v >= 4.8) return "#15803d";
+    if (v >= 4.5) return "#22c55e";
+    return "#888888";
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+          <Star className="h-4 w-4 text-primary" />
+          NPS — Média de Notas
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">
+          Google + TripAdvisor · meta ≥ 4,80
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-2.5">
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-6 w-full animate-pulse" />
+          ))
+        ) : data.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            Sem dados disponíveis
+          </p>
+        ) : (
+          data.map((row) => {
+            const pct = Math.min(100, Math.max(0, (row.media / 5) * 100));
+            const passed = row.media >= META;
+            return (
+              <div key={row.loja} className="flex items-center gap-2">
+                <span className="w-20 shrink-0 truncate text-right text-[11px] font-medium text-muted-foreground">
+                  {row.loja}
+                </span>
+                <div className="relative flex-1 h-5 rounded-md bg-muted/40 overflow-hidden">
+                  <div
+                    className="h-full rounded-md transition-all"
+                    style={{ width: `${pct}%`, backgroundColor: barColor(row.media) }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-end pr-2 text-[11px] font-bold text-foreground/90 tabular-nums">
+                    {row.media.toFixed(3).replace(".", ",")}
+                  </span>
+                </div>
+                {passed ? (
+                  <Check className="h-4 w-4 shrink-0" style={{ color: "#22c55e" }} />
+                ) : (
+                  <X className="h-4 w-4 shrink-0 text-destructive" />
+                )}
+              </div>
+            );
+          })
+        )}
+        <p className="pt-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+          Meta: ≥ 4,80
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// SEÇÃO B — Distribuição de Notas
+// ──────────────────────────────────────────────────────────────
+function DistribuicaoCard({
+  data,
+  loading,
+}: {
+  data: { nota: number; total: number; pct: number }[];
+  loading: boolean;
+}) {
+  const total5 = data.find((d) => d.nota === 5);
+  const totalAll = data.reduce((s, d) => s + (d.total || 0), 0);
+
+  const colorByNota = (n: number) => {
+    if (n === 5) return "#22c55e";
+    if (n === 4) return "#84cc16";
+    if (n === 3) return "#eab308";
+    if (n === 2) return "#f97316";
+    return "#ef4444";
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+          <Star className="h-4 w-4 text-primary" />
+          Distribuição de Notas
+        </CardTitle>
+        <p className="text-[11px] text-muted-foreground">todas as plataformas</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-32 animate-pulse" />
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-5 w-full animate-pulse" />
+            ))}
+          </div>
+        ) : data.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            Sem dados disponíveis
+          </p>
+        ) : (
+          <>
+            <div>
+              <div
+                className="text-3xl font-bold tabular-nums"
+                style={{ color: "#22c55e" }}
+              >
+                {total5 ? `${total5.pct.toFixed(2).replace(".", ",")}%` : "—"}
+              </div>
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                de avaliações 5 estrelas
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {data.map((row) => {
+                const pct = Math.min(100, Math.max(0, row.pct));
+                return (
+                  <div key={row.nota} className="flex items-center gap-2">
+                    <span className="w-8 shrink-0 text-[11px] font-bold tabular-nums">
+                      {row.nota}★
+                    </span>
+                    <div className="relative flex-1 h-4 rounded-md bg-muted/40 overflow-hidden">
+                      <div
+                        className="h-full rounded-md transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: colorByNota(row.nota),
+                        }}
+                      />
+                    </div>
+                    <span className="w-14 shrink-0 text-right text-[11px] font-semibold tabular-nums">
+                      {row.pct.toFixed(2).replace(".", ",")}%
+                    </span>
+                    <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                      {row.total.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {totalAll > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-2 border-t border-border/40">
+                {["iFood", "Google", "TripAdvisor", "Get In", "Instagram", "WhatsApp"].map(
+                  (p) => (
+                    <Badge
+                      key={p}
+                      variant="outline"
+                      className="text-[10px] font-medium uppercase tracking-wide"
+                    >
+                      {p}
+                    </Badge>
+                  )
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────
+// SEÇÃO C — Avaliações 1-3 × Faturamento
+// ──────────────────────────────────────────────────────────────
+function FatVsAvalCard({
+  data,
+  loading,
+}: {
+  data: {
+    salao: Array<{
+      loja: string;
+      av13: number;
+      totalAv: number;
+      pctAv13: number;
+      faturamento: number;
+      rPorAv: number;
+    }>;
+    delivery: Array<{
+      loja: string;
+      av13: number;
+      totalAv: number;
+      pctAv13: number;
+      faturamento: number;
+      rPorAv: number;
+    }>;
+  } | null;
+  loading: boolean;
+}) {
+  const [tab, setTab] = useState<"salao" | "delivery">("salao");
+  const rows = data ? (tab === "salao" ? data.salao : data.delivery) : [];
+
+  const fmtBRL = (v: number) =>
+    v.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+      maximumFractionDigits: 0,
+    });
+
+  const fmtNum = (v: number) =>
+    v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+
+  const rPorAvStyle = (v: number): { bg: string; color: string } => {
+    if (v >= 120000) return { bg: "rgba(34,197,94,.15)", color: "#16a34a" };
+    if (v >= 95000) return { bg: "rgba(234,179,8,.15)", color: "#ca8a04" };
+    if (v >= 70000) return { bg: "rgba(251,146,60,.15)", color: "#ea580c" };
+    return { bg: "rgba(239,68,68,.15)", color: "#dc2626" };
+  };
+
+  return (
+    <Card className="glass-card">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Avaliações 1-3 × Faturamento
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">Abril 2026</p>
+          </div>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as "salao" | "delivery")}>
+            <TabsList className="h-8">
+              <TabsTrigger value="salao" className="text-xs">
+                Salão
+              </TabsTrigger>
+              <TabsTrigger value="delivery" className="text-xs">
+                Delivery
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 p-0 sm:p-6 sm:pt-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Loja</TableHead>
+                <TableHead className="text-center">Aval. 1-3</TableHead>
+                <TableHead className="text-center">Total</TableHead>
+                <TableHead className="text-center">%</TableHead>
+                <TableHead className="text-right">Faturamento</TableHead>
+                <TableHead className="text-right">R$/Avaliação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 6 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-5 w-full animate-pulse" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="py-8 text-center text-xs text-muted-foreground"
+                  >
+                    Sem dados disponíveis
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => {
+                  const st = rPorAvStyle(row.rPorAv);
+                  return (
+                    <TableRow key={row.loja}>
+                      <TableCell className="font-medium">{row.loja}</TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {fmtNum(row.av13)}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {fmtNum(row.totalAv)}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        {row.pctAv13.toFixed(2).replace(".", ",")}%
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {fmtBRL(row.faturamento)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        <span
+                          className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold"
+                          style={{ backgroundColor: st.bg, color: st.color }}
+                        >
+                          {fmtBRL(row.rPorAv)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex flex-wrap gap-2 px-4 pb-4 sm:px-0 sm:pb-0">
+          {[
+            { label: "≥ R$ 120k", bg: "rgba(34,197,94,.15)", color: "#16a34a" },
+            { label: "≥ R$ 95k", bg: "rgba(234,179,8,.15)", color: "#ca8a04" },
+            { label: "≥ R$ 70k", bg: "rgba(251,146,60,.15)", color: "#ea580c" },
+            { label: "< R$ 70k", bg: "rgba(239,68,68,.15)", color: "#dc2626" },
+          ].map((c) => (
+            <span
+              key={c.label}
+              className="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ backgroundColor: c.bg, color: c.color }}
+            >
+              {c.label}
+            </span>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

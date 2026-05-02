@@ -1,15 +1,13 @@
-// Extracts utensils from a PDF stored in `utensilios-imports` bucket.
-// 1) Renders each page to PNG via pdfium-deno.
-// 2) Sends page images to Gemini Flash and asks for items WITH normalized bbox of their photo.
-// 3) Crops bbox out of the rendered page and uploads to public `utensilios-photos` bucket.
-// 4) Returns items with `foto_url` pre-filled.
+// Extracts utensils metadata from a PDF stored in `utensilios-imports` bucket.
+// Strategy: send the full PDF directly to Gemini (multimodal — accepts application/pdf)
+// and ask for structured items via tool calling. Photo cropping was removed because
+// PDF rasterization libraries available on esm.sh are not compatible with the Deno
+// edge runtime. Photos can be generated afterwards via `generate-utensilio-image`.
 //
 // Request body: { pdf_path: string }   (path inside `utensilios-imports` bucket)
-// Response:     { items: ExtractedItem[], pages: number, took_ms: number }
+// Response:     { items: ExtractedItem[], took_ms: number }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import * as mupdf from "https://esm.sh/mupdf@1.3.0";
-import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,26 +15,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const PAGES_PER_CALL = 2;       // imagens por chamada à IA
-const MAX_PARALLEL = 4;         // chamadas concorrentes à IA
-const RENDER_DPI = 144;         // qualidade do raster (px = pt * dpi/72)
 const MODEL = "google/gemini-2.5-flash";
-const PHOTO_BUCKET = "utensilios-photos";
 
-interface BBox { x: number; y: number; w: number; h: number; page_index: number; }
 interface ExtractedItem {
   nome: string;
   qtd_minima: number;
   custo_unitario: number | null;
   fornecedor: string | null;
   setor: string | null;
-  bbox?: BBox | null;
   foto_url?: string | null;
 }
 
-const SYSTEM_PROMPT = `Você é um extrator de matrizes de estoque mínimo de restaurantes a partir de IMAGENS de páginas.
+const SYSTEM_PROMPT = `Você é um extrator de matrizes de estoque mínimo de restaurantes a partir de PDF.
 Cada página tem cards/células com:
-- Foto/imagem do utensílio
+- Foto/imagem do utensílio (ignore a foto, extraia só os dados textuais)
 - Nome do utensílio (ex: "COPO AMER. 140ml", "PINÇA 30CM")
 - Fornecedor (ex: "TRAMONTINA", "MERCADO LIVRE")
 - Quantidade mínima (ex: "Qtd. Mín.: 700", às vezes "1 KIT" -> 1)
@@ -45,15 +37,8 @@ Cada página tem cards/células com:
   "SETOR PRODUÇÃO", "SETOR ESTOQUE", "SETOR FINALIZAÇÃO", "SETOR DELIVERY",
   "SETOR LAVAGEM", "SETOR APOIO À VENDA", "SETOR SALÃO")
 
-Para CADA item visível, retorne também o bounding box NORMALIZADO da FOTO/IMAGEM do produto
-(coordenadas 0..1 relativas à página onde ele aparece):
-  bbox: { x, y, w, h, page_index }
-- (x,y) = canto superior esquerdo da foto
-- (w,h) = largura e altura da foto
-- page_index = índice 0-based da imagem na sequência enviada
-
-Se a foto não estiver clara, retorne bbox=null. Use null para campos ausentes.
-Ignore página de "RESUMO FINANCEIRO POR SETOR".`;
+Use null para campos ausentes. Ignore a página de "RESUMO FINANCEIRO POR SETOR".
+Retorne TODOS os utensílios visíveis no PDF.`;
 
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
@@ -64,40 +49,12 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-async function renderAllPages(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
-  // mupdf-wasm: open document, render each page to PNG at desired DPI
-  const doc = mupdf.Document.openDocument(pdfBytes, "application/pdf");
-  const out: Uint8Array[] = [];
-  const matrix = mupdf.Matrix.scale(RENDER_DPI / 72, RENDER_DPI / 72);
-  const pageCount = doc.countPages();
-  for (let i = 0; i < pageCount; i++) {
-    const page = doc.loadPage(i);
-    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false);
-    const png = pixmap.asPNG();
-    out.push(new Uint8Array(png));
-    pixmap.destroy?.();
-    page.destroy?.();
-  }
-  doc.destroy?.();
-  return out;
-}
-
-async function callAI(
+async function callAIWithPdf(
   apiKey: string,
-  pageImages: Uint8Array[],
-  startIndex: number,
-  label: string,
+  pdfBytes: Uint8Array,
 ): Promise<ExtractedItem[]> {
   const t0 = Date.now();
-  const content: any[] = [
-    { type: "text", text: `Extraia todos os utensílios destas ${pageImages.length} páginas (${label}). page_index 0 = primeira imagem desta lista.` },
-  ];
-  for (const png of pageImages) {
-    content.push({
-      type: "image_url",
-      image_url: { url: `data:image/png;base64,${bytesToBase64(png)}` },
-    });
-  }
+  const pdfBase64 = bytesToBase64(pdfBytes);
 
   const aiResp = await fetch(
     "https://ai.gateway.lovable.dev/v1/chat/completions",
@@ -108,13 +65,22 @@ async function callAI(
         model: MODEL,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extraia TODOS os utensílios deste PDF de matriz de estoque mínimo." },
+              {
+                type: "image_url",
+                image_url: { url: `data:application/pdf;base64,${pdfBase64}` },
+              },
+            ],
+          },
         ],
         tools: [{
           type: "function",
           function: {
             name: "report_items",
-            description: "Reporta lista de utensílios extraídos com bbox da foto.",
+            description: "Reporta lista de utensílios extraídos do PDF.",
             parameters: {
               type: "object",
               properties: {
@@ -128,18 +94,6 @@ async function callAI(
                       custo_unitario: { type: ["number", "null"] },
                       fornecedor: { type: ["string", "null"] },
                       setor: { type: ["string", "null"] },
-                      bbox: {
-                        type: ["object", "null"],
-                        properties: {
-                          x: { type: "number" },
-                          y: { type: "number" },
-                          w: { type: "number" },
-                          h: { type: "number" },
-                          page_index: { type: "number" },
-                        },
-                        required: ["x", "y", "w", "h", "page_index"],
-                        additionalProperties: false,
-                      },
                     },
                     required: ["nome", "qtd_minima"],
                     additionalProperties: false,
@@ -158,7 +112,7 @@ async function callAI(
 
   if (!aiResp.ok) {
     const txt = await aiResp.text();
-    console.error(`[${label}] AI ${aiResp.status}:`, txt.slice(0, 300));
+    console.error(`AI ${aiResp.status}:`, txt.slice(0, 500));
     if (aiResp.status === 429) throw new Error("RATE_LIMIT");
     if (aiResp.status === 402) throw new Error("NO_CREDITS");
     throw new Error(`AI_ERROR_${aiResp.status}`);
@@ -167,81 +121,17 @@ async function callAI(
   const data = await aiResp.json();
   const toolCall = data?.choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) {
-    console.warn(`[${label}] no tool call`);
+    console.warn("no tool call in AI response");
     return [];
   }
   try {
     const parsed = JSON.parse(toolCall.function.arguments);
     const items = (parsed.items || []) as ExtractedItem[];
-    // re-base page_index para o índice global
-    for (const it of items) {
-      if (it.bbox && Number.isFinite(it.bbox.page_index)) {
-        it.bbox.page_index = startIndex + Math.max(0, Math.floor(it.bbox.page_index));
-      }
-    }
-    console.log(`[${label}] ${items.length} items in ${Date.now() - t0}ms`);
+    console.log(`[AI] ${items.length} items in ${Date.now() - t0}ms`);
     return items;
   } catch (e) {
-    console.error(`[${label}] JSON parse failed`, e);
+    console.error("JSON parse failed", e);
     return [];
-  }
-}
-
-async function processInPool<T, R>(
-  items: T[],
-  worker: (item: T, idx: number) => Promise<R>,
-  poolSize: number,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function runner() {
-    while (true) {
-      const i = next++;
-      if (i >= items.length) return;
-      results[i] = await worker(items[i], i);
-    }
-  }
-  const workers = Array.from({ length: Math.min(poolSize, items.length) }, runner);
-  await Promise.all(workers);
-  return results;
-}
-
-async function cropAndUpload(
-  admin: ReturnType<typeof createClient>,
-  pageImages: Uint8Array[],
-  item: ExtractedItem,
-): Promise<string | null> {
-  const b = item.bbox;
-  if (!b) return null;
-  if (b.page_index < 0 || b.page_index >= pageImages.length) return null;
-  const x = Math.max(0, Math.min(1, b.x));
-  const y = Math.max(0, Math.min(1, b.y));
-  let w = Math.max(0, Math.min(1 - x, b.w));
-  let h = Math.max(0, Math.min(1 - y, b.h));
-  if (w < 0.02 || h < 0.02) return null; // bbox degenerado
-
-  try {
-    const img = await Image.decode(pageImages[b.page_index]);
-    const px = Math.floor(x * img.width);
-    const py = Math.floor(y * img.height);
-    const pw = Math.max(8, Math.floor(w * img.width));
-    const ph = Math.max(8, Math.floor(h * img.height));
-    const cropped = img.clone().crop(px, py, pw, ph);
-    const png = await cropped.encode();
-    const fname = `imports/${crypto.randomUUID()}.png`;
-    const { error: upErr } = await admin.storage.from(PHOTO_BUCKET).upload(fname, png, {
-      contentType: "image/png",
-      upsert: false,
-    });
-    if (upErr) {
-      console.warn("upload crop failed:", upErr.message);
-      return null;
-    }
-    const { data: pub } = admin.storage.from(PHOTO_BUCKET).getPublicUrl(fname);
-    return pub.publicUrl;
-  } catch (e) {
-    console.warn("crop failed:", (e as Error).message);
-    return null;
   }
 }
 
@@ -276,69 +166,30 @@ Deno.serve(async (req: Request) => {
     const pdfBytes = new Uint8Array(await blob.arrayBuffer());
     console.log(`[downloaded] size=${(pdfBytes.length / 1024).toFixed(1)}KB`);
 
-    // Render all pages first (used for both AI input and cropping)
-    let pageImages: Uint8Array[] = [];
-    try {
-      pageImages = await renderAllPages(pdfBytes);
-      console.log(`[rendered] pages=${pageImages.length} dpi=${RENDER_DPI}`);
-    } catch (e) {
-      console.error("pdfium render failed:", (e as Error).message);
-      return new Response(JSON.stringify({ error: "Falha ao rasterizar PDF." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (pdfBytes.length > 20 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: "PDF muito grande (limite 20MB)." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Group pages into AI calls
-    const groups: { start: number; pages: Uint8Array[]; label: string }[] = [];
-    for (let s = 0; s < pageImages.length; s += PAGES_PER_CALL) {
-      const slice = pageImages.slice(s, s + PAGES_PER_CALL);
-      groups.push({ start: s, pages: slice, label: `pp ${s + 1}-${s + slice.length}` });
-    }
-    console.log(`[groups] count=${groups.length} pagesPerCall=${PAGES_PER_CALL}`);
+    const allItems = await callAIWithPdf(LOVABLE_API_KEY, pdfBytes);
 
-    const allResults = await processInPool(
-      groups,
-      (g) => callAI(LOVABLE_API_KEY, g.pages, g.start, g.label).catch((e) => {
-        console.error(`group ${g.label} failed:`, e?.message || e);
-        if (e?.message === "RATE_LIMIT" || e?.message === "NO_CREDITS") throw e;
-        return [] as ExtractedItem[];
-      }),
-      MAX_PARALLEL,
-    );
-    const allItems = allResults.flat();
-
-    // Deduplicate by normalized name + setor (chunks may overlap content visually)
+    // Deduplicate by name + sector
     const seen = new Map<string, ExtractedItem>();
     for (const it of allItems) {
       const key = `${(it.nome || "").trim().toLowerCase()}|${(it.setor || "").trim().toLowerCase()}`;
-      const prev = seen.get(key);
-      if (!prev) { seen.set(key, it); continue; }
-      // prefer the one with a bbox
-      if (!prev.bbox && it.bbox) seen.set(key, it);
+      if (!seen.has(key)) seen.set(key, { ...it, foto_url: null });
     }
     const dedup = Array.from(seen.values());
     console.log(`[dedup] ${allItems.length} -> ${dedup.length}`);
-
-    // Crop & upload photos in parallel (bounded)
-    await processInPool(
-      dedup,
-      async (it) => {
-        const url = await cropAndUpload(admin, pageImages, it);
-        it.foto_url = url;
-        delete it.bbox;
-      },
-      6,
-    );
-    const withPhotos = dedup.filter(d => d.foto_url).length;
-    console.log(`[photos] uploaded=${withPhotos}/${dedup.length}`);
 
     // Cleanup uploaded PDF (best-effort)
     admin.storage.from("utensilios-imports").remove([pdfPath])
       .catch((e) => console.warn("cleanup failed:", e?.message));
 
     const took = Date.now() - t0;
-    console.log(`[done] items=${dedup.length} photos=${withPhotos} tookMs=${took}`);
+    console.log(`[done] items=${dedup.length} tookMs=${took}`);
     return new Response(
-      JSON.stringify({ items: dedup, pages: pageImages.length, took_ms: took }),
+      JSON.stringify({ items: dedup, took_ms: took }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e: any) {

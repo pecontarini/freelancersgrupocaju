@@ -185,10 +185,63 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
     },
   });
 
+  // ── Unidades lookup (for selectedUnidadeId → nome) ────────────
+  const unidades = useQuery({
+    queryKey: ["painel-unidades-lookup"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("config_lojas")
+        .select("id, nome");
+      if (error) throw error;
+      return data ?? [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const selectedUnidadeNome = useMemo(() => {
+    if (!selectedUnidadeId || selectedUnidadeId === "all") return null;
+    const found = (unidades.data ?? []).find((u: any) => u.id === selectedUnidadeId);
+    return found?.nome ?? null;
+  }, [selectedUnidadeId, unidades.data]);
+
+  // ── Heatmap from Sheets (additive fallback over Supabase) ─────
+  const heatmapFromSheet = useMemo(() => {
+    return rkGeral.map((row) => {
+      const front = rkGerenteFront.find((r) => r.unidade === row.unidade);
+      const back = rkGerenteBack.find((r) => r.unidade === row.unidade);
+      return {
+        id: row.unidade,
+        nome: row.unidade,
+        general_score: row.media,
+        front_score: front?.media ?? null,
+        back_score: back?.media ?? null,
+        front_tier: null as string | null,
+        back_tier: null as string | null,
+        general_tier: null as string | null,
+        reclamacoes: 0,
+      };
+    });
+  }, [rkGeral, rkGerenteFront, rkGerenteBack]);
+
+  const heatmapRowsBase = heatmapFromSheet.length > 0 ? heatmapFromSheet : (heatmap.data ?? []);
+
+  const heatmapRows = useMemo(() => {
+    if (!selectedUnidadeNome) return heatmapRowsBase;
+    const target = selectedUnidadeNome.toUpperCase().trim();
+    return heatmapRowsBase.filter(
+      (r: any) => (r.nome ?? "").toUpperCase().trim() === target
+    );
+  }, [heatmapRowsBase, selectedUnidadeNome]);
+
   const criticalUnits = useMemo(
-    () => (heatmap.data ?? []).filter((r) => r.general_tier === "aceitavel"),
-    [heatmap.data]
+    () => heatmapRows.filter((r: any) => r.general_tier === "aceitavel"),
+    [heatmapRows]
   );
+
+  // ── Display KPI values: Sheets first, Supabase fallback ───────
+  const displayAvgFront = sheetAvgFront ?? overview.data?.avgFront ?? null;
+  const displayAvgBack = sheetAvgBack ?? overview.data?.avgBack ?? null;
+  const isLoadingKpis = overview.isLoading || loadingGeral || loadingChefias;
 
   return (
     <div className="space-y-4">

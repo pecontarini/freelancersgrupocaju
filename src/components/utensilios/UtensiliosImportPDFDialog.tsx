@@ -236,17 +236,33 @@ export function UtensiliosImportPDFDialog({ open, onOpenChange }: Props) {
         }
       }
 
-      // 3) Build cartesian items × lojas and bulk upsert utensilios_items
+      // 3) Build cartesian items × lojas and bulk upsert utensilios_items.
+      // Dedupe by (catalog_item_id, loja_id) to avoid Postgres
+      // "ON CONFLICT DO UPDATE cannot affect row a second time" error,
+      // which happens when two extracted rows map to the same catalog item
+      // (e.g. same utensil name appearing in two setores in the PDF).
       const lojasArr = Array.from(selectedLojas);
-      const payload = rows
-        .filter(r => r.catalog_item_id && r.qtd_minima > 0)
-        .flatMap(r => lojasArr.map(loja_id => ({
-          catalog_item_id: r.catalog_item_id!,
-          loja_id,
-          estoque_minimo: r.qtd_minima,
-          valor_unitario: r.custo_unitario ?? 0,
-          area_responsavel: r.setor_aplicado,
-        })));
+      const dedupMap = new Map<string, {
+        catalog_item_id: string; loja_id: string;
+        estoque_minimo: number; valor_unitario: number; area_responsavel: string;
+      }>();
+      for (const r of rows) {
+        if (!r.catalog_item_id || !(r.qtd_minima > 0)) continue;
+        for (const loja_id of lojasArr) {
+          const key = `${r.catalog_item_id}|${loja_id}`;
+          const existing = dedupMap.get(key);
+          if (!existing || r.qtd_minima > existing.estoque_minimo) {
+            dedupMap.set(key, {
+              catalog_item_id: r.catalog_item_id!,
+              loja_id,
+              estoque_minimo: r.qtd_minima,
+              valor_unitario: r.custo_unitario ?? 0,
+              area_responsavel: r.setor_aplicado,
+            });
+          }
+        }
+      }
+      const payload = Array.from(dedupMap.values());
 
       await bulkImport.mutateAsync(payload);
       toast.success(`${rows.length} itens aplicados em ${lojasArr.length} loja(s)`);

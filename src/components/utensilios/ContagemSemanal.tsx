@@ -40,6 +40,7 @@ export function ContagemSemanal() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
+  const [showUnconfigured, setShowUnconfigured] = useState(false);
 
   const activeSemana = semanaRef || "";
   const { data: contagens } = useUtensiliosContagens(effectiveUnidadeId, activeSemana || null);
@@ -70,6 +71,12 @@ export function ContagemSemanal() {
     return catalog
       .filter((c: any) => c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
       .filter((c: any) => showHidden ? hiddenSet.has(c.id) : !hiddenSet.has(c.id))
+      // Only show items linked to this store (configured) unless user opts in
+      .filter((c: any) => {
+        if (showHidden || showUnconfigured) return true;
+        const si = storeMap[c.id];
+        return si && (si.estoque_minimo ?? 0) > 0;
+      })
       .map((c: any) => {
         const storeItem = storeMap[c.id];
         return {
@@ -84,7 +91,13 @@ export function ContagemSemanal() {
         };
       })
       .filter((i) => setor === "Todos" || i.setor === setor);
-  }, [catalog, storeMap, search, setor, showHidden, hiddenSet]);
+  }, [catalog, storeMap, search, setor, showHidden, hiddenSet, showUnconfigured]);
+
+  const configuredCount = useMemo(
+    () => (storeItems || []).filter((si: any) => (si.estoque_minimo ?? 0) > 0).length,
+    [storeItems]
+  );
+  const catalogTotal = catalog?.length || 0;
 
   const handleToggleHide = (catalogId: string, hide: boolean) => {
     if (!effectiveUnidadeId) return;
@@ -180,6 +193,13 @@ export function ContagemSemanal() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar utensílio..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30">
+          <Switch id="show-unconfigured" checked={showUnconfigured} onCheckedChange={setShowUnconfigured} disabled={showHidden} />
+          <Label htmlFor="show-unconfigured" className="text-xs cursor-pointer">
+            Mostrar não configurados
+            <Badge variant="secondary" className="text-[10px] h-4 px-1 ml-1">{configuredCount}/{catalogTotal}</Badge>
+          </Label>
         </div>
         <div className="flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/30">
           <Switch id="show-hidden" checked={showHidden} onCheckedChange={setShowHidden} />
@@ -291,8 +311,18 @@ export function ContagemSemanal() {
           </Card>
         )
       ) : (
-        <Card><CardContent className="py-10 text-center text-muted-foreground">
-          {showHidden ? "Nenhum item oculto." : "Nenhum utensílio encontrado."}
+        <Card><CardContent className="py-10 text-center text-muted-foreground space-y-2">
+          {showHidden ? (
+            <p>Nenhum item oculto.</p>
+          ) : configuredCount === 0 ? (
+            <>
+              <p className="font-medium text-foreground">Nenhum utensílio configurado nesta loja.</p>
+              <p className="text-xs">Use "Importar PDF (IA)" ou "Definir Estoque Inicial" para começar.</p>
+              <p className="text-xs">Ou ative "Mostrar não configurados" para ver o catálogo completo ({catalogTotal} itens).</p>
+            </>
+          ) : (
+            <p>Nenhum utensílio encontrado com esses filtros.</p>
+          )}
         </CardContent></Card>
       )}
     </div>

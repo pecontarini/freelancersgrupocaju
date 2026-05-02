@@ -25,9 +25,12 @@ import { cn } from "@/lib/utils";
 import { MetaPageHeader } from "../shared/MetaPageHeader";
 import { KpiByStoreCard, KpiByStoreGrid } from "../shared/KpiByStoreGrid";
 import { currentMonth, formatNumberPt, monthRange } from "../shared/dateUtils";
+import { useSheetData } from "@/hooks/useSheetData";
+import { parseChecklistCSV } from "@/utils/parseSheetData";
 
 interface VisaoGeralViewProps {
   defaultMes?: string;
+  selectedUnidadeId?: string | null;
 }
 
 function avg(values: Array<number | null | undefined>): number | null {

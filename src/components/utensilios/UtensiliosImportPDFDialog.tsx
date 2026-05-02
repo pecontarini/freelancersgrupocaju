@@ -114,19 +114,23 @@ export function UtensiliosImportPDFDialog({ open, onOpenChange }: Props) {
     }
     setExtracting(true);
     try {
-      const buf = await file.arrayBuffer();
-      // Convert to base64 in chunks to avoid stack overflow
-      const bytes = new Uint8Array(buf);
-      let bin = "";
-      const CHUNK = 0x8000;
-      for (let i = 0; i < bytes.length; i += CHUNK) {
-        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK)));
-      }
-      const b64 = btoa(bin);
+      // 1) Upload PDF to private bucket — keeps invoke payload tiny (<1KB)
+      const pdfPath = `${crypto.randomUUID()}.pdf`;
+      toast.info("Enviando PDF...");
+      const { error: upErr } = await supabase.storage
+        .from("utensilios-imports")
+        .upload(pdfPath, file, { contentType: "application/pdf", upsert: false });
+      if (upErr) throw new Error(`Upload falhou: ${upErr.message}`);
 
-      const { data, error } = await supabase.functions.invoke("extract-utensilios-pdf", {
-        body: { pdf_base64: b64 },
+      // 2) Invoke extractor with a hard timeout so the UI never hangs forever
+      toast.info("Analisando páginas com IA (até 3 min)...");
+      const invokePromise = supabase.functions.invoke("extract-utensilios-pdf", {
+        body: { pdf_path: pdfPath },
       });
+      const timeoutPromise = new Promise<never>((_, rej) =>
+        setTimeout(() => rej(new Error("Tempo esgotado (3 min). Tente novamente ou use um PDF menor.")), 180_000)
+      );
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as any;
       if (error) throw error;
       const items: ExtractedItem[] = data?.items || [];
       if (items.length === 0) {

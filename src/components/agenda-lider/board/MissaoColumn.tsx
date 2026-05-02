@@ -1,4 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { MissaoStatus } from "@/hooks/useMissoes";
@@ -14,22 +15,23 @@ const STATUS_ACCENT: Record<MissaoStatus, string> = {
 export function MissaoColumn({
   status,
   count,
+  itemIds,
   children,
-  showPlaceholder = false,
+  isActiveTarget = false,
   isDragInProgress = false,
 }: {
   status: MissaoStatus;
   count: number;
+  itemIds: string[];
   children: ReactNode;
-  showPlaceholder?: boolean;
+  isActiveTarget?: boolean;
   isDragInProgress?: boolean;
 }) {
-  const { isOver, setNodeRef } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: `col-${status}`,
-    data: { status },
+    data: { status, type: "column" },
   });
 
-  const isActiveTarget = isOver && showPlaceholder;
   const dimmed = isDragInProgress && !isActiveTarget;
 
   return (
@@ -59,17 +61,9 @@ export function MissaoColumn({
           {count}
         </span>
       </div>
-      <div className="flex-1 space-y-2 overflow-y-auto">
-        {isActiveTarget && (
-          <div
-            aria-hidden
-            className="drop-placeholder flex items-center justify-center text-[11px] font-medium uppercase tracking-wider text-primary/70"
-          >
-            Soltar aqui
-          </div>
-        )}
-        {children}
-      </div>
+      <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+        <div className="flex-1 space-y-2 overflow-y-auto">{children}</div>
+      </SortableContext>
     </div>
   );
 }

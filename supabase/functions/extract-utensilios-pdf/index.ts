@@ -8,8 +8,7 @@
 // Response:     { items: ExtractedItem[], pages: number, took_ms: number }
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { PDFDocument as PdfLibDoc } from "https://esm.sh/pdf-lib@1.17.1";
-import * as pdfium from "https://deno.land/x/pdfium@0.1.6/mod.ts";
+import * as mupdf from "https://esm.sh/mupdf@1.3.0";
 import { Image } from "https://deno.land/x/imagescript@1.2.17/mod.ts";
 
 const corsHeaders = {

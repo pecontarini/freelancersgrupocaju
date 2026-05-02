@@ -71,3 +71,5 @@ verify_jwt = false
 
 [functions.get-sheets-data]
 verify_jwt = false
+[functions.plano-acao-ia]
+verify_jwt = false

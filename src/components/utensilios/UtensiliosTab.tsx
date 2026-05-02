@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { GlobalMinimumStockMatrix } from "./GlobalMinimumStockMatrix";
 import { UtensiliosImportPDFDialog } from "./UtensiliosImportPDFDialog";
+import { GaleriaFotos } from "./GaleriaFotos";
 
 export function UtensiliosTab() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -246,11 +247,12 @@ export function UtensiliosTab() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={isMobile ? "overflow-x-auto -mx-2 px-2" : ""}>
-          <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-4"}>
+          <TabsList className={isMobile ? "inline-flex w-auto min-w-full" : "grid w-full grid-cols-5"}>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="contagem">{isMobile ? "Contagem" : "Contagem Semanal"}</TabsTrigger>
             <TabsTrigger value="budget">{isMobile ? "Compras" : "Controle de Compras"}</TabsTrigger>
             <TabsTrigger value="historico">Histórico</TabsTrigger>
+            <TabsTrigger value="fotos">Fotos</TabsTrigger>
           </TabsList>
         </div>
 
@@ -258,6 +260,7 @@ export function UtensiliosTab() {
         <TabsContent value="contagem"><ContagemSemanal /></TabsContent>
         <TabsContent value="budget"><ControleBudget /></TabsContent>
         <TabsContent value="historico"><HistoricoContagens /></TabsContent>
+        <TabsContent value="fotos"><GaleriaFotos /></TabsContent>
       </Tabs>
 
       {/* Dialog: Definir Estoque Inicial */}

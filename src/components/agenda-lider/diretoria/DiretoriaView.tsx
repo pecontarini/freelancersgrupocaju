@@ -108,13 +108,13 @@ export function DiretoriaView() {
           <div className="space-y-3">
             {porUnidade.map((u) => (
               <div key={u.key}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-medium">{u.nome}</span>
-                  <span className="text-muted-foreground">
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-medium" title={u.nome}>{u.nome}</span>
+                  <span className="shrink-0 text-muted-foreground tabular-nums">
                     {u.done}/{u.total} ({u.pct}%)
                   </span>
                 </div>
-                <Progress value={u.pct} className="h-2" />
+                <Progress value={u.pct} className="h-2.5" />
               </div>
             ))}
             {porUnidade.length === 0 && (
@@ -130,13 +130,13 @@ export function DiretoriaView() {
           <div className="space-y-3">
             {porResponsavel.map((r) => (
               <div key={r.nome}>
-                <div className="mb-1 flex items-center justify-between text-xs">
-                  <span className="font-medium">{r.nome}</span>
-                  <span className="text-muted-foreground">
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-medium" title={r.nome}>{r.nome}</span>
+                  <span className="shrink-0 text-muted-foreground tabular-nums">
                     {r.done}/{r.total} ({r.pct}%)
                   </span>
                 </div>
-                <Progress value={r.pct} className="h-2" />
+                <Progress value={r.pct} className="h-2.5" />
               </div>
             ))}
             {porResponsavel.length === 0 && (

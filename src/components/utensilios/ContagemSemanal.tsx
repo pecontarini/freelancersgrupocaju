@@ -71,6 +71,12 @@ export function ContagemSemanal() {
     return catalog
       .filter((c: any) => c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
       .filter((c: any) => showHidden ? hiddenSet.has(c.id) : !hiddenSet.has(c.id))
+      // Only show items linked to this store (configured) unless user opts in
+      .filter((c: any) => {
+        if (showHidden || showUnconfigured) return true;
+        const si = storeMap[c.id];
+        return si && (si.estoque_minimo ?? 0) > 0;
+      })
       .map((c: any) => {
         const storeItem = storeMap[c.id];
         return {
@@ -85,7 +91,13 @@ export function ContagemSemanal() {
         };
       })
       .filter((i) => setor === "Todos" || i.setor === setor);
-  }, [catalog, storeMap, search, setor, showHidden, hiddenSet]);
+  }, [catalog, storeMap, search, setor, showHidden, hiddenSet, showUnconfigured]);
+
+  const configuredCount = useMemo(
+    () => (storeItems || []).filter((si: any) => (si.estoque_minimo ?? 0) > 0).length,
+    [storeItems]
+  );
+  const catalogTotal = catalog?.length || 0;
 
   const handleToggleHide = (catalogId: string, hide: boolean) => {
     if (!effectiveUnidadeId) return;

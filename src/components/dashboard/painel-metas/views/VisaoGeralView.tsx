@@ -42,14 +42,15 @@ import {
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RTooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from "recharts";
 import { toast } from "sonner";
 import { MetaPageHeader } from "../shared/MetaPageHeader";
@@ -907,41 +908,81 @@ function ComparisonChart({ rows }: { rows: any[] }) {
     [rows],
   );
 
+  const unitNames = rows.map((r) => r.nome).join(" · ");
+
   return (
     <div className={cn(NEW_CARD, "p-4")}>
-      <div className="mb-4 flex items-center gap-2">
-        <BarChart3 className="h-4 w-4 text-white/70" />
-        <span className="text-xs font-bold uppercase tracking-widest text-white/85">
-          Comparativo entre unidades
-        </span>
+      <div className="mb-3">
+        <div
+          className="text-[11px] font-semibold text-[#666] uppercase"
+          style={{ letterSpacing: "0.06em" }}
+        >
+          Comparativo de performance
+        </div>
+        <div className="mt-1 text-xs text-amber-400/90">{unitNames}</div>
       </div>
-      <div className="h-[360px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis dataKey="metric" stroke="rgba(255,255,255,0.55)" fontSize={11} />
-            <YAxis stroke="rgba(255,255,255,0.55)" fontSize={11} domain={[0, 100]} />
-            <RTooltip
-              contentStyle={{
-                backgroundColor: "#111",
-                border: "0.5px solid rgba(255,255,255,0.1)",
-                borderRadius: 10,
-                fontSize: 12,
-              }}
-              cursor={{ fill: "rgba(255,255,255,0.04)" }}
-            />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            {rows.map((r, i) => (
-              <Bar
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="rgba(255,255,255,0.04)"
+            vertical={false}
+          />
+          <XAxis
+            dataKey="metric"
+            tick={{ fontSize: 11, fill: "#666" }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            domain={[50, 100]}
+            tick={{ fontSize: 11, fill: "#555" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <ReferenceLine
+            y={85}
+            stroke="rgba(16,185,129,0.2)"
+            strokeDasharray="4 4"
+            label={{
+              value: "meta 85%",
+              fill: "#10B981",
+              fontSize: 10,
+              position: "right",
+            }}
+          />
+          <RTooltip
+            contentStyle={{
+              background: "#161616",
+              border: "0.5px solid rgba(255,255,255,0.1)",
+              borderRadius: "8px",
+              fontSize: "12px",
+            }}
+            labelStyle={{ color: "#888", marginBottom: "6px" }}
+            formatter={(value: any, name: any) => [`${Number(value).toFixed(1)}%`, name]}
+          />
+          <Legend
+            wrapperStyle={{ fontSize: "11px", color: "#666", marginTop: "12px" }}
+            iconType="circle"
+            iconSize={6}
+          />
+          {rows.map((r, i) => {
+            const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
+            return (
+              <Line
                 key={r.id}
+                type="monotone"
                 dataKey={r.nome}
-                fill={COMPARE_COLORS[i % COMPARE_COLORS.length]}
-                radius={[6, 6, 0, 0]}
+                stroke={color}
+                strokeWidth={2}
+                dot={{ r: 4, fill: color, strokeWidth: 0 }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+                animationDuration={600}
               />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }

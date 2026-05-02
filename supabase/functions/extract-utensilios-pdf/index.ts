@@ -65,20 +65,20 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 async function renderAllPages(pdfBytes: Uint8Array): Promise<Uint8Array[]> {
-  // pdfium-deno: PDFiumDocument.load + page.render
-  const doc = await pdfium.PDFiumDocument.fromBytes(pdfBytes);
+  // mupdf-wasm: open document, render each page to PNG at desired DPI
+  const doc = mupdf.Document.openDocument(pdfBytes, "application/pdf");
   const out: Uint8Array[] = [];
-  const scale = RENDER_DPI / 72;
-  for (let i = 0; i < doc.pageCount; i++) {
-    const page = doc.getPage(i);
-    const { width, height } = page.size; // points
-    const px = Math.round(width * scale);
-    const py = Math.round(height * scale);
-    const png = await page.render({ width: px, height: py, format: "png" });
-    out.push(png);
-    page.close?.();
+  const matrix = mupdf.Matrix.scale(RENDER_DPI / 72, RENDER_DPI / 72);
+  const pageCount = doc.countPages();
+  for (let i = 0; i < pageCount; i++) {
+    const page = doc.loadPage(i);
+    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false);
+    const png = pixmap.asPNG();
+    out.push(new Uint8Array(png));
+    pixmap.destroy?.();
+    page.destroy?.();
   }
-  doc.close?.();
+  doc.destroy?.();
   return out;
 }
 

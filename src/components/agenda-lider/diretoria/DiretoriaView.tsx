@@ -147,56 +147,126 @@ export function DiretoriaView() {
       </div>
 
       <div className="glass-card p-4">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Todas as missões ({missoes.length})
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs uppercase text-muted-foreground">
-                <th className="px-2 py-2 text-left">Missão</th>
-                <th className="px-2 py-2 text-left">Unidade</th>
-                <th className="px-2 py-2 text-left">Responsável</th>
-                <th className="px-2 py-2 text-left">Prioridade</th>
-                <th className="px-2 py-2 text-left">Status</th>
-                <th className="px-2 py-2 text-left">Prazo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {missoes.map((m) => (
-                <tr
-                  key={m.id}
-                  onClick={() => setOpenId(m.id)}
-                  className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
-                >
-                  <td className="max-w-xs truncate px-2 py-2 font-medium">{m.titulo}</td>
-                  <td className="px-2 py-2 text-muted-foreground">
-                    {m.unidade_id ? lojas[m.unidade_id] ?? "—" : "—"}
-                  </td>
-                  <td className="px-2 py-2 text-muted-foreground">{responsaveisMap[m.id] ?? "—"}</td>
-                  <td className="px-2 py-2">
-                    <PrioridadeBadge prioridade={m.prioridade} className="px-1.5 py-0 text-[10px]" />
-                  </td>
-                  <td className="px-2 py-2">
-                    <StatusBadge status={m.status} className="px-1.5 py-0 text-[10px]" />
-                  </td>
-                  <td className="px-2 py-2 text-muted-foreground">
-                    {m.prazo
-                      ? new Date(m.prazo + "T00:00:00").toLocaleDateString("pt-BR")
-                      : "—"}
-                  </td>
-                </tr>
-              ))}
-              {missoes.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                    Nenhuma missão criada.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Todas as missões ({missoes.length})
+          </h3>
+          <div className="-mx-1 flex gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {[
+              { key: "all" as const, label: "Todas" },
+              { key: "andamento" as const, label: "Em andamento" },
+              { key: "concluido" as const, label: "Concluídas" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                className={
+                  "h-8 shrink-0 rounded-full border px-3 text-xs font-medium transition " +
+                  (statusFilter === f.key
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted/40")
+                }
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {(() => {
+          const filtered = missoes.filter((m) => {
+            if (statusFilter === "all") return true;
+            if (statusFilter === "concluido") return m.status === "concluido";
+            return m.status !== "concluido";
+          });
+
+          if (filtered.length === 0) {
+            return (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Nenhuma missão encontrada.
+              </p>
+            );
+          }
+
+          if (isMobile) {
+            return (
+              <div className="space-y-2">
+                {filtered.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setOpenId(m.id)}
+                    className="w-full rounded-xl border border-border/60 bg-card/60 p-3 text-left transition active:bg-muted/60"
+                  >
+                    <div className="line-clamp-2 text-sm font-semibold leading-snug">
+                      {m.titulo}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <PrioridadeBadge prioridade={m.prioridade} className="h-5 px-1.5 text-[10px]" />
+                      <StatusBadge status={m.status} className="h-5 px-1.5 text-[10px]" />
+                      {m.prazo && (
+                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                          {new Date(m.prazo + "T00:00:00").toLocaleDateString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 truncate text-[11px] text-muted-foreground">
+                      {(m.unidade_id ? lojas[m.unidade_id] ?? "—" : "Sem unidade")} ·{" "}
+                      {responsaveisMap[m.id] ?? "—"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            );
+          }
+
+          return (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase text-muted-foreground">
+                    <th className="px-2 py-2 text-left">Missão</th>
+                    <th className="px-2 py-2 text-left">Unidade</th>
+                    <th className="px-2 py-2 text-left">Responsável</th>
+                    <th className="px-2 py-2 text-left">Prioridade</th>
+                    <th className="px-2 py-2 text-left">Status</th>
+                    <th className="px-2 py-2 text-left">Prazo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((m) => (
+                    <tr
+                      key={m.id}
+                      onClick={() => setOpenId(m.id)}
+                      className="cursor-pointer border-b border-border/40 hover:bg-muted/40"
+                    >
+                      <td className="max-w-xs truncate px-2 py-2 font-medium">{m.titulo}</td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {m.unidade_id ? lojas[m.unidade_id] ?? "—" : "—"}
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">{responsaveisMap[m.id] ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        <PrioridadeBadge prioridade={m.prioridade} className="px-1.5 py-0 text-[10px]" />
+                      </td>
+                      <td className="px-2 py-2">
+                        <StatusBadge status={m.status} className="px-1.5 py-0 text-[10px]" />
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {m.prazo
+                          ? new Date(m.prazo + "T00:00:00").toLocaleDateString("pt-BR")
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
 
       <MissaoDetailDialog missaoId={openId} open={!!openId} onClose={() => setOpenId(null)} />

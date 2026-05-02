@@ -326,7 +326,7 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {heatmap.isLoading ? (
+                {(heatmap.isLoading || loadingGeral) && heatmapRows.length === 0 ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       {Array.from({ length: 6 }).map((__, j) => (
@@ -336,14 +336,14 @@ export function VisaoGeralView({ defaultMes, selectedUnidadeId }: VisaoGeralView
                       ))}
                     </TableRow>
                   ))
-                ) : (heatmap.data ?? []).length === 0 ? (
+                ) : heatmapRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                       Nenhuma unidade disponível para este mês
                     </TableCell>
                   </TableRow>
                 ) : (
-                  (heatmap.data ?? []).map((row) => (
+                  heatmapRows.map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell className="font-medium">{row.nome}</TableCell>
                       <TableCell className="text-center">

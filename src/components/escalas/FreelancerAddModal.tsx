@@ -396,6 +396,26 @@ export function FreelancerAddModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Sector selector — choose any sector of the unit */}
+          {sectors.length > 1 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                Setor *
+              </Label>
+              <Select value={chosenSectorId} onValueChange={setChosenSectorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sectors.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Shared sector → unit toggle */}
           {isShared && (
             <div className="space-y-1.5 rounded-md border-2 border-primary/30 bg-primary/5 p-3">

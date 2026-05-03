@@ -37,6 +37,8 @@ interface FreelancerAddModalProps {
   partnerUnitId?: string;
   partnerUnitName?: string;
   partnerSectorId?: string;
+  /** All sectors of the unit (allows choosing any sector). */
+  sectors?: { id: string; name: string }[];
   onAdded?: (employeeId: string) => void;
 }
 
@@ -50,18 +52,22 @@ export function FreelancerAddModal({
   partnerUnitId,
   partnerUnitName,
   partnerSectorId,
+  sectors = [],
   onAdded,
 }: FreelancerAddModalProps) {
-  const isShared = !!partnerUnitId && !!partnerSectorId;
+  // User-chosen sector (defaults to the one the button was clicked from)
+  const [chosenSectorId, setChosenSectorId] = useState<string>(sectorId);
+  // Only allow partner-unit toggle when user is operating on the originally paired sector
+  const isShared = !!partnerUnitId && !!partnerSectorId && chosenSectorId === sectorId;
 
   // Track which side (loja) the freelancer will be linked to
   const [targetUnitId, setTargetUnitId] = useState<string>(unitId);
-  const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : sectorId;
+  const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : chosenSectorId;
 
   // Fetch employees from BOTH units (so existing-employee detection covers both sides)
   const { data: employees = [] } = useEmployees(unitId, isShared ? [partnerUnitId!] : undefined);
   const { data: sectorJobTitles = [] } = useSectorJobTitles(
-    isShared ? [sectorId, partnerSectorId!] : [sectorId]
+    isShared ? [chosenSectorId, partnerSectorId!] : [chosenSectorId]
   );
   const { data: allJobTitles = [] } = useJobTitles(targetUnitId);
   const upsertSchedule = useUpsertSchedule();

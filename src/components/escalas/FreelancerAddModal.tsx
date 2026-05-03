@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus, Building2 } from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";

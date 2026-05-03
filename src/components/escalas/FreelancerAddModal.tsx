@@ -114,10 +114,16 @@ export function FreelancerAddModal({
   // Reset form & target when modal opens
   useEffect(() => {
     if (open) {
+      setChosenSectorId(sectorId);
       setTargetUnitId(unitId);
       resetForm();
     }
-  }, [open, unitId]);
+  }, [open, unitId, sectorId]);
+
+  // When user changes sector, clear cargo (job titles list will refresh)
+  useEffect(() => {
+    setSelectedJobTitleId("");
+  }, [chosenSectorId]);
 
   const isSaving = upsertSchedule.isPending;
 

@@ -1777,6 +1777,7 @@ export function ManualScheduleGrid() {
           partnerUnitId={partnerSectorMeta?.unitId}
           partnerUnitName={partnerSectorMeta?.unitName}
           partnerSectorId={partnerSectorId || undefined}
+          sectors={sectors.map((s) => ({ id: s.id, name: s.name }))}
         />
       )}
 

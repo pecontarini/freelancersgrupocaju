@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus } from "lucide-react";
+import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus, Building2 } from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
@@ -37,6 +37,8 @@ interface FreelancerAddModalProps {
   partnerUnitId?: string;
   partnerUnitName?: string;
   partnerSectorId?: string;
+  /** All sectors of the unit (allows choosing any sector). */
+  sectors?: { id: string; name: string }[];
   onAdded?: (employeeId: string) => void;
 }
 
@@ -50,18 +52,22 @@ export function FreelancerAddModal({
   partnerUnitId,
   partnerUnitName,
   partnerSectorId,
+  sectors = [],
   onAdded,
 }: FreelancerAddModalProps) {
-  const isShared = !!partnerUnitId && !!partnerSectorId;
+  // User-chosen sector (defaults to the one the button was clicked from)
+  const [chosenSectorId, setChosenSectorId] = useState<string>(sectorId);
+  // Only allow partner-unit toggle when user is operating on the originally paired sector
+  const isShared = !!partnerUnitId && !!partnerSectorId && chosenSectorId === sectorId;
 
   // Track which side (loja) the freelancer will be linked to
   const [targetUnitId, setTargetUnitId] = useState<string>(unitId);
-  const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : sectorId;
+  const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : chosenSectorId;
 
   // Fetch employees from BOTH units (so existing-employee detection covers both sides)
   const { data: employees = [] } = useEmployees(unitId, isShared ? [partnerUnitId!] : undefined);
   const { data: sectorJobTitles = [] } = useSectorJobTitles(
-    isShared ? [sectorId, partnerSectorId!] : [sectorId]
+    isShared ? [chosenSectorId, partnerSectorId!] : [chosenSectorId]
   );
   const { data: allJobTitles = [] } = useJobTitles(targetUnitId);
   const upsertSchedule = useUpsertSchedule();
@@ -108,10 +114,16 @@ export function FreelancerAddModal({
   // Reset form & target when modal opens
   useEffect(() => {
     if (open) {
+      setChosenSectorId(sectorId);
       setTargetUnitId(unitId);
       resetForm();
     }
-  }, [open, unitId]);
+  }, [open, unitId, sectorId]);
+
+  // When user changes sector, clear cargo (job titles list will refresh)
+  useEffect(() => {
+    setSelectedJobTitleId("");
+  }, [chosenSectorId]);
 
   const isSaving = upsertSchedule.isPending;
 
@@ -384,6 +396,26 @@ export function FreelancerAddModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Sector selector — choose any sector of the unit */}
+          {sectors.length > 1 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                Setor *
+              </Label>
+              <Select value={chosenSectorId} onValueChange={setChosenSectorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o setor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sectors.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Shared sector → unit toggle */}
           {isShared && (
             <div className="space-y-1.5 rounded-md border-2 border-primary/30 bg-primary/5 p-3">

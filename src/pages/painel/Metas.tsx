@@ -16,6 +16,11 @@ import type { RankingMetric } from "@/components/dashboard/painel-metas/shared/m
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { snapshotToLoja, statusFor } from "@/components/dashboard/painel-metas/shared/mockLojas";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
+import { useSyncNpsSheets } from "@/hooks/useSyncNpsSheets";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 const METRIC_KEYS: RankingMetric[] = ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"];
 
@@ -77,6 +82,7 @@ export default function MetasPage() {
           />
 
           <main className="container mx-auto max-w-[1400px] px-3 py-6 md:px-6 md:py-8">
+            {showFullAccess && <NpsSyncBar />}
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               {/* Sidebar de métricas */}
               <aside className="md:sticky md:top-6 md:self-start">

@@ -1,9 +1,15 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock, Download } from "lucide-react";
+import { Trophy, AlertTriangle, Clock, Download, ArrowUpDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -20,62 +26,49 @@ import {
   bandeiraStyles,
   snapshotToLoja,
   statusFor,
-  variation,
   type RankingMetric,
+  type RankingStatus,
 } from "../shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { formatNpsDisplay } from "@/lib/metasUtils";
 
-const STATUS_LABEL: Record<string, string> = {
-  excelente: "Excelente",
-  bom: "Bom",
-  regular: "Regular",
-  redflag: "Crítico",
+const STATUS_CELL: Record<RankingStatus, string> = {
+  excelente: "bg-emerald-500/15 text-emerald-200 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-200 ring-amber-500/30",
+  regular: "bg-orange-500/15 text-orange-200 ring-orange-500/30",
+  redflag: "bg-red-500/20 text-red-200 ring-red-500/40",
 };
 
-const STATUS_DOT: Record<string, string> = {
-  excelente: "bg-emerald-500/80 ring-emerald-400/40",
-  bom: "bg-amber-500/80 ring-amber-400/40",
-  regular: "bg-orange-500/80 ring-orange-400/40",
-  redflag: "bg-red-500/90 ring-red-400/50",
-};
+function formatVal(metric: RankingMetric, value: number | null): string {
+  if (value === null) return "—";
+  if (metric === "nps") return formatNpsDisplay(value);
+  return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
 
 export function RankingView() {
-  const [metric, setMetric] = useState<RankingMetric>("nps");
+  const [sortBy, setSortBy] = useState<RankingMetric>("nps");
   const { data: snapshots, isLoading, isEmpty, error } = useMetasSnapshot();
-
   const lojas = useMemo(() => snapshots.map(snapshotToLoja), [snapshots]);
 
-  const rows = useMemo(() => {
-    const meta = METRIC_META[metric];
-    const sorted = [...lojas].sort((a, b) => {
-      const av = a.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
-      const bv = b.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
+  const sorted = useMemo(() => {
+    const meta = METRIC_META[sortBy];
+    return [...lojas].sort((a, b) => {
+      const av = a.values[sortBy] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
+      const bv = b.values[sortBy] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
       return meta.polarity === "higher" ? bv - av : av - bv;
     });
-    return sorted.map((loja, idx) => {
-      const value = loja.values[metric];
-      const prev = loja.prev[metric];
-      const v = variation(metric, value, prev);
-      const status = statusFor(metric, value);
-      const isRed = status === "redflag" || loja.redFlag;
-      return { loja, value, prev, variation: v, status, isRed, position: idx + 1 };
-    });
-  }, [lojas, metric]);
+  }, [lojas, sortBy]);
 
   const exportCSV = () => {
-    const meta = METRIC_META[metric];
-    const header = ["Posicao", "Loja", "Nome", "Bandeira", "Valor", "Anterior", "Status", "RedFlag"];
-    const lines = rows.map((r) =>
+    const header = ["Posicao", "Loja", "Nome", "Bandeira", ...RANKING_METRICS.map((m) => METRIC_META[m].label), "RedFlag"];
+    const lines = sorted.map((l, idx) =>
       [
-        r.position,
-        r.loja.code,
-        `"${r.loja.nome.replace(/"/g, '""')}"`,
-        r.loja.bandeira,
-        r.value ?? "",
-        r.prev ?? "",
-        r.status,
-        r.isRed ? "true" : "false",
+        idx + 1,
+        l.code,
+        `"${l.nome.replace(/"/g, '""')}"`,
+        l.bandeira,
+        ...RANKING_METRICS.map((m) => l.values[m] ?? ""),
+        l.redFlag ? "true" : "false",
       ].join(","),
     );
     const csv = [header.join(","), ...lines].join("\n");
@@ -83,7 +76,7 @@ export function RankingView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ranking-${metric}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `ranking-lojas-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -91,188 +84,171 @@ export function RankingView() {
   return (
     <Card className="vision-glass">
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Trophy className="h-4 w-4 text-amber-500" />
-              Ranking de Lojas
+              Ranking de Lojas — Visão Matricial
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Ordenação por métrica · top performers e red flags da rede
+              Todas as lojas × todas as métricas · células coloridas por status
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={exportCSV}
-            disabled={isLoading || isEmpty}
-            className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
-          >
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              Ordenar por
+            </div>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as RankingMetric)}>
+              <SelectTrigger className="vision-glass h-8 w-[200px] border-white/15 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RANKING_METRICS.map((m) => (
+                  <SelectItem key={m} value={m} className="text-xs">
+                    {METRIC_META[m].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={exportCSV}
+              disabled={isLoading || isEmpty}
+              className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Tabs value={metric} onValueChange={(v) => setMetric(v as RankingMetric)}>
-          <TabsList className="vision-glass mb-4 h-auto flex-wrap gap-1 bg-transparent p-1">
-            {RANKING_METRICS.map((m) => (
-              <TabsTrigger
-                key={m}
-                value={m}
-                className="text-[11px] font-semibold uppercase tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary"
-              >
-                {METRIC_META[m].label}
-              </TabsTrigger>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
             ))}
-          </TabsList>
-
-          {RANKING_METRICS.map((m) => (
-            <TabsContent key={m} value={m} className="mt-0">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+          </div>
+        ) : error ? (
+          <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-300 ring-1 ring-red-500/20">
+            Erro ao carregar metas: {error}
+          </div>
+        ) : isEmpty ? (
+          <EmptyState />
+        ) : (
+          <div className="overflow-x-auto rounded-xl ring-1 ring-white/10">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="w-12 text-center">#</TableHead>
+                  <TableHead>Loja</TableHead>
+                  {RANKING_METRICS.map((m) => (
+                    <TableHead
+                      key={m}
+                      className={cn(
+                        "text-center text-[10px] uppercase tracking-wider",
+                        m === sortBy && "text-primary",
+                      )}
+                    >
+                      {METRIC_META[m].label}
+                    </TableHead>
                   ))}
-                </div>
-              ) : error ? (
-                <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-300 ring-1 ring-red-500/20">
-                  Erro ao carregar metas: {error}
-                </div>
-              ) : isEmpty ? (
-                <EmptyState />
-              ) : (
-                <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="w-16 text-center">#</TableHead>
-                        <TableHead>Loja</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                        <TableHead className="text-center">Variação</TableHead>
-                        <TableHead className="text-center">Red Flag</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rows.map((r, idx) => {
-                        const b = bandeiraStyles(r.loja.bandeira);
-                        const trendUp = r.variation > 0.01;
-                        const trendDown = r.variation < -0.01;
-                        const isPodium = r.position <= 3;
-                        return (
-                          <motion.tr
-                            key={r.loja.code}
-                            initial={{ opacity: 0, y: 6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.25, delay: idx * 0.025 }}
+                  <TableHead className="text-center">Red Flag</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sorted.map((loja, idx) => {
+                  const b = bandeiraStyles(loja.bandeira);
+                  const isPodium = idx < 3;
+                  return (
+                    <motion.tr
+                      key={loja.code}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: idx * 0.02 }}
+                      className={cn(
+                        "border-white/5 hover:bg-white/5",
+                        loja.redFlag && "bg-red-500/5",
+                      )}
+                    >
+                      <TableCell className="text-center">
+                        <span
+                          className={cn(
+                            "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold tabular-nums",
+                            isPodium
+                              ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-[0_0_12px_rgba(245,158,11,0.45)]"
+                              : "bg-white/10 text-white/80",
+                          )}
+                        >
+                          {idx + 1}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span
                             className={cn(
-                              "border-white/5 transition-colors",
-                              "hover:bg-white/5",
-                              r.isRed && "bg-red-500/5",
+                              "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-[10px] font-bold tracking-wider ring-1",
+                              b.bg,
+                              b.text,
+                              b.ring,
                             )}
                           >
-                            <TableCell className="text-center">
-                              <span
-                                className={cn(
-                                  "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold tabular-nums",
-                                  isPodium
-                                    ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-[0_0_12px_rgba(245,158,11,0.45)]"
-                                    : "bg-white/10 text-white/80",
-                                )}
-                              >
-                                {r.position}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={cn(
-                                    "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-[10px] font-bold tracking-wider ring-1",
-                                    b.bg,
-                                    b.text,
-                                    b.ring,
-                                  )}
-                                >
-                                  {b.label}
-                                </span>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-foreground">
-                                    {r.loja.code}
-                                  </p>
-                                  <p className="truncate text-[11px] text-muted-foreground">
-                                    {r.loja.nome}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums font-[Sora] font-semibold">
-                              {r.value !== null
-                                ? m === "nps"
-                                  ? formatNpsDisplay(r.value)
-                                  : r.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
-                                : "—"}
-                              <span className="ml-0.5 text-xs text-muted-foreground">
-                                {METRIC_META[m].suffix}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-[11px] ring-1 ring-white/10">
-                                <span
-                                  className={cn(
-                                    "inline-block h-2 w-2 rounded-full ring-2",
-                                    STATUS_DOT[r.status],
-                                  )}
-                                />
-                                {STATUS_LABEL[r.status]}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1 text-xs tabular-nums",
-                                  trendUp && "text-emerald-400",
-                                  trendDown && "text-red-400",
-                                  !trendUp && !trendDown && "text-muted-foreground",
-                                )}
-                              >
-                                {trendUp ? (
-                                  <TrendingUp className="h-3.5 w-3.5" />
-                                ) : trendDown ? (
-                                  <TrendingDown className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Minus className="h-3.5 w-3.5" />
-                                )}
-                                {Math.abs(r.variation).toLocaleString("pt-BR", {
-                                  maximumFractionDigits: 2,
-                                })}
-                              </span>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {r.isRed ? (
-                                <motion.span
-                                  animate={{ opacity: [1, 0.4, 1] }}
-                                  transition={{ duration: 1.6, repeat: Infinity }}
-                                  className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40"
-                                >
-                                  <AlertTriangle className="h-3 w-3" />
-                                  Red Flag
-                                </motion.span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
+                            {b.label}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">{loja.code}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {loja.nome}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      {RANKING_METRICS.map((m) => {
+                        const v = loja.values[m];
+                        const status = statusFor(m, v);
+                        return (
+                          <TableCell key={m} className="text-center">
+                            <span
+                              className={cn(
+                                "inline-flex min-w-[3.5rem] items-center justify-center rounded-md px-2 py-1 text-xs font-semibold tabular-nums ring-1",
+                                STATUS_CELL[status],
+                                m === sortBy && "ring-2",
                               )}
-                            </TableCell>
-                          </motion.tr>
+                            >
+                              {formatVal(m, v)}
+                              {v !== null && (
+                                <span className="ml-0.5 text-[9px] opacity-70">
+                                  {METRIC_META[m].suffix}
+                                </span>
+                              )}
+                            </span>
+                          </TableCell>
                         );
                       })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
+                      <TableCell className="text-center">
+                        {loja.redFlag ? (
+                          <motion.span
+                            animate={{ opacity: [1, 0.4, 1] }}
+                            transition={{ duration: 1.6, repeat: Infinity }}
+                            className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40"
+                          >
+                            <AlertTriangle className="h-3 w-3" />
+                            Red Flag
+                          </motion.span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </motion.tr>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

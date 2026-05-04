@@ -39,8 +39,12 @@ export function MetaCard({
   status,
   redFlag,
   unidadeSufixo = "",
+  formatValor,
+  formatMeta,
 }: MetaCardProps) {
   const positiveTrend = percentual >= 100;
+  const valorAtualText = formatValor ? formatValor(valorAtual) : valorAtual.toLocaleString("pt-BR");
+  const valorMetaText = formatMeta ? formatMeta(valorMeta) : valorMeta.toLocaleString("pt-BR");
 
   return (
     <motion.div

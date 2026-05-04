@@ -84,6 +84,22 @@ export const META_DEFINITIONS: Record<MetaKey, MetaDefinition> = {
     dotToken: "bg-stone-500",
     adminOnly: true,
   },
+  ranking: {
+    key: "ranking",
+    label: "Ranking de Lojas",
+    description: "Ordenação por métrica · top performers e red flags",
+    iconKey: "Trophy",
+    dotToken: "bg-amber-400",
+    managerPlus: true,
+  },
+  comparativo: {
+    key: "comparativo",
+    label: "Comparativo de Lojas",
+    description: "Radar 0–100 entre 2 a 4 unidades",
+    iconKey: "Radar",
+    dotToken: "bg-violet-400",
+    managerPlus: true,
+  },
 };
 
 export interface MetaGroup {

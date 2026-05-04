@@ -16,6 +16,11 @@ import type { RankingMetric } from "@/components/dashboard/painel-metas/shared/m
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { snapshotToLoja, statusFor } from "@/components/dashboard/painel-metas/shared/mockLojas";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
+import { useSyncNpsSheets } from "@/hooks/useSyncNpsSheets";
+import { Button } from "@/components/ui/button";
+import { RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 const METRIC_KEYS: RankingMetric[] = ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"];
 
@@ -77,6 +82,7 @@ export default function MetasPage() {
           />
 
           <main className="container mx-auto max-w-[1400px] px-3 py-6 md:px-6 md:py-8">
+            {showFullAccess && <NpsSyncBar />}
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               {/* Sidebar de métricas */}
               <aside className="md:sticky md:top-6 md:self-start">
@@ -117,5 +123,48 @@ export default function MetasPage() {
         </SidebarInset>
       </div>
     </SidebarProvider>
+  );
+}
+
+function NpsSyncBar() {
+  const { syncing, lastSync, error, triggerSync } = useSyncNpsSheets();
+
+  useEffect(() => {
+    if (error) toast({ title: "Erro ao sincronizar NPS", description: error, variant: "destructive" });
+  }, [error]);
+
+  useEffect(() => {
+    if (lastSync) toast({ title: "NPS sincronizado", description: "Snapshots atualizados com sucesso." });
+  }, [lastSync]);
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
+      <div className="flex items-center gap-2 text-xs text-white/70">
+        {error ? (
+          <>
+            <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+            <span className="text-red-300">Falha: {error}</span>
+          </>
+        ) : lastSync ? (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            Última sincronização: {lastSync.toLocaleString("pt-BR")}
+          </>
+        ) : (
+          <span className="text-white/50">NPS ainda não sincronizado nesta sessão</span>
+        )}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={triggerSync}
+        disabled={syncing}
+        className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+        {syncing ? "Sincronizando…" : "Sincronizar NPS"}
+      </Button>
+    </div>
   );
 }

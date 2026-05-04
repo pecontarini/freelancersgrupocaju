@@ -125,3 +125,46 @@ export default function MetasPage() {
     </SidebarProvider>
   );
 }
+
+function NpsSyncBar() {
+  const { syncing, lastSync, error, triggerSync } = useSyncNpsSheets();
+
+  useEffect(() => {
+    if (error) toast({ title: "Erro ao sincronizar NPS", description: error, variant: "destructive" });
+  }, [error]);
+
+  useEffect(() => {
+    if (lastSync) toast({ title: "NPS sincronizado", description: "Snapshots atualizados com sucesso." });
+  }, [lastSync]);
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
+      <div className="flex items-center gap-2 text-xs text-white/70">
+        {error ? (
+          <>
+            <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+            <span className="text-red-300">Falha: {error}</span>
+          </>
+        ) : lastSync ? (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            Última sincronização: {lastSync.toLocaleString("pt-BR")}
+          </>
+        ) : (
+          <span className="text-white/50">NPS ainda não sincronizado nesta sessão</span>
+        )}
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={triggerSync}
+        disabled={syncing}
+        className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+      >
+        <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+        {syncing ? "Sincronizando…" : "Sincronizar NPS"}
+      </Button>
+    </div>
+  );
+}

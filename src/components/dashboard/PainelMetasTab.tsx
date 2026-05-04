@@ -2089,6 +2089,8 @@ import { Sheet as MetaSheet, SheetContent as MetaSheetContent, SheetTrigger as M
 import { Menu } from "lucide-react";
 import { PainelSidebar } from "./painel-metas/shared/PainelSidebar";
 import { VisaoGeralView } from "./painel-metas/views/VisaoGeralView";
+import { RankingView } from "./painel-metas/views/RankingView";
+import { ComparativoView } from "./painel-metas/views/ComparativoView";
 import { SixMonthsForUserUnit } from "./painel-metas/shared/SixMonthsForUserUnit";
 import { currentMonth as currentMonthHelper } from "./painel-metas/shared/dateUtils";
 import { META_DEFINITIONS } from "./painel-metas/shared/metas";

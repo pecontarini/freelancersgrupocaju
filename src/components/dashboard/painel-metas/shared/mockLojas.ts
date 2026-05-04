@@ -1,31 +1,19 @@
 /**
- * Mock determinístico para as 10 lojas reais da rede.
- * Substituir por dados reais (Supabase) na fase de integração.
+ * Adapter: converte snapshots vindos do Supabase em estrutura usada pelo painel
+ * (RankingView / ComparativoView). Tipos e helpers de normalização permanecem aqui.
  */
 import type { MetaKey, MetaPolarity } from "./types";
+import type { MetaSnapshotRow } from "@/hooks/useMetasSnapshot";
 
-export type LojaCode =
-  | "CP_SG"
-  | "CP_AN"
-  | "CP_AC"
-  | "CP_AS"
-  | "NZ_SG"
-  | "NZ_AS"
-  | "NZ_AC"
-  | "NZ_GO"
-  | "CJ_SG"
-  | "CJ_AN";
+export type Bandeira = "CP" | "NZ" | "CJ" | "FB" | "OUTRA";
 
-export type Bandeira = "CP" | "NZ" | "CJ";
-
-export interface LojaMock {
-  code: LojaCode;
+export interface LojaSnapshot {
+  code: string;
   nome: string;
   bandeira: Bandeira;
-  /** valores absolutos por métrica (mês corrente). */
-  values: Record<RankingMetric, number>;
-  /** valores do mês anterior (para variação). */
-  prev: Record<RankingMetric, number>;
+  values: Record<RankingMetric, number | null>;
+  prev: Record<RankingMetric, number | null>;
+  redFlag: boolean;
 }
 
 export type RankingMetric =
@@ -58,13 +46,17 @@ const BANDEIRA_NOME: Record<Bandeira, string> = {
   CP: "Caminito Parrilla",
   NZ: "Nazo Japanese",
   CJ: "Caju Limão",
+  FB: "Foster's Burguer",
+  OUTRA: "Loja",
 };
 
-function bandeiraFromCode(code: LojaCode): Bandeira {
-  return code.split("_")[0] as Bandeira;
+function bandeiraFromCode(code: string): Bandeira {
+  const prefix = code.split("_")[0]?.toUpperCase();
+  if (prefix === "CP" || prefix === "NZ" || prefix === "CJ" || prefix === "FB") return prefix;
+  return "OUTRA";
 }
 
-function unidadeSufixo(code: LojaCode): string {
+function unidadeSufixo(code: string): string {
   const map: Record<string, string> = {
     SG: "Setor Sul",
     AN: "Asa Norte",
@@ -72,46 +64,48 @@ function unidadeSufixo(code: LojaCode): string {
     AS: "Asa Sul",
     GO: "Goiânia",
   };
-  return map[code.split("_")[1]] ?? code.split("_")[1];
+  const suf = code.split("_")[1] ?? "";
+  return map[suf] ?? suf;
 }
 
-const RAW: Array<{ code: LojaCode; values: Record<RankingMetric, number>; prev: Record<RankingMetric, number> }> = [
-  { code: "CP_SG", values: { nps: 82, "cmv-salmao": 1.18, "cmv-carnes": 4.2, kds: 84, conformidade: 93 }, prev: { nps: 79, "cmv-salmao": 1.22, "cmv-carnes": 5.1, kds: 80, conformidade: 91 } },
-  { code: "CP_AN", values: { nps: 76, "cmv-salmao": 1.31, "cmv-carnes": 6.4, kds: 78, conformidade: 88 }, prev: { nps: 78, "cmv-salmao": 1.28, "cmv-carnes": 5.9, kds: 80, conformidade: 89 } },
-  { code: "CP_AC", values: { nps: 71, "cmv-salmao": 1.45, "cmv-carnes": 8.6, kds: 70, conformidade: 79 }, prev: { nps: 73, "cmv-salmao": 1.42, "cmv-carnes": 8.1, kds: 72, conformidade: 81 } },
-  { code: "CP_AS", values: { nps: 80, "cmv-salmao": 1.22, "cmv-carnes": 5.0, kds: 82, conformidade: 91 }, prev: { nps: 77, "cmv-salmao": 1.25, "cmv-carnes": 5.4, kds: 79, conformidade: 90 } },
-  { code: "NZ_SG", values: { nps: 85, "cmv-salmao": 1.15, "cmv-carnes": 3.8, kds: 88, conformidade: 95 }, prev: { nps: 82, "cmv-salmao": 1.20, "cmv-carnes": 4.2, kds: 85, conformidade: 93 } },
-  { code: "NZ_AS", values: { nps: 78, "cmv-salmao": 1.28, "cmv-carnes": 5.5, kds: 79, conformidade: 87 }, prev: { nps: 80, "cmv-salmao": 1.24, "cmv-carnes": 5.1, kds: 81, conformidade: 88 } },
-  { code: "NZ_AC", values: { nps: 68, "cmv-salmao": 1.62, "cmv-carnes": 9.2, kds: 64, conformidade: 73 }, prev: { nps: 70, "cmv-salmao": 1.58, "cmv-carnes": 8.7, kds: 66, conformidade: 75 } },
-  { code: "NZ_GO", values: { nps: 74, "cmv-salmao": 1.34, "cmv-carnes": 6.8, kds: 75, conformidade: 84 }, prev: { nps: 72, "cmv-salmao": 1.36, "cmv-carnes": 7.0, kds: 74, conformidade: 82 } },
-  { code: "CJ_SG", values: { nps: 81, "cmv-salmao": 1.20, "cmv-carnes": 4.6, kds: 83, conformidade: 92 }, prev: { nps: 79, "cmv-salmao": 1.23, "cmv-carnes": 4.9, kds: 81, conformidade: 90 } },
-  { code: "CJ_AN", values: { nps: 73, "cmv-salmao": 1.40, "cmv-carnes": 7.3, kds: 72, conformidade: 81 }, prev: { nps: 75, "cmv-salmao": 1.37, "cmv-carnes": 7.0, kds: 74, conformidade: 83 } },
-];
-
-export const LOJAS_MOCK: LojaMock[] = RAW.map((r) => {
-  const bandeira = bandeiraFromCode(r.code);
+/**
+ * Converte uma linha do Supabase em estrutura consumida pelas views.
+ */
+export function snapshotToLoja(row: MetaSnapshotRow): LojaSnapshot {
+  const bandeira = bandeiraFromCode(row.loja_codigo);
   return {
-    code: r.code,
+    code: row.loja_codigo,
     bandeira,
-    nome: `${BANDEIRA_NOME[bandeira]} · ${unidadeSufixo(r.code)}`,
-    values: r.values,
-    prev: r.prev,
+    nome: `${BANDEIRA_NOME[bandeira]} · ${unidadeSufixo(row.loja_codigo)}`,
+    values: {
+      nps: row.nps,
+      "cmv-salmao": row.cmv_salmao,
+      "cmv-carnes": row.cmv_carnes,
+      kds: row.kds,
+      conformidade: row.conformidade,
+    },
+    prev: {
+      nps: row.nps_anterior,
+      "cmv-salmao": row.cmv_salmao_anterior,
+      "cmv-carnes": row.cmv_carnes_anterior,
+      kds: row.kds_anterior,
+      conformidade: row.conformidade_anterior,
+    },
+    redFlag: row.red_flag,
   };
-});
+}
 
 /**
  * Normaliza um valor para 0–100 considerando meta e polaridade.
- * higher: 100 quando value ≥ meta; 0 quando value ≤ redFlag.
- * lower:  100 quando value ≤ meta; 0 quando value ≥ redFlag.
  */
-export function normalizeMetric(metric: RankingMetric, value: number): number {
+export function normalizeMetric(metric: RankingMetric, value: number | null): number {
+  if (value === null || Number.isNaN(value)) return 0;
   const { polarity, meta, redFlag } = METRIC_META[metric];
   if (polarity === "higher") {
     if (value >= meta) return 100;
     if (value <= redFlag) return 0;
     return Math.round(((value - redFlag) / (meta - redFlag)) * 100);
   }
-  // lower
   if (value <= meta) return 100;
   if (value >= redFlag) return 0;
   return Math.round(((redFlag - value) / (redFlag - meta)) * 100);
@@ -125,12 +119,17 @@ export function bandeiraStyles(b: Bandeira): { label: string; ring: string; bg: 
       return { label: "NZ", ring: "ring-sky-400/40", bg: "bg-sky-500/15", text: "text-sky-300" };
     case "CJ":
       return { label: "CJ", ring: "ring-emerald-400/40", bg: "bg-emerald-500/15", text: "text-emerald-300" };
+    case "FB":
+      return { label: "FB", ring: "ring-amber-400/40", bg: "bg-amber-500/15", text: "text-amber-300" };
+    default:
+      return { label: "—", ring: "ring-white/20", bg: "bg-white/10", text: "text-white/70" };
   }
 }
 
 export type RankingStatus = "excelente" | "bom" | "regular" | "redflag";
 
-export function statusFor(metric: RankingMetric, value: number): RankingStatus {
+export function statusFor(metric: RankingMetric, value: number | null): RankingStatus {
+  if (value === null) return "regular";
   const norm = normalizeMetric(metric, value);
   if (norm >= 90) return "excelente";
   if (norm >= 70) return "bom";
@@ -138,8 +137,12 @@ export function statusFor(metric: RankingMetric, value: number): RankingStatus {
   return "redflag";
 }
 
-export function variation(metric: RankingMetric, value: number, prev: number): number {
-  // Retorna variação positiva quando "melhorou" segundo a polaridade.
+export function variation(
+  metric: RankingMetric,
+  value: number | null,
+  prev: number | null,
+): number {
+  if (value === null || prev === null) return 0;
   const { polarity } = METRIC_META[metric];
   const diff = value - prev;
   return polarity === "higher" ? diff : -diff;

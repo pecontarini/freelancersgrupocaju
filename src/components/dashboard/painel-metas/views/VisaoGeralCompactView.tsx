@@ -153,7 +153,7 @@ export function VisaoGeralCompactView() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {podiums.map(({ metric, top }) => {
+            {podiums.map(({ metric, top, worst }) => {
               const meta = METRIC_META[metric];
               return (
                 <div

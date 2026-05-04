@@ -94,6 +94,7 @@ export default function MetasPage() {
         status = calcMetaStatus(value, spec.meta, spec.redFlag, spec.polarity);
       }
       const percentual = calcMetaPercentual(value, spec.meta, spec.polarity);
+      const isNps = spec.titulo.startsWith("NPS");
       return {
         titulo: spec.titulo,
         tipo: spec.tipo,
@@ -103,6 +104,8 @@ export default function MetasPage() {
         status,
         redFlag: status === "redflag",
         unidadeSufixo: spec.unidadeSufixo ?? "",
+        formatValor: isNps ? formatNpsDisplay : undefined,
+        formatMeta: isNps ? formatNpsDisplay : undefined,
       };
     });
   }, [data]);

@@ -23,6 +23,7 @@ import {
   type RankingMetric,
 } from "../shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
+import { formatNpsDisplay } from "@/lib/metasUtils";
 
 const STATUS_LABEL: Record<string, string> = {
   excelente: "Excelente",

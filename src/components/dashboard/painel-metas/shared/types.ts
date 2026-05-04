@@ -35,6 +35,8 @@ export interface MetaDefinition {
   polarity?: MetaPolarity;
   /** Apenas admin/operator pode ver. */
   adminOnly?: boolean;
+  /** Visível para admin, operator e gerente_unidade. */
+  managerPlus?: boolean;
   /** Sufixo de unidade exibido nos valores ("%", "kg", etc). */
   unitSuffix?: string;
 }

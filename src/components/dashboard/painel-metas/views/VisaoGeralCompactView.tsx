@@ -89,9 +89,10 @@ export function VisaoGeralCompactView() {
           const av = a.values[m]!;
           const bv = b.values[m]!;
           return meta.polarity === "higher" ? bv - av : av - bv;
-        })
-        .slice(0, 3);
-      return { metric: m, top: sorted };
+        });
+      const top = sorted.slice(0, 3);
+      const worst = sorted.length > 3 ? sorted[sorted.length - 1] : null;
+      return { metric: m, top, worst };
     });
   }, [lojas]);
 
@@ -197,6 +198,28 @@ export function VisaoGeralCompactView() {
                     {top.length === 0 && (
                       <li className="text-[11px] italic text-muted-foreground">
                         Sem dados
+                      </li>
+                    )}
+                    {worst && (
+                      <li className="mt-1 flex items-center gap-2 rounded-lg bg-red-500/10 px-2 py-1.5 ring-1 ring-red-500/30">
+                        <span className="text-base leading-none">💀</span>
+                        <span
+                          className={cn(
+                            "inline-flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[9px] font-bold ring-1",
+                            bandeiraStyles(worst.bandeira).bg,
+                            bandeiraStyles(worst.bandeira).text,
+                            bandeiraStyles(worst.bandeira).ring,
+                          )}
+                        >
+                          {bandeiraStyles(worst.bandeira).label}
+                        </span>
+                        <span className="flex-1 truncate text-xs text-red-200">{worst.code}</span>
+                        <span className="font-[Sora] text-xs font-semibold tabular-nums text-red-200">
+                          {metric === "nps"
+                            ? formatNpsDisplay(worst.values[metric])
+                            : worst.values[metric]?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                          <span className="ml-0.5 text-[10px] opacity-70">{meta.suffix}</span>
+                        </span>
                       </li>
                     )}
                   </ul>

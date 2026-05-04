@@ -46,6 +46,24 @@ export function formatNpsDisplay(value: number | null | undefined): string {
   return `R$ ${value.toFixed(0)}`;
 }
 
+/** CMV Carnes — % de desvio sobre valor transferido (menor é melhor) */
+export function calcCmvCarnesStatus(value: number | null | undefined): MetaStatus {
+  if (value === null || value === undefined || Number.isNaN(value)) return "regular";
+  if (value <= 0.6) return "excelente";
+  if (value <= 1.0) return "bom";
+  if (value <= 2.0) return "regular";
+  return "redflag";
+}
+
+/** CMV Salmão — kg por R$1k vendido (menor é melhor) */
+export function calcCmvSalmaoStatus(value: number | null | undefined): MetaStatus {
+  if (value === null || value === undefined || Number.isNaN(value)) return "regular";
+  if (value <= 1.55) return "excelente";
+  if (value <= 1.65) return "bom";
+  if (value <= 1.90) return "regular";
+  return "redflag";
+}
+
 /**
  * Conformidade (auditoria/checklist) — meta 90%, red flag < 75%.
  */

@@ -150,7 +150,7 @@ export function ComparativoView() {
                       style={{ background: RADAR_COLORS[idx] }}
                     />
                     <span className={cn("font-bold", b.text)}>{b.label}</span>
-                    <span className="text-foreground/80">{code}</span>
+                    <span className="text-foreground/80">{getLojaDisplay(code).nome}</span>
                     <button
                       type="button"
                       onClick={() => toggle(code)}
@@ -195,7 +195,7 @@ export function ComparativoView() {
                           )}
                         >
                           <span className={cn("font-bold", b.text)}>{b.label}</span>
-                          <span className="truncate">{loja.code}</span>
+                          <span className="truncate">{getLojaDisplay(loja.code).nome}</span>
                         </button>
                       );
                     })}
@@ -232,7 +232,7 @@ export function ComparativoView() {
                     {selected.map((code, idx) => (
                       <Radar
                         key={code}
-                        name={code}
+                        name={getLojaDisplay(code).nome}
                         dataKey={code}
                         stroke={RADAR_COLORS[idx]}
                         fill={RADAR_COLORS[idx]}

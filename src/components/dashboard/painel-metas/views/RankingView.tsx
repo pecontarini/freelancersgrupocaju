@@ -199,9 +199,9 @@ export function RankingView() {
                             {b.label}
                           </span>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground">{loja.code}</p>
+                            <p className="text-sm font-medium text-foreground">{getLojaDisplay(loja.code).nome}</p>
                             <p className="truncate text-[11px] text-muted-foreground">
-                              {loja.nome}
+                              {loja.code}
                             </p>
                           </div>
                         </div>

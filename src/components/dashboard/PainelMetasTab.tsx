@@ -2112,8 +2112,9 @@ function PlaceholderView({ metaKey }: { metaKey: MetaKey }) {
 }
 
 export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
-  const { isAdmin, isOperator } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const showAdmin = isAdmin || isOperator;
+  const showManagerPlus = isAdmin || isOperator || isGerenteUnidade;
   const isMobile = useIsMobile();
 
   const [active, setActive] = useState<MetaKey>("visao-geral");
@@ -2130,9 +2131,15 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
     active !== "planos" &&
     active !== "diario" &&
     active !== "holding" &&
-    active !== "red-flag";
+    active !== "red-flag" &&
+    active !== "ranking" &&
+    active !== "comparativo";
 
   const renderView = () => {
+    // Guard de acesso: ranking/comparativo só para admin/operator/gerente_unidade
+    if ((active === "ranking" || active === "comparativo") && !showManagerPlus) {
+      return <PlaceholderView metaKey={active} />;
+    }
     switch (active) {
       case "visao-geral":
         return <VisaoGeralView selectedUnidadeId={selectedUnidadeId} />;
@@ -2146,6 +2153,10 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
         return <DiarioView selectedUnidadeId={selectedUnidadeId} />;
       case "holding":
         return <HoldingCentralTab selectedUnidadeId={selectedUnidadeId} />;
+      case "ranking":
+        return <RankingView />;
+      case "comparativo":
+        return <ComparativoView />;
       case "cmv-salmao":
       case "cmv-carnes":
       case "kds":
@@ -2156,7 +2167,12 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   };
 
   const sidebar = (
-    <PainelSidebar active={active} onSelect={handleSelect} showAdmin={showAdmin} />
+    <PainelSidebar
+      active={active}
+      onSelect={handleSelect}
+      showAdmin={showAdmin}
+      showManagerPlus={showManagerPlus}
+    />
   );
 
   return (

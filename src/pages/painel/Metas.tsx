@@ -1,75 +1,115 @@
 import { motion } from "framer-motion";
-import { Target, Sparkles } from "lucide-react";
+import { Target, Sparkles, Clock } from "lucide-react";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { MetaCard, type MetaCardProps } from "@/components/metas/MetaCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
+import {
+  calcMetaStatus,
+  calcNpsStatus,
+  calcConformidadeStatus,
+  calcMetaPercentual,
+} from "@/lib/metasUtils";
+import { useMemo } from "react";
 
-// Mock — Supabase integration to be wired later.
-const MOCK_METAS: MetaCardProps[] = [
+interface MetricSpec {
+  titulo: string;
+  tipo: string;
+  meta: number;
+  redFlag: number;
+  polarity: "higher" | "lower";
+  unidadeSufixo?: string;
+  pick: (r: any) => number | null;
+}
+
+const METRIC_SPECS: MetricSpec[] = [
   {
     titulo: "NPS Salão",
     tipo: "Experiência",
-    valorAtual: 78,
-    valorMeta: 80,
-    percentual: 97,
-    status: "bom",
-    unidadeSufixo: "",
+    meta: 80,
+    redFlag: 60,
+    polarity: "higher",
+    pick: (r) => r.nps,
   },
   {
     titulo: "CMV Salmão",
     tipo: "Custo",
-    valorAtual: 1.42,
-    valorMeta: 1.2,
-    percentual: 84,
-    status: "regular",
+    meta: 1.2,
+    redFlag: 1.6,
+    polarity: "lower",
     unidadeSufixo: "kg",
+    pick: (r) => r.cmv_salmao,
   },
   {
     titulo: "CMV Carnes",
     tipo: "Custo",
-    valorAtual: 8.1,
-    valorMeta: 5,
-    percentual: 62,
-    status: "redflag",
-    redFlag: true,
+    meta: 5,
+    redFlag: 8,
+    polarity: "lower",
     unidadeSufixo: "%",
+    pick: (r) => r.cmv_carnes,
   },
   {
     titulo: "Conformidade Auditoria",
     tipo: "Operação",
-    valorAtual: 92,
-    valorMeta: 90,
-    percentual: 102,
-    status: "excelente",
+    meta: 90,
+    redFlag: 75,
+    polarity: "higher",
     unidadeSufixo: "%",
+    pick: (r) => r.conformidade,
   },
   {
     titulo: "KDS · Tempo de Prato",
     tipo: "Cozinha",
-    valorAtual: 71,
-    valorMeta: 80,
-    percentual: 89,
-    status: "bom",
+    meta: 80,
+    redFlag: 65,
+    polarity: "higher",
     unidadeSufixo: "%",
-  },
-  {
-    titulo: "Reclamações Delivery",
-    tipo: "Experiência",
-    valorAtual: 12,
-    valorMeta: 5,
-    percentual: 41,
-    status: "redflag",
-    redFlag: true,
-    unidadeSufixo: "",
+    pick: (r) => r.kds,
   },
 ];
 
+function avg(values: Array<number | null>): number | null {
+  const nums = values.filter((v): v is number => typeof v === "number" && !Number.isNaN(v));
+  if (!nums.length) return null;
+  return nums.reduce((s, n) => s + n, 0) / nums.length;
+}
+
 export default function MetasPage() {
-  const { profile, roles, unidade, isLoading } = useUserProfile();
+  const { profile, roles, unidade, isLoading: loadingProfile } = useUserProfile();
   const cargo = roles[0] ?? "employee";
+  const { data, isLoading, isEmpty, error } = useMetasSnapshot();
+
+  const metas: MetaCardProps[] = useMemo(() => {
+    if (!data.length) return [];
+    return METRIC_SPECS.map((spec) => {
+      const value = avg(data.map(spec.pick));
+      let status: MetaCardProps["status"];
+      if (spec.titulo.startsWith("NPS")) {
+        status = calcNpsStatus(value);
+      } else if (spec.titulo.startsWith("Conformidade")) {
+        status = calcConformidadeStatus(value);
+      } else {
+        status = calcMetaStatus(value, spec.meta, spec.redFlag, spec.polarity);
+      }
+      const percentual = calcMetaPercentual(value, spec.meta, spec.polarity);
+      return {
+        titulo: spec.titulo,
+        tipo: spec.tipo,
+        valorAtual: value ?? 0,
+        valorMeta: spec.meta,
+        percentual,
+        status,
+        redFlag: status === "redflag",
+        unidadeSufixo: spec.unidadeSufixo ?? "",
+      };
+    });
+  }, [data]);
+
+  const hasRealData = !isLoading && !isEmpty && metas.length > 0;
 
   return (
     <div className="min-h-screen" style={{ background: "#0D0D0D" }}>
-      {/* Aurora glow */}
       <div
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
@@ -79,7 +119,6 @@ export default function MetasPage() {
       />
 
       <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
-        {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,32 +144,72 @@ export default function MetasPage() {
                 Painel de Metas
               </h1>
               <p className="font-[DM_Sans] text-sm text-white/60">
-                {isLoading
+                {loadingProfile
                   ? "Carregando perfil…"
                   : `${profile?.full_name ?? "Líder"} · ${cargo} ${unidade?.nome ? `· ${unidade.nome}` : ""}`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-amber-300 ring-1 ring-amber-500/30">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span className="font-[DM_Sans]">Dados de demonstração</span>
-          </div>
+          {hasRealData && (
+            <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-emerald-300 ring-1 ring-emerald-500/30">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="font-[DM_Sans]">Sincronizado</span>
+            </div>
+          )}
         </motion.header>
 
+        {/* Loading */}
+        {isLoading && (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-56 w-full rounded-2xl bg-white/5" />
+            ))}
+          </div>
+        )}
+
+        {/* Error */}
+        {!isLoading && error && (
+          <div className="glass-card flex flex-col items-center gap-2 p-10 text-center text-red-300 ring-1 ring-red-500/30">
+            <p className="font-[Sora] text-sm font-semibold">Erro ao carregar metas</p>
+            <p className="text-xs text-white/60">{error}</p>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!isLoading && !error && isEmpty && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20"
+          >
+            <Clock className="h-10 w-10 text-amber-400" />
+            <div>
+              <p className="font-[Sora] text-base font-semibold text-white">
+                Aguardando sincronização semanal
+              </p>
+              <p className="mt-1 font-[DM_Sans] text-sm text-white/60">
+                Os snapshots de metas ainda não foram gerados para este mês.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Grid */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {MOCK_METAS.map((m, i) => (
-            <motion.div
-              key={m.titulo}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 * i, duration: 0.4 }}
-            >
-              <MetaCard {...m} />
-            </motion.div>
-          ))}
-        </div>
+        {hasRealData && (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {metas.map((m, i) => (
+              <motion.div
+                key={m.titulo}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 * i, duration: 0.4 }}
+              >
+                <MetaCard {...m} />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

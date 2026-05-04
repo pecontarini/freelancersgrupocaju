@@ -9,6 +9,8 @@ import {
   calcConformidadeStatus,
   calcMetaStatus,
   calcMetaPercentual,
+  calcCmvCarnesStatus,
+  calcCmvSalmaoStatus,
   formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";
@@ -34,18 +36,18 @@ const METRIC_SPECS: MetricSpec[] = [
   },
   {
     titulo: "CMV Salmão",
-    tipo: "Custo",
-    meta: 1.2,
-    redFlag: 1.6,
+    tipo: "kg por R$1k vendido",
+    meta: 1.55,
+    redFlag: 1.90,
     polarity: "lower",
     unidadeSufixo: "kg",
     pick: (r) => r.cmv_salmao,
   },
   {
     titulo: "CMV Carnes",
-    tipo: "Custo",
-    meta: 5,
-    redFlag: 8,
+    tipo: "% desvio s/ transferido",
+    meta: 0.6,
+    redFlag: 2.0,
     polarity: "lower",
     unidadeSufixo: "%",
     pick: (r) => r.cmv_carnes,
@@ -61,10 +63,10 @@ const METRIC_SPECS: MetricSpec[] = [
   },
   {
     titulo: "KDS · Tempo de Prato",
-    tipo: "Cozinha",
-    meta: 80,
-    redFlag: 65,
-    polarity: "higher",
+    tipo: "% pratos black target",
+    meta: 5,
+    redFlag: 10,
+    polarity: "lower",
     unidadeSufixo: "%",
     pick: (r) => r.kds,
   },
@@ -90,6 +92,10 @@ export default function MetasPage() {
         status = calcNpsStatus(value);
       } else if (spec.titulo.startsWith("Conformidade")) {
         status = calcConformidadeStatus(value);
+      } else if (spec.titulo === "CMV Carnes") {
+        status = calcCmvCarnesStatus(value);
+      } else if (spec.titulo === "CMV Salmão") {
+        status = calcCmvSalmaoStatus(value);
       } else {
         status = calcMetaStatus(value, spec.meta, spec.redFlag, spec.polarity);
       }

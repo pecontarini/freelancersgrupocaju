@@ -4,15 +4,15 @@ import { AlertTriangle, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
-import { calcMetaStatus, calcNpsStatus, calcConformidadeStatus } from "@/lib/metasUtils";
+import { calcMetaStatus, calcNpsStatus, calcConformidadeStatus, calcCmvCarnesStatus, calcCmvSalmaoStatus } from "@/lib/metasUtils";
 import { cn } from "@/lib/utils";
 
 /** Métricas avaliadas para detectar Red Flag. */
 const METRICS = [
   { key: "nps", label: "NPS", meta: 120000, redFlag: 70000, polarity: "higher" as const, status: calcNpsStatus },
-  { key: "cmv_salmao", label: "CMV Salmão", meta: 1.2, redFlag: 1.6, polarity: "lower" as const, status: null },
-  { key: "cmv_carnes", label: "CMV Carnes", meta: 5, redFlag: 8, polarity: "lower" as const, status: null },
-  { key: "kds", label: "KDS", meta: 80, redFlag: 65, polarity: "higher" as const, status: null },
+  { key: "cmv_salmao", label: "CMV Salmão", meta: 1.55, redFlag: 1.90, polarity: "lower" as const, status: calcCmvSalmaoStatus },
+  { key: "cmv_carnes", label: "CMV Carnes", meta: 0.6, redFlag: 2.0, polarity: "lower" as const, status: calcCmvCarnesStatus },
+  { key: "kds", label: "KDS", meta: 5, redFlag: 10, polarity: "lower" as const, status: null },
   { key: "conformidade", label: "Conformidade", meta: 90, redFlag: 75, polarity: "higher" as const, status: calcConformidadeStatus },
 ] as const;
 

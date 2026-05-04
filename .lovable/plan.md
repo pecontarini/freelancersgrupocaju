@@ -1,49 +1,53 @@
 ## Objetivo
-
-Redefinir a métrica NPS no Painel de Metas: o valor armazenado em `metas_snapshot.nps` deixa de ser uma nota 0–100 e passa a representar **R$ por reclamação** (faturamento ÷ nº de reclamações), com faixas distintas para Salão e Delivery.
-
-## Novas faixas
-
-| Tipo | Excelente | Bom | Regular | Red Flag |
-|---|---|---|---|---|
-| Salão | ≥ R$ 120k | ≥ R$ 95k | ≥ R$ 70k | < R$ 70k |
-| Delivery | ≥ R$ 12k | ≥ R$ 10k | ≥ R$ 8k | < R$ 8k |
+Aplicar as réguas reais da empresa para CMV Carnes e CMV Salmão, ajustar labels/sufixos dos cards, e regravar o seed do `metas_snapshot` com valores realistas. KDS passa a ser "% pratos black target" (menor é melhor).
 
 ## Mudanças
 
 ### 1. `src/lib/metasUtils.ts`
-- Substituir `calcNpsStatus(value)` pela versão com parâmetro `tipo: "salao" | "delivery"` (default `"salao"`) usando os thresholds acima.
-- Adicionar `formatNpsDisplay(value)` → `"R$ 311,5k"` / `"R$ 950"`.
+Adicionar duas novas funções puras (sem alterar as existentes):
 
-### 2. `src/pages/painel/Metas.tsx`
-- Atualizar o spec do card "NPS Salão": `meta: 120000`, `redFlag: 70000`, `polarity: "higher"`, sem sufixo de unidade.
-- Passar valor formatado para o card (ver item 4).
+```ts
+/** CMV Carnes — % de desvio sobre valor transferido (menor é melhor) */
+export function calcCmvCarnesStatus(value): MetaStatus {
+  if (value <= 0.6)  return "excelente";
+  if (value <= 1.0)  return "bom";
+  if (value <= 2.0)  return "regular";
+  return "redflag"; // > 2.0
+}
 
-### 3. `src/components/metas/MetaCard.tsx`
-- Aceitar prop opcional `formatValor?: (n: number) => string` e `formatMeta?: (n: number) => string`. Se ausentes, mantém `toLocaleString("pt-BR")` atual. Usar `formatNpsDisplay` apenas no card de NPS.
-
-### 4. `src/components/dashboard/painel-metas/shared/mockLojas.ts`
-- Em `METRIC_META.nps`: `meta: 120000`, `redFlag: 70000` (mantém `polarity: "higher"`). Isso recalibra ranking/normalização.
-- No `RankingView`, formatar a coluna de valor de NPS via `formatNpsDisplay` (demais métricas seguem como hoje).
-
-### 5. `src/components/metas/RedFlagBanner.tsx`
-- Atualizar entrada do array `METRICS` para NPS: `meta: 120000`, `redFlag: 70000` (status segue chamando `calcNpsStatus` — default Salão).
-
-### 6. Seed em `metas_snapshot` (mes_ref `2026-04`)
-Os 10 registros atuais têm `nps` entre 68 e 88 (escala antiga). Vou **reescrever via UPDATE** para valores realistas em R$/reclamação, mantendo a hierarquia do ranking e deixando `NZ_GO` em red flag (< 70k). `nps_anterior` recebe variação de ±5–10% para preservar a tendência.
-
-Exemplo (valores aproximados):
-```text
-NZ_SG  148000 / 138000     CP_AC  92000 / 88000
-CJ_SG  132000 / 125000     CP_AS  85000 / 95000  (queda)
-NZ_AC  121000 / 110000     NZ_AS  82000 / 78000
-CP_AN  118000 / 112000     CJ_AN  74000 / 71000
-CP_SG  105000 / 99000      NZ_GO  58000 / 65000  (red flag)
+/** CMV Salmão — kg por R$1k vendido (menor é melhor) */
+export function calcCmvSalmaoStatus(value): MetaStatus {
+  if (value <= 1.55) return "excelente";
+  if (value <= 1.65) return "bom";
+  if (value <= 1.90) return "regular";
+  return "redflag"; // > 1.90
+}
 ```
 
-## Pontos em aberto (assumi defaults — ajusto se preferir)
+### 2. `src/pages/painel/Metas.tsx`
+- Importar `calcCmvCarnesStatus` e `calcCmvSalmaoStatus`.
+- Atualizar specs dos cards:
+  - **CMV Carnes**: `titulo: "CMV Carnes"`, `tipo: "% desvio s/ transferido"`, `meta: 0.6`, `redFlag: 2.0`, `unidadeSufixo: "%"`.
+  - **CMV Salmão**: `titulo: "CMV Salmão"`, `tipo: "kg por R$1k vendido"`, `meta: 1.55`, `redFlag: 1.90`, `unidadeSufixo: "kg"`.
+  - **KDS**: marcar como `polarity: "lower"`, `meta: 5`, `redFlag: 10`, `tipo: "% pratos black target"` (menor é melhor agora).
+- Roteamento de status no `useMemo`: usar `calcCmvCarnesStatus` para CMV Carnes e `calcCmvSalmaoStatus` para CMV Salmão (mantém `calcNpsStatus`/`calcConformidadeStatus`/`calcMetaStatus` para os demais).
 
-1. **Delivery**: hoje `metas_snapshot` só tem `nps` (Salão). Não criarei coluna `nps_delivery` nesta rodada — `formatNpsDisplay` e a sobrecarga `tipo` ficam prontas para quando a coluna existir. Confirme se quer já adicionar `nps_delivery` à tabela.
-2. **Histórico (`MetasHistoricoDrawer`)**: a linha de referência da meta passa de 80 para 120000 automaticamente via prop. Tooltip do gráfico também usará `formatNpsDisplay` para o eixo NPS.
+### 3. `src/components/dashboard/painel-metas/shared/mockLojas.ts`
+Atualizar `METRIC_META` para alinhar normalização do ranking:
+- `cmv-salmao`: `meta: 1.55`, `redFlag: 1.90`.
+- `cmv-carnes`: `meta: 0.6`, `redFlag: 2.0`.
+- `kds`: `polarity: "lower"`, `meta: 5`, `redFlag: 10`, label `"KDS Black Target (%)"`.
 
-Não toco em `VisaoGeralView` (usa fonte separada `nps_dashboard` com média 0–5 vinda de Sheets — semântica diferente).
+### 4. `src/components/metas/RedFlagBanner.tsx`
+Atualizar entradas do array `METRICS`:
+- `cmv_salmao`: `meta: 1.55`, `redFlag: 1.90`, status `calcCmvSalmaoStatus`.
+- `cmv_carnes`: `meta: 0.6`, `redFlag: 2.0`, status `calcCmvCarnesStatus`.
+- `kds`: `polarity: "lower"`, `meta: 5`, `redFlag: 10`.
+
+### 5. Seed Supabase (via insert tool)
+Executar `DELETE FROM metas_snapshot;` seguido do `INSERT` com os 10 registros de `2026-05` fornecidos pelo usuário.
+
+## Validação
+- NZ_GO deve aparecer como red flag (carnes 2.24 > 2.0; salmão 2.11 > 1.90; kds 11.2 > 10).
+- Cards exibem "0,41%" e "1,31kg" com labels corretos.
+- Ranking e RedFlagBanner refletem a nova régua.

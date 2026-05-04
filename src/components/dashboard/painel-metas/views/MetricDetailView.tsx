@@ -458,40 +458,52 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                                   <span className="text-sm">{getLojaDisplay(r.loja.code).nome}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right tabular-nums text-sm font-semibold">
-                                {formatValue(metric, r.value)}
-                                <span className="ml-0.5 text-[10px] text-muted-foreground">
-                                  {meta.suffix}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <span
-                                  className={cn(
-                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ring-1",
-                                    STATUS_BADGE[r.status],
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      "h-2 w-2 rounded-full ring-2",
-                                      STATUS_DOT[r.status],
-                                    )}
-                                  />
-                                  {STATUS_LABEL_PT[r.status]}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                <span
-                                  className={cn(
-                                    "font-[Sora] text-sm font-bold",
-                                    valor === c.pesoReais && "text-emerald-300",
-                                    valor === 0 && "text-red-300",
-                                    valor > 0 && valor < c.pesoReais && "text-amber-300",
-                                  )}
-                                >
-                                  R$ {valor.toLocaleString("pt-BR")}
-                                </span>
-                              </TableCell>
+                              {r.naMetric ? (
+                                <>
+                                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-center text-xs italic text-muted-foreground">
+                                    Não se aplica
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">R$ —</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-right tabular-nums text-sm font-semibold">
+                                    {formatValue(metric, r.value)}
+                                    <span className="ml-0.5 text-[10px] text-muted-foreground">
+                                      {meta.suffix}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ring-1",
+                                        STATUS_BADGE[r.status],
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          "h-2 w-2 rounded-full ring-2",
+                                          STATUS_DOT[r.status],
+                                        )}
+                                      />
+                                      {STATUS_LABEL_PT[r.status]}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    <span
+                                      className={cn(
+                                        "font-[Sora] text-sm font-bold",
+                                        valor === c.pesoReais && "text-emerald-300",
+                                        valor === 0 && "text-red-300",
+                                        valor > 0 && valor < c.pesoReais && "text-amber-300",
+                                      )}
+                                    >
+                                      R$ {valor.toLocaleString("pt-BR")}
+                                    </span>
+                                  </TableCell>
+                                </>
+                              )}
                             </TableRow>
                           );
                         })}

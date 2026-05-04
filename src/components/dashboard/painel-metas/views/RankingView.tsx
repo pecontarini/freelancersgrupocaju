@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Minus, AlertTriangle, Clock, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -62,16 +63,56 @@ export function RankingView() {
     });
   }, [lojas, metric]);
 
+  const exportCSV = () => {
+    const meta = METRIC_META[metric];
+    const header = ["Posicao", "Loja", "Nome", "Bandeira", "Valor", "Anterior", "Status", "RedFlag"];
+    const lines = rows.map((r) =>
+      [
+        r.position,
+        r.loja.code,
+        `"${r.loja.nome.replace(/"/g, '""')}"`,
+        r.loja.bandeira,
+        r.value ?? "",
+        r.prev ?? "",
+        r.status,
+        r.isRed ? "true" : "false",
+      ].join(","),
+    );
+    const csv = [header.join(","), ...lines].join("\n");
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ranking-${metric}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card className="vision-glass">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Trophy className="h-4 w-4 text-amber-500" />
-          Ranking de Lojas
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Ordenação por métrica · top performers e red flags da rede
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="h-4 w-4 text-amber-500" />
+              Ranking de Lojas
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Ordenação por métrica · top performers e red flags da rede
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            disabled={isLoading || isEmpty}
+            className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs value={metric} onValueChange={(v) => setMetric(v as RankingMetric)}>

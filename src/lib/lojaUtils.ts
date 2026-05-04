@@ -38,3 +38,42 @@ export function getLojaBadge(codigo: string) {
   const l = getLojaDisplay(codigo);
   return { sigla: l.sigla, cor: l.cor, nomeCompleto: l.nome, marca: l.marca };
 }
+
+/**
+ * Aplicabilidade de cada métrica por loja (true = a loja é avaliada nessa métrica).
+ */
+export const LOJA_METRICS: Record<
+  string,
+  { nps: boolean; cmv_carnes: boolean; cmv_salmao: boolean; kds: boolean; conformidade: boolean }
+> = {
+  CJ_AN: { nps: true, cmv_carnes: false, cmv_salmao: false, kds: true, conformidade: true },
+  CJ_SG: { nps: true, cmv_carnes: false, cmv_salmao: false, kds: true, conformidade: true },
+  CP_AC: { nps: true, cmv_carnes: true, cmv_salmao: false, kds: true, conformidade: true },
+  CP_AN: { nps: true, cmv_carnes: true, cmv_salmao: false, kds: true, conformidade: true },
+  CP_AS: { nps: true, cmv_carnes: true, cmv_salmao: false, kds: true, conformidade: true },
+  CP_SG: { nps: true, cmv_carnes: true, cmv_salmao: false, kds: true, conformidade: true },
+  NZ_AC: { nps: true, cmv_carnes: false, cmv_salmao: true, kds: true, conformidade: true },
+  NZ_AS: { nps: true, cmv_carnes: false, cmv_salmao: true, kds: true, conformidade: true },
+  NZ_GO: { nps: true, cmv_carnes: false, cmv_salmao: true, kds: true, conformidade: true },
+  NZ_SG: { nps: true, cmv_carnes: false, cmv_salmao: true, kds: true, conformidade: true },
+};
+
+export type LojaMetricKey = "nps" | "cmv_carnes" | "cmv_salmao" | "kds" | "conformidade";
+
+export function lojaHasMetric(loja_codigo: string, metric: LojaMetricKey): boolean {
+  return LOJA_METRICS[loja_codigo]?.[metric] ?? false;
+}
+
+const RANKING_TO_LOJA_METRIC: Record<string, LojaMetricKey> = {
+  nps: "nps",
+  "cmv-salmao": "cmv_salmao",
+  "cmv-carnes": "cmv_carnes",
+  kds: "kds",
+  conformidade: "conformidade",
+};
+
+/** Aceita o RankingMetric (com hífen) usado nas views. */
+export function lojaHasRankingMetric(loja_codigo: string, metric: string): boolean {
+  const k = RANKING_TO_LOJA_METRIC[metric];
+  return k ? lojaHasMetric(loja_codigo, k) : true;
+}

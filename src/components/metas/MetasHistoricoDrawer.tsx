@@ -189,7 +189,7 @@ export function MetasHistoricoDrawer({
                     <Minus className="h-3.5 w-3.5" />
                   )}
                   Variação no período: {trend.diff > 0 ? "+" : ""}
-                  {trend.diff.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                  {formatValue(metric, trend.diff)}
                 </div>
               )}
 

@@ -12,6 +12,8 @@ export interface MetaCardProps {
   status: MetaStatus;
   redFlag?: boolean;
   unidadeSufixo?: string;
+  formatValor?: (n: number) => string;
+  formatMeta?: (n: number) => string;
 }
 
 const STATUS_LABEL: Record<MetaStatus, string> = {

@@ -333,7 +333,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
       </Card>
 
       {/* ── Abas por Cargo ──────────────────────────────────── */}
-      {cargos && cargos.length > 0 && (
+      {!hideCargoTabs && cargos && cargos.length > 0 && (
         <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">

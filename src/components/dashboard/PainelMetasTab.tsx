@@ -2089,6 +2089,8 @@ import { Sheet as MetaSheet, SheetContent as MetaSheetContent, SheetTrigger as M
 import { Menu } from "lucide-react";
 import { PainelSidebar } from "./painel-metas/shared/PainelSidebar";
 import { VisaoGeralView } from "./painel-metas/views/VisaoGeralView";
+import { RankingView } from "./painel-metas/views/RankingView";
+import { ComparativoView } from "./painel-metas/views/ComparativoView";
 import { SixMonthsForUserUnit } from "./painel-metas/shared/SixMonthsForUserUnit";
 import { currentMonth as currentMonthHelper } from "./painel-metas/shared/dateUtils";
 import { META_DEFINITIONS } from "./painel-metas/shared/metas";
@@ -2110,8 +2112,9 @@ function PlaceholderView({ metaKey }: { metaKey: MetaKey }) {
 }
 
 export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
-  const { isAdmin, isOperator } = useUserProfile();
+  const { isAdmin, isOperator, isGerenteUnidade } = useUserProfile();
   const showAdmin = isAdmin || isOperator;
+  const showManagerPlus = isAdmin || isOperator || isGerenteUnidade;
   const isMobile = useIsMobile();
 
   const [active, setActive] = useState<MetaKey>("visao-geral");
@@ -2128,9 +2131,15 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
     active !== "planos" &&
     active !== "diario" &&
     active !== "holding" &&
-    active !== "red-flag";
+    active !== "red-flag" &&
+    active !== "ranking" &&
+    active !== "comparativo";
 
   const renderView = () => {
+    // Guard de acesso: ranking/comparativo só para admin/operator/gerente_unidade
+    if ((active === "ranking" || active === "comparativo") && !showManagerPlus) {
+      return <PlaceholderView metaKey={active} />;
+    }
     switch (active) {
       case "visao-geral":
         return <VisaoGeralView selectedUnidadeId={selectedUnidadeId} />;
@@ -2144,6 +2153,10 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
         return <DiarioView selectedUnidadeId={selectedUnidadeId} />;
       case "holding":
         return <HoldingCentralTab selectedUnidadeId={selectedUnidadeId} />;
+      case "ranking":
+        return <RankingView />;
+      case "comparativo":
+        return <ComparativoView />;
       case "cmv-salmao":
       case "cmv-carnes":
       case "kds":
@@ -2154,7 +2167,12 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
   };
 
   const sidebar = (
-    <PainelSidebar active={active} onSelect={handleSelect} showAdmin={showAdmin} />
+    <PainelSidebar
+      active={active}
+      onSelect={handleSelect}
+      showAdmin={showAdmin}
+      showManagerPlus={showManagerPlus}
+    />
   );
 
   return (
@@ -2179,6 +2197,7 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
                 setDrawerOpen(false);
               }}
               showAdmin={showAdmin}
+              showManagerPlus={showManagerPlus}
               forceExpanded
             />
           </MetaSheetContent>

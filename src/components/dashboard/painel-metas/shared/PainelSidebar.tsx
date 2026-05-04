@@ -11,6 +11,8 @@ import {
   Timer,
   Fish,
   Beef,
+  Trophy,
+  Radar,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -28,12 +30,16 @@ const ICONS: Record<string, LucideIcon> = {
   Timer,
   Fish,
   Beef,
+  Trophy,
+  Radar,
 };
 
 interface PainelSidebarProps {
   active: MetaKey;
   onSelect: (key: MetaKey) => void;
   showAdmin: boolean;
+  /** Visível para admin/operator/gerente_unidade. */
+  showManagerPlus?: boolean;
   /** Map de meta -> badge (ex.: red flags ativas). */
   badges?: Partial<Record<MetaKey, number>>;
   /** Força sidebar expandida (ex.: dentro de um sheet mobile). */
@@ -50,6 +56,7 @@ export function PainelSidebar({
   active,
   onSelect,
   showAdmin,
+  showManagerPlus = false,
   badges,
   forceExpanded = false,
 }: PainelSidebarProps) {
@@ -60,11 +67,14 @@ export function PainelSidebar({
     () =>
       META_GROUPS.map((g) => ({
         ...g,
-        items: g.items.filter((k) =>
-          META_DEFINITIONS[k].adminOnly ? showAdmin : true
-        ),
+        items: g.items.filter((k) => {
+          const def = META_DEFINITIONS[k];
+          if (def.adminOnly) return showAdmin;
+          if (def.managerPlus) return showManagerPlus;
+          return true;
+        }),
       })).filter((g) => g.items.length > 0),
-    [showAdmin]
+    [showAdmin, showManagerPlus]
   );
 
   return (

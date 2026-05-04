@@ -84,6 +84,22 @@ export const META_DEFINITIONS: Record<MetaKey, MetaDefinition> = {
     dotToken: "bg-stone-500",
     adminOnly: true,
   },
+  ranking: {
+    key: "ranking",
+    label: "Ranking de Lojas",
+    description: "Ordenação por métrica · top performers e red flags",
+    iconKey: "Trophy",
+    dotToken: "bg-amber-400",
+    managerPlus: true,
+  },
+  comparativo: {
+    key: "comparativo",
+    label: "Comparativo de Lojas",
+    description: "Radar 0–100 entre 2 a 4 unidades",
+    iconKey: "Radar",
+    dotToken: "bg-violet-400",
+    managerPlus: true,
+  },
 };
 
 export interface MetaGroup {
@@ -94,6 +110,7 @@ export interface MetaGroup {
 export const META_GROUPS: MetaGroup[] = [
   { title: "Visão Geral", items: ["visao-geral"] },
   { title: "Indicadores", items: ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"] },
+  { title: "Análise", items: ["ranking", "comparativo"] },
   { title: "Gestão", items: ["red-flag", "planos"] },
   { title: "Admin", items: ["diario", "holding"] },
 ];

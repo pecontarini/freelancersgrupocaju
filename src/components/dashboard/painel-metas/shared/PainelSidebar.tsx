@@ -11,6 +11,8 @@ import {
   Timer,
   Fish,
   Beef,
+  Trophy,
+  Radar,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -28,6 +30,8 @@ const ICONS: Record<string, LucideIcon> = {
   Timer,
   Fish,
   Beef,
+  Trophy,
+  Radar,
 };
 
 interface PainelSidebarProps {

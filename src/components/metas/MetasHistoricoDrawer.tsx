@@ -211,6 +211,7 @@ export function MetasHistoricoDrawer({
                     <YAxis
                       tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }}
                       stroke="rgba(255,255,255,0.15)"
+                      tickFormatter={(v) => formatValue(metric, v)}
                     />
                     <Tooltip
                       contentStyle={{
@@ -220,6 +221,7 @@ export function MetasHistoricoDrawer({
                         fontSize: 12,
                         color: "white",
                       }}
+                      formatter={(v: number) => formatValue(metric, v)}
                     />
                     <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }} />
                     <ReferenceLine
@@ -227,7 +229,7 @@ export function MetasHistoricoDrawer({
                       stroke="#10B981"
                       strokeDasharray="4 4"
                       label={{
-                        value: `Meta ${meta}`,
+                        value: `Meta ${formatValue(metric, meta)}`,
                         position: "right",
                         fill: "#10B981",
                         fontSize: 10,

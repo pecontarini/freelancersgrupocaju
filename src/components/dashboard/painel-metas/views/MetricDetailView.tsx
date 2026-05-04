@@ -256,7 +256,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                       )}
                     >
                       <TableCell className="text-center text-xs font-bold tabular-nums text-white/80">
-                        {r.position}
+                        {r.naMetric ? "—" : r.position}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -280,66 +280,81 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-[Sora] text-sm font-semibold">
-                        {formatValue(metric, r.value)}
-                        <span className="ml-0.5 text-[10px] text-muted-foreground">
-                          {meta.suffix}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                        {meta.meta}
-                        {meta.suffix}
-                      </TableCell>
-                      <TableCell>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-                          <div
-                            className={cn("h-full transition-all", STATUS_BAR[r.status])}
-                            style={{ width: `${Math.max(2, r.norm)}%` }}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1",
-                            STATUS_BADGE[r.status],
-                          )}
-                        >
-                          <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[r.status])} />
-                          {STATUS_LABEL_PT[r.status]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs tabular-nums",
-                            trendUp && "text-emerald-400",
-                            trendDown && "text-red-400",
-                            !trendUp && !trendDown && "text-muted-foreground",
-                          )}
-                        >
-                          {trendUp ? (
-                            <TrendingUp className="h-3.5 w-3.5" />
-                          ) : trendDown ? (
-                            <TrendingDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <Minus className="h-3.5 w-3.5" />
-                          )}
-                          {Math.abs(r.variation).toLocaleString("pt-BR", {
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {r.isRed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
-                            <AlertTriangle className="h-3 w-3" />
-                            Red Flag
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {r.naMetric ? (
+                        <>
+                          <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
+                          <TableCell>
+                            <span className="text-[11px] italic text-muted-foreground">Não se aplica</span>
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="text-right tabular-nums font-[Sora] text-sm font-semibold">
+                            {formatValue(metric, r.value)}
+                            <span className="ml-0.5 text-[10px] text-muted-foreground">
+                              {meta.suffix}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                            {meta.meta}
+                            {meta.suffix}
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                              <div
+                                className={cn("h-full transition-all", STATUS_BAR[r.status])}
+                                style={{ width: `${Math.max(2, r.norm)}%` }}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1",
+                                STATUS_BADGE[r.status],
+                              )}
+                            >
+                              <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[r.status])} />
+                              {STATUS_LABEL_PT[r.status]}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 text-xs tabular-nums",
+                                trendUp && "text-emerald-400",
+                                trendDown && "text-red-400",
+                                !trendUp && !trendDown && "text-muted-foreground",
+                              )}
+                            >
+                              {trendUp ? (
+                                <TrendingUp className="h-3.5 w-3.5" />
+                              ) : trendDown ? (
+                                <TrendingDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <Minus className="h-3.5 w-3.5" />
+                              )}
+                              {Math.abs(r.variation).toLocaleString("pt-BR", {
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {r.isRed ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
+                                <AlertTriangle className="h-3 w-3" />
+                                Red Flag
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </>
+                      )}
                     </motion.tr>
                   );
                 })}

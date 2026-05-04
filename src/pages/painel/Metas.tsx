@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Target, Sparkles, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
 import { MetaCard, type MetaCardProps } from "@/components/metas/MetaCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
@@ -14,6 +16,10 @@ import {
   formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";
+import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { PortalHeader } from "@/components/layout/PortalHeader";
 
 interface MetricSpec {
   titulo: string;
@@ -79,7 +85,9 @@ function avg(values: Array<number | null>): number | null {
 }
 
 export default function MetasPage() {
+  const navigate = useNavigate();
   const { profile, roles, unidade, isLoading: loadingProfile } = useUserProfile();
+  const { selectedUnidadeId, setSelectedUnidadeId } = useUnidade();
   const cargo = roles[0] ?? "employee";
   const { data, isLoading, isEmpty, error } = useMetasSnapshot();
 
@@ -119,108 +127,113 @@ export default function MetasPage() {
   const hasRealData = !isLoading && !isEmpty && metas.length > 0;
 
   return (
-    <div className="min-h-screen" style={{ background: "#0D0D0D" }}>
-      <div
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(60% 40% at 20% 0%, rgba(245,158,11,0.12), transparent 60%), radial-gradient(50% 40% at 100% 10%, rgba(208,89,55,0.10), transparent 60%)",
-        }}
-      />
+    <SidebarProvider>
+      <AppGlassBackground />
+      <div className="flex min-h-screen w-full">
+        <AppSidebar activeTab="painel" onTabChange={(tab) => navigate(`/?tab=${tab}`)} />
+        <SidebarInset>
+          <PortalHeader
+            title="Painel de Metas"
+            subtitle="Acompanhamento de indicadores estratégicos"
+            selectedUnidadeId={selectedUnidadeId}
+            onUnidadeChange={setSelectedUnidadeId}
+          />
 
-      <div className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
-        <motion.header
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="glass-card mb-8 flex flex-wrap items-center justify-between gap-4 p-6"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(255,255,255,0.02))",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-2xl"
+          <main className="container mx-auto max-w-7xl px-4 py-8 md:py-12">
+            <motion.header
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="glass-card mb-8 flex flex-wrap items-center justify-between gap-4 p-6"
               style={{
-                background: "linear-gradient(135deg, #F59E0B, #D05937)",
-                boxShadow: "0 8px 24px -8px rgba(245,158,11,0.5)",
+                background:
+                  "linear-gradient(135deg, rgba(245,158,11,0.10), rgba(255,255,255,0.02))",
               }}
             >
-              <Target className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="font-[Sora] text-2xl font-bold tracking-tight text-white">
-                Painel de Metas
-              </h1>
-              <p className="font-[DM_Sans] text-sm text-white/60">
-                {loadingProfile
-                  ? "Carregando perfil…"
-                  : `${profile?.full_name ?? "Líder"} · ${cargo} ${unidade?.nome ? `· ${unidade.nome}` : ""}`}
-              </p>
-            </div>
-          </div>
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  style={{
+                    background: "linear-gradient(135deg, #F59E0B, #D05937)",
+                    boxShadow: "0 8px 24px -8px rgba(245,158,11,0.5)",
+                  }}
+                >
+                  <Target className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-[Sora] text-2xl font-bold tracking-tight text-white">
+                    Painel de Metas
+                  </h1>
+                  <p className="font-[DM_Sans] text-sm text-white/60">
+                    {loadingProfile
+                      ? "Carregando perfil…"
+                      : `${profile?.full_name ?? "Líder"} · ${cargo} ${unidade?.nome ? `· ${unidade.nome}` : ""}`}
+                  </p>
+                </div>
+              </div>
 
-          {hasRealData && (
-            <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-emerald-300 ring-1 ring-emerald-500/30">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="font-[DM_Sans]">Sincronizado</span>
-            </div>
-          )}
-        </motion.header>
+              {hasRealData && (
+                <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 text-xs text-emerald-300 ring-1 ring-emerald-500/30">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span className="font-[DM_Sans]">Sincronizado</span>
+                </div>
+              )}
+            </motion.header>
 
-        {/* Loading */}
-        {isLoading && (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-56 w-full rounded-2xl bg-white/5" />
-            ))}
-          </div>
-        )}
+            {/* Loading */}
+            {isLoading && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-56 w-full rounded-2xl bg-white/5" />
+                ))}
+              </div>
+            )}
 
-        {/* Error */}
-        {!isLoading && error && (
-          <div className="glass-card flex flex-col items-center gap-2 p-10 text-center text-red-300 ring-1 ring-red-500/30">
-            <p className="font-[Sora] text-sm font-semibold">Erro ao carregar metas</p>
-            <p className="text-xs text-white/60">{error}</p>
-          </div>
-        )}
+            {/* Error */}
+            {!isLoading && error && (
+              <div className="glass-card flex flex-col items-center gap-2 p-10 text-center text-red-300 ring-1 ring-red-500/30">
+                <p className="font-[Sora] text-sm font-semibold">Erro ao carregar metas</p>
+                <p className="text-xs text-white/60">{error}</p>
+              </div>
+            )}
 
-        {/* Empty */}
-        {!isLoading && !error && isEmpty && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20"
-          >
-            <Clock className="h-10 w-10 text-amber-400" />
-            <div>
-              <p className="font-[Sora] text-base font-semibold text-white">
-                Aguardando sincronização semanal
-              </p>
-              <p className="mt-1 font-[DM_Sans] text-sm text-white/60">
-                Os snapshots de metas ainda não foram gerados para este mês.
-              </p>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Grid */}
-        {hasRealData && (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {metas.map((m, i) => (
+            {/* Empty */}
+            {!isLoading && !error && isEmpty && (
               <motion.div
-                key={m.titulo}
-                initial={{ opacity: 0, y: 14 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05 * i, duration: 0.4 }}
+                className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20"
               >
-                <MetaCard {...m} />
+                <Clock className="h-10 w-10 text-amber-400" />
+                <div>
+                  <p className="font-[Sora] text-base font-semibold text-white">
+                    Aguardando sincronização semanal
+                  </p>
+                  <p className="mt-1 font-[DM_Sans] text-sm text-white/60">
+                    Os snapshots de metas ainda não foram gerados para este mês.
+                  </p>
+                </div>
               </motion.div>
-            ))}
-          </div>
-        )}
+            )}
+
+            {/* Grid */}
+            {hasRealData && (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {metas.map((m, i) => (
+                  <motion.div
+                    key={m.titulo}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i, duration: 0.4 }}
+                  >
+                    <MetaCard {...m} />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

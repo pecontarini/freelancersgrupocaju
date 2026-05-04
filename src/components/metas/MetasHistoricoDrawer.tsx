@@ -256,9 +256,7 @@ export function MetasHistoricoDrawer({
                   >
                     <span className="text-white/70">{p.label}</span>
                     <span className="font-[Sora] font-semibold tabular-nums text-white">
-                      {p.value !== null
-                        ? p.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
-                        : "—"}
+                      {formatValue(metric, p.value)}
                     </span>
                   </li>
                 ))}

@@ -2715,6 +2715,77 @@ export type Database = {
           },
         ]
       }
+      metas_snapshot: {
+        Row: {
+          cmv_carnes: number | null
+          cmv_carnes_anterior: number | null
+          cmv_salmao: number | null
+          cmv_salmao_anterior: number | null
+          conformidade: number | null
+          conformidade_anterior: number | null
+          created_at: string
+          id: string
+          kds: number | null
+          kds_anterior: number | null
+          loja_codigo: string
+          loja_id: string | null
+          mes_ref: string
+          nps: number | null
+          nps_anterior: number | null
+          observacoes: string | null
+          red_flag: boolean
+          updated_at: string
+        }
+        Insert: {
+          cmv_carnes?: number | null
+          cmv_carnes_anterior?: number | null
+          cmv_salmao?: number | null
+          cmv_salmao_anterior?: number | null
+          conformidade?: number | null
+          conformidade_anterior?: number | null
+          created_at?: string
+          id?: string
+          kds?: number | null
+          kds_anterior?: number | null
+          loja_codigo: string
+          loja_id?: string | null
+          mes_ref: string
+          nps?: number | null
+          nps_anterior?: number | null
+          observacoes?: string | null
+          red_flag?: boolean
+          updated_at?: string
+        }
+        Update: {
+          cmv_carnes?: number | null
+          cmv_carnes_anterior?: number | null
+          cmv_salmao?: number | null
+          cmv_salmao_anterior?: number | null
+          conformidade?: number | null
+          conformidade_anterior?: number | null
+          created_at?: string
+          id?: string
+          kds?: number | null
+          kds_anterior?: number | null
+          loja_codigo?: string
+          loja_id?: string | null
+          mes_ref?: string
+          nps?: number | null
+          nps_anterior?: number | null
+          observacoes?: string | null
+          red_flag?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_snapshot_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       missao_anexos: {
         Row: {
           created_at: string

@@ -93,12 +93,14 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
   const def = META_DEFINITIONS[metric];
 
   const rows = useMemo(() => {
-    const sorted = [...lojas].sort((a, b) => {
+    const eligible = lojas.filter((l) => lojaHasRankingMetric(l.code, metric));
+    const naLojas = lojas.filter((l) => !lojaHasRankingMetric(l.code, metric));
+    const sorted = [...eligible].sort((a, b) => {
       const av = a.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
       const bv = b.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
       return meta.polarity === "higher" ? bv - av : av - bv;
     });
-    return sorted.map((loja, idx) => {
+    const eligibleRows = sorted.map((loja, idx) => {
       const value = loja.values[metric];
       const prev = loja.prev[metric];
       const status = statusFor(metric, value);
@@ -111,13 +113,27 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
         norm: normalizeMetric(metric, value),
         isRed: status === "redflag" || loja.redFlag,
         position: idx + 1,
+        naMetric: false,
       };
     });
+    const naRows = naLojas.map((loja) => ({
+      loja,
+      value: null as number | null,
+      prev: null as number | null,
+      variation: 0,
+      status: "regular" as RankingStatus,
+      norm: 0,
+      isRed: false,
+      position: 0,
+      naMetric: true,
+    }));
+    return [...eligibleRows, ...naRows];
   }, [lojas, metric, meta.polarity]);
 
   const counts = useMemo(() => {
     const c: Record<RankingStatus, number> = { excelente: 0, bom: 0, regular: 0, redflag: 0 };
     rows.forEach((r) => {
+      if (r.naMetric) return;
       c[r.status]++;
     });
     return c;

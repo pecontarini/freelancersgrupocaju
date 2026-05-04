@@ -110,6 +110,7 @@ export interface MetaGroup {
 export const META_GROUPS: MetaGroup[] = [
   { title: "Visão Geral", items: ["visao-geral"] },
   { title: "Indicadores", items: ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"] },
+  { title: "Análise", items: ["ranking", "comparativo"] },
   { title: "Gestão", items: ["red-flag", "planos"] },
   { title: "Admin", items: ["diario", "holding"] },
 ];

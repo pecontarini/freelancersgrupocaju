@@ -85,7 +85,9 @@ function avg(values: Array<number | null>): number | null {
 }
 
 export default function MetasPage() {
+  const navigate = useNavigate();
   const { profile, roles, unidade, isLoading: loadingProfile } = useUserProfile();
+  const { selectedUnidadeId, setSelectedUnidadeId } = useUnidade();
   const cargo = roles[0] ?? "employee";
   const { data, isLoading, isEmpty, error } = useMetasSnapshot();
 

@@ -5,10 +5,11 @@ import { MetaCard, type MetaCardProps } from "@/components/metas/MetaCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import {
-  calcMetaStatus,
   calcNpsStatus,
   calcConformidadeStatus,
+  calcMetaStatus,
   calcMetaPercentual,
+  formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";
 

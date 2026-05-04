@@ -1,4 +1,4 @@
-import { getLojaDisplay } from "@/lib/lojaUtils";
+import { getLojaDisplay, lojaHasRankingMetric } from "@/lib/lojaUtils";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Sparkles, Clock } from "lucide-react";
@@ -70,7 +70,8 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
   const metas: MetaCardProps[] = useMemo(() => {
     if (!data.length) return [];
     return SPECS.map((spec) => {
-      const value = avg(data.map(spec.pick));
+      const eligible = data.filter((r) => lojaHasRankingMetric(r.loja_codigo, spec.key));
+      const value = avg(eligible.map(spec.pick));
       let status: MetaCardProps["status"];
       if (spec.titulo.startsWith("NPS")) status = calcNpsStatus(value);
       else if (spec.titulo.startsWith("Conformidade")) status = calcConformidadeStatus(value);
@@ -97,7 +98,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
     return RANKING_METRICS.map((m) => {
       const meta = METRIC_META[m];
       const sorted = [...lojas]
-        .filter((l) => l.values[m] !== null)
+        .filter((l) => l.values[m] !== null && lojaHasRankingMetric(l.code, m))
         .sort((a, b) => {
           const av = a.values[m]!;
           const bv = b.values[m]!;

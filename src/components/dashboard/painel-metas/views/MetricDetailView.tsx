@@ -1,4 +1,4 @@
-import { getLojaDisplay } from "@/lib/lojaUtils";
+import { getLojaDisplay, lojaHasRankingMetric } from "@/lib/lojaUtils";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
@@ -93,12 +93,14 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
   const def = META_DEFINITIONS[metric];
 
   const rows = useMemo(() => {
-    const sorted = [...lojas].sort((a, b) => {
+    const eligible = lojas.filter((l) => lojaHasRankingMetric(l.code, metric));
+    const naLojas = lojas.filter((l) => !lojaHasRankingMetric(l.code, metric));
+    const sorted = [...eligible].sort((a, b) => {
       const av = a.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
       const bv = b.values[metric] ?? (meta.polarity === "higher" ? -Infinity : Infinity);
       return meta.polarity === "higher" ? bv - av : av - bv;
     });
-    return sorted.map((loja, idx) => {
+    const eligibleRows = sorted.map((loja, idx) => {
       const value = loja.values[metric];
       const prev = loja.prev[metric];
       const status = statusFor(metric, value);
@@ -111,13 +113,27 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
         norm: normalizeMetric(metric, value),
         isRed: status === "redflag" || loja.redFlag,
         position: idx + 1,
+        naMetric: false,
       };
     });
+    const naRows = naLojas.map((loja) => ({
+      loja,
+      value: null as number | null,
+      prev: null as number | null,
+      variation: 0,
+      status: "regular" as RankingStatus,
+      norm: 0,
+      isRed: false,
+      position: 0,
+      naMetric: true,
+    }));
+    return [...eligibleRows, ...naRows];
   }, [lojas, metric, meta.polarity]);
 
   const counts = useMemo(() => {
     const c: Record<RankingStatus, number> = { excelente: 0, bom: 0, regular: 0, redflag: 0 };
     rows.forEach((r) => {
+      if (r.naMetric) return;
       c[r.status]++;
     });
     return c;
@@ -240,7 +256,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                       )}
                     >
                       <TableCell className="text-center text-xs font-bold tabular-nums text-white/80">
-                        {r.position}
+                        {r.naMetric ? "—" : r.position}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -264,66 +280,81 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-[Sora] text-sm font-semibold">
-                        {formatValue(metric, r.value)}
-                        <span className="ml-0.5 text-[10px] text-muted-foreground">
-                          {meta.suffix}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
-                        {meta.meta}
-                        {meta.suffix}
-                      </TableCell>
-                      <TableCell>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-                          <div
-                            className={cn("h-full transition-all", STATUS_BAR[r.status])}
-                            style={{ width: `${Math.max(2, r.norm)}%` }}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1",
-                            STATUS_BADGE[r.status],
-                          )}
-                        >
-                          <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[r.status])} />
-                          {STATUS_LABEL_PT[r.status]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-xs tabular-nums",
-                            trendUp && "text-emerald-400",
-                            trendDown && "text-red-400",
-                            !trendUp && !trendDown && "text-muted-foreground",
-                          )}
-                        >
-                          {trendUp ? (
-                            <TrendingUp className="h-3.5 w-3.5" />
-                          ) : trendDown ? (
-                            <TrendingDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <Minus className="h-3.5 w-3.5" />
-                          )}
-                          {Math.abs(r.variation).toLocaleString("pt-BR", {
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {r.isRed ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
-                            <AlertTriangle className="h-3 w-3" />
-                            Red Flag
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {r.naMetric ? (
+                        <>
+                          <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-right text-xs text-muted-foreground">—</TableCell>
+                          <TableCell>
+                            <span className="text-[11px] italic text-muted-foreground">Não se aplica</span>
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">—</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="text-right tabular-nums font-[Sora] text-sm font-semibold">
+                            {formatValue(metric, r.value)}
+                            <span className="ml-0.5 text-[10px] text-muted-foreground">
+                              {meta.suffix}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                            {meta.meta}
+                            {meta.suffix}
+                          </TableCell>
+                          <TableCell>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                              <div
+                                className={cn("h-full transition-all", STATUS_BAR[r.status])}
+                                style={{ width: `${Math.max(2, r.norm)}%` }}
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1",
+                                STATUS_BADGE[r.status],
+                              )}
+                            >
+                              <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[r.status])} />
+                              {STATUS_LABEL_PT[r.status]}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 text-xs tabular-nums",
+                                trendUp && "text-emerald-400",
+                                trendDown && "text-red-400",
+                                !trendUp && !trendDown && "text-muted-foreground",
+                              )}
+                            >
+                              {trendUp ? (
+                                <TrendingUp className="h-3.5 w-3.5" />
+                              ) : trendDown ? (
+                                <TrendingDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <Minus className="h-3.5 w-3.5" />
+                              )}
+                              {Math.abs(r.variation).toLocaleString("pt-BR", {
+                                maximumFractionDigits: 2,
+                              })}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {r.isRed ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
+                                <AlertTriangle className="h-3 w-3" />
+                                Red Flag
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </>
+                      )}
                     </motion.tr>
                   );
                 })}
@@ -427,40 +458,52 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                                   <span className="text-sm">{getLojaDisplay(r.loja.code).nome}</span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right tabular-nums text-sm font-semibold">
-                                {formatValue(metric, r.value)}
-                                <span className="ml-0.5 text-[10px] text-muted-foreground">
-                                  {meta.suffix}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <span
-                                  className={cn(
-                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ring-1",
-                                    STATUS_BADGE[r.status],
-                                  )}
-                                >
-                                  <span
-                                    className={cn(
-                                      "h-2 w-2 rounded-full ring-2",
-                                      STATUS_DOT[r.status],
-                                    )}
-                                  />
-                                  {STATUS_LABEL_PT[r.status]}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                <span
-                                  className={cn(
-                                    "font-[Sora] text-sm font-bold",
-                                    valor === c.pesoReais && "text-emerald-300",
-                                    valor === 0 && "text-red-300",
-                                    valor > 0 && valor < c.pesoReais && "text-amber-300",
-                                  )}
-                                >
-                                  R$ {valor.toLocaleString("pt-BR")}
-                                </span>
-                              </TableCell>
+                              {r.naMetric ? (
+                                <>
+                                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                                  <TableCell className="text-center text-xs italic text-muted-foreground">
+                                    Não se aplica
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">R$ —</TableCell>
+                                </>
+                              ) : (
+                                <>
+                                  <TableCell className="text-right tabular-nums text-sm font-semibold">
+                                    {formatValue(metric, r.value)}
+                                    <span className="ml-0.5 text-[10px] text-muted-foreground">
+                                      {meta.suffix}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <span
+                                      className={cn(
+                                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] ring-1",
+                                        STATUS_BADGE[r.status],
+                                      )}
+                                    >
+                                      <span
+                                        className={cn(
+                                          "h-2 w-2 rounded-full ring-2",
+                                          STATUS_DOT[r.status],
+                                        )}
+                                      />
+                                      {STATUS_LABEL_PT[r.status]}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums">
+                                    <span
+                                      className={cn(
+                                        "font-[Sora] text-sm font-bold",
+                                        valor === c.pesoReais && "text-emerald-300",
+                                        valor === 0 && "text-red-300",
+                                        valor > 0 && valor < c.pesoReais && "text-amber-300",
+                                      )}
+                                    >
+                                      R$ {valor.toLocaleString("pt-BR")}
+                                    </span>
+                                  </TableCell>
+                                </>
+                              )}
                             </TableRow>
                           );
                         })}

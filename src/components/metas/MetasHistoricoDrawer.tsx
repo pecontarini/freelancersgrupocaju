@@ -31,11 +31,17 @@ export type HistoricoMetric =
   | "conformidade";
 
 const METRIC_LABEL: Record<HistoricoMetric, string> = {
-  nps: "NPS Salão",
+  nps: "NPS Salão (R$/recl.)",
   cmv_salmao: "CMV Salmão (kg/R$1k)",
   cmv_carnes: "CMV Carnes (desvio %)",
   kds: "KDS Target Preta (%)",
   conformidade: "Conformidade (%)",
+};
+
+const formatValue = (metric: HistoricoMetric, v: number | null) => {
+  if (v === null) return "—";
+  if (metric === "nps") return formatNpsDisplay(v);
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 };
 
 interface MetasHistoricoDrawerProps {

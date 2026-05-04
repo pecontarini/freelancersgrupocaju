@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { Target, Sparkles, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
 import { MetaCard, type MetaCardProps } from "@/components/metas/MetaCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
@@ -14,6 +16,10 @@ import {
   formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";
+import { AppGlassBackground } from "@/components/layout/AppGlassBackground";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { PortalHeader } from "@/components/layout/PortalHeader";
 
 interface MetricSpec {
   titulo: string;

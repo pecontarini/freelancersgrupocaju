@@ -27,7 +27,7 @@ export const METRIC_META: Record<
   RankingMetric,
   { label: string; suffix: string; polarity: MetaPolarity; meta: number; redFlag: number }
 > = {
-  nps: { label: "NPS Salão", suffix: "", polarity: "higher", meta: 80, redFlag: 60 },
+  nps: { label: "NPS Salão (R$/recl.)", suffix: "", polarity: "higher", meta: 120000, redFlag: 70000 },
   "cmv-salmao": { label: "CMV Salmão (kg/R$1k)", suffix: "kg", polarity: "lower", meta: 1.2, redFlag: 1.6 },
   "cmv-carnes": { label: "CMV Carnes (desvio %)", suffix: "%", polarity: "lower", meta: 5, redFlag: 8 },
   kds: { label: "KDS Target Preta", suffix: "%", polarity: "higher", meta: 80, redFlag: 65 },

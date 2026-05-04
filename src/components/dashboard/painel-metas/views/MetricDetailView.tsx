@@ -1,3 +1,4 @@
+import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
@@ -255,10 +256,10 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                           </span>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground">
-                              {r.loja.code}
+                              {getLojaDisplay(r.loja.code).nome}
                             </p>
                             <p className="truncate text-[11px] text-muted-foreground">
-                              {r.loja.nome}
+                              {r.loja.code}
                             </p>
                           </div>
                         </div>
@@ -423,7 +424,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                                   >
                                     {b.label}
                                   </span>
-                                  <span className="text-sm">{r.loja.code}</span>
+                                  <span className="text-sm">{getLojaDisplay(r.loja.code).nome}</span>
                                 </div>
                               </TableCell>
                               <TableCell className="text-right tabular-nums text-sm font-semibold">

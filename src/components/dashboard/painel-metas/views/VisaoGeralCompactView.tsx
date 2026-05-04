@@ -1,3 +1,4 @@
+import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Sparkles, Clock } from "lucide-react";
@@ -195,7 +196,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                           >
                             {b.label}
                           </span>
-                          <span className="flex-1 truncate text-xs">{loja.code}</span>
+                          <span className="flex-1 truncate text-xs">{getLojaDisplay(loja.code).nome}</span>
                           <span className="font-[Sora] text-xs font-semibold tabular-nums">
                             {metric === "nps"
                               ? formatNpsDisplay(value)
@@ -225,7 +226,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                         >
                           {bandeiraStyles(worst.bandeira).label}
                         </span>
-                        <span className="flex-1 truncate text-xs text-red-200">{worst.code}</span>
+                        <span className="flex-1 truncate text-xs text-red-200">{getLojaDisplay(worst.code).nome}</span>
                         <span className="font-[Sora] text-xs font-semibold tabular-nums text-red-200">
                           {metric === "nps"
                             ? formatNpsDisplay(worst.values[metric])

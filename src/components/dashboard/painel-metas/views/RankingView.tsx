@@ -168,7 +168,9 @@ export function RankingView() {
                             </TableCell>
                             <TableCell className="text-right tabular-nums font-[Sora] font-semibold">
                               {r.value !== null
-                                ? r.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
+                                ? m === "nps"
+                                  ? formatNpsDisplay(r.value)
+                                  : r.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
                                 : "—"}
                               <span className="ml-0.5 text-xs text-muted-foreground">
                                 {METRIC_META[m].suffix}

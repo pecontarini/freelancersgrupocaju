@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, History, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { formatNpsDisplay } from "@/lib/metasUtils";
 
 export type HistoricoMetric =
   | "nps"

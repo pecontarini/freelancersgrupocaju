@@ -21,6 +21,7 @@ import LiquidGlassSimulator from "./pages/LiquidGlassSimulator";
 import ContagemUtensilios from "./pages/ContagemUtensilios";
 import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
+import MetasPage from "./pages/painel/Metas";
 import { PageTransition } from "@/components/motion";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
+                <Route path="/painel/metas" element={<ProtectedRoute><MetasPage /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

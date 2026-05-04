@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 /** Métricas avaliadas para detectar Red Flag. */
 const METRICS = [
-  { key: "nps", label: "NPS", meta: 80, redFlag: 60, polarity: "higher" as const, status: calcNpsStatus },
+  { key: "nps", label: "NPS", meta: 120000, redFlag: 70000, polarity: "higher" as const, status: calcNpsStatus },
   { key: "cmv_salmao", label: "CMV Salmão", meta: 1.2, redFlag: 1.6, polarity: "lower" as const, status: null },
   { key: "cmv_carnes", label: "CMV Carnes", meta: 5, redFlag: 8, polarity: "lower" as const, status: null },
   { key: "kds", label: "KDS", meta: 80, redFlag: 65, polarity: "higher" as const, status: null },

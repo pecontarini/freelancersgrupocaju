@@ -12,7 +12,9 @@ export type MetaKey =
   | "red-flag"
   | "planos"
   | "diario"
-  | "holding";
+  | "holding"
+  | "ranking"
+  | "comparativo";
 
 /**
  * Polaridade da meta:

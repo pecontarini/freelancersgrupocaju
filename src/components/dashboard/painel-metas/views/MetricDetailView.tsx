@@ -59,6 +59,10 @@ const STATUS_BADGE: Record<RankingStatus, string> = {
 
 interface Props {
   metric: RankingMetric;
+  /** Se definido, restringe ranking e cargos à loja indicada (gerente_unidade). */
+  restrictToLojaCodigo?: string | null;
+  /** Quando true, oculta o bloco de Variável por Cargo (operator não-admin). */
+  hideCargoTabs?: boolean;
 }
 
 function formatMonthLabel(mes: string): string {
@@ -74,8 +78,15 @@ function formatValue(metric: RankingMetric, value: number | null): string {
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 }
 
-export function MetricDetailView({ metric }: Props) {
-  const { data: snapshots, isLoading, isEmpty, error } = useMetasSnapshot();
+export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }: Props) {
+  const { data: rawSnapshots, isLoading, isEmpty, error } = useMetasSnapshot();
+  const snapshots = useMemo(
+    () =>
+      restrictToLojaCodigo
+        ? rawSnapshots.filter((s) => s.loja_codigo === restrictToLojaCodigo)
+        : rawSnapshots,
+    [rawSnapshots, restrictToLojaCodigo],
+  );
   const lojas = useMemo(() => snapshots.map(snapshotToLoja), [snapshots]);
   const meta = METRIC_META[metric];
   const def = META_DEFINITIONS[metric];
@@ -322,7 +333,7 @@ export function MetricDetailView({ metric }: Props) {
       </Card>
 
       {/* ── Abas por Cargo ──────────────────────────────────── */}
-      {cargos && cargos.length > 0 && (
+      {!hideCargoTabs && cargos && cargos.length > 0 && (
         <Card className="vision-glass">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">

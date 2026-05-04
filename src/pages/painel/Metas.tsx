@@ -9,6 +9,8 @@ import {
   calcConformidadeStatus,
   calcMetaStatus,
   calcMetaPercentual,
+  calcCmvCarnesStatus,
+  calcCmvSalmaoStatus,
   formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";

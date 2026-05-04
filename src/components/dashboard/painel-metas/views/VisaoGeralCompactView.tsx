@@ -50,8 +50,20 @@ function avg(values: Array<number | null>): number | null {
   return nums.reduce((s, n) => s + n, 0) / nums.length;
 }
 
-export function VisaoGeralCompactView() {
-  const { data, isLoading, isEmpty, error } = useMetasSnapshot();
+interface VisaoGeralProps {
+  /** Se definido, restringe a visualização à loja indicada (ex: gerente_unidade). */
+  restrictToLojaCodigo?: string | null;
+}
+
+export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps = {}) {
+  const { data: rawData, isLoading, isEmpty, error } = useMetasSnapshot();
+  const data = useMemo(
+    () =>
+      restrictToLojaCodigo
+        ? rawData.filter((r) => r.loja_codigo === restrictToLojaCodigo)
+        : rawData,
+    [rawData, restrictToLojaCodigo],
+  );
   const lojas = useMemo(() => data.map(snapshotToLoja), [data]);
 
   const metas: MetaCardProps[] = useMemo(() => {

@@ -2197,6 +2197,7 @@ export function PainelMetasTab({ selectedUnidadeId }: PainelMetasTabProps) {
                 setDrawerOpen(false);
               }}
               showAdmin={showAdmin}
+              showManagerPlus={showManagerPlus}
               forceExpanded
             />
           </MetaSheetContent>

@@ -92,6 +92,10 @@ export default function MetasPage() {
         status = calcNpsStatus(value);
       } else if (spec.titulo.startsWith("Conformidade")) {
         status = calcConformidadeStatus(value);
+      } else if (spec.titulo === "CMV Carnes") {
+        status = calcCmvCarnesStatus(value);
+      } else if (spec.titulo === "CMV Salmão") {
+        status = calcCmvSalmaoStatus(value);
       } else {
         status = calcMetaStatus(value, spec.meta, spec.redFlag, spec.polarity);
       }

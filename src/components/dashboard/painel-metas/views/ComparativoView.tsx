@@ -1,3 +1,4 @@
+import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Radar as RadarIcon, X, Plus, Clock } from "lucide-react";

@@ -1,3 +1,4 @@
+import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Sparkles, Clock } from "lucide-react";

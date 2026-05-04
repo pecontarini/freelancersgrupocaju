@@ -27,8 +27,8 @@ const METRIC_SPECS: MetricSpec[] = [
   {
     titulo: "NPS Salão",
     tipo: "Experiência",
-    meta: 80,
-    redFlag: 60,
+    meta: 120000,
+    redFlag: 70000,
     polarity: "higher",
     pick: (r) => r.nps,
   },

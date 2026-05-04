@@ -5,10 +5,11 @@ import { MetaCard, type MetaCardProps } from "@/components/metas/MetaCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import {
-  calcMetaStatus,
   calcNpsStatus,
   calcConformidadeStatus,
+  calcMetaStatus,
   calcMetaPercentual,
+  formatNpsDisplay,
 } from "@/lib/metasUtils";
 import { useMemo } from "react";
 
@@ -26,8 +27,8 @@ const METRIC_SPECS: MetricSpec[] = [
   {
     titulo: "NPS Salão",
     tipo: "Experiência",
-    meta: 80,
-    redFlag: 60,
+    meta: 120000,
+    redFlag: 70000,
     polarity: "higher",
     pick: (r) => r.nps,
   },
@@ -93,6 +94,7 @@ export default function MetasPage() {
         status = calcMetaStatus(value, spec.meta, spec.redFlag, spec.polarity);
       }
       const percentual = calcMetaPercentual(value, spec.meta, spec.polarity);
+      const isNps = spec.titulo.startsWith("NPS");
       return {
         titulo: spec.titulo,
         tipo: spec.tipo,
@@ -102,6 +104,8 @@ export default function MetasPage() {
         status,
         redFlag: status === "redflag",
         unidadeSufixo: spec.unidadeSufixo ?? "",
+        formatValor: isNps ? formatNpsDisplay : undefined,
+        formatMeta: isNps ? formatNpsDisplay : undefined,
       };
     });
   }, [data]);

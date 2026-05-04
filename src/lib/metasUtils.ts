@@ -18,14 +18,32 @@ export interface ThresholdLower {
 }
 
 /**
- * NPS — meta padrão 80, red flag < 60.
+ * NPS CajuPAR — valor em R$/reclamação (não é 0–100).
+ * Salão:    ≥120k excelente · ≥95k bom · ≥70k regular · <70k redflag
+ * Delivery: ≥12k excelente  · ≥10k bom · ≥8k regular  · <8k redflag
  */
-export function calcNpsStatus(value: number | null | undefined): MetaStatus {
+export function calcNpsStatus(
+  value: number | null | undefined,
+  tipo: "salao" | "delivery" = "salao",
+): MetaStatus {
   if (value === null || value === undefined || Number.isNaN(value)) return "regular";
-  if (value >= 80) return "excelente";
-  if (value >= 70) return "bom";
-  if (value >= 60) return "regular";
+  if (tipo === "salao") {
+    if (value >= 120000) return "excelente";
+    if (value >= 95000) return "bom";
+    if (value >= 70000) return "regular";
+    return "redflag";
+  }
+  if (value >= 12000) return "excelente";
+  if (value >= 10000) return "bom";
+  if (value >= 8000) return "regular";
   return "redflag";
+}
+
+/** Formata R$/reclamação para exibição (ex.: 311545 → "R$ 311,5k"). */
+export function formatNpsDisplay(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1).replace(".", ",")}k`;
+  return `R$ ${value.toFixed(0)}`;
 }
 
 /**

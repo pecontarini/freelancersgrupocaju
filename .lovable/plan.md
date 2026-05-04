@@ -1,41 +1,49 @@
 ## Objetivo
 
-Permitir adicionar freelancer extra escolhendo **qualquer setor cadastrado** da unidade direto no editor de escalas (hoje só dá pra adicionar no setor da aba ativa). A integração com POP do dia e com o lançamento automático em Budget Gerencial **já existe** — só precisa do gatilho de UI.
+Redefinir a métrica NPS no Painel de Metas: o valor armazenado em `metas_snapshot.nps` deixa de ser uma nota 0–100 e passa a representar **R$ por reclamação** (faturamento ÷ nº de reclamações), com faixas distintas para Salão e Delivery.
 
-## O que já está pronto (não precisa mexer)
+## Novas faixas
 
-- Trigger `sync_schedule_to_freelancer_entry` cria/atualiza automaticamente o registro em `freelancer_entries` com `origem='escala'` toda vez que uma escala de freelancer é gravada → aparece sozinho no Budget Gerencial.
-- `calculateDailyMetrics` (`src/lib/peakHours.ts`) já soma freelancers na contagem POP de almoço/jantar do dia.
-- `FreelancerAddModal` já trata: lookup por CPF, vínculo a employee existente, criação de novo, sem-CPF, taxa, horário, setor compartilhado.
+| Tipo | Excelente | Bom | Regular | Red Flag |
+|---|---|---|---|---|
+| Salão | ≥ R$ 120k | ≥ R$ 95k | ≥ R$ 70k | < R$ 70k |
+| Delivery | ≥ R$ 12k | ≥ R$ 10k | ≥ R$ 8k | < R$ 8k |
 
-## Mudança de UX
+## Mudanças
 
-Hoje, no cabeçalho de cada dia da grade (`ManualScheduleGrid.tsx` linhas ~1407 / 1641 / 1655), o botão `+ Freelancer` chama `setFreelancerModal({ open, date })` e o modal usa **fixo** `activeSectorId` (linha 1775).
+### 1. `src/lib/metasUtils.ts`
+- Substituir `calcNpsStatus(value)` pela versão com parâmetro `tipo: "salao" | "delivery"` (default `"salao"`) usando os thresholds acima.
+- Adicionar `formatNpsDisplay(value)` → `"R$ 311,5k"` / `"R$ 950"`.
 
-Vamos:
+### 2. `src/pages/painel/Metas.tsx`
+- Atualizar o spec do card "NPS Salão": `meta: 120000`, `redFlag: 70000`, `polarity: "higher"`, sem sufixo de unidade.
+- Passar valor formatado para o card (ver item 4).
 
-1. Estender o estado `freelancerModal` para aceitar `sectorId` opcional. Se não vier, modal abre com seletor de setor visível.
-2. No `FreelancerAddModal`:
-   - Receber lista de setores da unidade (`sectors: {id,name}[]`) e `initialSectorId` opcional.
-   - Adicionar um **Select de Setor** no topo do formulário (sempre visível quando há mais de 1 setor disponível).
-   - Quando o usuário troca de setor, recarregar `useSectorJobTitles([selectedSectorId])` e resetar `selectedJobTitleId`.
-   - O `targetSectorId` passa a vir desse seletor (mantendo a lógica atual de setor compartilhado quando aplicável — checar `useSectorPartner` para o setor escolhido).
-3. Manter o atalho atual: clicar no botão dentro de uma aba de setor já vem com aquele setor pré-selecionado, mas o usuário pode trocar.
-4. Adicionar opcionalmente um botão `+ Freelancer (qualquer setor)` no cabeçalho geral da semana (ao lado de "Copiar dia anterior") que abre o modal sem setor pré-selecionado, exigindo escolha.
+### 3. `src/components/metas/MetaCard.tsx`
+- Aceitar prop opcional `formatValor?: (n: number) => string` e `formatMeta?: (n: number) => string`. Se ausentes, mantém `toLocaleString("pt-BR")` atual. Usar `formatNpsDisplay` apenas no card de NPS.
 
-## Arquivos a alterar
+### 4. `src/components/dashboard/painel-metas/shared/mockLojas.ts`
+- Em `METRIC_META.nps`: `meta: 120000`, `redFlag: 70000` (mantém `polarity: "higher"`). Isso recalibra ranking/normalização.
+- No `RankingView`, formatar a coluna de valor de NPS via `formatNpsDisplay` (demais métricas seguem como hoje).
 
-- `src/components/escalas/FreelancerAddModal.tsx` — novo seletor de setor + props `sectors`, `initialSectorId`; refazer hook `useSectorJobTitles` para reagir ao setor selecionado; reavaliar parceria via lookup leve.
-- `src/components/escalas/ManualScheduleGrid.tsx` — passar `sectors` e `initialSectorId={activeSectorId}` ao modal; estado do modal aceita `sectorId?: string`.
+### 5. `src/components/metas/RedFlagBanner.tsx`
+- Atualizar entrada do array `METRICS` para NPS: `meta: 120000`, `redFlag: 70000` (status segue chamando `calcNpsStatus` — default Salão).
 
-## Comportamento esperado após o ajuste
+### 6. Seed em `metas_snapshot` (mes_ref `2026-04`)
+Os 10 registros atuais têm `nps` entre 68 e 88 (escala antiga). Vou **reescrever via UPDATE** para valores realistas em R$/reclamação, mantendo a hierarquia do ranking e deixando `NZ_GO` em red flag (< 70k). `nps_anterior` recebe variação de ±5–10% para preservar a tendência.
 
-- Operador clica em `+ Freelancer` em qualquer dia → escolhe setor (ou aceita o pré-selecionado) → preenche CPF / dados → salva.
-- A escala aparece imediatamente na grade do setor escolhido.
-- O contador POP do dia (almoço/jantar) já reflete o freelancer extra automaticamente (regra de janela ≥2h consecutivas).
-- O lançamento aparece automaticamente no Budget Gerencial (`freelancer_entries` com `origem='escala'`) — sem ação adicional.
+Exemplo (valores aproximados):
+```text
+NZ_SG  148000 / 138000     CP_AC  92000 / 88000
+CJ_SG  132000 / 125000     CP_AS  85000 / 95000  (queda)
+NZ_AC  121000 / 110000     NZ_AS  82000 / 78000
+CP_AN  118000 / 112000     CJ_AN  74000 / 71000
+CP_SG  105000 / 99000      NZ_GO  58000 / 65000  (red flag)
+```
 
-## Não-objetivos
+## Pontos em aberto (assumi defaults — ajusto se preferir)
 
-- Não criar lançamento manual paralelo no Budget Gerencial — o trigger já cobre.
-- Não mexer em RLS, contadores POP nem na lógica de pareamento de setores.
+1. **Delivery**: hoje `metas_snapshot` só tem `nps` (Salão). Não criarei coluna `nps_delivery` nesta rodada — `formatNpsDisplay` e a sobrecarga `tipo` ficam prontas para quando a coluna existir. Confirme se quer já adicionar `nps_delivery` à tabela.
+2. **Histórico (`MetasHistoricoDrawer`)**: a linha de referência da meta passa de 80 para 120000 automaticamente via prop. Tooltip do gráfico também usará `formatNpsDisplay` para o eixo NPS.
+
+Não toco em `VisaoGeralView` (usa fonte separada `nps_dashboard` com média 0–5 vinda de Sheets — semântica diferente).

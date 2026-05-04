@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, History, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { formatNpsDisplay } from "@/lib/metasUtils";
 
 export type HistoricoMetric =
   | "nps"
@@ -30,11 +31,17 @@ export type HistoricoMetric =
   | "conformidade";
 
 const METRIC_LABEL: Record<HistoricoMetric, string> = {
-  nps: "NPS Salão",
+  nps: "NPS Salão (R$/recl.)",
   cmv_salmao: "CMV Salmão (kg/R$1k)",
   cmv_carnes: "CMV Carnes (desvio %)",
   kds: "KDS Target Preta (%)",
   conformidade: "Conformidade (%)",
+};
+
+const formatValue = (metric: HistoricoMetric, v: number | null) => {
+  if (v === null) return "—";
+  if (metric === "nps") return formatNpsDisplay(v);
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 };
 
 interface MetasHistoricoDrawerProps {
@@ -182,7 +189,7 @@ export function MetasHistoricoDrawer({
                     <Minus className="h-3.5 w-3.5" />
                   )}
                   Variação no período: {trend.diff > 0 ? "+" : ""}
-                  {trend.diff.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                  {formatValue(metric, trend.diff)}
                 </div>
               )}
 
@@ -204,6 +211,7 @@ export function MetasHistoricoDrawer({
                     <YAxis
                       tick={{ fill: "rgba(255,255,255,0.6)", fontSize: 11 }}
                       stroke="rgba(255,255,255,0.15)"
+                      tickFormatter={(v) => formatValue(metric, v)}
                     />
                     <Tooltip
                       contentStyle={{
@@ -213,6 +221,7 @@ export function MetasHistoricoDrawer({
                         fontSize: 12,
                         color: "white",
                       }}
+                      formatter={(v: number) => formatValue(metric, v)}
                     />
                     <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }} />
                     <ReferenceLine
@@ -220,7 +229,7 @@ export function MetasHistoricoDrawer({
                       stroke="#10B981"
                       strokeDasharray="4 4"
                       label={{
-                        value: `Meta ${meta}`,
+                        value: `Meta ${formatValue(metric, meta)}`,
                         position: "right",
                         fill: "#10B981",
                         fontSize: 10,
@@ -247,9 +256,7 @@ export function MetasHistoricoDrawer({
                   >
                     <span className="text-white/70">{p.label}</span>
                     <span className="font-[Sora] font-semibold tabular-nums text-white">
-                      {p.value !== null
-                        ? p.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })
-                        : "—"}
+                      {formatValue(metric, p.value)}
                     </span>
                   </li>
                 ))}

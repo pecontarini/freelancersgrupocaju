@@ -12,6 +12,8 @@ export interface MetaCardProps {
   status: MetaStatus;
   redFlag?: boolean;
   unidadeSufixo?: string;
+  formatValor?: (n: number) => string;
+  formatMeta?: (n: number) => string;
 }
 
 const STATUS_LABEL: Record<MetaStatus, string> = {
@@ -37,8 +39,12 @@ export function MetaCard({
   status,
   redFlag,
   unidadeSufixo = "",
+  formatValor,
+  formatMeta,
 }: MetaCardProps) {
   const positiveTrend = percentual >= 100;
+  const valorAtualText = formatValor ? formatValor(valorAtual) : valorAtual.toLocaleString("pt-BR");
+  const valorMetaText = formatMeta ? formatMeta(valorMeta) : valorMeta.toLocaleString("pt-BR");
 
   return (
     <motion.div
@@ -75,14 +81,14 @@ export function MetaCard({
         <div className="flex-1">
           <div className="flex items-baseline gap-1">
             <span className="font-[Sora] text-3xl font-bold tabular-nums text-white">
-              {valorAtual.toLocaleString("pt-BR")}
+              {valorAtualText}
             </span>
             <span className="font-[DM_Sans] text-sm text-white/50">
               {unidadeSufixo}
             </span>
           </div>
           <p className="mt-1 font-[DM_Sans] text-xs text-white/50">
-            Meta: <span className="text-white/70">{valorMeta.toLocaleString("pt-BR")}{unidadeSufixo}</span>
+            Meta: <span className="text-white/70">{valorMetaText}{unidadeSufixo}</span>
           </p>
           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/70 ring-1 ring-white/10">
             {positiveTrend ? (

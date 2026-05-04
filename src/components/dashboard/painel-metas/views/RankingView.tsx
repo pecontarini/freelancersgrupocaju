@@ -209,6 +209,16 @@ export function RankingView() {
                       </TableCell>
                       {RANKING_METRICS.map((m) => {
                         const v = loja.values[m];
+                        const applies = lojaHasRankingMetric(loja.code, m);
+                        if (!applies) {
+                          return (
+                            <TableCell key={m} className="text-center">
+                              <span className="inline-flex min-w-[3.5rem] items-center justify-center rounded-md px-2 py-1 text-xs text-muted-foreground">
+                                —
+                              </span>
+                            </TableCell>
+                          );
+                        }
                         const status = statusFor(m, v);
                         return (
                           <TableCell key={m} className="text-center">

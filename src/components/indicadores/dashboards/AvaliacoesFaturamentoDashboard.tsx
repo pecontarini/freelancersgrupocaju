@@ -152,8 +152,16 @@ function Inner({ d }: { d: AvalFatData }) {
               <Tabela rows={cur} />
             </MetricCard>
           </div>
-        );
-      }}
+  );
+}
+
+export function AvaliacoesFaturamentoDashboard() {
+  return (
+    <IndicadorDashboardShell<AvalFatData>
+      metaKey="atendimento-medias"
+      subtitle="Avaliações 1-3 vs faturamento por loja"
+      render={(d) => <Inner d={d} />}
     />
   );
 }
+

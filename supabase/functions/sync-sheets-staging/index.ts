@@ -974,17 +974,33 @@ serve(async (req) => {
       .maybeSingle();
     if (srcErr || !source) throw new Error('Fonte não encontrada.');
 
-    const url = normalizeSheetsUrl(source.url || body.url || '');
-    if (!url) throw new Error('URL inválida.');
+    const sourceUrl = source.url || body.url || '';
+    const { sheetId, gid } = extractSheetParams(sourceUrl);
+    if (!sheetId) throw new Error('URL inválida — não foi possível extrair o sheetId.');
     const metaKey = source.meta_key;
     if (!metaKey) throw new Error('Esta fonte não tem `meta_key` definido.');
 
     console.log('[sync] meta=', metaKey, 'mes=', referenciaMes);
 
-    const csvResp = await fetch(url);
-    if (!csvResp.ok) throw new Error('Não foi possível acessar a planilha (verifique compartilhamento).');
-    const csv = await csvResp.text();
-    const grid = parseCSV(csv);
+    // Aba Depara (opcional)
+    DEPARA_MAP = {};
+    try {
+      const deparaGrid = await fetchGvizGrid(buildGvizUrl(sheetId, 'Depara'));
+      for (const r of deparaGrid.slice(1)) {
+        if (r[0] && r[1]) {
+          const k = r[0].trim().toLowerCase();
+          DEPARA_MAP[k] = r[1].trim();
+          // também versão normTxt
+          DEPARA_MAP[normTxt(r[0])] = r[1].trim();
+        }
+      }
+      console.log('[sync] Depara entries:', Object.keys(DEPARA_MAP).length);
+    } catch (e) {
+      console.warn('[sync] Aba Depara ausente/inválida em', sheetId, e instanceof Error ? e.message : e);
+    }
+
+    // Grid principal via gviz
+    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid));
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);

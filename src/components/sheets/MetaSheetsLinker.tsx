@@ -160,7 +160,28 @@ function MetaSourceCard({
       <CardContent className="space-y-3">
         {source ? (
           <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-            <p className="text-xs font-medium truncate">{source.nome}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-medium truncate">{source.nome}</p>
+              {(() => {
+                const st = source.ultimo_status ?? 'pendente';
+                const cls =
+                  st === 'ok'
+                    ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : st === 'erro'
+                    ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300'
+                    : 'bg-muted text-muted-foreground';
+                const label = st === 'ok' ? 'Sincronizado' : st === 'erro' ? 'Erro' : 'Pendente';
+                return (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] ${cls}`}
+                    title={st === 'erro' ? source.ultimo_erro || 'Erro na última sincronização' : undefined}
+                  >
+                    {label}
+                  </Badge>
+                );
+              })()}
+            </div>
             <p className="text-xs text-muted-foreground truncate">{source.url}</p>
             <p className="text-[11px] text-muted-foreground">
               Última sync:{" "}
@@ -168,10 +189,15 @@ function MetaSourceCard({
                 ? format(new Date(source.ultima_sincronizacao), "dd/MM/yyyy HH:mm", { locale: ptBR })
                 : "Nunca"}
             </p>
+            {source.ultimo_status === 'erro' && source.ultimo_erro && (
+              <p className="text-[11px] text-rose-600 dark:text-rose-300 leading-snug">
+                {source.ultimo_erro}
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Vincule uma planilha do Google Drive (formato CSV) para alimentar esta meta no Painel.
+            Vincule uma planilha do Google Drive para alimentar esta meta no Painel.
           </p>
         )}
 

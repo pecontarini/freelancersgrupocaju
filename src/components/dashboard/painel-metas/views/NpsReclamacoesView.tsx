@@ -474,15 +474,14 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Visualizações da Planilha
+          Indicadores (Upload Manual)
         </h3>
-        <SheetBlocksSection metaKey="reclamacoes" />
-        <SheetBlocksSection metaKey="nps" emptyMessage="Vincule a planilha de NPS em Configurações." />
+        <NpsAtendimentoDashboard />
+        <AvaliacoesFaturamentoDashboard />
+        <ReclamacoesCommentsDashboard />
       </section>
-
-      <ReclamacoesCommentsWall restrictToLojaCodigo={restrictToLojaCodigo ?? null} />
     </div>
   );
 }

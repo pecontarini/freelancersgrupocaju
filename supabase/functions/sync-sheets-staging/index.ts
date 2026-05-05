@@ -153,9 +153,9 @@ function shiftMonth(mes: string, delta: number): string {
 
 function normalizeSheetsUrl(raw: string): string | null {
   if (!raw) return null;
-  const { sheetId, gid } = extractSheetParams(raw.trim());
+  const { sheetId, gid, sheetName } = extractSheetParams(raw.trim());
   if (!sheetId) return null;
-  return buildGvizUrl(sheetId, gid);
+  return buildGvizUrl(sheetId, gid ?? sheetName);
 }
 
 function parseDateBR(s: string): string | null {

@@ -114,6 +114,20 @@ function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
     : `${base}&gid=${gidOrName}`;
 }
 
+function buildCsvExportUrl(sheetId: string, gidOrName: string | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+  if (!gidOrName) return base;
+  return isNaN(Number(gidOrName))
+    ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
+    : `${base}&gid=${gidOrName}`;
+}
+
+async function fetchCsvGrid(url: string): Promise<string[][]> {
+  const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ao buscar CSV da planilha`);
+  return parseCSV(await resp.text());
+}
+
 async function fetchGvizGrid(url: string): Promise<string[][]> {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`HTTP ${resp.status} ao buscar planilha`);

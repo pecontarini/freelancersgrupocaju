@@ -97,12 +97,15 @@ export function useSheetsSources() {
         throw new Error(validation.error);
       }
 
+      const normalizedUrl = normalizeSheetsUrl(input.url) ?? input.url;
+      const parsed = parseSheetsCsvUrl(normalizedUrl);
+
       const { error } = await supabase
         .from('sheets_sources')
         .insert({
           nome: input.nome,
-          url: input.url,
-          gid: input.gid || '0',
+          url: normalizedUrl,
+          gid: input.gid || parsed?.gid || '0',
           ativo: input.ativo ?? true,
           meta_key: input.meta_key ?? null,
         });

@@ -20,6 +20,7 @@ import { useConformidadeData, type SectorGroup } from "@/hooks/useConformidadeDa
 import { useLojaCodigoMap } from "../shared/useLojaCodigoMap";
 import { calcConformidadeStatus } from "@/lib/metasUtils";
 import { useSourceForMeta } from "@/hooks/useSheetsSources";
+import { SheetBlocksSection } from "../blocks/SheetBlocksSection";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -456,6 +457,14 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Blocos estruturados extraídos da planilha vinculada */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Visualizações da Planilha
+        </h3>
+        <SheetBlocksSection metaKey="conformidade" />
+      </section>
     </div>
   );
 }

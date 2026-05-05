@@ -32,6 +32,7 @@ import {
 } from "../shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { formatNpsDisplay } from "@/lib/metasUtils";
+import { SupervisoresRankingDashboard } from "@/components/indicadores/dashboards/SupervisoresRankingDashboard";
 
 const STATUS_CELL: Record<RankingStatus, string> = {
   excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 ring-emerald-500/30",
@@ -264,6 +265,7 @@ export function RankingView() {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 

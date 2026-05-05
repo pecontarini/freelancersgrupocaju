@@ -1,116 +1,117 @@
-## Diagnóstico
 
-Os parsers atuais foram desenhados pra um layout "Unidade | Valor" simples, mas nenhuma das 7 planilhas vinculadas tem esse formato. Por isso `sheets_blocks_snapshot` está vazia (confirmado via SQL) e os blocks no painel mostram "Vincule uma planilha…".
+Execução completa nas 6 etapas, sem novo diagnóstico.
 
-Formato real de cada planilha (amostra lida via CSV export):
+## Etapa 1 — Migrations
 
-| meta_key | Layout real | Layout que o parser atual espera |
+**Migration A** — `sheets_sources` ganha colunas de status:
+```sql
+ALTER TABLE public.sheets_sources
+  ADD COLUMN IF NOT EXISTS ultimo_status text DEFAULT 'pendente'
+    CHECK (ultimo_status IN ('ok','erro','pendente')),
+  ADD COLUMN IF NOT EXISTS ultimo_erro text;
+```
+
+**Migration B** — tabela `planos_acao` + RLS:
+```sql
+CREATE TABLE IF NOT EXISTS public.planos_acao (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  comentario_id uuid REFERENCES public.reclamacoes_comentarios(id) ON DELETE CASCADE,
+  texto_acao text NOT NULL,
+  responsavel text,
+  data_criacao timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id),
+  status text DEFAULT 'aberto'
+);
+ALTER TABLE public.planos_acao ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "select_planos" ON public.planos_acao FOR SELECT TO authenticated USING (true);
+CREATE POLICY "insert_planos" ON public.planos_acao FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
+CREATE POLICY "update_planos" ON public.planos_acao FOR UPDATE TO authenticated USING (auth.uid() = created_by OR has_role(auth.uid(),'admin'));
+```
+(Pequeno ajuste de segurança nas policies de insert/update para amarrar a `auth.uid()` — evita escalada.)
+
+## Etapa 2 — `supabase/functions/sync-sheets-staging/index.ts`
+
+- Adicionar `extractSheetParams`, `buildGvizUrl`, `fetchGvizGrid` exatamente como no prompt.
+- Substituir `normalizeSheetsUrl` para retornar URL gviz/tq.
+- No `serve`: trocar fetch CSV por:
+  ```ts
+  const { sheetId, gid } = extractSheetParams(source.url);
+  let deparaMap: Record<string,string> = {};
+  try {
+    const dep = await fetchGvizGrid(buildGvizUrl(sheetId, 'Depara'));
+    for (const r of dep.slice(1)) if (r[0] && r[1]) deparaMap[r[0].trim().toLowerCase()] = r[1].trim();
+  } catch { console.warn('[sync] Depara ausente', sheetId); }
+  const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid));
+  const parsed = dispatchParser(metaKey, grid, deparaMap);
+  ```
+- Estender `dispatchParser(metaKey, grid, deparaMap = {})` e cada parser existente para aceitar `deparaMap` como 2º parâmetro opcional (default `{}`). `matchLojaCodigo` consulta `deparaMap` antes do `UNIT_ALIAS`.
+- Substituir o bloco final de gravação de status pela versão condicional do prompt (status `ok` apenas com `hasData`; senão grava `ultimo_status='erro'` + `ultimo_erro` e responde 422).
+
+## Etapa 3 — `src/hooks/useSheetsSources.ts`
+
+- Reescrever `normalizeSheetsUrl` usando `extractSheetParams` + `buildGvizUrl` (gviz/tq).
+- Adicionar ao tipo `SheetsSource`:
+  ```ts
+  ultimo_status: 'ok' | 'erro' | 'pendente';
+  ultimo_erro: string | null;
+  ```
+- Incluir as colunas no `select('*')` (já cobre — confirmar nada hardcoded). Atualizar `parseSheetsCsvUrl` se necessário para entender URLs gviz já normalizadas.
+
+## Etapa 4 — `MetaSheetsLinker.tsx`
+
+Ao lado de cada fonte, badge:
+- `ok` → verde "Sincronizado"
+- `erro` → vermelho "Erro" + `Tooltip` com `ultimo_erro`
+- `pendente` → cinza "Pendente"
+
+Usar `Badge` shadcn + classes glass + accent amber existentes.
+
+## Etapa 5 — Registrar 7 fontes
+
+Insert/Upsert em `sheets_sources` (operação de dados via insert tool, não migration). Para itens com `meta_key` vazio, gerar `meta_key` único como `pendente-N` (já que coluna é unique implicitamente quando ativo) ou simplesmente deixar `meta_key=NULL` + `ativo=false`. Confirmar que não há constraint UNIQUE em `meta_key` antes — se houver, usar `meta_key=NULL` (Postgres permite múltiplos NULL em UNIQUE).
+
+URLs salvas no formato gviz canônico:
+```
+https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:json&gid={GID}
+```
+
+| meta_key | nome | ativo |
 |---|---|---|
-| `conformidade` | 3 rankings empilhados (Geral / Back / Front) com `Pos | Unidade | %` | ✅ próximo do correto, só precisa ajuste de detecção |
-| `kds` (Target Preto) | 3 blocos **lado a lado** (Caminito / Nazo / Caju) — cada bloco é `Loja | Categoria | Total | Qtn | %` | ❌ espera matriz Categoria × Loja |
-| `nps` (Médias Atendimento) | 2 grandes blocos: "Google+TripAdvisor" e "iFood/Delivery", cada um com sub-blocos por loja | ❌ espera header "Loja | Google | iFood…" |
-| `reclamacoes` (Distribuição) | Bloco "Geral Grupo" + N blocos por loja, todos com colunas `iFood | Google | TripAdvisor | Get In | Instagram | Whatsapp | Total | %` e linhas 1‒5 | ❌ espera lojas em linhas |
-| `cmv-salmao` | **Lojas como colunas** (Águas Claras, SIG, Asa Sul, Goiânia), datas em linhas, com faixas verde/amarelo/vermelho | ❌ espera lojas em linhas, datas em colunas |
-| `cmv-carnes` | 2 blocos lado a lado (Caminito Águas Claras / Caminito Norte), cada um com `Custo | Item | 01/04 | Envios | Envios R$ | Devolução | Vendas | Era pra Ter | 01/05 | Diferença | Vlr Total | Diff %` | ❌ delega pra parseTargetPreto |
-| `target-preto` | mesma planilha do KDS (gid 0) | ❌ idem KDS |
+| ranking-supervisores | Ranking Supervisores | true |
+| nps | NPS | true |
+| atendimento-medias | NPS / Avaliações | true |
+| reclamacoes | Base Avaliações | true |
+| NULL | Pendente Mapeamento #2 | false |
+| NULL | Pendente Mapeamento #6 | false |
+| NULL | Pendente Mapeamento #7 | false |
 
-## Plano
+Também vincular `reclamacoes_config.source_id` à fonte `reclamacoes` recém-criada (para o Mural de Comentários).
 
-### 1. Reescrever parsers em `supabase/functions/sync-sheets-staging/index.ts`
+Adicionar parser `parseSupervisoresRanking` (reusa lógica genérica) e mapear em `dispatchParser`: `case 'ranking-supervisores': return parseGenericMeta(...)` como fallback até termos formato real.
 
-Adicionar utilitários:
-- `findAllUnitHeaders(grid)` — varre o grid inteiro procurando células que são código de loja (via `matchLojaCodigo`), retorna posições para detectar blocos lado-a-lado e blocos empilhados.
-- `parseDateBR(s)` — `dd/mm/aaaa` → `YYYY-MM-DD`.
-- `splitGridIntoHorizontalBlocks(grid)` — detecta colunas vazias persistentes pra separar blocos horizontais.
+## Etapa 6 — Comments Wall + Plano de Ação
 
-Reescrever os 6 parsers:
+**`ReclamacoesCommentsWall.tsx`:**
+- Adicionar 2 `<input type="date">` (De/Até) + botão "Limpar filtros" acima dos filtros atuais. Filtrar `comentarios` por `data_comentario`.
+- Em cada card: nova query `useQuery(['planos_count', c.id])` ou um único `useQuery` que carrega todos `planos_acao` por `comentario_id IN (...)` e indexa por id.
+- Botão `<Plus> Plano de Ação` (amber outline, sm) → abre `PlanoAcaoDialog`. Se já há plano, mostrar `Badge` verde "Plano criado".
 
-**`parseConformidade`** (mantém base, ajusta detecção):
-- Scaneia por células com posição `1°…10°` na coluna seguinte do bloco.
-- Mantém 3 sections (geral/back/front) → 3 blocks `ranking`.
+**Novo `src/components/dashboard/painel-metas/comments/PlanoAcaoDialog.tsx`:**
+- Dialog shadcn (glass + amber).
+- Campos: Textarea `texto_acao` (obrigatório), Input `responsavel` (opcional).
+- Salvar: `supabase.from('planos_acao').insert({ comentario_id, texto_acao, responsavel, created_by: user.id })`.
+- Sucesso: `toast.success`, fechar, invalidar query `['planos_count']`. Erro: `toast.error(e.message)`.
 
-**`parseTargetPretoKds`** (novo, substitui `parseTargetPreto` atual):
-- Detecta header repetido `Loja | Categoria | Total de Pratos | Qtn. Target Preto | % Target Preto`.
-- Para cada bloco horizontal, lê linhas até "Total Geral".
-- Saída:
-  - `block_type='matrix'` com `categorias` × `lojas` (% Target Preto).
-  - `block_type='ranking'` "Total Geral por loja" (% agregado).
-  - `block_type='item_table'` "Pratos com mais Target Preto" (top 10 por Qtn).
-- Agrega `metas_snapshot.kds` = % Total Geral.
+## Restrições
 
-**`parseAtendimentoMedias`** (novo, planilha NPS médias):
-- Detecta blocos de loja (cabeçalho com nome da loja + canais).
-- Para cada bloco, extrai média Google + TripAdvisor e iFood separadamente.
-- Saída:
-  - `item_table` "Médias por canal" (loja × canal × nota).
-  - `ranking` "Atendimento (Google+Trip)" e `ranking` "Delivery (iFood)".
-  - `kpi_strip` com média geral do grupo.
+Mantidas: nada em `/auth`, `/agenda`, `/contagem-utensilios`, `/confirm-shift/:id`, `/checklist/:token`, `/checkin`. Parsers existentes intocados (apenas recebem `deparaMap` opcional). Componentes apenas estendidos.
 
-**`parseReclamacoesDistribuicao`** (reescreve):
-- Detecta os blocos "Geral Grupo" + por loja.
-- Para cada bloco extrai distribuição 1‒5 por canal e calcula:
-  - Média ponderada da loja.
-  - % de notas 1‒2 (insatisfação).
-- Saída:
-  - `distribution` (notas 1‒5 stacked) por loja.
-  - `matrix` canal × nota agregada (Geral Grupo).
-  - `ranking` "% Insatisfação" (lower=worse).
-  - `kpi_strip` "Notas 5 / Total" e "Insatisfação % grupo".
-- Agrega `metas_snapshot.nps` = média ponderada.
+## Ordem de execução
 
-**`parseCmvSalmaoSeries`** (reescreve):
-- Detecta header com lista de lojas em colunas (Águas Claras, SIG, Asa Sul, Goiânia).
-- Linhas: `Data | Dia da Semana | <valor por loja>`.
-- Lê faixas (Verde ≤1,55 / Amarelo 1,56‒1,65 / Vermelho > 1,65) da própria planilha, salva como `thresholds` no payload.
-- Saída:
-  - `series` (eixo X = data, uma série por loja, com bandas de faixa).
-  - `ranking` "Média do mês por loja".
-  - `matrix` "Dias acima do limite por loja".
-- Agrega `metas_snapshot.cmv_salmao` = média da loja no mês.
-
-**`parseCmvCarnesItens`** (novo):
-- Para cada bloco de loja, lê itens (PO ANCHO 250G…) com colunas Envios / Vendas / Era pra Ter / 01/05 (estoque) / Diferença / Vlr Total / Diff %.
-- Saída:
-  - `item_table` "Desvios de carnes por loja" (com filtro/sort por |Diff %|).
-  - `ranking` "Perda total R$ por loja" (soma Vlr Total negativo).
-  - `matrix` "Diferença % item × loja" (heatmap).
-- Agrega `metas_snapshot.cmv_carnes` = média ponderada |Diff %|.
-
-### 2. Componentes de visualização novos / atualizados em `src/components/dashboard/painel-metas/blocks/`
-
-Atualizar:
-- `RankingBlock.tsx` — aceitar `polarity` (lower/higher) pra colorir e badge "↓ menor é melhor".
-- `MatrixBlock.tsx` — modo heatmap (cor por valor com escala min/max do payload).
-- `SeriesBlock.tsx` — usar Recharts `LineChart` multi-série + `ReferenceArea` pras faixas verde/amarelo/vermelho do payload `thresholds`.
-- `DistributionBlock.tsx` — barra empilhada (1=vermelho, 5=verde) + chip "% insatisfação".
-- `ItemTableBlock.tsx` — search + sort + paginação client-side, suporte a colunas tipadas (R$, %, número).
-
-Adicionar:
-- `KpiStripBlock.tsx` — faixa horizontal de KPIs (média grupo, total avaliações, etc), responsivo.
-
-### 3. Cabeçalho de cada view
-
-Em `ConformidadeDetailView`, `KdsConformidadeView`, `NpsReclamacoesView`, `CmvDetailView` adicionar:
-- Botão "Sincronizar planilha" (chama `sync-sheets-staging` com o `sourceId` da meta).
-- Selo "Última atualização: 05/05 14:32".
-- `<SheetBlocksSection metaKey={…} mesRef={…} />` já existe — só passar `polarity`/`emptyMessage` mais útil.
-
-### 4. Migração mínima
-
-Nenhuma mudança de schema — `sheets_blocks_snapshot.payload` é JSONB, suporta os novos formatos. Só `INSERT/UPDATE` via edge function.
-
-### 5. Validação
-
-Após deploy do edge function:
-1. Disparar "Sincronizar agora" pra cada uma das 7 fontes.
-2. Conferir via SQL `SELECT meta_key, block_type, count(*) FROM sheets_blocks_snapshot GROUP BY 1,2;` que cada meta tem ≥1 block.
-3. Abrir `/painel/metas` em cada aba e validar visualmente.
-
-### Detalhes técnicos
-- O detector horizontal-block usa heurística: encontra coluna `j` cuja média de células vazias entre linhas N e N+30 é >70% → marca como separador.
-- Datas em PT-BR são parseadas com regex `^(\d{2})\/(\d{2})\/(\d{4})$`.
-- Valores monetários `R$ 28,19` e `-R$ 591,99` tratados em `parseBRL` (separado de `parsePercentOrNumber` pra não confundir milhar `.` com decimal `,`).
-- Códigos de loja "Caminito Norte" precisam ser adicionados ao `UNIT_ALIAS` (não existe ainda — provavelmente é CP_AN).
-- Idempotência: cada parser usa `block_key` estável; upsert por `(meta_key, mes_ref, loja_codigo, block_key)`.
-
-Tempo estimado: ~1 ciclo grande de implementação (parsers + 1 componente novo + ajustes nos 4 views).
+1. Migration A + B
+2. Edge Function (deploy automático)
+3. Hook + tipos
+4. Badge no Linker
+5. Insert das 7 fontes (+ vincular `reclamacoes_config`)
+6. Comments Wall + Dialog
+7. Smoke test: rodar "Sincronizar agora" em uma fonte e verificar `ultimo_status` no DB.

@@ -3298,6 +3298,44 @@ export type Database = {
           },
         ]
       }
+      planos_acao: {
+        Row: {
+          comentario_id: string | null
+          created_by: string | null
+          data_criacao: string | null
+          id: string
+          responsavel: string | null
+          status: string | null
+          texto_acao: string
+        }
+        Insert: {
+          comentario_id?: string | null
+          created_by?: string | null
+          data_criacao?: string | null
+          id?: string
+          responsavel?: string | null
+          status?: string | null
+          texto_acao: string
+        }
+        Update: {
+          comentario_id?: string | null
+          created_by?: string | null
+          data_criacao?: string | null
+          id?: string
+          responsavel?: string | null
+          status?: string | null
+          texto_acao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planos_acao_comentario_id_fkey"
+            columns: ["comentario_id"]
+            isOneToOne: false
+            referencedRelation: "reclamacoes_comentarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pracas_plano_chao: {
         Row: {
           created_at: string
@@ -4034,6 +4072,8 @@ export type Database = {
           tipo_dado: Database["public"]["Enums"]["import_destino"]
           ultima_execucao_cron: string | null
           ultima_sincronizacao: string | null
+          ultimo_erro: string | null
+          ultimo_status: string | null
           updated_at: string
           url: string
         }
@@ -4048,6 +4088,8 @@ export type Database = {
           tipo_dado?: Database["public"]["Enums"]["import_destino"]
           ultima_execucao_cron?: string | null
           ultima_sincronizacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_status?: string | null
           updated_at?: string
           url: string
         }
@@ -4062,6 +4104,8 @@ export type Database = {
           tipo_dado?: Database["public"]["Enums"]["import_destino"]
           ultima_execucao_cron?: string | null
           ultima_sincronizacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_status?: string | null
           updated_at?: string
           url?: string
         }

@@ -12,6 +12,8 @@ export interface SheetsSource {
   created_at: string;
   updated_at: string;
   meta_key: string | null;
+  ultimo_status?: 'ok' | 'erro' | 'pendente' | null;
+  ultimo_erro?: string | null;
 }
 
 export interface SheetsSourceInput {
@@ -22,31 +24,38 @@ export interface SheetsSourceInput {
   meta_key?: string | null;
 }
 
-// Extrai o ID da planilha de qualquer URL Google Sheets/Drive
-function extractSheetId(url: string): string | null {
-  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  return m ? m[1] : null;
+// Extrai sheetId + gid de qualquer URL Google Sheets
+export function extractSheetParams(url: string): { sheetId: string; gid: string | null } {
+  const idMatch = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
+  const gidMatch = (url || '').match(/[#&?]gid=(\d+)/);
+  return { sheetId: idMatch?.[1] ?? '', gid: gidMatch?.[1] ?? null };
 }
 
-// Extrai o gid de qualquer URL (?gid=, #gid=, &gid=)
+export function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+  if (!gidOrName) return base;
+  return isNaN(Number(gidOrName))
+    ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
+    : `${base}&gid=${gidOrName}`;
+}
+
+function extractSheetId(url: string): string | null {
+  return extractSheetParams(url).sheetId || null;
+}
+
 function extractGid(url: string): string {
-  const m = url.match(/[#?&]gid=(\d+)/);
-  return m ? m[1] : '0';
+  return extractSheetParams(url).gid ?? '0';
 }
 
 /**
- * Normaliza qualquer link de Google Sheets para o CSV canônico:
- * https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}
- * Aceita: /edit, /edit#gid=, /edit?gid=, /view, /export?format=csv, /gviz/tq
+ * Normaliza qualquer link de Google Sheets para o gviz/tq canônico:
+ * https://docs.google.com/spreadsheets/d/{ID}/gviz/tq?tqx=out:json&gid={GID}
  */
 export function normalizeSheetsUrl(url: string): string | null {
   if (!url) return null;
-  const trimmed = url.trim();
-  if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(trimmed)) return trimmed;
-  const sheetId = extractSheetId(trimmed);
+  const { sheetId, gid } = extractSheetParams(url.trim());
   if (!sheetId) return null;
-  const gid = extractGid(trimmed);
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  return buildGvizUrl(sheetId, gid);
 }
 
 // Valida que a URL é reconhecível como uma planilha Google Sheets

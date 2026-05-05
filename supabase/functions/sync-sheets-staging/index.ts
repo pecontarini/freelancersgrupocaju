@@ -75,16 +75,55 @@ const UNIT_ALIAS: Record<string, string> = {
   'GOIANIA': 'NZ_GO',
 };
 
+// Mapa Depara dinâmico (preenchido por sincronização a partir da aba "Depara")
+let DEPARA_MAP: Record<string, string> = {};
+
 function matchLojaCodigo(raw: string): string | null {
   const n = normTxt(raw);
   if (!n) return null;
+  // 1) Depara da planilha (case-insensitive, sem acento)
+  const deparaHit = DEPARA_MAP[n] ?? DEPARA_MAP[(raw || '').trim().toLowerCase()];
+  if (deparaHit) return deparaHit;
   if (UNIT_ALIAS[n]) return UNIT_ALIAS[n];
-  // Try contained match (longest first to avoid CP AN matching inside something else)
   const sorted = Object.keys(UNIT_ALIAS).sort((a, b) => b.length - a.length);
   for (const alias of sorted) {
     if (n.includes(alias)) return UNIT_ALIAS[alias];
   }
   return null;
+}
+
+// ============================================================
+// Google Sheets — gviz/tq helpers
+// ============================================================
+function extractSheetParams(url: string): { sheetId: string; gid: string | null } {
+  const idMatch = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
+  const gidMatch = (url || '').match(/[#&?]gid=(\d+)/);
+  return { sheetId: idMatch?.[1] ?? '', gid: gidMatch?.[1] ?? null };
+}
+
+function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+  if (!gidOrName) return base;
+  return isNaN(Number(gidOrName))
+    ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
+    : `${base}&gid=${gidOrName}`;
+}
+
+async function fetchGvizGrid(url: string): Promise<string[][]> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ao buscar planilha`);
+  const text = await resp.text();
+  const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+  if (!m) throw new Error('Formato gviz inesperado — planilha pode estar privada ou com link inválido.');
+  const json = JSON.parse(m[1]);
+  if (!json?.table) throw new Error('Resposta gviz sem tabela.');
+  const cols = (json.table.cols || []) as Array<{ label?: string }>;
+  const rows = (json.table.rows || []) as Array<{ c: Array<{ v: unknown; f?: string } | null> }>;
+  const header = cols.map(c => (c?.label ?? '').toString());
+  const body = rows.map(r =>
+    (r.c || []).map(cell => (cell?.f ?? (cell?.v == null ? '' : String(cell.v))))
+  );
+  return [header, ...body];
 }
 
 function shiftMonth(mes: string, delta: number): string {
@@ -95,13 +134,9 @@ function shiftMonth(mes: string, delta: number): string {
 
 function normalizeSheetsUrl(raw: string): string | null {
   if (!raw) return null;
-  const t = raw.trim();
-  if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(t)) return t;
-  const idMatch = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!idMatch) return null;
-  const gidMatch = t.match(/[#?&]gid=(\d+)/);
-  const gid = gidMatch ? gidMatch[1] : '0';
-  return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+  const { sheetId, gid } = extractSheetParams(raw.trim());
+  if (!sheetId) return null;
+  return buildGvizUrl(sheetId, gid);
 }
 
 function parseDateBR(s: string): string | null {
@@ -905,6 +940,7 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
     case 'reclamacoes': return parseReclamacoesDist(grid);
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
+    case 'ranking-supervisores': return parseGenericMeta(grid);
     default: return parseGenericMeta(grid);
   }
 }
@@ -939,17 +975,33 @@ serve(async (req) => {
       .maybeSingle();
     if (srcErr || !source) throw new Error('Fonte não encontrada.');
 
-    const url = normalizeSheetsUrl(source.url || body.url || '');
-    if (!url) throw new Error('URL inválida.');
+    const sourceUrl = source.url || body.url || '';
+    const { sheetId, gid } = extractSheetParams(sourceUrl);
+    if (!sheetId) throw new Error('URL inválida — não foi possível extrair o sheetId.');
     const metaKey = source.meta_key;
     if (!metaKey) throw new Error('Esta fonte não tem `meta_key` definido.');
 
     console.log('[sync] meta=', metaKey, 'mes=', referenciaMes);
 
-    const csvResp = await fetch(url);
-    if (!csvResp.ok) throw new Error('Não foi possível acessar a planilha (verifique compartilhamento).');
-    const csv = await csvResp.text();
-    const grid = parseCSV(csv);
+    // Aba Depara (opcional)
+    DEPARA_MAP = {};
+    try {
+      const deparaGrid = await fetchGvizGrid(buildGvizUrl(sheetId, 'Depara'));
+      for (const r of deparaGrid.slice(1)) {
+        if (r[0] && r[1]) {
+          const k = r[0].trim().toLowerCase();
+          DEPARA_MAP[k] = r[1].trim();
+          // também versão normTxt
+          DEPARA_MAP[normTxt(r[0])] = r[1].trim();
+        }
+      }
+      console.log('[sync] Depara entries:', Object.keys(DEPARA_MAP).length);
+    } catch (e) {
+      console.warn('[sync] Aba Depara ausente/inválida em', sheetId, e instanceof Error ? e.message : e);
+    }
+
+    // Grid principal via gviz
+    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid));
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);
@@ -1014,14 +1066,37 @@ serve(async (req) => {
       }
     }
 
+    const now = new Date().toISOString();
+    const hasData = grid.length > 1 && (parsed.rows.length + parsed.blocks.length) > 0;
+
+    if (!hasData) {
+      const erroMsg = 'Parser não retornou linhas ou blocos válidos. Verifique se a planilha está pública e se o formato da aba está correto.';
+      await supabase.from('sheets_sources')
+        .update({ ultimo_status: 'erro', ultimo_erro: erroMsg })
+        .eq('id', sourceId);
+      await supabase.from('sincronizacoes_sheets').insert({
+        url: sourceUrl, referencia_mes: referenciaMes, loja_id: null,
+        status: 'error', linhas_importadas: 0,
+        completed_at: now,
+      });
+      return new Response(
+        JSON.stringify({ success: false, error: erroMsg }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 422 }
+      );
+    }
+
     await supabase.from('sheets_sources')
-      .update({ ultima_sincronizacao: new Date().toISOString() })
+      .update({
+        ultima_sincronizacao: now,
+        ultimo_status: 'ok',
+        ultimo_erro: null,
+      })
       .eq('id', sourceId);
 
     await supabase.from('sincronizacoes_sheets').insert({
-      url, referencia_mes: referenciaMes, loja_id: null,
+      url: sourceUrl, referencia_mes: referenciaMes, loja_id: null,
       status: 'success', linhas_importadas: updated,
-      completed_at: new Date().toISOString(),
+      completed_at: now,
     });
 
     return new Response(
@@ -1038,6 +1113,18 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error('[sync] error', e);
+    // Tenta marcar erro na source se temos sourceId no escopo
+    try {
+      const body2 = await req.clone().json().catch(() => ({}));
+      const sId = (body2 as { sourceId?: string })?.sourceId;
+      if (sId) {
+        const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        await sb.from('sheets_sources').update({
+          ultimo_status: 'erro',
+          ultimo_erro: e instanceof Error ? e.message : 'Erro desconhecido',
+        }).eq('id', sId);
+      }
+    } catch { /* noop */ }
     return new Response(
       JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Erro desconhecido' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

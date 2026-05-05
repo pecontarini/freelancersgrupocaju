@@ -74,18 +74,37 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
   });
   const { data: lojaMap } = useLojaCodigoMap();
 
+  // Override via planilha vinculada (Configurações → Integrações)
+  const { source: linkedSource } = useSourceForMeta("conformidade");
+  const { data: snapshotRows } = useMetasSnapshot({});
+  const snapshotByCodigo = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of snapshotRows) {
+      if (r.conformidade !== null && r.conformidade !== undefined) {
+        m.set(r.loja_codigo, Number(r.conformidade));
+      }
+    }
+    return m;
+  }, [snapshotRows]);
+
   // Filtra agregados por brand quando não há loja específica
   const lojasFiltradas = useMemo(() => {
     if (!lojaMap) return [] as Array<{ loja_id: string; back: number | null; front: number | null; total: number | null; code: string }>;
     return aggregated.lojas
-      .map((l) => ({ ...l, code: lojaMap.idToCodigo[l.loja_id] ?? "" }))
+      .map((l) => {
+        const code = lojaMap.idToCodigo[l.loja_id] ?? "";
+        const snap = code ? snapshotByCodigo.get(code) : undefined;
+        // Se houver fonte vinculada com snapshot, ele substitui o "total" (Back/Front continuam de auditoria interna)
+        const total = linkedSource && snap !== undefined ? snap : l.total;
+        return { ...l, code, total };
+      })
       .filter((l): l is typeof l & { code: string } => {
         if (!l.code) return false;
         if (restrictToLojaCodigo) return l.code === restrictToLojaCodigo;
         if (brand !== "all" && !l.code.startsWith(`${brand}_`)) return false;
         return true;
       });
-  }, [aggregated.lojas, lojaMap, brand, restrictToLojaCodigo]);
+  }, [aggregated.lojas, lojaMap, brand, restrictToLojaCodigo, linkedSource, snapshotByCodigo]);
 
   const networkAvg = useMemo(() => {
     const arr = lojasFiltradas

@@ -285,7 +285,7 @@ const Index = () => {
       case "rede":
         return isAdmin ? <RedeTab /> : null;
       case "painel":
-        return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
+        return null; // redirect handled by useEffect → /painel/metas
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:

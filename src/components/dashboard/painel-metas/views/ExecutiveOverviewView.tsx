@@ -217,7 +217,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-display text-base font-semibold text-foreground">
+        <p className="text-base font-semibold text-foreground">
           Aguardando sincronização semanal
         </p>
         <p className="text-xs text-muted-foreground">
@@ -231,7 +231,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground">Dashboard Executivo</h2>
+          <h2 className="text-xl font-bold text-foreground">Dashboard Executivo</h2>
           <p className="text-xs text-muted-foreground">
             Visão consolidada de {lojas.length} loja{lojas.length === 1 ? "" : "s"} · clique em qualquer indicador para explorar
           </p>
@@ -313,7 +313,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                     {d.sigla}
                   </span>
                   <span className="flex-1 truncate text-sm">{d.nome}</span>
-                  <span className="font-display text-sm font-semibold tabular-nums">
+                  <span className="text-sm font-semibold tabular-nums">
                     {formatNpsDisplay(l.values[ranking.metric])}
                   </span>
                 </button>
@@ -340,7 +340,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                         {d.sigla}
                       </span>
                       <span className="flex-1 truncate text-sm text-red-700 dark:text-red-100">{d.nome}</span>
-                      <span className="font-display text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
+                      <span className="text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
                         {formatNpsDisplay(l.values[ranking.metric])}
                       </span>
                     </button>
@@ -401,7 +401,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                             {m.label}
                           </p>
                         </div>
-                        <span className="font-display text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
+                        <span className="text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
                           {it.metric === "nps"
                             ? formatNpsDisplay(it.value)
                             : it.value?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}

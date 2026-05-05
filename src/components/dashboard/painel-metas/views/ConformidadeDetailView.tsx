@@ -154,7 +154,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-display text-base font-semibold text-foreground">
+        <p className="text-base font-semibold text-foreground">
           Sem auditorias registradas
         </p>
         <p className="text-xs text-muted-foreground">
@@ -168,7 +168,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground">
+          <h2 className="text-xl font-bold text-foreground">
             Conformidade · Auditorias
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -335,7 +335,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
                     <span className="min-w-0 flex-1 truncate text-sm text-foreground">{s.code}</span>
                     <span className="text-[10px] text-muted-foreground/70">n={s.n}</span>
                     <span
-                      className="font-display text-sm font-bold tabular-nums"
+                      className="text-sm font-bold tabular-nums"
                       style={{ color: STATUS_FILL[status] }}
                     >
                       {fmt(s.score)}
@@ -402,7 +402,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
                         <p className="text-[11px] text-muted-foreground">{a.audit_date}</p>
                       </div>
                       <span
-                        className="font-display text-sm font-bold tabular-nums"
+                        className="text-sm font-bold tabular-nums"
                         style={{ color: STATUS_FILL[status] }}
                       >
                         {fmt(a.global_score)}

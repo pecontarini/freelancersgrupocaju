@@ -102,7 +102,7 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
               Valor atual
             </p>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-display text-4xl font-bold text-foreground">
+              <span className="text-4xl font-bold text-foreground">
                 {formatVal(metric, value)}
               </span>
               <span className="text-sm text-muted-foreground">{meta.suffix}</span>
@@ -127,7 +127,7 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Meta
               </p>
-              <p className="mt-1 font-display text-xl font-bold tabular-nums">
+              <p className="mt-1 text-xl font-bold tabular-nums">
                 {meta.meta}
                 <span className="ml-1 text-xs text-muted-foreground">{meta.suffix}</span>
               </p>
@@ -137,7 +137,7 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
                 Mês anterior
               </p>
               <div className="mt-1 flex items-baseline gap-2">
-                <p className="font-display text-xl font-bold tabular-nums">
+                <p className="text-xl font-bold tabular-nums">
                   {formatVal(metric, prev)}
                 </p>
                 <span

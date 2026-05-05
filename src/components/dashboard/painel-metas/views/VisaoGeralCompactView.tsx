@@ -130,7 +130,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-display text-base font-semibold text-foreground">
+        <p className="text-base font-semibold text-foreground">
           Aguardando sincronização semanal
         </p>
         <p className="text-xs text-muted-foreground">
@@ -198,7 +198,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                             {b.label}
                           </span>
                           <span className="flex-1 truncate text-xs">{getLojaDisplay(loja.code).nome}</span>
-                          <span className="font-display text-xs font-semibold tabular-nums">
+                          <span className="text-xs font-semibold tabular-nums">
                             {metric === "nps"
                               ? formatNpsDisplay(value)
                               : value?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
@@ -228,7 +228,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                           {bandeiraStyles(worst.bandeira).label}
                         </span>
                         <span className="flex-1 truncate text-xs text-red-700 dark:text-red-200">{getLojaDisplay(worst.code).nome}</span>
-                        <span className="font-display text-xs font-semibold tabular-nums text-red-700 dark:text-red-200">
+                        <span className="text-xs font-semibold tabular-nums text-red-700 dark:text-red-200">
                           {metric === "nps"
                             ? formatNpsDisplay(worst.values[metric])
                             : worst.values[metric]?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}

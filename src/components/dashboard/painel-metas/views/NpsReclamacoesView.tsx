@@ -136,7 +136,7 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground">NPS · Reclamações</h2>
+          <h2 className="text-xl font-bold text-foreground">NPS · Reclamações</h2>
           <p className="text-xs text-muted-foreground">
             Análise temática · Pareto · Heatmap loja × tema
           </p>

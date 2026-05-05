@@ -84,7 +84,7 @@ function tierClasses(tier: string | null | undefined): string {
     case "bronze":
       return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200";
     case "aceitavel":
-      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-600 dark:text-red-300";
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
     default:
       return "bg-muted text-muted-foreground";
   }

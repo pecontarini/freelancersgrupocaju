@@ -320,8 +320,8 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
               );
             })}
             {ranking.bottom.length > 0 && (
-              <div className="mt-3 border-t border-white/5 pt-3">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600/70 dark:text-red-600 dark:text-red-300/70">
+              <div className="mt-3 border-t border-border/60 pt-3">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600/70 dark:text-red-300/70">
                   Atenção · piores
                 </p>
                 {ranking.bottom.map((l) => {

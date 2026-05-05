@@ -251,7 +251,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: idx * 0.02 }}
                       className={cn(
-                        "border-white/5 transition-colors hover:bg-foreground/5",
+                        "border-border/60 transition-colors hover:bg-foreground/5",
                         r.isRed && "animate-pulse bg-red-500/5",
                       )}
                     >
@@ -439,7 +439,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                             <TableRow
                               key={r.loja.code}
                               className={cn(
-                                "border-white/5 hover:bg-foreground/5",
+                                "border-border/60 hover:bg-foreground/5",
                                 r.isRed && "bg-red-500/5",
                               )}
                             >

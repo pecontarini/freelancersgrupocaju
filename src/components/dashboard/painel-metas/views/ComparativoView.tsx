@@ -281,7 +281,7 @@ export function ComparativoView() {
                     const max = Math.max(...r.norms);
                     const min = Math.min(...r.norms);
                     return (
-                      <TableRow key={r.metric} className="border-white/5 hover:bg-foreground/5">
+                      <TableRow key={r.metric} className="border-border/60 hover:bg-foreground/5">
                         <TableCell className="text-sm">{METRIC_META[r.metric].label}</TableCell>
                         {r.norms.map((n, i) => {
                           const isMax = n === max && max !== min;

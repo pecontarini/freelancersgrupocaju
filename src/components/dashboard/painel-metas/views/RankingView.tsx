@@ -171,7 +171,7 @@ export function RankingView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: idx * 0.02 }}
                       className={cn(
-                        "border-white/5 hover:bg-foreground/5",
+                        "border-border/60 hover:bg-foreground/5",
                         loja.redFlag && "bg-red-500/5",
                       )}
                     >

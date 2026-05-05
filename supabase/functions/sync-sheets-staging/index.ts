@@ -89,6 +89,16 @@ function matchLojaCodigo(raw: string): string | null {
   for (const alias of sorted) {
     if (n.includes(alias)) return UNIT_ALIAS[alias];
   }
+  if (n.includes('CAMINITO') && n.includes('ASA NORTE')) return 'CP_AN';
+  if (n.includes('CAMINITO') && n.includes('ASA SUL')) return 'CP_AS';
+  if (n.includes('CAMINITO') && n.includes('AGUAS CLARAS')) return 'CP_AC';
+  if (n.includes('CAMINITO') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'CP_SG';
+  if (n.includes('CAJU') && n.includes('ASA NORTE')) return 'CJ_AN';
+  if (n.includes('CAJU') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'CJ_SG';
+  if (n.includes('NAZO') && n.includes('ASA SUL')) return 'NZ_AS';
+  if (n.includes('NAZO') && n.includes('AGUAS CLARAS')) return 'NZ_AC';
+  if (n.includes('NAZO') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'NZ_SG';
+  if (n.includes('NAZO') && (n.includes('GOIANIA') || n.includes('GYN') || n.includes('GO'))) return 'NZ_GO';
   return null;
 }
 

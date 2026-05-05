@@ -5,6 +5,7 @@ import { BudgetConfigSection as OperationalBudgetSection } from "@/components/Op
 import { BonusConfigSection } from "@/components/BonusConfigSection";
 import { CargosConfigSection } from "@/components/CargosConfigSection";
 import { GoogleSheetsSync } from "@/components/GoogleSheetsSync";
+import { MetaSheetsLinker } from "@/components/sheets/MetaSheetsLinker";
 import { ChecklistImportSection } from "@/components/ChecklistImportSection";
 import { LegacySyncPanel } from "@/components/LegacySyncPanel";
 import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
@@ -50,6 +51,9 @@ export function ConfigurationsTab() {
       {isAdmin && (
         <BonusConfigSection />
       )}
+
+      {/* Vínculo Planilha → Meta do Painel - Admin Only */}
+      {isAdmin && <MetaSheetsLinker />}
 
       {/* Google Sheets Sync - Admin Only */}
       {isAdmin && (

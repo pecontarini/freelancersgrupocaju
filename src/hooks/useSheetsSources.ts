@@ -11,6 +11,7 @@ export interface SheetsSource {
   ultima_sincronizacao: string | null;
   created_at: string;
   updated_at: string;
+  meta_key: string | null;
 }
 
 export interface SheetsSourceInput {
@@ -18,6 +19,7 @@ export interface SheetsSourceInput {
   url: string;
   gid?: string;
   ativo?: boolean;
+  meta_key?: string | null;
 }
 
 // Validate that URL is a valid Google Sheets export CSV format
@@ -85,6 +87,7 @@ export function useSheetsSources() {
           url: input.url,
           gid: input.gid || '0',
           ativo: input.ativo ?? true,
+          meta_key: input.meta_key ?? null,
         });
 
       if (error) throw error;
@@ -155,6 +158,39 @@ export function useSheetsSources() {
     },
   });
 
+  // Vincula (ou substitui) a fonte ativa de uma meta específica.
+  const linkSourceToMeta = useMutation({
+    mutationFn: async ({ metaKey, url, nome }: { metaKey: string; url: string; nome: string }) => {
+      const validation = validateSheetsCsvUrl(url);
+      if (!validation.valid) throw new Error(validation.error);
+
+      await supabase
+        .from('sheets_sources')
+        .update({ ativo: false })
+        .eq('meta_key', metaKey)
+        .eq('ativo', true);
+
+      const parsed = parseSheetsCsvUrl(url);
+      const { error } = await supabase
+        .from('sheets_sources')
+        .insert({
+          nome,
+          url,
+          gid: parsed?.gid || '0',
+          ativo: true,
+          meta_key: metaKey,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sheets_sources'] });
+      toast.success('Planilha vinculada à meta!');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Erro ao vincular planilha.');
+    },
+  });
+
   return {
     sources,
     activeSources,
@@ -164,5 +200,15 @@ export function useSheetsSources() {
     updateSource,
     deleteSource,
     toggleActive,
+    linkSourceToMeta,
   };
+}
+
+/** Retorna a fonte ATIVA vinculada a uma meta específica do Painel. */
+export function useSourceForMeta(metaKey: string | null | undefined) {
+  const { sources, isLoading } = useSheetsSources();
+  const source = metaKey
+    ? sources.find((s) => s.meta_key === metaKey && s.ativo) ?? null
+    : null;
+  return { source, isLoading };
 }

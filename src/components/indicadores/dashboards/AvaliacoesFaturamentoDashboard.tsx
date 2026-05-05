@@ -86,22 +86,17 @@ function Tabela({ rows }: { rows: AvalFatRow[] }) {
   );
 }
 
-export function AvaliacoesFaturamentoDashboard() {
+function Inner({ d }: { d: AvalFatData }) {
   const [tab, setTab] = useState<"salao" | "delivery">("salao");
+  const cur = tab === "salao" ? d.salao : d.delivery;
+  const k = useMemo(() => {
+    const tot = cur.reduce((a, r) => a + r.aval13, 0);
+    const totalAval = cur.reduce((a, r) => a + r.totalAval, 0);
+    const pct = totalAval > 0 ? (tot / totalAval) * 100 : 0;
+    const ofensor = [...cur].sort((a, b) => pctNorm(b.pct) - pctNorm(a.pct))[0];
+    return { tot, pct, ofensor };
+  }, [cur]);
   return (
-    <IndicadorDashboardShell<AvalFatData>
-      metaKey="atendimento-medias"
-      subtitle="Avaliações 1-3 vs faturamento por loja"
-      render={(d) => {
-        const cur = tab === "salao" ? d.salao : d.delivery;
-        const k = useMemo(() => {
-          const tot = cur.reduce((a, r) => a + r.aval13, 0);
-          const totalAval = cur.reduce((a, r) => a + r.totalAval, 0);
-          const pct = totalAval > 0 ? (tot / totalAval) * 100 : 0;
-          const ofensor = [...cur].sort((a, b) => pctNorm(b.pct) - pctNorm(a.pct))[0];
-          return { tot, pct, ofensor };
-        }, [cur]);
-        return (
           <div className="space-y-4">
             {d.periodo && (
               <div className="text-xs text-white/50">

@@ -129,10 +129,21 @@ const Index = () => {
         navigate("/agenda");
         return;
       }
+      if (tab === "painel") {
+        navigate("/painel/metas");
+        return;
+      }
       setActiveTab(tab);
     },
     [navigate]
   );
+
+  // If user lands here with ?tab=painel, redirect to /painel/metas
+  useEffect(() => {
+    if (activeTab === "painel") {
+      navigate("/painel/metas", { replace: true });
+    }
+  }, [activeTab, navigate]);
 
   // Set default tab for chefe_setor
   useEffect(() => {

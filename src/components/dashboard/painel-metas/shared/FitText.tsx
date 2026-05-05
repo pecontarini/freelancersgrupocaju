@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface FitTextProps {
@@ -8,7 +8,6 @@ interface FitTextProps {
   /** Tamanho mínimo de fonte em px. */
   min?: number;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
 }
 
 /**

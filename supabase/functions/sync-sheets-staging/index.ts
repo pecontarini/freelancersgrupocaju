@@ -8,283 +8,301 @@ const corsHeaders = {
 
 interface SyncRequest {
   sourceId: string;
-  url: string;
-  referenciaMes: string;
+  url?: string;
+  referenciaMes?: string;
 }
 
-interface SheetRow {
-  unidade?: string;
-  data_referencia?: string;
-  faturamento?: string | number;
-  nps?: string | number;
-  nota_reclamacao?: string | number;
-  tipo_operacao?: string;
-}
-
-// Parse CSV content with proper handling
-function parseCSV(csvContent: string): SheetRow[] {
-  const lines = csvContent.split('\n').filter(line => line.trim());
-  if (lines.length < 2) return [];
-
-  // Normalize headers
-  const headers = lines[0].split(',').map(h => 
-    h.trim().toLowerCase()
-      .replace(/["']/g, '')
-      .replace(/\s+/g, '_')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  );
-
-  const rows: SheetRow[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    // Handle CSV values with potential commas inside quotes
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (const char of lines[i]) {
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        values.push(current.trim().replace(/["']/g, ''));
-        current = '';
-      } else {
-        current += char;
-      }
+// ============================================================
+// CSV utilities
+// ============================================================
+function parseCSV(csv: string): string[][] {
+  const lines = csv.split(/\r?\n/);
+  const out: string[][] = [];
+  for (const line of lines) {
+    if (!line.length) { out.push([]); continue; }
+    const row: string[] = [];
+    let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) { row.push(cur); cur = ''; }
+      else cur += c;
     }
-    values.push(current.trim().replace(/["']/g, ''));
-
-    const row: Record<string, string> = {};
-    headers.forEach((header, index) => {
-      row[header] = values[index] || '';
-    });
-
-    rows.push(row as unknown as SheetRow);
+    row.push(cur);
+    out.push(row.map(s => s.trim()));
   }
-
-  return rows;
+  return out;
 }
 
-// Normalize store name
-function normalizeUnidade(name: string): string {
-  return name
-    .toUpperCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_');
+function parsePercentOrNumber(v: string | undefined): number | null {
+  if (!v) return null;
+  const s = String(v).replace(/%/g, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
 }
 
-// Parse number from string
-function parseNumber(value: string | number | undefined): number {
-  if (value === undefined || value === null || value === '') return 0;
-  if (typeof value === 'number') return value;
-  
-  const cleaned = value
-    .replace(/[R$\s]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.');
-  
-  return parseFloat(cleaned) || 0;
+function normUnit(s: string): string {
+  return (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// Parse date string
-function parseDate(value: string | undefined): string | null {
-  if (!value) return null;
-  
-  // Try various formats
-  const patterns = [
-    /^(\d{4})-(\d{2})-(\d{2})/, // YYYY-MM-DD
-    /^(\d{2})\/(\d{2})\/(\d{4})/, // DD/MM/YYYY
-  ];
+// Mapa "CP AN" / "NZ GO" / "CJ AN" → loja_codigo (CP_AN, NZ_GO, CJ_AN)
+const UNIT_ALIAS: Record<string, string> = {
+  'CP AN': 'CP_AN', 'CPAN': 'CP_AN', 'CAMINITO ASA NORTE': 'CP_AN',
+  'CP AS': 'CP_AS', 'CPAS': 'CP_AS', 'CAMINITO ASA SUL': 'CP_AS',
+  'CP AC': 'CP_AC', 'CPAC': 'CP_AC', 'CAMINITO AGUAS CLARAS': 'CP_AC',
+  'CP SG': 'CP_SG', 'CPSG': 'CP_SG', 'CAMINITO SIG': 'CP_SG',
+  'NZ AS': 'NZ_AS', 'NZAS': 'NZ_AS', 'NAZO ASA SUL': 'NZ_AS',
+  'NZ AC': 'NZ_AC', 'NZAC': 'NZ_AC', 'NAZO AGUAS CLARAS': 'NZ_AC',
+  'NZ SG': 'NZ_SG', 'NZSG': 'NZ_SG', 'NAZO SIG': 'NZ_SG',
+  'NZ GO': 'NZ_GO', 'NZGO': 'NZ_GO', 'NAZO GO': 'NZ_GO', 'NAZO GOIANIA': 'NZ_GO',
+  'CJ AN': 'CJ_AN', 'CJAN': 'CJ_AN', 'CAJU ASA NORTE': 'CJ_AN',
+  'CJ SG': 'CJ_SG', 'CJSG': 'CJ_SG', 'CAJU SIG': 'CJ_SG',
+};
 
-  for (const pattern of patterns) {
-    const match = value.match(pattern);
-    if (match) {
-      if (pattern === patterns[0]) {
-        return `${match[1]}-${match[2]}-${match[3]}`;
-      } else {
-        return `${match[3]}-${match[2]}-${match[1]}`;
-      }
-    }
+function matchLojaCodigo(raw: string): string | null {
+  const n = normUnit(raw);
+  if (UNIT_ALIAS[n]) return UNIT_ALIAS[n];
+  for (const [alias, code] of Object.entries(UNIT_ALIAS)) {
+    if (n.includes(alias)) return code;
   }
-  
   return null;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+function shiftMonth(mes: string, delta: number): string {
+  const [y, m] = mes.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function normalizeSheetsUrl(raw: string): string | null {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(t)) return t;
+  const idMatch = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!idMatch) return null;
+  const gidMatch = t.match(/[#?&]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
+  return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+}
+
+// ============================================================
+// PARSERS BY META
+// ============================================================
+type MetaRow = { loja_codigo: string; valor: number };
+
+/**
+ * Conformidade: a planilha tem múltiplos blocos de ranking (GERAL, GERENTE BACK, GERENTE FRONT...).
+ * Usamos o primeiro bloco "GERAL" para popular metas_snapshot.conformidade.
+ * Layout esperado: linhas com [..., posicao, "CP AN", "88,98%"]
+ */
+function parseConformidade(grid: string[][]): MetaRow[] {
+  const rows: MetaRow[] = [];
+  let inGeral = false;
+  for (const r of grid) {
+    const joined = r.join(' ').toUpperCase();
+    if (joined.includes('RANKING') && joined.includes('GERAL') && !joined.includes('BACK') && !joined.includes('FRONT')) {
+      inGeral = true; continue;
+    }
+    // Início de outro bloco → pára
+    if (inGeral && (joined.includes('GERENTE BACK') || joined.includes('GERENTE FRONT') || joined.includes('PERIODO'))) {
+      if (joined.includes('GERENTE BACK') || joined.includes('GERENTE FRONT')) break;
+    }
+    if (!inGeral) continue;
+    // Procura colunas com unidade + percentual
+    for (let i = 0; i < r.length - 1; i++) {
+      const codigo = matchLojaCodigo(r[i]);
+      const valor = parsePercentOrNumber(r[i + 1]);
+      if (codigo && valor !== null && valor > 0 && valor <= 100) {
+        if (!rows.find(x => x.loja_codigo === codigo)) {
+          rows.push({ loja_codigo: codigo, valor });
+        }
+        break;
+      }
+    }
   }
+  return rows;
+}
+
+/**
+ * Layout genérico (fallback / NPS / KDS / CMV simples):
+ * Espera-se header com colunas "Unidade" e "Valor" (ou nome da meta).
+ * Pega a coluna "valor" (numérica) por linha.
+ */
+function parseGenericMeta(grid: string[][]): MetaRow[] {
+  const rows: MetaRow[] = [];
+  // tenta achar header
+  let headerIdx = -1;
+  let unitCol = -1;
+  let valueCol = -1;
+  for (let i = 0; i < Math.min(grid.length, 20); i++) {
+    const r = grid[i].map(c => c.toUpperCase());
+    const u = r.findIndex(c => /UNIDADE|LOJA/.test(c));
+    const v = r.findIndex(c => /VALOR|MEDIA|MÉDIA|SCORE|NPS|CMV|KDS|%/.test(c));
+    if (u >= 0 && v >= 0) { headerIdx = i; unitCol = u; valueCol = v; break; }
+  }
+  if (headerIdx < 0) return rows;
+  for (let i = headerIdx + 1; i < grid.length; i++) {
+    const r = grid[i];
+    const codigo = matchLojaCodigo(r[unitCol] || '');
+    const valor = parsePercentOrNumber(r[valueCol] || '');
+    if (codigo && valor !== null) rows.push({ loja_codigo: codigo, valor });
+  }
+  return rows;
+}
+
+function dispatchParser(metaKey: string, grid: string[][]): MetaRow[] {
+  switch (metaKey) {
+    case 'conformidade': return parseConformidade(grid);
+    case 'nps':
+    case 'kds':
+    case 'cmv-salmao':
+    case 'cmv-carnes':
+    case 'visao-geral':
+    default:
+      return parseGenericMeta(grid);
+  }
+}
+
+// metaKey → coluna em metas_snapshot
+const METRIC_COLUMN: Record<string, string> = {
+  'conformidade': 'conformidade',
+  'nps': 'nps',
+  'kds': 'kds',
+  'cmv-salmao': 'cmv_salmao',
+  'cmv-carnes': 'cmv_carnes',
+};
+
+// ============================================================
+// HANDLER
+// ============================================================
+serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
     const body: SyncRequest = await req.json();
-    const { sourceId, url, referenciaMes } = body;
+    const { sourceId } = body;
+    const referenciaMes = body.referenciaMes
+      || `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}`;
 
-    console.log('Starting staging sync:', { sourceId, referenciaMes });
+    // Busca a fonte (prioriza dados do banco sobre o body)
+    const { data: source, error: srcErr } = await supabase
+      .from('sheets_sources')
+      .select('id, url, meta_key, nome')
+      .eq('id', sourceId)
+      .maybeSingle();
+    if (srcErr || !source) throw new Error('Fonte não encontrada.');
 
-    // Normaliza qualquer link Google Sheets para CSV canônico
-    const normalizeSheetsUrl = (raw: string): string | null => {
-      if (!raw) return null;
-      const t = raw.trim();
-      if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(t)) return t;
-      const idMatch = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      if (!idMatch) return null;
-      const gidMatch = t.match(/[#?&]gid=(\d+)/);
-      const gid = gidMatch ? gidMatch[1] : '0';
-      return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
-    };
+    const url = normalizeSheetsUrl(source.url || body.url || '');
+    if (!url) throw new Error('URL inválida.');
+    const metaKey = source.meta_key;
+    if (!metaKey) throw new Error('Esta fonte não tem `meta_key` definido.');
+    const column = METRIC_COLUMN[metaKey];
+    if (!column) throw new Error(`Meta "${metaKey}" não tem coluna mapeada em metas_snapshot.`);
 
-    const normalizedUrl = normalizeSheetsUrl(url);
-    if (!normalizedUrl) {
-      throw new Error('URL inválida. Cole um link do Google Sheets.');
+    console.log('[sync] meta=', metaKey, 'col=', column, 'mes=', referenciaMes);
+
+    const csvResp = await fetch(url);
+    if (!csvResp.ok) throw new Error('Não foi possível acessar a planilha (verifique compartilhamento).');
+    const csv = await csvResp.text();
+    const grid = parseCSV(csv);
+
+    const parsed = dispatchParser(metaKey, grid);
+    if (parsed.length === 0) {
+      throw new Error(`Layout não reconhecido para a meta "${metaKey}". Nenhuma linha extraída.`);
+    }
+    console.log('[sync] parsed rows=', parsed.length);
+
+    // Mapeia loja_codigo → loja_id (config_lojas) para FK
+    const { data: lojas } = await supabase.from('config_lojas').select('id, nome');
+    const lojaIdByCodigo = new Map<string, string>();
+    // Heurística simples: pega config_lojas existentes em metas_snapshot
+    const { data: snapLojas } = await supabase
+      .from('metas_snapshot')
+      .select('loja_codigo, loja_id')
+      .not('loja_id', 'is', null)
+      .limit(1000);
+    for (const s of (snapLojas || [])) {
+      if (s.loja_codigo && s.loja_id) lojaIdByCodigo.set(s.loja_codigo, s.loja_id as string);
     }
 
-    // Fetch CSV
-    const csvResponse = await fetch(normalizedUrl);
-    if (!csvResponse.ok) {
-      throw new Error('Não foi possível acessar a planilha. Verifique se está pública.');
-    }
+    // Mês anterior — para preencher *_anterior
+    const mesAnterior = shiftMonth(referenciaMes, -1);
+    const colAnterior = `${column}_anterior`;
 
-    const csvContent = await csvResponse.text();
-    const rows = parseCSV(csvContent);
+    let updated = 0;
+    for (const row of parsed) {
+      // Lê snapshot atual e mês anterior
+      const { data: existing } = await supabase
+        .from('metas_snapshot')
+        .select('id, observacoes')
+        .eq('loja_codigo', row.loja_codigo)
+        .eq('mes_ref', referenciaMes)
+        .maybeSingle();
 
-    if (rows.length === 0) {
-      throw new Error('Planilha vazia ou formato inválido.');
-    }
+      const { data: prevRow } = await supabase
+        .from('metas_snapshot')
+        .select(column)
+        .eq('loja_codigo', row.loja_codigo)
+        .eq('mes_ref', mesAnterior)
+        .maybeSingle();
+      const prevValue = prevRow ? (prevRow as Record<string, unknown>)[column] : null;
 
-    console.log(`Parsed ${rows.length} rows`);
+      const upsertPayload: Record<string, unknown> = {
+        loja_codigo: row.loja_codigo,
+        loja_id: lojaIdByCodigo.get(row.loja_codigo) ?? null,
+        mes_ref: referenciaMes,
+        [column]: row.valor,
+        [colAnterior]: prevValue ?? null,
+      };
 
-    // Validate required columns
-    const requiredColumns = ['unidade', 'data_referencia', 'faturamento'];
-    const firstRow = rows[0] as Record<string, unknown>;
-    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
-    
-    if (missingColumns.length > 0) {
-      throw new Error(`Colunas obrigatórias faltando: ${missingColumns.join(', ')}`);
-    }
-
-    // Get stores for matching
-    const { data: lojas } = await supabase
-      .from('config_lojas')
-      .select('id, nome');
-
-    const lojaMap = new Map(lojas?.map(l => [normalizeUnidade(l.nome), l.id]) || []);
-
-    // Create sync record
-    const { data: syncData, error: syncError } = await supabase
-      .from('sincronizacoes_sheets')
-      .insert({
-        url: normalizedUrl,
-        referencia_mes: referenciaMes,
-        loja_id: null,
-        status: 'processing',
-      })
-      .select()
-      .single();
-
-    if (syncError) {
-      console.error('Error creating sync record:', syncError);
-    }
-
-    const syncId = syncData?.id;
-
-    // Process rows into staging
-    const stagingRows = [];
-    let importedCount = 0;
-
-    for (const row of rows) {
-      const unidadeRaw = (row.unidade || '').toString().trim();
-      if (!unidadeRaw) continue;
-
-      const unidadeNormalizada = normalizeUnidade(unidadeRaw);
-      const lojaId = lojaMap.get(unidadeNormalizada) || null;
-
-      // Try partial match if exact match fails
-      let matchedLojaId = lojaId;
-      if (!matchedLojaId) {
-        for (const [nome, id] of lojaMap.entries()) {
-          if (nome.includes(unidadeNormalizada) || unidadeNormalizada.includes(nome)) {
-            matchedLojaId = id;
-            break;
-          }
-        }
+      const { error: upErr } = await supabase
+        .from('metas_snapshot')
+        .upsert(upsertPayload, { onConflict: 'loja_codigo,mes_ref' });
+      if (upErr) {
+        console.error('[sync] upsert error', row.loja_codigo, upErr.message);
+        continue;
       }
-
-      const dataRef = parseDate(row.data_referencia?.toString()) || `${referenciaMes}-15`;
-      const tipoOp = row.tipo_operacao?.toString().toLowerCase();
-      const validTipo = tipoOp === 'salao' || tipoOp === 'delivery' ? tipoOp : null;
-
-      stagingRows.push({
-        source_id: sourceId,
-        sync_id: syncId,
-        unidade_raw: unidadeRaw,
-        unidade_normalizada: unidadeNormalizada,
-        loja_id: matchedLojaId,
-        data_referencia: dataRef,
-        faturamento: parseNumber(row.faturamento),
-        nps: row.nps ? parseNumber(row.nps) : null,
-        nota_reclamacao: row.nota_reclamacao ? parseNumber(row.nota_reclamacao) : null,
-        tipo_operacao: validTipo,
-        processed: false,
-      });
-
-      importedCount++;
+      updated++;
     }
 
-    // Insert staging data
-    if (stagingRows.length > 0) {
-      const { error: insertError } = await supabase
-        .from('sheets_staging')
-        .insert(stagingRows);
-
-      if (insertError) {
-        console.error('Error inserting staging:', insertError);
-        throw new Error('Erro ao inserir dados no staging.');
-      }
-    }
-
-    // Update source last sync
+    // Marca última sincronização
     await supabase
       .from('sheets_sources')
       .update({ ultima_sincronizacao: new Date().toISOString() })
       .eq('id', sourceId);
 
-    // Update sync status
-    if (syncId) {
-      await supabase
-        .from('sincronizacoes_sheets')
-        .update({
-          status: 'success',
-          linhas_importadas: importedCount,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', syncId);
-    }
-
-    console.log(`Staging sync completed. ${importedCount} rows imported.`);
+    // Log no histórico de sincronizações
+    await supabase.from('sincronizacoes_sheets').insert({
+      url,
+      referencia_mes: referenciaMes,
+      loja_id: null,
+      status: 'success',
+      linhas_importadas: updated,
+      completed_at: new Date().toISOString(),
+    });
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        rowsImported: importedCount,
-        message: `${importedCount} linhas importadas para staging.`,
+      JSON.stringify({
+        success: true,
+        meta: metaKey,
+        column,
+        mesRef: referenciaMes,
+        rowsImported: updated,
+        message: `${updated} loja(s) atualizada(s) em metas_snapshot.${column} para ${referenciaMes}.`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
-  } catch (error) {
-    console.error('Sync error:', error);
-
+  } catch (e) {
+    console.error('[sync] error', e);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Erro ao processar planilha',
-      }),
+      JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Erro desconhecido' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

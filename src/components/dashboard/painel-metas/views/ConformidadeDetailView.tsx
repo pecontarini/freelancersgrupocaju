@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ClipboardCheck,
@@ -9,6 +10,7 @@ import {
   FileText,
   ChevronRight,
   Layers,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricKpiCard } from "../shared/MetricKpiCard";
@@ -17,6 +19,10 @@ import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useConformidadeData, type SectorGroup } from "@/hooks/useConformidadeData";
 import { useLojaCodigoMap } from "../shared/useLojaCodigoMap";
 import { calcConformidadeStatus } from "@/lib/metasUtils";
+import { useSourceForMeta } from "@/hooks/useSheetsSources";
+import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   BarChart,
   Bar,
@@ -68,18 +74,37 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
   });
   const { data: lojaMap } = useLojaCodigoMap();
 
+  // Override via planilha vinculada (Configurações → Integrações)
+  const { source: linkedSource } = useSourceForMeta("conformidade");
+  const { data: snapshotRows } = useMetasSnapshot({});
+  const snapshotByCodigo = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of snapshotRows) {
+      if (r.conformidade !== null && r.conformidade !== undefined) {
+        m.set(r.loja_codigo, Number(r.conformidade));
+      }
+    }
+    return m;
+  }, [snapshotRows]);
+
   // Filtra agregados por brand quando não há loja específica
   const lojasFiltradas = useMemo(() => {
     if (!lojaMap) return [] as Array<{ loja_id: string; back: number | null; front: number | null; total: number | null; code: string }>;
     return aggregated.lojas
-      .map((l) => ({ ...l, code: lojaMap.idToCodigo[l.loja_id] ?? "" }))
+      .map((l) => {
+        const code = lojaMap.idToCodigo[l.loja_id] ?? "";
+        const snap = code ? snapshotByCodigo.get(code) : undefined;
+        // Se houver fonte vinculada com snapshot, ele substitui o "total" (Back/Front continuam de auditoria interna)
+        const total = linkedSource && snap !== undefined ? snap : l.total;
+        return { ...l, code, total };
+      })
       .filter((l): l is typeof l & { code: string } => {
         if (!l.code) return false;
         if (restrictToLojaCodigo) return l.code === restrictToLojaCodigo;
         if (brand !== "all" && !l.code.startsWith(`${brand}_`)) return false;
         return true;
       });
-  }, [aggregated.lojas, lojaMap, brand, restrictToLojaCodigo]);
+  }, [aggregated.lojas, lojaMap, brand, restrictToLojaCodigo, linkedSource, snapshotByCodigo]);
 
   const networkAvg = useMemo(() => {
     const arr = lojasFiltradas
@@ -150,7 +175,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     );
   }
 
-  if (isEmpty) {
+  if (isEmpty && !linkedSource) {
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
@@ -174,6 +199,20 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
           <p className="text-xs text-muted-foreground">
             Score consolidado por unidade · Back/Front · meta ≥ 90 · red flag &lt; 75
           </p>
+          {linkedSource && (
+            <Badge
+              variant="outline"
+              className="mt-1 inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              <FileSpreadsheet className="h-3 w-3" />
+              Fonte: {linkedSource.nome}
+              {linkedSource.ultima_sincronizacao && (
+                <span className="opacity-70">
+                  · sync {format(new Date(linkedSource.ultima_sincronizacao), "dd/MM HH:mm", { locale: ptBR })}
+                </span>
+              )}
+            </Badge>
+          )}
         </div>
         <PainelFilters
           brand={brand}

@@ -1272,6 +1272,7 @@ function parseBaseAvaliacoes(grid: string[][]): ParseResult {
       ordem: 0,
     });
   }
+  if (!reclamacoes.length) return parseReclamacoesDist(grid);
   return { rows, blocks };
 }
 

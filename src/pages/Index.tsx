@@ -23,7 +23,7 @@ import { RedeTab } from "@/components/dashboard/RedeTab";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
-import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
+
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
@@ -127,6 +127,10 @@ const Index = () => {
     (tab: string) => {
       if (tab === "agenda") {
         navigate("/agenda");
+        return;
+      }
+      if (tab === "painel") {
+        navigate("/painel/metas");
         return;
       }
       setActiveTab(tab);
@@ -272,8 +276,6 @@ const Index = () => {
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":
         return isAdmin ? <RedeTab /> : null;
-      case "painel":
-        return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:

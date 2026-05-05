@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
 import { PainelSidebar } from "@/components/dashboard/painel-metas/shared/PainelSidebar";
 import { ExecutiveOverviewView } from "@/components/dashboard/painel-metas/views/ExecutiveOverviewView";
-import { MetricDetailView } from "@/components/dashboard/painel-metas/views/MetricDetailView";
+
 import { RankingView } from "@/components/dashboard/painel-metas/views/RankingView";
 import { ComparativoView } from "@/components/dashboard/painel-metas/views/ComparativoView";
 import { NpsReclamacoesView } from "@/components/dashboard/painel-metas/views/NpsReclamacoesView";

@@ -1065,14 +1065,37 @@ serve(async (req) => {
       }
     }
 
+    const now = new Date().toISOString();
+    const hasData = grid.length > 1 && (parsed.rows.length + parsed.blocks.length) > 0;
+
+    if (!hasData) {
+      const erroMsg = 'Parser não retornou linhas ou blocos válidos. Verifique se a planilha está pública e se o formato da aba está correto.';
+      await supabase.from('sheets_sources')
+        .update({ ultimo_status: 'erro', ultimo_erro: erroMsg })
+        .eq('id', sourceId);
+      await supabase.from('sincronizacoes_sheets').insert({
+        url: sourceUrl, referencia_mes: referenciaMes, loja_id: null,
+        status: 'error', linhas_importadas: 0,
+        completed_at: now,
+      });
+      return new Response(
+        JSON.stringify({ success: false, error: erroMsg }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 422 }
+      );
+    }
+
     await supabase.from('sheets_sources')
-      .update({ ultima_sincronizacao: new Date().toISOString() })
+      .update({
+        ultima_sincronizacao: now,
+        ultimo_status: 'ok',
+        ultimo_erro: null,
+      })
       .eq('id', sourceId);
 
     await supabase.from('sincronizacoes_sheets').insert({
-      url, referencia_mes: referenciaMes, loja_id: null,
+      url: sourceUrl, referencia_mes: referenciaMes, loja_id: null,
       status: 'success', linhas_importadas: updated,
-      completed_at: new Date().toISOString(),
+      completed_at: now,
     });
 
     return new Response(
@@ -1089,6 +1112,18 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error('[sync] error', e);
+    // Tenta marcar erro na source se temos sourceId no escopo
+    try {
+      const body2 = await req.clone().json().catch(() => ({}));
+      const sId = (body2 as { sourceId?: string })?.sourceId;
+      if (sId) {
+        const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        await sb.from('sheets_sources').update({
+          ultimo_status: 'erro',
+          ultimo_erro: e instanceof Error ? e.message : 'Erro desconhecido',
+        }).eq('id', sId);
+      }
+    } catch { /* noop */ }
     return new Response(
       JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Erro desconhecido' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

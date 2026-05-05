@@ -8,9 +8,12 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
 import { PainelSidebar } from "@/components/dashboard/painel-metas/shared/PainelSidebar";
 import { ExecutiveOverviewView } from "@/components/dashboard/painel-metas/views/ExecutiveOverviewView";
-import { MetricDetailView } from "@/components/dashboard/painel-metas/views/MetricDetailView";
+
 import { RankingView } from "@/components/dashboard/painel-metas/views/RankingView";
 import { ComparativoView } from "@/components/dashboard/painel-metas/views/ComparativoView";
+import { NpsReclamacoesView } from "@/components/dashboard/painel-metas/views/NpsReclamacoesView";
+import { CmvDetailView } from "@/components/dashboard/painel-metas/views/CmvDetailView";
+import { KdsConformidadeView } from "@/components/dashboard/painel-metas/views/KdsConformidadeView";
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import type { RankingMetric } from "@/components/dashboard/painel-metas/shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
@@ -23,10 +26,7 @@ import { toast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 
 const METRIC_KEYS: RankingMetric[] = ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"];
-
-function isMetricKey(k: MetaKey): k is RankingMetric {
-  return (METRIC_KEYS as MetaKey[]).includes(k);
-}
+void METRIC_KEYS;
 
 export default function MetasPage() {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ export default function MetasPage() {
   // gerente_unidade: vê apenas a própria loja, sem Ranking/Comparativo
   const showFullAccess = isAdmin || isOperator;
   const showManagerPlus = showFullAccess; // gerente_unidade NÃO vê Ranking/Comparativo
-  const hideCargoTabs = isOperator && !isAdmin; // operator vê valores agregados sem tabs de cargo
+  void (isOperator && !isAdmin); // hideCargoTabs reserved for future use
   const restrictToLojaCodigo = useMemo(() => {
     if (isAdmin || isOperator) return null;
     if (!isGerenteUnidade) return null;
@@ -100,12 +100,20 @@ export default function MetasPage() {
                 {safeView === "visao-geral" && (
                   <ExecutiveOverviewView restrictToLojaCodigo={restrictToLojaCodigo} onNavigate={setView} />
                 )}
-                {isMetricKey(safeView) && (
-                  <MetricDetailView
-                    metric={safeView}
-                    restrictToLojaCodigo={restrictToLojaCodigo}
-                    hideCargoTabs={hideCargoTabs}
-                  />
+                {safeView === "nps" && (
+                  <NpsReclamacoesView restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "cmv-salmao" && (
+                  <CmvDetailView variant="salmao" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "cmv-carnes" && (
+                  <CmvDetailView variant="carnes" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "kds" && (
+                  <KdsConformidadeView metric="kds" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "conformidade" && (
+                  <KdsConformidadeView metric="conformidade" restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "ranking" && showManagerPlus && <RankingView />}
                 {safeView === "comparativo" && showManagerPlus && <ComparativoView />}

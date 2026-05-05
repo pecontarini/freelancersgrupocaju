@@ -127,14 +127,25 @@ serve(async (req) => {
 
     console.log('Starting staging sync:', { sourceId, referenciaMes });
 
-    // Validate URL format
-    const exportPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/export\?format=csv/;
-    if (!exportPattern.test(url)) {
-      throw new Error('URL inválida. Use formato: /export?format=csv&gid=0');
+    // Normaliza qualquer link Google Sheets para CSV canônico
+    const normalizeSheetsUrl = (raw: string): string | null => {
+      if (!raw) return null;
+      const t = raw.trim();
+      if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(t)) return t;
+      const idMatch = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!idMatch) return null;
+      const gidMatch = t.match(/[#?&]gid=(\d+)/);
+      const gid = gidMatch ? gidMatch[1] : '0';
+      return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+    };
+
+    const normalizedUrl = normalizeSheetsUrl(url);
+    if (!normalizedUrl) {
+      throw new Error('URL inválida. Cole um link do Google Sheets.');
     }
 
     // Fetch CSV
-    const csvResponse = await fetch(url);
+    const csvResponse = await fetch(normalizedUrl);
     if (!csvResponse.ok) {
       throw new Error('Não foi possível acessar a planilha. Verifique se está pública.');
     }

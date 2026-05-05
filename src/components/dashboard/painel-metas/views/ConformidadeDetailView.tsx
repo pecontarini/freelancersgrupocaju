@@ -98,10 +98,10 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     return lojasFiltradas
       .map((l) => {
         const value = grupo === "back" ? l.back : grupo === "front" ? l.front : l.total;
-        const d = getLojaDisplay(l.code!);
+        const d = getLojaDisplay(l.code);
         return {
-          code: l.code!,
-          nome: `${d.sigla}·${l.code!.split("_")[1]}`,
+          code: l.code,
+          nome: `${d.sigla}·${l.code.split("_")[1]}`,
           back: l.back,
           front: l.front,
           value,

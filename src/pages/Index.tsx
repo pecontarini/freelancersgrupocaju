@@ -23,7 +23,7 @@ import { RedeTab } from "@/components/dashboard/RedeTab";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
-import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
+// PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
@@ -129,10 +129,22 @@ const Index = () => {
         navigate("/agenda");
         return;
       }
+      if (tab === "painel") {
+        navigate("/painel/metas");
+        return;
+      }
       setActiveTab(tab);
     },
     [navigate]
   );
+
+  // If user lands here with ?tab=painel (legacy entry), redirect to /painel/metas
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "painel" || activeTab === "painel") {
+      navigate("/painel/metas", { replace: true });
+    }
+  }, [activeTab, navigate]);
 
   // Set default tab for chefe_setor
   useEffect(() => {
@@ -273,7 +285,7 @@ const Index = () => {
       case "rede":
         return isAdmin ? <RedeTab /> : null;
       case "painel":
-        return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
+        return null; // redirect handled by useEffect → /painel/metas
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:

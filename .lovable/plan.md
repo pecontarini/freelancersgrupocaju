@@ -1,153 +1,95 @@
 
-# Painel de Indicadores — Reformulação Profissional
+# Painel de Indicadores — redirect + reconstrução completa
 
-Objetivo: transformar `/painel/metas` em um dashboard executivo interativo (drilldown por clique, filtros vivos, gráficos responsivos) e dar a cada métrica uma visão dedicada e profunda. Foco em UX, hierarquia visual, e dados reais já presentes no projeto.
+## Diagnóstico do que está quebrado
 
-## Arquitetura geral
+1. **Botão "Painel de Indicadores" não abre `/painel/metas`.** Em `src/pages/Index.tsx`, `handleTabChange("painel")` apenas chama `setActiveTab("painel")` e renderiza inline o componente antigo `PainelMetasTab`. O dashboard executivo novo (`src/pages/painel/Metas.tsx`) nunca é alcançado pelo menu lateral / bottom nav.
+
+2. **O painel novo só lê `metas_snapshot`.** Hoje a tabela tem **10 linhas** (apenas mês 2026-05) populadas pelo `useSyncNpsSheets`. Os dados reais que dão profundidade vivem em outras tabelas que o painel ainda não consome:
+   - `reclamacoes` (4 linhas) — base de NPS / temas / gravidade
+   - `supervision_audits` (146) e `audit_sector_scores` (86) — Conformidade por setor (back/front), com `pdf_url` da auditoria
+   - `metas_snapshot` é só o agregado mensal e KDS/Conformidade ali estão incompletos
+   
+   Resultado: heatmap, KPIs e drilldown ficam vazios fora de NPS.
+
+3. **Drilldown raso.** `MetricDrawer` mostra meta vs atual e variação MoM, mas não traz histórico, série temporal nem composição (temas de reclamação, scores por setor, evolução de auditoria).
+
+4. **Sem fidelidade às planilhas.** Não há indicação de qual fonte alimenta o quê, data da última sincronização por métrica, nem botões para forçar sync individual.
+
+---
+
+## Plano de execução
+
+### Passo 1 — Redirect do menu para `/painel/metas`
+- Em `src/pages/Index.tsx`, no `handleTabChange`, interceptar `tab === "painel"` e chamar `navigate("/painel/metas")` (mesmo padrão usado para `"agenda"`).
+- Remover o `case "painel"` de `renderTabContent` e o import de `PainelMetasTab`.
+- Validar destaque do menu na nova rota (já passamos `activeTab="painel"` em `Metas.tsx`).
+
+### Passo 2 — Hooks de dados reais (novos)
+Criar hooks que vão alimentar todas as views, retornando dados normalizados por loja/mês, com `fetchAllRows` e respeitando RLS:
+
+- `src/hooks/useConformidadeData.ts` — lê `audit_sector_scores` + `supervision_audits`, agrega por `loja_id`, `month_year`, `sector_code` (back/front), retorna média ponderada e série mensal (últimos 6 meses).
+- `src/hooks/useReclamacoesData.ts` — lê `reclamacoes`, agrega por loja, fonte (google/ifood/tripadvisor/getin), tema (jsonb), gravidade. Retorna pareto de temas + lista ordenada por gravidade + série temporal.
+- `src/hooks/useMetasHistorico.ts` — lê `metas_snapshot` dos últimos 6 meses por loja e métrica, para sparklines no KPI card e linha de evolução no drawer.
+- `useMetasSnapshot` continua sendo a fonte do mês corrente (KPIs hero).
+
+Todos os hooks aceitam `restrictToLojaCodigo` (mapeado para `loja_id` via `lojaMapping.ts` quando preciso).
+
+### Passo 3 — Reconectar as views existentes às fontes reais
+
+- **`ExecutiveOverviewView`** (visão geral): adicionar mini-sparkline 6m em cada `MetricKpiCard` usando `useMetasHistorico`, e badge "última atualização" por métrica. Heatmap continua igual.
+- **`NpsReclamacoesView`**: trocar mocks por `useReclamacoesData` real → Pareto de temas, heatmap loja×tema, lista de reclamações com `resumo_ia` e flag `is_grave`.
+- **`KdsConformidadeView` (modo `conformidade`)**: passar a usar `useConformidadeData`. Adiciona:
+  - Toggle Back / Front (sector_code)
+  - Bar chart por loja (mês corrente)
+  - Linha de evolução 6m da loja selecionada
+  - Lista de auditorias recentes com link `pdf_url` clicável
+- **`KdsConformidadeView` (modo `kds`)**: manter snapshot agregado + nota explícita "Fonte: Sheets KDS — última sincronização XX". Quando KDS ainda não foi sincronizado, mostrar empty state, não zeros.
+- **`CmvDetailView`** (Salmão / Carnes): manter ranking, adicionar série 6m e atalho "Abrir CMV (Unitários)" para análise profunda da loja.
+- **`RankingView`** e **`ComparativoView`**: já consomem `metas_snapshot`. Adicionar seletor de mês e export CSV.
+
+### Passo 4 — Drilldown profundo (`MetricDrawer`)
+Expandir o drawer em 3 seções:
+1. **Resumo**: meta vs atual, delta MoM, status colorido (já existe).
+2. **Histórico 6 meses**: line chart via `useMetasHistorico`.
+3. **Composição** (depende da métrica):
+   - NPS → top 5 temas de reclamação da loja
+   - Conformidade → barras por sector_code (back/front) + link `pdf_url` da última auditoria
+   - CMV → atalho para CMV unitário daquela loja
+   - KDS → empty state se ainda não há detalhe disponível
+
+### Passo 5 — Barra de status de fontes
+Acima do conteúdo de `/painel/metas`, transformar o `NpsSyncBar` atual em um `DataSourceStatusBar` mostrando, para cada métrica:
+- Última sincronização
+- Botão "Sincronizar agora" (NPS já existe; demais ficam desabilitadas com tooltip "Aguardando ingestão de planilha XYZ" enquanto não houver sync automático).
+
+Isso dá transparência total sobre a fidelidade dos dados.
+
+### Passo 6 — Limpeza
+- Remover `VisaoGeralCompactView.tsx` e `VisaoGeralView.tsx` (substituídos pelo `ExecutiveOverviewView`).
+- Remover `PainelMetasTab` se não tiver mais consumidores.
+- Salvar nota em `mem://architecture/painel-indicadores-route` explicando que o Painel de Indicadores vive exclusivamente em `/painel/metas`.
+
+---
+
+## Detalhes técnicos
 
 ```text
-/painel/metas
-├── Visão Geral (Dashboard Executivo)        ← reformulado
-├── NPS / Reclamações                        ← foco 100% reclamações
-├── CMV Salmão (marcas Nazo)                 ← foco unitários Nazo
-├── CMV Carnes (marcas Caminito)             ← foco unitários Caminito
-├── KDS · Tempo de Prato (todas marcas)      ← banco + Drive
-├── Conformidade (Auditorias)                ← drilldown back/front
-└── Ranking de Lojas                         ← reformulado, multi-métrica
+Fluxo de dados após mudança
+───────────────────────────
+Sheets (Google) ─► useSyncNpsSheets ─► metas_snapshot ─► useMetasSnapshot ───┐
+                                                         useMetasHistorico ──┤
+supervision_audits + audit_sector_scores ─► useConformidadeData ─────────────┼─► views /painel/metas
+reclamacoes ──────────────────────────────► useReclamacoesData ──────────────┤
+(futuro) Sheets KDS ─► nova função sync ─► metas_snapshot.kds ───────────────┘
 ```
 
-Cada view compartilha 4 controles globais: período (mês/3m/6m/YTD), marca, loja, métrica em destaque. Estado fica em URL (`?periodo=&marca=&loja=&metric=`) para deep-link.
+- `fetchAllRows` em todos os hooks para evitar truncamento em 1000.
+- Datas como `YYYY-MM` strings (mês de referência).
+- `restrictToLojaCodigo` propagado em cada hook via `lojaCodigoFromNome` ↔ `loja_id`.
+- Realtime mantido apenas em `metas_snapshot` (já existe).
 
----
-
-## 1. Dashboard Executivo (Visão Geral)
-
-Substitui `VisaoGeralCompactView` por uma composição em 4 faixas:
-
-```text
-┌─ Faixa 1: KPIs hero (5 cards clicáveis) ──────────────────────┐
-│ NPS · CMV Salmão · CMV Carnes · KDS · Conformidade           │
-│ cada card: valor, delta vs mês anterior, sparkline 6m,       │
-│ chip de status; clicar abre a view dedicada da métrica       │
-├─ Faixa 2: Heatmap Loja × Métrica (interativo) ───────────────┤
-│ matriz colorida; hover destaca linha+coluna; clique abre     │
-│ drawer com detalhe da loja×métrica (série mensal + ações)    │
-├─ Faixa 3: 2 colunas ─────────────────────────────────────────┤
-│ Ranking compacto (top3/bot3 por métrica selecionada)         │
-│ Tendência da rede (linha multi-métrica normalizada 0–100)    │
-├─ Faixa 4: Red Flags ativos + Atalhos ────────────────────────┤
-│ lista clicável; cada item leva à loja+métrica responsável    │
-└──────────────────────────────────────────────────────────────┘
-```
-
-Interações chave:
-- Clique no KPI → navega para a view da métrica com loja=todas.
-- Clique numa célula do heatmap → abre `Sheet` lateral com série 6m, meta vs real, plano de ação vinculado.
-- Toggle "Comparar com mês anterior / 3m / YTD" recalcula deltas e cores.
-- Filtro de marca propaga para todas as faixas via contexto local.
-
----
-
-## 2. NPS / Reclamações (foco reclamações)
-
-Reaproveita `useReclamacoes`. Conteúdo:
-- 4 KPIs: total mês, graves, NPS-proxy (R$/reclamação), tempo médio de resposta.
-- Pareto interativo de temas (clique filtra a lista abaixo).
-- Heatmap loja × tema (intensidade = nº reclamações).
-- Lista de reclamações com filtros sincronizados (tema, gravidade, loja, período).
-- Evolução semanal (linha + barras de graves).
-
-Sem qualquer indicador não-reclamação (vendas, NPS bruto positivo, etc.).
-
----
-
-## 3. CMV Salmão (Nazo)
-
-Filtro fixo a marcas Nazo (`NZ_*`). Usa `useCMV` / `useCMVAnalytics` / `useCMVContagens`.
-- KPI: kg/R$1k vendido (atual, meta 1.55, redflag 1.90), variação semana/mês.
-- Tabela de **unitários por item de salmão** (preço médio, kg consumidos, kg vendidos, desvio).
-- Gráfico de evolução (linha) por loja Nazo, com seleção múltipla.
-- Drilldown por contagem semanal (clica → abre detalhes da contagem).
-
----
-
-## 4. CMV Carnes (Caminito)
-
-Mesma estrutura do Salmão, fixado em `CP_*`:
-- KPI: % desvio sobre transferido (meta 0.6%, redflag 2.0%).
-- Tabela de unitários por corte (picanha, ancho, fraldinha…).
-- Curva de desvio semanal por loja Caminito.
-- Comparativo "transferido × consumido × vendido".
-
----
-
-## 5. KDS · Tempo de Prato (todas marcas)
-
-- Fonte: tabela do banco (criar hook `useKdsTempoPrato` lendo de `metas_snapshot` + tabela específica se existir; senão, ler CSV do Drive via `sync-google-sheets` já presente).
-- KPIs: % black target, tempo médio (s), p95.
-- Gráfico de barras por loja (ordenável), com toggle marca.
-- Distribuição de tempos (histograma) por loja selecionada.
-- Linha de evolução semanal por marca.
-
-Decisão de fonte (banco vs Drive) será confirmada no momento da implementação após inspecionar o schema (`metas_snapshot.kds` já existe; complementaremos com a planilha se houver detalhamento por prato).
-
----
-
-## 6. Conformidade (Auditorias)
-
-Mesma vibe interativa do executivo, dentro do escopo de auditoria. Usa `useSupervisionAudits` + `useAuditSectorScores`:
-- KPIs: nota global rede, evolução vs auditoria anterior, % itens críticos abertos, planos de ação resolvidos.
-- Toggle **Back / Front / Geral** que filtra setores.
-- Heatmap loja × setor (clique abre a auditoria com itens críticos).
-- Linha de evolução das notas por loja (multi-seleção).
-- Lista de não-conformidades pendentes com link para o plano de ação.
-
----
-
-## 7. Ranking de Lojas (reformulado)
-
-Substitui o ranking atual por um ranking executivo:
-- Seletor de métrica primária (ou "Score composto" normalizado 0–100 de todas as métricas aplicáveis).
-- Tabela com: posição, loja, marca, valor, delta vs mês anterior, status, mini-sparkline 6m.
-- Respeita `lojaHasRankingMetric` (— para métricas N/A).
-- Botões de exportação (CSV / PNG da matriz).
-- Visão "Pódio" no topo (ouro/prata/bronze) por métrica selecionada.
-
----
-
-## Camada técnica
-
-- Novos componentes:
-  - `views/ExecutiveOverviewView.tsx` (substitui o uso atual)
-  - `views/NpsReclamacoesView.tsx`
-  - `views/CmvSalmaoView.tsx`
-  - `views/CmvCarnesView.tsx`
-  - `views/KdsTempoPratoView.tsx`
-  - `views/ConformidadeView.tsx`
-  - `views/RankingView.tsx` (reescrito)
-  - `shared/MetricHeatmap.tsx`, `shared/MetricDrawer.tsx`, `shared/PeriodFilter.tsx`, `shared/BrandFilter.tsx`
-- Hooks novos:
-  - `useKdsTempoPrato` (banco + fallback Drive via edge function existente)
-  - `useNpsReclamacoesAggregates` (composição de `useReclamacoes`)
-  - `useConformidadeBreakdown` (back/front a partir de `useAuditSectorScores`)
-- Roteamento interno de `Metas.tsx` é atualizado para mapear cada `MetaKey` à nova view; o `safeView` para `gerente_unidade` continua respeitado.
-- Estado de filtros vive em `useSearchParams` para deep-link e refresh-safe.
-- Visual: mantém `vision-glass`, sem emojis em UI (per memory), `lucide-react`, animações Framer Motion suaves; mobile-first com bottom sheet para drawers.
-- Sem mudanças em RLS ou tabelas — só consumo. Caso o KDS detalhado exija nova tabela, pediremos confirmação antes de criar migração.
-
-## Fora de escopo (não tocar)
-
-- Nada fora de `/painel/metas` e `src/lib/lojaUtils.ts`.
-- `ExecutiveNetworkDashboard.tsx` (usado em outra aba "Rede") permanece intacto.
-- Sem alterações em autenticação, perfis, ou outras tabs do portal.
-
-## Entrega faseada (na ordem de implementação)
-
-1. Skeleton dos arquivos de view + roteamento + filtros globais (URL state).
-2. Dashboard Executivo (KPIs hero + heatmap + drawer).
-3. View NPS/Reclamações.
-4. Views CMV Salmão e CMV Carnes.
-5. View KDS.
-6. View Conformidade (drilldown back/front).
-7. Ranking reformulado + exportações.
-8. Polimento mobile + microinterações.
+## Fora de escopo (sugestões depois)
+- Funções de sync para KDS e Conformidade vindas de Sheets (depende dos IDs das planilhas).
+- Deep-linking via querystring (`?metric=&loja=&periodo=`).
+- Export PNG dos gráficos.

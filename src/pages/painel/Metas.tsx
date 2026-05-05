@@ -14,6 +14,7 @@ import { ComparativoView } from "@/components/dashboard/painel-metas/views/Compa
 import { NpsReclamacoesView } from "@/components/dashboard/painel-metas/views/NpsReclamacoesView";
 import { CmvDetailView } from "@/components/dashboard/painel-metas/views/CmvDetailView";
 import { KdsConformidadeView } from "@/components/dashboard/painel-metas/views/KdsConformidadeView";
+import { ConformidadeDetailView } from "@/components/dashboard/painel-metas/views/ConformidadeDetailView";
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import type { RankingMetric } from "@/components/dashboard/painel-metas/shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
@@ -113,7 +114,7 @@ export default function MetasPage() {
                   <KdsConformidadeView metric="kds" restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "conformidade" && (
-                  <KdsConformidadeView metric="conformidade" restrictToLojaCodigo={restrictToLojaCodigo} />
+                  <ConformidadeDetailView restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "ranking" && showManagerPlus && <RankingView />}
                 {safeView === "comparativo" && showManagerPlus && <ComparativoView />}

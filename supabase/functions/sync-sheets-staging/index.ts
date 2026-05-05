@@ -1019,19 +1019,25 @@ function parseNpsAtendimento(grid: string[][]): ParseResult {
   type Agg = { sumNotaQtd: number; sumQtd: number };
   const atendimento = new Map<string, Agg>();
   const delivery = new Map<string, Agg>();
+  const header = grid[0] || [];
+  const groupStarts = header
+    .map((cell, idx) => /^plataforma$/i.test((cell || '').trim()) ? idx : -1)
+    .filter(idx => idx >= 0);
+  const starts = groupStarts.length >= 4 ? groupStarts.slice(0, 4) : [0, 4, 8, 12];
 
   for (let i = 1; i < grid.length; i++) {
     const r = grid[i];
     if (!r || !r.length) continue;
-    for (let g = 0; g < 4; g++) {
-      const off = g * 4;
+    for (let g = 0; g < starts.length; g++) {
+      const off = starts[g];
+      const plataforma = normTxt(r[off] || header[off] || '');
       const restRaw = (r[off + 1] || '').trim();
       const nota = _parseInt(r[off + 2]);
       const qtd = _parseInt(r[off + 3]);
       if (!restRaw || !qtd || qtd <= 0 || nota === null) continue;
       const code = matchLojaCodigo(restRaw);
       if (!code) continue;
-      const target = g <= 1 ? atendimento : delivery;
+      const target = plataforma.includes('GOOGLE') || plataforma.includes('TRIP') ? atendimento : delivery;
       const cur = target.get(code) || { sumNotaQtd: 0, sumQtd: 0 };
       cur.sumNotaQtd += nota * qtd;
       cur.sumQtd += qtd;

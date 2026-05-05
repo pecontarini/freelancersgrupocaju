@@ -95,10 +95,15 @@ function matchLojaCodigo(raw: string): string | null {
 // ============================================================
 // Google Sheets — gviz/tq helpers
 // ============================================================
-function extractSheetParams(url: string): { sheetId: string; gid: string | null } {
+function extractSheetParams(url: string): { sheetId: string; gid: string | null; sheetName: string | null } {
   const idMatch = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
   const gidMatch = (url || '').match(/[#&?]gid=(\d+)/);
-  return { sheetId: idMatch?.[1] ?? '', gid: gidMatch?.[1] ?? null };
+  const sheetMatch = (url || '').match(/[#&?]sheet=([^&]+)/);
+  return {
+    sheetId: idMatch?.[1] ?? '',
+    gid: gidMatch?.[1] ?? null,
+    sheetName: sheetMatch ? decodeURIComponent(sheetMatch[1]) : null,
+  };
 }
 
 function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
@@ -896,6 +901,345 @@ function parseCmvCarnesItens(grid: string[][]): ParseResult {
 }
 
 // ──────────────────────────────────────────────────────────────
+// NEW PARSERS (V2) — leem layouts reais das planilhas
+// ──────────────────────────────────────────────────────────────
+
+function _parseBRL(s: string | undefined | null): number | null {
+  if (s == null) return null;
+  let t = String(s).trim();
+  if (!t) return null;
+  t = t.replace(/R\$\s?/gi, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
+function _parsePct(s: string | undefined | null): number | null {
+  if (s == null) return null;
+  let t = String(s).trim();
+  if (!t) return null;
+  t = t.replace('%', '').replace(',', '.').trim();
+  const n = parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
+function _parseInt(s: unknown): number | null {
+  if (s == null) return null;
+  const n = parseInt(String(s).replace(/[^\d-]/g, ''), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+// 1) parseSupervisoresRanking — aba "GERAL E GERENTES"
+function parseSupervisoresRanking(grid: string[][]): ParseResult {
+  type Item = { posicao: number; loja_codigo: string; valor: number };
+  type Sec = { key: 'geral' | 'back' | 'front'; label: string; periodo: string; itens: Item[] };
+  const sections: Sec[] = [];
+  let current: Sec | null = null;
+
+  for (let i = 0; i < grid.length; i++) {
+    const r = grid[i];
+    const joined = normTxt(r.join(' '));
+    if (!joined) continue;
+
+    let key: Sec['key'] | null = null;
+    let label = '';
+    if (/GERENTE\s*BACK/.test(joined)) { key = 'back'; label = 'Gerente Back'; }
+    else if (/GERENTE\s*FRONT/.test(joined)) { key = 'front'; label = 'Gerente Front'; }
+    else if (/\bGERAL\b/.test(joined) && !/TOTAL\s*GERAL/.test(joined)) {
+      if (!current || current.key !== 'geral') { key = 'geral'; label = 'Geral'; }
+    }
+
+    if (key) {
+      if (current) sections.push(current);
+      const periodMatch = r.join(' ').match(/per[ií]odo[:\s]+([^\|]+)/i);
+      current = { key, label, periodo: periodMatch?.[1]?.trim() ?? '', itens: [] };
+      continue;
+    }
+    if (!current) continue;
+    if (/TOTAL\s*GERAL|PERIODO|POSICAO/.test(joined)) continue;
+
+    for (let j = 0; j < r.length - 2; j++) {
+      const posCell = (r[j] || '').trim();
+      if (!/[ºo°]/i.test(posCell)) continue;
+      const pos = parseInt(posCell, 10);
+      if (!Number.isFinite(pos) || pos < 1) continue;
+      const unidadeRaw = (r[j + 1] || '').trim();
+      const code = matchLojaCodigo(unidadeRaw);
+      const valor = _parsePct(r[j + 2]);
+      if (code && valor !== null) {
+        if (!current.itens.find(x => x.loja_codigo === code)) {
+          current.itens.push({ posicao: pos, loja_codigo: code, valor });
+        }
+      }
+      break;
+    }
+  }
+  if (current) sections.push(current);
+
+  const rows: MetaRow[] = [];
+  const blocks: Block[] = [];
+  for (const s of sections) {
+    if (!s.itens.length) continue;
+    blocks.push({
+      block_key: `ranking_${s.key}`,
+      block_type: 'ranking',
+      payload: { label: s.label, periodo: s.periodo, suffix: '%', polarity: 'higher', items: s.itens },
+      ordem: s.key === 'geral' ? 0 : s.key === 'back' ? 1 : 2,
+    });
+    if (s.key === 'geral') {
+      for (const it of s.itens) rows.push({ loja_codigo: it.loja_codigo, valor: it.valor });
+    }
+  }
+  return { rows, blocks };
+}
+
+// 2) parseNpsAtendimento — aba "BASE dados"
+function parseNpsAtendimento(grid: string[][]): ParseResult {
+  type Agg = { sumNotaQtd: number; sumQtd: number };
+  const atendimento = new Map<string, Agg>();
+  const delivery = new Map<string, Agg>();
+
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || !r.length) continue;
+    for (let g = 0; g < 4; g++) {
+      const off = g * 4;
+      const restRaw = (r[off + 1] || '').trim();
+      const nota = _parseInt(r[off + 2]);
+      const qtd = _parseInt(r[off + 3]);
+      if (!restRaw || !qtd || qtd <= 0 || nota === null) continue;
+      const code = matchLojaCodigo(restRaw);
+      if (!code) continue;
+      const target = g <= 1 ? atendimento : delivery;
+      const cur = target.get(code) || { sumNotaQtd: 0, sumQtd: 0 };
+      cur.sumNotaQtd += nota * qtd;
+      cur.sumQtd += qtd;
+      target.set(code, cur);
+    }
+  }
+
+  const buildRanking = (m: Map<string, Agg>) =>
+    Array.from(m.entries())
+      .map(([code, a]) => ({
+        loja_codigo: code,
+        valor: a.sumQtd > 0 ? a.sumNotaQtd / a.sumQtd : 0,
+        totalAvaliacoes: a.sumQtd,
+      }))
+      .sort((a, b) => b.valor - a.valor)
+      .map((it, idx) => ({ ...it, posicao: idx + 1 }));
+
+  const atItems = buildRanking(atendimento);
+  const dlItems = buildRanking(delivery);
+
+  const rows: MetaRow[] = [];
+  for (const it of atItems) rows.push({ loja_codigo: it.loja_codigo, valor: it.valor });
+
+  const blocks: Block[] = [];
+  if (atItems.length) blocks.push({
+    block_key: 'ranking_atendimento',
+    block_type: 'ranking',
+    payload: { label: 'Atendimento (Google + TripAdvisor)', suffix: '★', polarity: 'higher', decimals: 2, items: atItems },
+    ordem: 0,
+  });
+  if (dlItems.length) blocks.push({
+    block_key: 'ranking_delivery',
+    block_type: 'ranking',
+    payload: { label: 'Delivery (iFood + iFood Dark)', suffix: '★', polarity: 'higher', decimals: 2, items: dlItems },
+    ordem: 1,
+  });
+
+  return { rows, blocks };
+}
+
+// 3) parseAvaliacoesFaturamento — aba "01/04 - 30/04"
+function parseAvaliacoesFaturamento(grid: string[][]): ParseResult {
+  type Row = { loja: string; loja_codigo: string; aval13: number; totalAval: number; pct: number; fatTotal: number; rsPorAval: number };
+  const salao: Row[] = [];
+  const delivery: Row[] = [];
+
+  let periodo = '';
+  for (let i = 0; i < Math.min(grid.length, 5); i++) {
+    const j = grid[i].join(' ');
+    const m = j.match(/(\d{1,2}\/\d{1,2})\s*[-–]\s*(\d{1,2}\/\d{1,2})/);
+    if (m) { periodo = `${m[1]} - ${m[2]}`; break; }
+  }
+
+  const readBlock = (startCol: number, target: Row[]) => {
+    for (let i = 2; i < grid.length; i++) {
+      const r = grid[i];
+      const lojaRaw = (r[startCol] || '').trim();
+      if (!lojaRaw) break;
+      if (/total/i.test(lojaRaw)) continue;
+      const code = matchLojaCodigo(lojaRaw);
+      if (!code) continue;
+      const aval13 = _parseInt(r[startCol + 1]) ?? 0;
+      const totalAval = _parseInt(r[startCol + 2]) ?? 0;
+      const pct = _parsePct(r[startCol + 3]) ?? 0;
+      const fatTotal = _parseBRL(r[startCol + 4]) ?? 0;
+      const rsPorAval = _parseBRL(r[startCol + 5]) ?? 0;
+      target.push({ loja: lojaRaw, loja_codigo: code, aval13, totalAval, pct, fatTotal, rsPorAval });
+    }
+  };
+  readBlock(1, salao);
+  readBlock(7, delivery);
+
+  const rows: MetaRow[] = [];
+  for (const r of salao) rows.push({ loja_codigo: r.loja_codigo, valor: r.pct });
+
+  const blocks: Block[] = [];
+  if (salao.length || delivery.length) {
+    blocks.push({
+      block_key: 'tabela_aval_fat',
+      block_type: 'item_table',
+      payload: { label: 'Avaliações & Faturamento', periodo, salao, delivery },
+      ordem: 0,
+    });
+  }
+  return { rows, blocks };
+}
+
+// 4) parseKdsTargetPretoV2 — aba "Salão"
+function parseKdsTargetPretoV2(grid: string[][]): ParseResult {
+  let dataAtualizacao = '';
+  if (grid[0]) {
+    const m = grid[0].join(' ').match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+    if (m) dataAtualizacao = m[1];
+  }
+
+  type Cat = { categoria: string; totalPratos: number; qtnTarget: number; pct: number };
+  type LojaData = { loja: string; loja_codigo: string; categorias: Cat[]; totalGeral: { totalPratos: number; qtnTarget: number; pct: number } };
+  const lojasMap = new Map<string, LojaData>();
+
+  let currentLoja: LojaData | null = null;
+  for (let i = 3; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || !r.length) continue;
+    const lojaCell = (r[0] || '').trim();
+    const catCell = (r[1] || '').trim();
+
+    if (lojaCell) {
+      const code = matchLojaCodigo(lojaCell);
+      if (code) {
+        if (!lojasMap.has(code)) {
+          lojasMap.set(code, {
+            loja: lojaCell, loja_codigo: code, categorias: [],
+            totalGeral: { totalPratos: 0, qtnTarget: 0, pct: 0 },
+          });
+        }
+        currentLoja = lojasMap.get(code)!;
+      }
+    }
+    if (!currentLoja) continue;
+
+    if (/total\s*geral/i.test(catCell)) {
+      currentLoja.totalGeral = {
+        totalPratos: _parseInt(r[2]) ?? 0,
+        qtnTarget: _parseInt(r[3]) ?? 0,
+        pct: _parsePct(r[4]) ?? 0,
+      };
+      continue;
+    }
+    if (catCell && !lojaCell) {
+      const total = _parseInt(r[2]);
+      const qtn = _parseInt(r[3]);
+      const pct = _parsePct(r[4]);
+      if (total !== null || qtn !== null || pct !== null) {
+        currentLoja.categorias.push({
+          categoria: catCell,
+          totalPratos: total ?? 0,
+          qtnTarget: qtn ?? 0,
+          pct: pct ?? 0,
+        });
+      }
+    }
+  }
+
+  const lojas = Array.from(lojasMap.values());
+  const rows: MetaRow[] = lojas.map(l => ({ loja_codigo: l.loja_codigo, valor: l.totalGeral.pct }));
+
+  const blocks: Block[] = [];
+  if (lojas.length) {
+    const ranking = [...lojas]
+      .sort((a, b) => a.totalGeral.pct - b.totalGeral.pct)
+      .map((l, idx) => ({
+        loja_codigo: l.loja_codigo, valor: l.totalGeral.pct, posicao: idx + 1,
+        hint: `${l.totalGeral.qtnTarget}/${l.totalGeral.totalPratos}`,
+      }));
+    blocks.push({
+      block_key: 'ranking_target_preto',
+      block_type: 'ranking',
+      payload: { label: 'Target Preto · % por loja', suffix: '%', polarity: 'lower', items: ranking, dataAtualizacao },
+      ordem: 0,
+    });
+
+    const allCats = Array.from(new Set(lojas.flatMap(l => l.categorias.map(c => c.categoria))));
+    if (allCats.length) {
+      const catRows = allCats.map(cat => {
+        const valores: Record<string, number | null> = {};
+        for (const l of lojas) {
+          const c = l.categorias.find(x => x.categoria === cat);
+          valores[l.loja_codigo] = c ? c.pct : null;
+        }
+        return { categoria: cat, valores };
+      });
+      blocks.push({
+        block_key: 'matrix_categoria_loja',
+        block_type: 'matrix',
+        payload: {
+          label: 'Target Preto por Categoria × Loja',
+          lojas: lojas.map(l => l.loja_codigo),
+          categorias: catRows,
+          suffix: '%', polarity: 'lower',
+          scale: { min: 0, mid: 10, max: 30 },
+          dataAtualizacao,
+        },
+        ordem: 1,
+      });
+    }
+  }
+  return { rows, blocks };
+}
+
+// 5) parseBaseAvaliacoes — aba "Consolidado"
+function parseBaseAvaliacoes(grid: string[][]): ParseResult {
+  type Recl = { loja_codigo: string; loja: string; data: string; diaSemana: string; nota: number; autor: string; comentario: string };
+  const reclamacoes: Recl[] = [];
+  let totalLinhas = 0;
+
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i];
+    if (!r || !r.length) continue;
+    const loja = (r[0] || '').trim();
+    const dataStr = (r[1] || '').trim();
+    const diaSemana = (r[2] || '').trim();
+    const autor = (r[4] || '').trim();
+    const comentario = (r[5] || '').trim();
+    if (!loja || !dataStr) continue;
+    totalLinhas++;
+    if (!comentario) continue;
+    const nota = _parseInt(r[3]);
+    if (nota === null || nota > 3) continue;
+    const code = matchLojaCodigo(loja);
+    if (!code) continue;
+    const iso = parseDateBR(dataStr) ?? dataStr;
+    reclamacoes.push({ loja_codigo: code, loja, data: iso, diaSemana, nota, autor, comentario });
+  }
+
+  const rows: MetaRow[] = [];
+  const countByLoja = new Map<string, number>();
+  for (const r of reclamacoes) countByLoja.set(r.loja_codigo, (countByLoja.get(r.loja_codigo) || 0) + 1);
+  for (const [code, count] of countByLoja) rows.push({ loja_codigo: code, valor: count });
+
+  const blocks: Block[] = [];
+  if (reclamacoes.length) {
+    blocks.push({
+      block_key: 'mural_reclamacoes',
+      block_type: 'item_table',
+      payload: { label: 'Mural de Reclamações (notas ≤ 3)', totalLinhas, items: reclamacoes },
+      ordem: 0,
+    });
+  }
+  return { rows, blocks };
+}
+
+// ──────────────────────────────────────────────────────────────
 // Fallback genérico
 // ──────────────────────────────────────────────────────────────
 function parseGenericMeta(grid: string[][]): ParseResult {
@@ -934,13 +1278,14 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
   switch (metaKey) {
     case 'conformidade': return parseConformidade(grid);
     case 'kds':
-    case 'target-preto': return parseTargetPretoKds(grid);
-    case 'atendimento-medias':
-    case 'nps': return parseAtendimentoMedias(grid);
-    case 'reclamacoes': return parseReclamacoesDist(grid);
+    case 'kds-target-preto':
+    case 'target-preto': return parseKdsTargetPretoV2(grid);
+    case 'nps': return parseNpsAtendimento(grid);
+    case 'atendimento-medias': return parseAvaliacoesFaturamento(grid);
+    case 'reclamacoes': return parseBaseAvaliacoes(grid);
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
-    case 'ranking-supervisores': return parseGenericMeta(grid);
+    case 'ranking-supervisores': return parseSupervisoresRanking(grid);
     default: return parseGenericMeta(grid);
   }
 }
@@ -976,7 +1321,7 @@ serve(async (req) => {
     if (srcErr || !source) throw new Error('Fonte não encontrada.');
 
     const sourceUrl = source.url || body.url || '';
-    const { sheetId, gid } = extractSheetParams(sourceUrl);
+    const { sheetId, gid, sheetName } = extractSheetParams(sourceUrl);
     if (!sheetId) throw new Error('URL inválida — não foi possível extrair o sheetId.');
     const metaKey = source.meta_key;
     if (!metaKey) throw new Error('Esta fonte não tem `meta_key` definido.');
@@ -1001,7 +1346,7 @@ serve(async (req) => {
     }
 
     // Grid principal via gviz
-    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid));
+    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);

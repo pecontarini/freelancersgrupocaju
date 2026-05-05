@@ -23,7 +23,7 @@ import { RedeTab } from "@/components/dashboard/RedeTab";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
-import { PainelMetasTab } from "@/components/dashboard/PainelMetasTab";
+// PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";

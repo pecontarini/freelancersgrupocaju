@@ -11,6 +11,7 @@ export interface SheetsSource {
   ultima_sincronizacao: string | null;
   created_at: string;
   updated_at: string;
+  meta_key: string | null;
 }
 
 export interface SheetsSourceInput {
@@ -18,6 +19,7 @@ export interface SheetsSourceInput {
   url: string;
   gid?: string;
   ativo?: boolean;
+  meta_key?: string | null;
 }
 
 // Validate that URL is a valid Google Sheets export CSV format

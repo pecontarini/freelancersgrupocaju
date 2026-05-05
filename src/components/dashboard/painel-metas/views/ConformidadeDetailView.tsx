@@ -70,10 +70,10 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
 
   // Filtra agregados por brand quando não há loja específica
   const lojasFiltradas = useMemo(() => {
-    if (!lojaMap) return aggregated.lojas;
+    if (!lojaMap) return [] as Array<{ loja_id: string; back: number | null; front: number | null; total: number | null; code: string }>;
     return aggregated.lojas
-      .map((l) => ({ ...l, code: lojaMap.idToCodigo[l.loja_id] ?? null }))
-      .filter((l) => {
+      .map((l) => ({ ...l, code: lojaMap.idToCodigo[l.loja_id] ?? "" }))
+      .filter((l): l is typeof l & { code: string } => {
         if (!l.code) return false;
         if (restrictToLojaCodigo) return l.code === restrictToLojaCodigo;
         if (brand !== "all" && !l.code.startsWith(`${brand}_`)) return false;

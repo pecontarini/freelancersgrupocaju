@@ -63,11 +63,13 @@ export function MetricKpiCard({
         )}
       </div>
 
-      <div className="relative flex items-baseline gap-1.5">
-        <span className="text-3xl font-bold tabular-nums text-foreground">
-          {value}
-        </span>
-        {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
+      <div className="relative flex items-baseline gap-1.5 min-w-0">
+        <div className="min-w-0 flex-1">
+          <FitText max={30} min={14} className="font-bold tabular-nums text-foreground">
+            {value}
+          </FitText>
+        </div>
+        {suffix && <span className="shrink-0 text-xs text-muted-foreground">{suffix}</span>}
       </div>
 
       <div className="relative flex items-center justify-between">

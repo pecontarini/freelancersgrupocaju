@@ -179,7 +179,7 @@ serve(async (req) => {
     const { data: syncData, error: syncError } = await supabase
       .from('sincronizacoes_sheets')
       .insert({
-        url,
+        url: normalizedUrl,
         referencia_mes: referenciaMes,
         loja_id: null,
         status: 'processing',

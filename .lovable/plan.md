@@ -1,100 +1,116 @@
+## Diagnóstico
 
-## Escopo aprovado
+Os parsers atuais foram desenhados pra um layout "Unidade | Valor" simples, mas nenhuma das 7 planilhas vinculadas tem esse formato. Por isso `sheets_blocks_snapshot` está vazia (confirmado via SQL) e os blocks no painel mostram "Vincule uma planilha…".
 
-Seguir com o pipeline das 7 planilhas + planilha #3 com placeholder. Comentários de reclamações (Parte B) entram **agora como infraestrutura pronta**, mas ficam **desligados/ocultos por padrão** — você liga via toggle em Configurações quando quiser começar a popular.
+Formato real de cada planilha (amostra lida via CSV export):
 
----
+| meta_key | Layout real | Layout que o parser atual espera |
+|---|---|---|
+| `conformidade` | 3 rankings empilhados (Geral / Back / Front) com `Pos | Unidade | %` | ✅ próximo do correto, só precisa ajuste de detecção |
+| `kds` (Target Preto) | 3 blocos **lado a lado** (Caminito / Nazo / Caju) — cada bloco é `Loja | Categoria | Total | Qtn | %` | ❌ espera matriz Categoria × Loja |
+| `nps` (Médias Atendimento) | 2 grandes blocos: "Google+TripAdvisor" e "iFood/Delivery", cada um com sub-blocos por loja | ❌ espera header "Loja | Google | iFood…" |
+| `reclamacoes` (Distribuição) | Bloco "Geral Grupo" + N blocos por loja, todos com colunas `iFood | Google | TripAdvisor | Get In | Instagram | Whatsapp | Total | %` e linhas 1‒5 | ❌ espera lojas em linhas |
+| `cmv-salmao` | **Lojas como colunas** (Águas Claras, SIG, Asa Sul, Goiânia), datas em linhas, com faixas verde/amarelo/vermelho | ❌ espera lojas em linhas, datas em colunas |
+| `cmv-carnes` | 2 blocos lado a lado (Caminito Águas Claras / Caminito Norte), cada um com `Custo | Item | 01/04 | Envios | Envios R$ | Devolução | Vendas | Era pra Ter | 01/05 | Diferença | Vlr Total | Diff %` | ❌ delega pra parseTargetPreto |
+| `target-preto` | mesma planilha do KDS (gid 0) | ❌ idem KDS |
 
-## Parte A — Pipeline base (7 planilhas)
+## Plano
 
-### A1. Banco
-Migration:
-- `sheets_blocks_snapshot(id, source_id, meta_key, block_key, block_type, mes_ref, loja_codigo nullable, payload jsonb, ordem int, updated_at)` + RLS leitura autenticada, escrita service_role.
-- Índice `(meta_key, mes_ref)` e `(source_id)`.
+### 1. Reescrever parsers em `supabase/functions/sync-sheets-staging/index.ts`
 
-### A2. Edge function `sync-sheets-staging`
-Refator para dispatcher por `meta_key` com 7 parsers:
-- `parseConformidade` (já existe — mantém)
-- `parseTargetPreto` — matriz Categoria × Loja
-- `parseAtendimentoMedias` (#3) — tolera vazio, gera bloco `{rows: []}`
-- `parseAvaliacoes13` — faturamento × avaliações 1-3
-- `parseReclamacoesDistribuicao` — distribuição 1-5 estrelas
-- `parseCmvSalmao` — série diária
-- `parseCmvCarnes` — tabela itemizada
+Adicionar utilitários:
+- `findAllUnitHeaders(grid)` — varre o grid inteiro procurando células que são código de loja (via `matchLojaCodigo`), retorna posições para detectar blocos lado-a-lado e blocos empilhados.
+- `parseDateBR(s)` — `dd/mm/aaaa` → `YYYY-MM-DD`.
+- `splitGridIntoHorizontalBlocks(grid)` — detecta colunas vazias persistentes pra separar blocos horizontais.
 
-Cada parser grava:
-1. KPI agregado em `metas_snapshot` (quando aplicável).
-2. Blocos estruturados em `sheets_blocks_snapshot`.
+Reescrever os 6 parsers:
 
-### A3. UI Configurações
-`MetaSheetsLinker`: 6 entradas novas (já tem Conformidade). Cada uma com link, sync manual e badge de última sincronização.
+**`parseConformidade`** (mantém base, ajusta detecção):
+- Scaneia por células com posição `1°…10°` na coluna seguinte do bloco.
+- Mantém 3 sections (geral/back/front) → 3 blocks `ranking`.
 
-### A4. Componentes de bloco
-Em `src/components/dashboard/painel-metas/blocks/`:
-- `RankingBlock`, `MatrixBlock`, `SeriesBlock`, `DistributionBlock`, `ItemTableBlock`, `KpiStripBlock`, `SheetSourceBadge`, `EmptyBlockState`.
+**`parseTargetPretoKds`** (novo, substitui `parseTargetPreto` atual):
+- Detecta header repetido `Loja | Categoria | Total de Pratos | Qtn. Target Preto | % Target Preto`.
+- Para cada bloco horizontal, lê linhas até "Total Geral".
+- Saída:
+  - `block_type='matrix'` com `categorias` × `lojas` (% Target Preto).
+  - `block_type='ranking'` "Total Geral por loja" (% agregado).
+  - `block_type='item_table'` "Pratos com mais Target Preto" (top 10 por Qtn).
+- Agrega `metas_snapshot.kds` = % Total Geral.
 
-### A5. Hook + integração
-- `useSheetBlocks(metaKey, mesRef)` — busca blocos por meta.
-- Atualizar 4 views: Conformidade, NPS/Reclamações, KDS/Atendimento, CMV.
+**`parseAtendimentoMedias`** (novo, planilha NPS médias):
+- Detecta blocos de loja (cabeçalho com nome da loja + canais).
+- Para cada bloco, extrai média Google + TripAdvisor e iFood separadamente.
+- Saída:
+  - `item_table` "Médias por canal" (loja × canal × nota).
+  - `ranking` "Atendimento (Google+Trip)" e `ranking` "Delivery (iFood)".
+  - `kpi_strip` com média geral do grupo.
 
-### Tratamento da #3 (placeholder)
-- Vincula link agora.
-- Parser tolera headers sem dados → bloco vazio.
-- UI mostra `EmptyBlockState`: "Aguardando primeiros dados — fonte vinculada em DD/MM. Próximo sync automático às 6h."
-- Quando você popular, aparece sozinho no próximo sync.
+**`parseReclamacoesDistribuicao`** (reescreve):
+- Detecta os blocos "Geral Grupo" + por loja.
+- Para cada bloco extrai distribuição 1‒5 por canal e calcula:
+  - Média ponderada da loja.
+  - % de notas 1‒2 (insatisfação).
+- Saída:
+  - `distribution` (notas 1‒5 stacked) por loja.
+  - `matrix` canal × nota agregada (Geral Grupo).
+  - `ranking` "% Insatisfação" (lower=worse).
+  - `kpi_strip` "Notas 5 / Total" e "Insatisfação % grupo".
+- Agrega `metas_snapshot.nps` = média ponderada.
 
----
+**`parseCmvSalmaoSeries`** (reescreve):
+- Detecta header com lista de lojas em colunas (Águas Claras, SIG, Asa Sul, Goiânia).
+- Linhas: `Data | Dia da Semana | <valor por loja>`.
+- Lê faixas (Verde ≤1,55 / Amarelo 1,56‒1,65 / Vermelho > 1,65) da própria planilha, salva como `thresholds` no payload.
+- Saída:
+  - `series` (eixo X = data, uma série por loja, com bandas de faixa).
+  - `ranking` "Média do mês por loja".
+  - `matrix` "Dias acima do limite por loja".
+- Agrega `metas_snapshot.cmv_salmao` = média da loja no mês.
 
-## Parte B — Comentários de reclamações (infra pronta, desligado por padrão)
+**`parseCmvCarnesItens`** (novo):
+- Para cada bloco de loja, lê itens (PO ANCHO 250G…) com colunas Envios / Vendas / Era pra Ter / 01/05 (estoque) / Diferença / Vlr Total / Diff %.
+- Saída:
+  - `item_table` "Desvios de carnes por loja" (com filtro/sort por |Diff %|).
+  - `ranking` "Perda total R$ por loja" (soma Vlr Total negativo).
+  - `matrix` "Diferença % item × loja" (heatmap).
+- Agrega `metas_snapshot.cmv_carnes` = média ponderada |Diff %|.
 
-### B1. Banco
-Migration:
-- `reclamacoes_comentarios(id, loja_codigo, canal, nota, data_comentario, autor, comentario, tags text[], status, action_plan_id, source_hash unique, source_id, created_at, updated_at)` + RLS (leitura por loja do usuário, escrita admin/operador + service_role).
-- `reclamacoes_config(enabled boolean default false, source_id uuid, classificador_ai boolean default false, updated_at)` — singleton por org.
+### 2. Componentes de visualização novos / atualizados em `src/components/dashboard/painel-metas/blocks/`
 
-### B2. Edge function
-- Novo parser `parseReclamacoesComentarios` no dispatcher, ativado **somente se `reclamacoes_config.enabled = true`**.
-- Upsert idempotente por `source_hash = sha256(data|loja|canal|autor|comentario)`.
-- Cron diário já existente cobre automaticamente.
+Atualizar:
+- `RankingBlock.tsx` — aceitar `polarity` (lower/higher) pra colorir e badge "↓ menor é melhor".
+- `MatrixBlock.tsx` — modo heatmap (cor por valor com escala min/max do payload).
+- `SeriesBlock.tsx` — usar Recharts `LineChart` multi-série + `ReferenceArea` pras faixas verde/amarelo/vermelho do payload `thresholds`.
+- `DistributionBlock.tsx` — barra empilhada (1=vermelho, 5=verde) + chip "% insatisfação".
+- `ItemTableBlock.tsx` — search + sort + paginação client-side, suporte a colunas tipadas (R$, %, número).
 
-### B3. UI Configurações — toggle
-Card novo "Comentários de reclamações" em Configurações:
-- Switch **Ativar coleta de comentários** (default OFF).
-- Quando ligado: campo de link da aba + botão Sincronizar + opção "Classificar tags com IA".
-- Esquema esperado documentado inline: `data | loja | canal | nota | autor | comentario`.
+Adicionar:
+- `KpiStripBlock.tsx` — faixa horizontal de KPIs (média grupo, total avaliações, etc), responsivo.
 
-### B4. UI Painel — Mural (oculto enquanto desligado)
-Aba "Mural de Comentários" dentro de Reclamações aparece **só se `enabled = true`**:
-- Filtros: loja, canal, nota (default 1-3), período, status, busca.
-- Cards por comentário com nota colorida, canal, data, autor, texto, tags, status.
-- Ações: marcar em análise / descartar / **gerar plano de ação** (cria `action_plan` pré-preenchido linkado via `action_plan_id`) / copiar para WhatsApp.
-- Resumo topo: contagem por status, distribuição por canal, top 3 lojas.
+### 3. Cabeçalho de cada view
 
-### B5. Classificador opcional (Lovable AI)
-- Edge chama `gemini-2.5-flash` por lote para gerar `tags`.
-- Liga/desliga por toggle. Sem custo extra para você.
+Em `ConformidadeDetailView`, `KdsConformidadeView`, `NpsReclamacoesView`, `CmvDetailView` adicionar:
+- Botão "Sincronizar planilha" (chama `sync-sheets-staging` com o `sourceId` da meta).
+- Selo "Última atualização: 05/05 14:32".
+- `<SheetBlocksSection metaKey={…} mesRef={…} />` já existe — só passar `polarity`/`emptyMessage` mais útil.
 
-### Como você "liga" no futuro
-1. Cria aba `Comentários` na planilha #5 com as 6 colunas.
-2. Configurações → Comentários de reclamações → ativa o switch + cola o link CSV.
-3. Sync roda. Mural aparece no painel.
+### 4. Migração mínima
 
----
+Nenhuma mudança de schema — `sheets_blocks_snapshot.payload` é JSONB, suporta os novos formatos. Só `INSERT/UPDATE` via edge function.
 
-## Ordem de implementação
+### 5. Validação
 
-1. Migration (`sheets_blocks_snapshot` + `reclamacoes_comentarios` + `reclamacoes_config`).
-2. Refator `sync-sheets-staging` com 7 parsers + parser de comentários gated por flag.
-3. `MetaSheetsLinker` com 6 novas metas + card de Comentários (toggle).
-4. Biblioteca de blocos + hook `useSheetBlocks`.
-5. Integração nas 4 views do painel.
-6. Mural de Comentários (renderizado condicionalmente).
-7. Classificador AI (toggle).
+Após deploy do edge function:
+1. Disparar "Sincronizar agora" pra cada uma das 7 fontes.
+2. Conferir via SQL `SELECT meta_key, block_type, count(*) FROM sheets_blocks_snapshot GROUP BY 1,2;` que cada meta tem ≥1 block.
+3. Abrir `/painel/metas` em cada aba e validar visualmente.
 
-Cada passo é entregável e validável independentemente.
+### Detalhes técnicos
+- O detector horizontal-block usa heurística: encontra coluna `j` cuja média de células vazias entre linhas N e N+30 é >70% → marca como separador.
+- Datas em PT-BR são parseadas com regex `^(\d{2})\/(\d{2})\/(\d{4})$`.
+- Valores monetários `R$ 28,19` e `-R$ 591,99` tratados em `parseBRL` (separado de `parsePercentOrNumber` pra não confundir milhar `.` com decimal `,`).
+- Códigos de loja "Caminito Norte" precisam ser adicionados ao `UNIT_ALIAS` (não existe ainda — provavelmente é CP_AN).
+- Idempotência: cada parser usa `block_key` estável; upsert por `(meta_key, mes_ref, loja_codigo, block_key)`.
 
-## Premissas que vou adotar (ajusto depois se precisar)
-
-- Planilha #3: layout `Loja | Google | TripAdvisor | iFood`.
-- Comentários: esquema padrão `data | loja | canal | nota | autor | comentario` (extras ignorados).
-- Classificador AI inicia **desligado**; você liga quando quiser testar.
+Tempo estimado: ~1 ciclo grande de implementação (parsers + 1 componente novo + ajustes nos 4 views).

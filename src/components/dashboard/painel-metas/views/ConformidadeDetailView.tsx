@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { MetricKpiCard } from "../shared/MetricKpiCard";
 import { PainelFilters, type BrandFilter } from "../shared/PainelFilters";
 import { getLojaDisplay } from "@/lib/lojaUtils";
-import { useConformidadeData, classifySector, type SectorGroup } from "@/hooks/useConformidadeData";
+import { useConformidadeData, type SectorGroup } from "@/hooks/useConformidadeData";
 import { useLojaCodigoMap } from "../shared/useLojaCodigoMap";
 import { calcConformidadeStatus } from "@/lib/metasUtils";
 import {

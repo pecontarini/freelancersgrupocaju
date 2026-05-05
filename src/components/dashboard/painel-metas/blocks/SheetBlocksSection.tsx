@@ -4,6 +4,7 @@ import { MatrixBlock } from "./MatrixBlock";
 import { SeriesBlock } from "./SeriesBlock";
 import { DistributionBlock } from "./DistributionBlock";
 import { ItemTableBlock } from "./ItemTableBlock";
+import { KpiStripBlock } from "./KpiStripBlock";
 import { Loader2, FileSpreadsheet } from "lucide-react";
 
 function renderBlock(block: SheetBlock) {
@@ -13,6 +14,7 @@ function renderBlock(block: SheetBlock) {
     case "series": return <SeriesBlock key={block.id} block={block} />;
     case "distribution": return <DistributionBlock key={block.id} block={block} />;
     case "item_table": return <ItemTableBlock key={block.id} block={block} />;
+    case "kpi_strip": return <KpiStripBlock key={block.id} block={block} />;
     default: return null;
   }
 }

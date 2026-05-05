@@ -199,6 +199,20 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
           <p className="text-xs text-muted-foreground">
             Score consolidado por unidade · Back/Front · meta ≥ 90 · red flag &lt; 75
           </p>
+          {linkedSource && (
+            <Badge
+              variant="outline"
+              className="mt-1 inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+            >
+              <FileSpreadsheet className="h-3 w-3" />
+              Fonte: {linkedSource.nome}
+              {linkedSource.ultima_sincronizacao && (
+                <span className="opacity-70">
+                  · sync {format(new Date(linkedSource.ultima_sincronizacao), "dd/MM HH:mm", { locale: ptBR })}
+                </span>
+              )}
+            </Badge>
+          )}
         </div>
         <PainelFilters
           brand={brand}

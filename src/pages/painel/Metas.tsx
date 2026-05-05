@@ -98,7 +98,7 @@ export default function MetasPage() {
               {/* Conteúdo */}
               <div className="min-w-0 flex-1">
                 {safeView === "visao-geral" && (
-                  <VisaoGeralCompactView restrictToLojaCodigo={restrictToLojaCodigo} />
+                  <ExecutiveOverviewView restrictToLojaCodigo={restrictToLojaCodigo} onNavigate={setView} />
                 )}
                 {isMetricKey(safeView) && (
                   <MetricDetailView

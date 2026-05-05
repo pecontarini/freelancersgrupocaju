@@ -56,13 +56,14 @@ function MetaSourceCard({
   const [preview, setPreview] = useState<PreviewState>({ loading: false });
 
   const validation = url ? validateSheetsCsvUrl(url) : { valid: true };
+  const normalizedUrl = url && validation.valid ? normalizeSheetsUrl(url) : null;
 
   const handleTest = async () => {
-    if (!validation.valid || !url) return;
+    if (!validation.valid || !normalizedUrl) return;
     setPreview({ loading: true });
     try {
       const { data, error } = await supabase.functions.invoke("test-sheet-source", {
-        body: { url },
+        body: { url: normalizedUrl },
       });
       if (error) throw error;
       if (data?.error) {
@@ -84,11 +85,11 @@ function MetaSourceCard({
   };
 
   const handleSave = async () => {
-    if (!validation.valid || !url || !nome.trim()) {
+    if (!validation.valid || !normalizedUrl || !nome.trim()) {
       toast.error("Preencha nome e URL válida.");
       return;
     }
-    await linkSourceToMeta.mutateAsync({ metaKey, url, nome: nome.trim() });
+    await linkSourceToMeta.mutateAsync({ metaKey, url: normalizedUrl, nome: nome.trim() });
     setOpen(false);
     setPreview({ loading: false });
   };

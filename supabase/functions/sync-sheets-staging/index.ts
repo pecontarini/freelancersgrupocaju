@@ -65,9 +65,9 @@ const UNIT_ALIAS: Record<string, string> = {
   'NZ AS': 'NZ_AS', 'NZAS': 'NZ_AS', 'NAZO ASA SUL': 'NZ_AS',
   'NZ AC': 'NZ_AC', 'NZAC': 'NZ_AC', 'NAZO AGUAS CLARAS': 'NZ_AC', 'NAZO JAPANESE FOOD AGUAS CLARAS': 'NZ_AC',
   'NZ SG': 'NZ_SG', 'NZSG': 'NZ_SG', 'NAZO SIG': 'NZ_SG', 'NAZO SUDOESTE': 'NZ_SG', 'NAZO JAPANESE FOOD SUDOESTE': 'NZ_SG',
-  'NZ GO': 'NZ_GO', 'NZGO': 'NZ_GO', 'NAZO GO': 'NZ_GO', 'NAZO GOIANIA': 'NZ_GO',
-  'CJ AN': 'CJ_AN', 'CJAN': 'CJ_AN', 'CAJU ASA NORTE': 'CJ_AN',
-  'CJ SG': 'CJ_SG', 'CJSG': 'CJ_SG', 'CAJU SIG': 'CJ_SG', 'CAJU SUDOESTE': 'CJ_SG',
+  'NZ GO': 'NZ_GO', 'NZGO': 'NZ_GO', 'NZ GYN': 'NZ_GO', 'NZGYN': 'NZ_GO', 'NAZO GO': 'NZ_GO', 'NAZO GOIANIA': 'NZ_GO',
+  'CJ AN': 'CJ_AN', 'CJAN': 'CJ_AN', 'CAJU AN': 'CJ_AN', 'CAJU ASA NORTE': 'CJ_AN',
+  'CJ SG': 'CJ_SG', 'CJSG': 'CJ_SG', 'CAJU SG': 'CJ_SG', 'CAJU SIG': 'CJ_SG', 'CAJU SUDOESTE': 'CJ_SG',
   // For salmao sheet (just neighborhood names; assume Nazo)
   'AGUAS CLARAS': 'NZ_AC',
   'SIG': 'NZ_SG',
@@ -89,6 +89,16 @@ function matchLojaCodigo(raw: string): string | null {
   for (const alias of sorted) {
     if (n.includes(alias)) return UNIT_ALIAS[alias];
   }
+  if (n.includes('CAMINITO') && n.includes('ASA NORTE')) return 'CP_AN';
+  if (n.includes('CAMINITO') && n.includes('ASA SUL')) return 'CP_AS';
+  if (n.includes('CAMINITO') && n.includes('AGUAS CLARAS')) return 'CP_AC';
+  if (n.includes('CAMINITO') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'CP_SG';
+  if (n.includes('CAJU') && n.includes('ASA NORTE')) return 'CJ_AN';
+  if (n.includes('CAJU') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'CJ_SG';
+  if (n.includes('NAZO') && n.includes('ASA SUL')) return 'NZ_AS';
+  if (n.includes('NAZO') && n.includes('AGUAS CLARAS')) return 'NZ_AC';
+  if (n.includes('NAZO') && (n.includes('SUDOESTE') || n.includes('SIG'))) return 'NZ_SG';
+  if (n.includes('NAZO') && (n.includes('GOIANIA') || n.includes('GYN') || n.includes('GO'))) return 'NZ_GO';
   return null;
 }
 
@@ -112,6 +122,20 @@ function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
   return isNaN(Number(gidOrName))
     ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
     : `${base}&gid=${gidOrName}`;
+}
+
+function buildCsvExportUrl(sheetId: string, gidOrName: string | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+  if (!gidOrName) return base;
+  return isNaN(Number(gidOrName))
+    ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
+    : `${base}&gid=${gidOrName}`;
+}
+
+async function fetchCsvGrid(url: string): Promise<string[][]> {
+  const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ao buscar CSV da planilha`);
+  return parseCSV(await resp.text());
 }
 
 async function fetchGvizGrid(url: string): Promise<string[][]> {
@@ -139,9 +163,9 @@ function shiftMonth(mes: string, delta: number): string {
 
 function normalizeSheetsUrl(raw: string): string | null {
   if (!raw) return null;
-  const { sheetId, gid } = extractSheetParams(raw.trim());
+  const { sheetId, gid, sheetName } = extractSheetParams(raw.trim());
   if (!sheetId) return null;
-  return buildGvizUrl(sheetId, gid);
+  return buildGvizUrl(sheetId, gid ?? sheetName);
 }
 
 function parseDateBR(s: string): string | null {
@@ -995,19 +1019,25 @@ function parseNpsAtendimento(grid: string[][]): ParseResult {
   type Agg = { sumNotaQtd: number; sumQtd: number };
   const atendimento = new Map<string, Agg>();
   const delivery = new Map<string, Agg>();
+  const header = grid[0] || [];
+  const groupStarts = header
+    .map((cell, idx) => /^plataforma$/i.test((cell || '').trim()) ? idx : -1)
+    .filter(idx => idx >= 0);
+  const starts = groupStarts.length >= 4 ? groupStarts.slice(0, 4) : [0, 4, 8, 12];
 
   for (let i = 1; i < grid.length; i++) {
     const r = grid[i];
     if (!r || !r.length) continue;
-    for (let g = 0; g < 4; g++) {
-      const off = g * 4;
+    for (let g = 0; g < starts.length; g++) {
+      const off = starts[g];
+      const plataforma = normTxt(r[off] || header[off] || '');
       const restRaw = (r[off + 1] || '').trim();
       const nota = _parseInt(r[off + 2]);
       const qtd = _parseInt(r[off + 3]);
       if (!restRaw || !qtd || qtd <= 0 || nota === null) continue;
       const code = matchLojaCodigo(restRaw);
       if (!code) continue;
-      const target = g <= 1 ? atendimento : delivery;
+      const target = plataforma.includes('GOOGLE') || plataforma.includes('TRIP') ? atendimento : delivery;
       const cur = target.get(code) || { sumNotaQtd: 0, sumQtd: 0 };
       cur.sumNotaQtd += nota * qtd;
       cur.sumQtd += qtd;
@@ -1062,11 +1092,11 @@ function parseAvaliacoesFaturamento(grid: string[][]): ParseResult {
   }
 
   const readBlock = (startCol: number, target: Row[]) => {
-    for (let i = 2; i < grid.length; i++) {
+    for (let i = 1; i < grid.length; i++) {
       const r = grid[i];
       const lojaRaw = (r[startCol] || '').trim();
-      if (!lojaRaw) break;
-      if (/total/i.test(lojaRaw)) continue;
+      if (!lojaRaw) continue;
+      if (/total|loja/i.test(lojaRaw)) continue;
       const code = matchLojaCodigo(lojaRaw);
       if (!code) continue;
       const aval13 = _parseInt(r[startCol + 1]) ?? 0;
@@ -1077,8 +1107,14 @@ function parseAvaliacoesFaturamento(grid: string[][]): ParseResult {
       target.push({ loja: lojaRaw, loja_codigo: code, aval13, totalAval, pct, fatTotal, rsPorAval });
     }
   };
-  readBlock(1, salao);
-  readBlock(7, delivery);
+  const lojaCols: number[] = [];
+  for (let i = 0; i < Math.min(grid.length, 5); i++) {
+    for (let j = 0; j < (grid[i] || []).length; j++) {
+      if (/^loja$/i.test((grid[i][j] || '').trim()) || /per[ií]odo:.*loja/i.test(grid[i][j] || '')) lojaCols.push(j);
+    }
+  }
+  readBlock(lojaCols[0] ?? 2, salao);
+  readBlock(lojaCols[1] ?? 10, delivery);
 
   const rows: MetaRow[] = [];
   for (const r of salao) rows.push({ loja_codigo: r.loja_codigo, valor: r.pct });
@@ -1236,6 +1272,7 @@ function parseBaseAvaliacoes(grid: string[][]): ParseResult {
       ordem: 0,
     });
   }
+  if (!reclamacoes.length) return parseReclamacoesDist(grid);
   return { rows, blocks };
 }
 
@@ -1345,8 +1382,15 @@ serve(async (req) => {
       console.warn('[sync] Aba Depara ausente/inválida em', sheetId, e instanceof Error ? e.message : e);
     }
 
-    // Grid principal via gviz
-    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    // Grid principal: CSV preserva linhas de cabeçalho em abas com células mescladas;
+    // gviz é mantido para abas por nome (ex.: BASE dados) onde export CSV ignora sheet=.
+    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes'].includes(metaKey);
+    let grid = preferCsv
+      ? await fetchCsvGrid(buildCsvExportUrl(sheetId, gid ?? sheetName))
+      : await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    if (preferCsv && grid.length <= 1) {
+      grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    }
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);

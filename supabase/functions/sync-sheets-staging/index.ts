@@ -981,7 +981,7 @@ serve(async (req) => {
     if (srcErr || !source) throw new Error('Fonte não encontrada.');
 
     const sourceUrl = source.url || body.url || '';
-    const { sheetId, gid } = extractSheetParams(sourceUrl);
+    const { sheetId, gid, sheetName } = extractSheetParams(sourceUrl);
     if (!sheetId) throw new Error('URL inválida — não foi possível extrair o sheetId.');
     const metaKey = source.meta_key;
     if (!metaKey) throw new Error('Esta fonte não tem `meta_key` definido.');

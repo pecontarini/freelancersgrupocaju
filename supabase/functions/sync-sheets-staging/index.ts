@@ -1369,8 +1369,15 @@ serve(async (req) => {
       console.warn('[sync] Aba Depara ausente/inválida em', sheetId, e instanceof Error ? e.message : e);
     }
 
-    // Grid principal via gviz
-    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    // Grid principal: CSV preserva linhas de cabeçalho em abas com células mescladas;
+    // gviz é mantido para abas por nome (ex.: BASE dados) onde export CSV ignora sheet=.
+    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes'].includes(metaKey);
+    let grid = preferCsv
+      ? await fetchCsvGrid(buildCsvExportUrl(sheetId, gid ?? sheetName))
+      : await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    if (preferCsv && grid.length <= 1) {
+      grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
+    }
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);

@@ -103,12 +103,20 @@ export default function MetasPage() {
                 {safeView === "visao-geral" && (
                   <ExecutiveOverviewView restrictToLojaCodigo={restrictToLojaCodigo} onNavigate={setView} />
                 )}
-                {isMetricKey(safeView) && (
-                  <MetricDetailView
-                    metric={safeView}
-                    restrictToLojaCodigo={restrictToLojaCodigo}
-                    hideCargoTabs={hideCargoTabs}
-                  />
+                {safeView === "nps" && (
+                  <NpsReclamacoesView restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "cmv-salmao" && (
+                  <CmvDetailView variant="salmao" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "cmv-carnes" && (
+                  <CmvDetailView variant="carnes" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "kds" && (
+                  <KdsConformidadeView metric="kds" restrictToLojaCodigo={restrictToLojaCodigo} />
+                )}
+                {safeView === "conformidade" && (
+                  <KdsConformidadeView metric="conformidade" restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "ranking" && showManagerPlus && <RankingView />}
                 {safeView === "comparativo" && showManagerPlus && <ComparativoView />}

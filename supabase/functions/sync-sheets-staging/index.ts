@@ -134,13 +134,9 @@ function shiftMonth(mes: string, delta: number): string {
 
 function normalizeSheetsUrl(raw: string): string | null {
   if (!raw) return null;
-  const t = raw.trim();
-  if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(t)) return t;
-  const idMatch = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  if (!idMatch) return null;
-  const gidMatch = t.match(/[#?&]gid=(\d+)/);
-  const gid = gidMatch ? gidMatch[1] : '0';
-  return `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gid}`;
+  const { sheetId, gid } = extractSheetParams(raw.trim());
+  if (!sheetId) return null;
+  return buildGvizUrl(sheetId, gid);
 }
 
 function parseDateBR(s: string): string | null {

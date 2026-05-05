@@ -129,6 +129,10 @@ const Index = () => {
         navigate("/agenda");
         return;
       }
+      if (tab === "painel") {
+        navigate("/painel/metas");
+        return;
+      }
       setActiveTab(tab);
     },
     [navigate]

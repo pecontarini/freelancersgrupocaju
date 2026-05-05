@@ -1,84 +1,26 @@
-## Diagnóstico
-
-A aba **Configurações** é renderizada por `src/components/dashboard/ConfiguracoesTab.tsx`, que envolve dois componentes:
-
-1. `ConfigurationsTab` (`src/components/ConfigurationsTab.tsx`) — contém todos os blocos abaixo
-2. `UserManagement` (`src/components/UserManagement.tsx`) — gestão de usuários
-
-### Blocos atualmente renderizados em `ConfigurationsTab`
-
-| # | Componente | Permissão | Ação |
-|---|-----------|-----------|------|
-| 1 | `ClearEntriesModal` (header) | Admin | Manter |
-| 2 | `UnitPartnershipsSection` — Lojas Casadas | Admin/Operador | Manter |
-| 3 | `OperationalBudgetSection` — Orçamento operacional | Admin/Operador | Manter |
-| 4 | `CargosConfigSection` — Cargos V2 | Admin | Manter |
-| 5 | `BonusConfigSection` — Regras de bônus legacy | Admin | Manter |
-| 6 | `MetaSheetsLinker` — Vínculo planilha → meta do Painel | Admin | **Manter** (exceção pedida) |
-| 7 | `GoogleSheetsSync` — Sync Sheets geral | Admin | **Remover** |
-| 8 | `ChecklistImportSection` — Import Checklist Fácil | Admin/Gerente | **Remover** |
-| 9 | `LegacySyncPanel` — PDF Miner / legado | Admin | **Remover** |
-| 10 | `ConfigSection` × 3 — Lojas / Funções / Gerências | Todos | Manter |
-| 11 | `UserManagement` (no wrapper) | conforme hook | Manter |
+## Objetivo
+Permitir colar qualquer link de planilha Google (formatos `/edit`, `/edit#gid=`, `/view`, `/export?format=csv`, `/gviz/tq`) no vínculo de metas. O sistema converte automaticamente para o CSV canônico antes de salvar/testar.
 
 ## Mudanças
 
-### 1. Remoções em `src/components/ConfigurationsTab.tsx`
+### 1. `src/hooks/useSheetsSources.ts`
+- Adicionar `extractSheetId(url)` e `extractGid(url)` (helpers internos).
+- Adicionar `normalizeSheetsUrl(url)` exportado: devolve sempre `https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}`. URLs `gviz/tq` são preservadas.
+- Simplificar `validateSheetsCsvUrl`: aceita qualquer URL `docs.google.com/spreadsheets/d/...` desde que tenha ID.
+- `parseSheetsCsvUrl` passa a usar os helpers (aceita qualquer formato).
+- Em `createSource`, `updateSource` e `linkSourceToMeta`: chamar `normalizeSheetsUrl(input.url)` antes do insert/update — o que vai pro banco é sempre CSV canônico.
 
-Remover imports e usos de:
-- `GoogleSheetsSync` (`@/components/GoogleSheetsSync`)
-- `ChecklistImportSection` (`@/components/ChecklistImportSection`)
-- `LegacySyncPanel` (`@/components/LegacySyncPanel`)
+### 2. `src/components/sheets/MetaSheetsLinker.tsx`
+- Atualizar `DialogDescription`: "Cole o link da planilha (qualquer formato — `/edit`, `/view` ou `/export`). Convertemos automaticamente para CSV. Compartilhe como 'Qualquer pessoa com o link'."
+- Abaixo do input URL, mostrar preview da URL CSV gerada via `normalizeSheetsUrl(url)` quando válida: `→ vai ler: …/export?format=csv&gid=N`.
+- `handleTest` e `handleSave` usam `normalizeSheetsUrl(url)` antes de chamar a edge function / mutation.
+- Texto do placeholder atualizado para mostrar exemplo `/edit#gid=0`.
 
-Não remover os arquivos em si (podem ser referenciados em outros lugares — verifico antes). Apenas desplugar da tela de Configurações. Não há estados/funções locais associados a esses três blocos dentro de `ConfigurationsTab` (são auto-contidos), então a remoção é só dos JSX + imports.
+### 3. `supabase/functions/sync-sheets-staging/index.ts`
+Defesa em profundidade: replicar `normalizeSheetsUrl` no servidor e aplicar ao `url` recebido antes do regex de validação. Se chegar um link `/edit`, ele é convertido lá também antes do `fetch`.
 
-### 2. Reorganização visual
-
-Reescrever o JSX de `ConfigurationsTab` agrupando o que sobrou em **4 grupos** dentro de containers `glass-card`, na ordem:
-
-```text
-┌─ Header (título + ClearEntriesModal) ─────────┐
-│                                                │
-├─ GRUPO 1 · INTEGRAÇÕES (Plug)  ───────────────┤
-│   • MetaSheetsLinker                           │
-│                                                │
-├─ GRUPO 2 · OPERAÇÃO & FINANCEIRO (Building2) ─┤
-│   • UnitPartnershipsSection                    │
-│   • OperationalBudgetSection                   │
-│                                                │
-├─ GRUPO 3 · CARGOS & BÔNUS (Briefcase) ────────┤
-│   • CargosConfigSection                        │
-│   • BonusConfigSection                         │
-│                                                │
-├─ GRUPO 4 · CADASTROS BÁSICOS (Settings2) ─────┤
-│   grid 1 col mobile / 2 cols md / 3 cols lg    │
-│   • Lojas · Funções · Gerências (ConfigSection)│
-└────────────────────────────────────────────────┘
-```
-
-Padrão de cabeçalho de cada grupo:
-```tsx
-<div className="flex items-center gap-2 mb-4">
-  <Icon className="h-4 w-4 text-primary" />
-  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-    Nome do Grupo
-  </h3>
-</div>
-```
-
-Container do grupo: `glass-card p-6 rounded-2xl` com `space-y-6` interno.
-Espaçamento entre grupos: `space-y-8` no container raiz.
-
-Grupos 2 e 3 (sub-cards independentes) podem ir em `grid md:grid-cols-2 gap-6` quando os dois cards filhos forem renderizados — mas como cada subseção já é um Card próprio, manter empilhado dentro do glass-card mantém a leitura. Vou usar `grid md:grid-cols-1` (empilhado) porque cada subseção é larga (tabelas/forms) e quebraria mal em 2 cols. Apenas o grid de **Cadastros Básicos** (grupo 4) é `md:grid-cols-2 lg:grid-cols-3`.
-
-### 3. Verificação fora do escopo
-
-Antes de editar, conferir com `rg` se `GoogleSheetsSync`, `ChecklistImportSection`, `LegacySyncPanel` são importados em outros arquivos. Se forem só usados em `ConfigurationsTab.tsx`, a remoção da referência é suficiente (arquivos ficam órfãos, mas não quebram o build). Não excluo arquivos para evitar efeito colateral.
-
-### Arquivos alterados
-- `src/components/ConfigurationsTab.tsx` (único arquivo modificado)
-
-### Restrições respeitadas
-- Nenhuma rota tocada
-- Nenhuma outra página alterada
-- Sem reescrever do zero — apenas remover 3 blocos e reagrupar o restante
+## Restrições
+- Banco: nenhuma alteração de schema.
+- Rotas: nenhuma.
+- Outras telas: nenhuma.
+- Pré-requisito de compartilhamento da planilha ("Qualquer pessoa com o link → Visualizador") permanece — o botão **Testar conexão** continua sendo a verificação.

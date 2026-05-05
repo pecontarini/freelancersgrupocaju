@@ -1092,11 +1092,11 @@ function parseAvaliacoesFaturamento(grid: string[][]): ParseResult {
   }
 
   const readBlock = (startCol: number, target: Row[]) => {
-    for (let i = 2; i < grid.length; i++) {
+    for (let i = 1; i < grid.length; i++) {
       const r = grid[i];
       const lojaRaw = (r[startCol] || '').trim();
-      if (!lojaRaw) break;
-      if (/total/i.test(lojaRaw)) continue;
+      if (!lojaRaw) continue;
+      if (/total|loja/i.test(lojaRaw)) continue;
       const code = matchLojaCodigo(lojaRaw);
       if (!code) continue;
       const aval13 = _parseInt(r[startCol + 1]) ?? 0;
@@ -1107,8 +1107,14 @@ function parseAvaliacoesFaturamento(grid: string[][]): ParseResult {
       target.push({ loja: lojaRaw, loja_codigo: code, aval13, totalAval, pct, fatTotal, rsPorAval });
     }
   };
-  readBlock(1, salao);
-  readBlock(7, delivery);
+  const lojaCols: number[] = [];
+  for (let i = 0; i < Math.min(grid.length, 5); i++) {
+    for (let j = 0; j < (grid[i] || []).length; j++) {
+      if (/^loja$/i.test((grid[i][j] || '').trim()) || /per[ií]odo:.*loja/i.test(grid[i][j] || '')) lojaCols.push(j);
+    }
+  }
+  readBlock(lojaCols[0] ?? 2, salao);
+  readBlock(lojaCols[1] ?? 10, delivery);
 
   const rows: MetaRow[] = [];
   for (const r of salao) rows.push({ loja_codigo: r.loja_codigo, valor: r.pct });

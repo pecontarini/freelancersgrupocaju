@@ -75,16 +75,55 @@ const UNIT_ALIAS: Record<string, string> = {
   'GOIANIA': 'NZ_GO',
 };
 
+// Mapa Depara dinâmico (preenchido por sincronização a partir da aba "Depara")
+let DEPARA_MAP: Record<string, string> = {};
+
 function matchLojaCodigo(raw: string): string | null {
   const n = normTxt(raw);
   if (!n) return null;
+  // 1) Depara da planilha (case-insensitive, sem acento)
+  const deparaHit = DEPARA_MAP[n] ?? DEPARA_MAP[(raw || '').trim().toLowerCase()];
+  if (deparaHit) return deparaHit;
   if (UNIT_ALIAS[n]) return UNIT_ALIAS[n];
-  // Try contained match (longest first to avoid CP AN matching inside something else)
   const sorted = Object.keys(UNIT_ALIAS).sort((a, b) => b.length - a.length);
   for (const alias of sorted) {
     if (n.includes(alias)) return UNIT_ALIAS[alias];
   }
   return null;
+}
+
+// ============================================================
+// Google Sheets — gviz/tq helpers
+// ============================================================
+function extractSheetParams(url: string): { sheetId: string; gid: string | null } {
+  const idMatch = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
+  const gidMatch = (url || '').match(/[#&?]gid=(\d+)/);
+  return { sheetId: idMatch?.[1] ?? '', gid: gidMatch?.[1] ?? null };
+}
+
+function buildGvizUrl(sheetId: string, gidOrName: string | null): string {
+  const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+  if (!gidOrName) return base;
+  return isNaN(Number(gidOrName))
+    ? `${base}&sheet=${encodeURIComponent(gidOrName)}`
+    : `${base}&gid=${gidOrName}`;
+}
+
+async function fetchGvizGrid(url: string): Promise<string[][]> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ao buscar planilha`);
+  const text = await resp.text();
+  const m = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+  if (!m) throw new Error('Formato gviz inesperado — planilha pode estar privada ou com link inválido.');
+  const json = JSON.parse(m[1]);
+  if (!json?.table) throw new Error('Resposta gviz sem tabela.');
+  const cols = (json.table.cols || []) as Array<{ label?: string }>;
+  const rows = (json.table.rows || []) as Array<{ c: Array<{ v: unknown; f?: string } | null> }>;
+  const header = cols.map(c => (c?.label ?? '').toString());
+  const body = rows.map(r =>
+    (r.c || []).map(cell => (cell?.f ?? (cell?.v == null ? '' : String(cell.v))))
+  );
+  return [header, ...body];
 }
 
 function shiftMonth(mes: string, delta: number): string {

@@ -314,9 +314,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                   </span>
                   <span className="flex-1 truncate text-sm">{d.nome}</span>
                   <span className="font-[Sora] text-sm font-semibold tabular-nums">
-                    {false
-                      ? formatNpsDisplay(l.values[ranking.metric])
-                      : (l.values[ranking.metric] as number | null)?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                    {formatNpsDisplay(l.values[ranking.metric])}
                   </span>
                 </button>
               );

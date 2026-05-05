@@ -66,8 +66,8 @@ const UNIT_ALIAS: Record<string, string> = {
   'NZ AC': 'NZ_AC', 'NZAC': 'NZ_AC', 'NAZO AGUAS CLARAS': 'NZ_AC', 'NAZO JAPANESE FOOD AGUAS CLARAS': 'NZ_AC',
   'NZ SG': 'NZ_SG', 'NZSG': 'NZ_SG', 'NAZO SIG': 'NZ_SG', 'NAZO SUDOESTE': 'NZ_SG', 'NAZO JAPANESE FOOD SUDOESTE': 'NZ_SG',
   'NZ GO': 'NZ_GO', 'NZGO': 'NZ_GO', 'NZ GYN': 'NZ_GO', 'NZGYN': 'NZ_GO', 'NAZO GO': 'NZ_GO', 'NAZO GOIANIA': 'NZ_GO',
-  'CJ AN': 'CJ_AN', 'CJAN': 'CJ_AN', 'CAJU ASA NORTE': 'CJ_AN',
-  'CJ SG': 'CJ_SG', 'CJSG': 'CJ_SG', 'CAJU SIG': 'CJ_SG', 'CAJU SUDOESTE': 'CJ_SG',
+  'CJ AN': 'CJ_AN', 'CJAN': 'CJ_AN', 'CAJU AN': 'CJ_AN', 'CAJU ASA NORTE': 'CJ_AN',
+  'CJ SG': 'CJ_SG', 'CJSG': 'CJ_SG', 'CAJU SG': 'CJ_SG', 'CAJU SIG': 'CJ_SG', 'CAJU SUDOESTE': 'CJ_SG',
   // For salmao sheet (just neighborhood names; assume Nazo)
   'AGUAS CLARAS': 'NZ_AC',
   'SIG': 'NZ_SG',

@@ -180,15 +180,22 @@ export function useSheetsSources() {
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('sheets_sources')
         .update({ ativo })
-        .eq('id', id);
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Sem permissão para alterar esta fonte (apenas admins).');
     },
-    onSuccess: () => {
+    onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ['sheets_sources'] });
+      toast.success(vars.ativo ? 'Fonte ativada.' : 'Fonte desativada.');
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Erro ao alterar status da fonte.');
     },
   });
 

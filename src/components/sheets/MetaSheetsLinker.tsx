@@ -22,8 +22,17 @@ import { META_DEFINITIONS } from "@/components/dashboard/painel-metas/shared/met
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ReclamacoesCommentsToggle } from "./ReclamacoesCommentsToggle";
 
-// Metas que aceitam vínculo com planilha externa
+// Definição leve para metas "extras" não presentes em MetaKey
+type ExtraMetaDef = { key: string; label: string; description: string };
+const EXTRA_LINKABLE_METAS: ExtraMetaDef[] = [
+  { key: "target-preto", label: "KDS · Target Preto (Matriz)", description: "Matriz Categoria × Loja com % de target preta" },
+  { key: "atendimento-medias", label: "Atendimento — Médias (Google/TripAdvisor/iFood)", description: "Médias por canal — placeholder até popular" },
+  { key: "reclamacoes", label: "Reclamações — Distribuição", description: "Distribuição 1–5 estrelas por loja" },
+];
+
+// Metas core do MetaKey
 const LINKABLE_METAS: MetaKey[] = [
   "visao-geral",
   "nps",

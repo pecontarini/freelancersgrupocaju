@@ -1,133 +1,104 @@
 ## Objetivo
 
-Reescrever 5 parsers da edge function `sync-sheets-staging` para ler corretamente as abas/colunas reais das planilhas, ajustar a URL da fonte NPS para a aba "BASE dados", e atualizar o `dispatchParser` para mapear as novas chaves.
+Substituir a fonte de dados do Painel de Indicadores (hoje `useSheetBlocks` lendo `sheets_blocks_snapshot` populado pela edge function `sync-sheets-staging`) por um fluxo de **upload manual de planilha Excel por mês**. Cada upload gera um snapshot versionado em `indicadores_snapshots`, permitindo navegar pelo histórico mês a mês.
 
-Sem alterar UI, hooks ou outros parsers (`parseConformidade`, `parseCmvSalmaoSeries`, `parseCmvCarnesItens`, `parseGenericMeta` ficam intactos).
+O motor de sync (Sheets → staging) **permanece intacto**. Apenas o painel passa a consumir a nova tabela de snapshots.
 
----
+## Escopo (5 indicadores)
 
-## Etapa 1 — UPDATE da URL da fonte NPS (data operation)
+| meta_key | Label |
+|---|---|
+| `ranking-supervisores` | Ranking Supervisores (Checklist) |
+| `nps` | NPS — Notas de Atendimento |
+| `atendimento-medias` | Avaliações 1-3 / Faturamento |
+| `kds-target-preto` | KDS — Target Preto |
+| `reclamacoes` | Base de Avaliações / Comentários |
 
-Via tool `supabase--read_query` + insert/update tool (data, não migration):
+## Etapa 1 — Migration
 
-```sql
-UPDATE sheets_sources
-SET url = 'https://docs.google.com/spreadsheets/d/138MkoGLwTM10q8I_9hQCyOpeVQy2UhcB/gviz/tq?tqx=out:json&sheet=BASE%20dados'
-WHERE meta_key = 'nps';
-```
+Criar tabela `public.indicadores_snapshots`:
 
-A função `extractSheetParams` extrai `sheetId` corretamente; quando `gid` é null e a URL contém `&sheet=...`, o `buildGvizUrl` precisa preservar isso. Verificar — caso contrário, ajustar `extractSheetParams` para também capturar o parâmetro `sheet=` e usá-lo como nome de aba em `buildGvizUrl`.
+- `id uuid PK`, `meta_key text`, `referencia_mes text` (`YYYY-MM`), `referencia_label text`, `dados jsonb`, `arquivo_nome text`, `linhas_importadas int`, `uploaded_by uuid → auth.users`, `created_at timestamptz`
+- `UNIQUE(meta_key, referencia_mes)` — permite upsert por mês
+- RLS habilitado: SELECT/INSERT/UPDATE para `authenticated` (mesmo padrão dos outros snapshots do painel)
 
----
+## Etapa 2 — Hooks
 
-## Etapa 2 — Reescrever parsers em `supabase/functions/sync-sheets-staging/index.ts`
+`src/hooks/useIndicadoresSnapshot.ts`:
 
-Substituir as 5 funções abaixo (mantendo assinatura `(grid: string[][]) => ParseResult`):
+- `useIndicadoresSnapshot(metaKey, referenciaMes?)` — retorna `{ dados, meta, loading, error }`. Sem `referenciaMes` → busca o mais recente (`order referencia_mes desc limit 1`).
+- `useIndicadoresHistorico(metaKey)` — lista de `SnapshotMeta[]` (sem `dados`) ordenada DESC, para popular o seletor.
 
-### 2.1 `parseSupervisoresRanking` (NOVA — substitui o uso de `parseGenericMeta` para `ranking-supervisores`)
+## Etapa 3 — Parsers client-side (SheetJS)
 
-- Detecta seções por header contendo `GERAL`, `GERENTE BACK`, `GERENTE FRONT`.
-- Captura período da linha de seção (regex `/Período[:\s]+(.+)/i`) ou linha seguinte.
-- Para cada linha após header: busca padrão `[posição com "º", unidade, valor com "%"]`.
-- Ignora "Total Geral", "Período:", cabeçalhos.
-- Emite 3 blocks `ranking` (`ranking_geral`, `ranking_back`, `ranking_front`), cada um com `payload: { label, periodo, suffix: '%', polarity: 'higher', items: [{posicao, loja_codigo, valor}] }`.
-- `rows` (KPI agregado): valores da seção GERAL.
+`xlsx` já está disponível no projeto. Criar `src/lib/indicadores-parsers.ts` com helpers `sheetToGrid`, `toNum`, `toStr` e 5 funções `parse*(wb)` → `{ dados, linhas }`:
 
-### 2.2 `parseNpsAtendimento` (substitui `parseAtendimentoMedias` para `nps`)
+1. **parseSupervisoresRanking** — aba `GERAL E GERENTES`; detecta seções `geral` / `gerenteBack` / `gerenteFront`; lê `posicao` (col C), `unidade` (D), `media` (E); captura `Período:`.
+2. **parseNpsAtendimento** — aba `BASE dados`; grupos de 4 colunas (offsets 0,4,8,12); agrega por restaurante separando Atendimento (Google + TripAdvisor) vs Delivery (iFood + iFood Dark) com média ponderada.
+3. **parseAvaliacoesFaturamento** — primeira aba; detecta dinamicamente colunas "Loja" do bloco Salão e Delivery; lê 6 colunas por bloco.
+4. **parseKdsTargetPreto** — aba `Salão` (fallback primeira); extrai data de atualização da linha 0; agrupa por loja com categorias e total geral.
+5. **parseBaseAvaliacoes** — abas `Consolidado` → `Google` → primeira; retorna **todas** as avaliações (filtro fica no componente).
 
-- Skip linha 0 (header).
-- Para cada linha, lê 4 grupos de 4 colunas em offsets 0, 4, 8, 12: `{plataforma, restaurante, nota:int, qtd:int}`.
-- Ignora itens com `qtd === 0` ou restaurante vazio.
-- Mapeia `restaurante` via `matchLojaCodigo`.
-- Agrupa por loja:
-  - **Atendimento** = Google + TripAdvisor (grupos 0, 1) — média ponderada `Σ(nota·qtd)/Σ(qtd)`.
-  - **Delivery** = iFood + iFood Dark (grupos 2, 3) — mesma fórmula.
-- Emite 2 blocks `ranking`:
-  - `ranking_atendimento` (polarity higher, decimals 2, suffix '★'), itens ordenados desc.
-  - `ranking_delivery` (idem).
-- `rows`: para cada loja, valor = média de atendimento (ou geral se atendimento ausente).
+Mapa `PARSERS` indexado por `meta_key`. A lógica espelha os parsers da edge function, adaptada para `XLSX.WorkBook` (células podem ser numéricas nativas).
 
-### 2.3 `parseAvaliacoesFaturamento` (NOVA — usada por `atendimento-medias`)
+## Etapa 4 — UploadIndicadorModal
 
-- Linha 0 vazia, linha 1 contém títulos "Salão" / "Delivery" (extrair período se presente em linha 0 ou junto).
-- Bloco Salão: cols B–G (índices 1–6): `[loja(1), aval13(2), totalAval(3), pct(4), fatTotal(5), rsPorAval(6)]`.
-- Bloco Delivery: cols H–M (índices 7–12): mesma ordem em `[7..12]`.
-- Dados a partir da linha 2; parar quando `loja` (col 1 ou 7) vazia.
-- Helpers locais: `parseBRL`, `parsePct`.
-- Emite block único `item_table` `tabela_aval_fat` com `payload: { label, periodo, salao: [...], delivery: [...] }`.
-- `rows`: opcional — média de `pct` (Salão) por loja para KPI agregado.
+`src/components/indicadores/UploadIndicadorModal.tsx` — Dialog estilo glass + accent amber:
 
-### 2.4 `parseKdsTargetPreto` (substitui o atual `parseTargetPretoKds`)
+1. Select de indicador (5 opções com labels amigáveis).
+2. `input type="month"` para mês de referência; gera label `"Abril 2026"` em pt-BR.
+3. Drag-and-drop `.xlsx/.xls`; ao soltar, roda o parser correspondente e mostra preview ("✓ X registros" ou "✗ formato não reconhecido").
+4. Botão **Confirmar**: `upsert` em `indicadores_snapshots` por `(meta_key, referencia_mes)`, toast de sucesso, fecha modal e invalida queries (`['indicadores_snapshot', metaKey]` e `['indicadores_historico', metaKey]`).
 
-- Linha 0: extrair "Data de Atualização DD/MM/YYYY" via regex.
-- Linha 1 vazia, linha 2 cabeçalho (skip).
-- Cols: `[Loja(0), Categoria(1), TotalPratos(2), QtnTargetPreto(3), PctTargetPreto(4)]`.
-- Itera linhas a partir de 3, mantendo `currentLoja`. Se `loja` preenchida → atualiza atual; se `loja` vazia + `categoria` contém "Total Geral" → linha de total da loja atual.
-- Agrupa por loja: `{loja, categorias: [...], totalGeral: {...}}`.
-- Emite blocks: `ranking_target_preto` (por totalGeral.pct, polarity lower) e `matrix_categoria_loja`. `kpi_strip` opcional com `dataAtualizacao`.
-- `rows`: `valor = totalGeral.pct` por loja.
+## Etapa 5 — HistoricoUploads
 
-### 2.5 `parseBaseAvaliacoes` (substitui `parseReclamacoesDist` para `reclamacoes`)
+`src/components/indicadores/HistoricoUploads.tsx`:
 
-- Header linha 0: `[Loja(0), Data(1), DiaSemana(2), Nota(3), Autor(4), Comentario(5)]`.
-- Dados linha 1+. Converte `Nota → int`, `Data DD/MM/YYYY → ISO`.
-- Ignora linhas sem comentário (col 5 vazia).
-- Filtra `nota <= 3`.
-- Emite block único `item_table` `mural_reclamacoes` com `payload: { totalLinhas, items: [{loja_codigo, data_iso, dia_semana, nota, autor, comentario}] }`.
-- `rows`: contagem de reclamações por loja como `valor` (KPI).
+- Recebe `metaKey`, `referenciaMes`, `onChange`.
+- Lista chips horizontais com os meses disponíveis (label "Abr 2026"); ativo = filled amber, demais outline amber, hover destaca.
+- Vazio → mensagem "Nenhum upload ainda".
 
----
+## Etapa 6 — Integração nos dashboards
 
-## Etapa 3 — Atualizar `dispatchParser`
+Os "dashboards" hoje são **views + blocks** sob `src/components/dashboard/painel-metas/`. Plano de integração mínima sem reescrever views:
 
-Substituir o switch para:
+- Criar wrappers em `src/components/indicadores/dashboards/`:
+  - `SupervisoresRankingDashboard`, `NpsAtendimentoDashboard`, `AvaliacoesFaturamentoDashboard`, `KdsTargetPretoDashboard`, `ReclamacoesCommentsDashboard`.
+- Cada wrapper:
+  - Estado local `referenciaMes` (default = mais recente do histórico).
+  - Header: chip do período ativo + `<HistoricoUploads>` + botão **＋ Upload** que abre `<UploadIndicadorModal metaKey={...} />`.
+  - Consome `useIndicadoresSnapshot(metaKey, referenciaMes)` e renderiza a visualização da Etapa 7.
+- Substituir os pontos atuais que renderizam dados desses 5 `meta_key`s:
+  - `NpsReclamacoesView.tsx`: trocar `<SheetBlocksSection metaKey="reclamacoes" />` e `metaKey="nps"` pelos novos dashboards.
+  - `KdsConformidadeView.tsx` (`metaKey="target-preto"`) → `<KdsTargetPretoDashboard />` (mapear chave para `kds-target-preto`).
+  - `RankingView.tsx` → embutir `<SupervisoresRankingDashboard />`.
+  - `AvaliacoesFaturamentoDashboard` adicionado onde hoje há ranking de atendimento (dentro de `NpsReclamacoesView` ou nova seção).
+- Demais usos de `useSheetBlocks` (conformidade, visao-geral, etc.) **não são alterados** — sync atual segue ativo para eles.
 
-```ts
-case 'conformidade': return parseConformidade(grid);
-case 'kds':
-case 'kds-target-preto':
-case 'target-preto':         return parseKdsTargetPreto(grid);
-case 'nps':                  return parseNpsAtendimento(grid);
-case 'atendimento-medias':   return parseAvaliacoesFaturamento(grid);
-case 'reclamacoes':          return parseBaseAvaliacoes(grid);
-case 'cmv-salmao':           return parseCmvSalmaoSeries(grid);
-case 'cmv-carnes':           return parseCmvCarnesItens(grid);
-case 'ranking-supervisores': return parseSupervisoresRanking(grid);
-default:                     return parseGenericMeta(grid);
-```
+## Etapa 7 — Visualizações (glass + amber)
 
----
+Cada wrapper renderiza a visão correspondente, mantendo o design system Liquid Glass + accent amber/coral:
 
-## Etapa 4 — Pequeno ajuste em `extractSheetParams` / `buildGvizUrl`
+- **Supervisores**: 3 cards (Geral / Back / Front), tabela ranking com pódio destacado.
+- **NPS**: dois rankings lado a lado (Atendimento / Delivery), barras proporcionais à média, badge com nº de avaliações.
+- **Avaliações × Faturamento**: tabelas Salão e Delivery com colunas de % e R$/avaliação; heat color por % de notas baixas.
+- **KDS Target Preto**: accordion por loja; total geral em destaque + categorias com barra de % preto (verde < meta, amber, vermelho).
+- **Reclamações**: mural com filtros (loja, nota ≤3, busca textual); cards com nota, autor, comentário, data.
 
-Para suportar URL com `&sheet=BASE%20dados` (sem gid numérico), capturar também o parâmetro `sheet` da URL original e, se presente, passá-lo em `buildGvizUrl` como nome de aba quando `gid` for null.
+Conteúdo detalhado de UI segue o "Prompt 2 anterior" referenciado pelo usuário (mesmas regras de cor, pódio, barras, accordion, filtros).
 
-```ts
-function extractSheetParams(url: string) {
-  const idMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-  const gidMatch = url.match(/[#&?]gid=(\d+)/);
-  const sheetMatch = url.match(/[#&?]sheet=([^&]+)/);
-  return {
-    sheetId: idMatch?.[1] ?? '',
-    gid: gidMatch?.[1] ?? null,
-    sheetName: sheetMatch ? decodeURIComponent(sheetMatch[1]) : null,
-  };
-}
-```
+## Restrições respeitadas
 
-E no handler principal: `gid ?? sheetName` na chamada de `buildGvizUrl`.
+- Não tocar em `/auth`, `/agenda`, `/contagem-utensilios`, `/confirm-shift/:id`, `/checklist/:token`, `/checkin`.
+- Edge function `sync-sheets-staging` e tabela `sheets_blocks_snapshot` permanecem; outras views que as consomem seguem funcionando.
+- Rotas atuais (`/painel/metas`) preservadas — apenas o conteúdo dos 5 indicadores muda de fonte.
 
----
+## Ordem de execução
 
-## Etapa 5 — Deploy + teste
-
-- Deploy de `sync-sheets-staging`.
-- Disparar sync manual nas 5 fontes e verificar logs (`rowsImported`, `blocksImported`).
-
----
-
-## Restrições
-
-- Não tocar em `parseConformidade`, `parseCmvSalmaoSeries`, `parseCmvCarnesItens`, `parseGenericMeta`.
-- Não alterar hooks (`useSheetsSources`, `useSheetBlocks`, `useSheetData`) nem componentes UI.
-- Não alterar rotas: `/auth`, `/agenda`, `/contagem-utensilios`, `/confirm-shift/:id`, `/checklist/:token`, `/checkin`.
+1. Migration SQL.
+2. `useIndicadoresSnapshot` + `useIndicadoresHistorico`.
+3. `indicadores-parsers.ts` + `PARSERS` map.
+4. `UploadIndicadorModal`.
+5. `HistoricoUploads`.
+6. 5 dashboards wrappers + integração nas views existentes.
+7. Visualizações finais com design glass+amber.

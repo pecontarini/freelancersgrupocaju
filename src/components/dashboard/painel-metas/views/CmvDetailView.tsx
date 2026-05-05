@@ -9,6 +9,7 @@ import { MetricKpiCard } from "../shared/MetricKpiCard";
 import { PainelFilters, type BrandFilter } from "../shared/PainelFilters";
 import { getLojaDisplay, lojaHasRankingMetric } from "@/lib/lojaUtils";
 import { METRIC_META, statusFor, type RankingMetric, type RankingStatus } from "../shared/mockLojas";
+import { SheetBlocksSection } from "../blocks/SheetBlocksSection";
 
 interface Props {
   variant: "salmao" | "carnes";
@@ -244,6 +245,12 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
         </CardContent>
       </Card>
 
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Visualizações da Planilha
+        </h3>
+        <SheetBlocksSection metaKey={variant === "salmao" ? "cmv-salmao" : "cmv-carnes"} />
+      </section>
     </div>
   );
 }

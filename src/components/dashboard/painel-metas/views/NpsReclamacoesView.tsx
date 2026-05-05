@@ -35,6 +35,9 @@ const FONTE_LABEL: Record<FonteReclamacao, string> = {
   sheets: "Sheets",
 };
 
+import { SheetBlocksSection } from "../blocks/SheetBlocksSection";
+import { ReclamacoesCommentsWall } from "../comments/ReclamacoesCommentsWall";
+
 export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
   const { reclamacoes, isLoading } = useReclamacoes();
   const { data: lojaMap } = useLojaCodigoMap();
@@ -470,6 +473,16 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
           )}
         </CardContent>
       </Card>
+
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Visualizações da Planilha
+        </h3>
+        <SheetBlocksSection metaKey="reclamacoes" />
+        <SheetBlocksSection metaKey="nps" emptyMessage="Vincule a planilha de NPS em Configurações." />
+      </section>
+
+      <ReclamacoesCommentsWall restrictToLojaCodigo={restrictToLojaCodigo ?? null} />
     </div>
   );
 }

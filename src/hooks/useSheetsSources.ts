@@ -87,6 +87,7 @@ export function useSheetsSources() {
           url: input.url,
           gid: input.gid || '0',
           ativo: input.ativo ?? true,
+          meta_key: input.meta_key ?? null,
         });
 
       if (error) throw error;

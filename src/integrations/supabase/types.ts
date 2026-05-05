@@ -3978,7 +3978,7 @@ export type Database = {
           block_type: string
           created_at: string
           id: string
-          loja_codigo: string | null
+          loja_codigo: string
           mes_ref: string
           meta_key: string
           ordem: number
@@ -3991,7 +3991,7 @@ export type Database = {
           block_type: string
           created_at?: string
           id?: string
-          loja_codigo?: string | null
+          loja_codigo?: string
           mes_ref: string
           meta_key: string
           ordem?: number
@@ -4004,7 +4004,7 @@ export type Database = {
           block_type?: string
           created_at?: string
           id?: string
-          loja_codigo?: string | null
+          loja_codigo?: string
           mes_ref?: string
           meta_key?: string
           ordem?: number

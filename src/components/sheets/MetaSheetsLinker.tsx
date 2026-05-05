@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useSheetsSources, validateSheetsCsvUrl, type SheetsSource } from "@/hooks/useSheetsSources";
+import { useSheetsSources, validateSheetsCsvUrl, normalizeSheetsUrl, type SheetsSource } from "@/hooks/useSheetsSources";
 import { META_DEFINITIONS } from "@/components/dashboard/painel-metas/shared/metas";
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,13 +56,14 @@ function MetaSourceCard({
   const [preview, setPreview] = useState<PreviewState>({ loading: false });
 
   const validation = url ? validateSheetsCsvUrl(url) : { valid: true };
+  const normalizedUrl = url && validation.valid ? normalizeSheetsUrl(url) : null;
 
   const handleTest = async () => {
-    if (!validation.valid || !url) return;
+    if (!validation.valid || !normalizedUrl) return;
     setPreview({ loading: true });
     try {
       const { data, error } = await supabase.functions.invoke("test-sheet-source", {
-        body: { url },
+        body: { url: normalizedUrl },
       });
       if (error) throw error;
       if (data?.error) {
@@ -84,11 +85,11 @@ function MetaSourceCard({
   };
 
   const handleSave = async () => {
-    if (!validation.valid || !url || !nome.trim()) {
+    if (!validation.valid || !normalizedUrl || !nome.trim()) {
       toast.error("Preencha nome e URL válida.");
       return;
     }
-    await linkSourceToMeta.mutateAsync({ metaKey, url, nome: nome.trim() });
+    await linkSourceToMeta.mutateAsync({ metaKey, url: normalizedUrl, nome: nome.trim() });
     setOpen(false);
     setPreview({ loading: false });
   };
@@ -194,8 +195,9 @@ function MetaSourceCard({
           <DialogHeader>
             <DialogTitle>Vincular planilha — {def.label}</DialogTitle>
             <DialogDescription>
-              Cole o link CSV da planilha do Google Sheets. A planilha precisa estar
-              compartilhada como "Qualquer pessoa com o link pode visualizar".
+              Cole o link da planilha do Google Sheets em qualquer formato (/edit, /view ou /export).
+              Convertemos automaticamente para CSV. A planilha precisa estar compartilhada como
+              "Qualquer pessoa com o link pode visualizar".
             </DialogDescription>
           </DialogHeader>
 
@@ -209,11 +211,11 @@ function MetaSourceCard({
               />
             </div>
             <div className="space-y-2">
-              <Label>URL CSV</Label>
+              <Label>URL da planilha</Label>
               <Input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"
+                placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0"
                 className={url && !validation.valid ? "border-destructive" : ""}
               />
               {url && !validation.valid && (
@@ -222,10 +224,12 @@ function MetaSourceCard({
                   {validation.error}
                 </p>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                Formato esperado:{" "}
-                <code className="text-[11px]">/export?format=csv&amp;gid=...</code>
-              </p>
+              {normalizedUrl && normalizedUrl !== url && (
+                <p className="text-[11px] text-muted-foreground break-all">
+                  → vai ler:{" "}
+                  <code className="text-[11px] text-foreground/80">{normalizedUrl}</code>
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2">

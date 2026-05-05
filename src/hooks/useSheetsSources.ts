@@ -22,36 +22,53 @@ export interface SheetsSourceInput {
   meta_key?: string | null;
 }
 
-// Validate that URL is a valid Google Sheets export CSV format
+// Extrai o ID da planilha de qualquer URL Google Sheets/Drive
+function extractSheetId(url: string): string | null {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+// Extrai o gid de qualquer URL (?gid=, #gid=, &gid=)
+function extractGid(url: string): string {
+  const m = url.match(/[#?&]gid=(\d+)/);
+  return m ? m[1] : '0';
+}
+
+/**
+ * Normaliza qualquer link de Google Sheets para o CSV canônico:
+ * https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}
+ * Aceita: /edit, /edit#gid=, /edit?gid=, /view, /export?format=csv, /gviz/tq
+ */
+export function normalizeSheetsUrl(url: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (/\/spreadsheets\/d\/[a-zA-Z0-9-_]+\/gviz\/tq/.test(trimmed)) return trimmed;
+  const sheetId = extractSheetId(trimmed);
+  if (!sheetId) return null;
+  const gid = extractGid(trimmed);
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+}
+
+// Valida que a URL é reconhecível como uma planilha Google Sheets
 export function validateSheetsCsvUrl(url: string): { valid: boolean; error?: string } {
-  const exportPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/export\?format=csv/;
-  
-  if (!exportPattern.test(url)) {
-    // Check if it's an edit/view URL
-    if (url.includes('/edit') || url.includes('/view')) {
-      return {
-        valid: false,
-        error: 'Use o formato de exportação CSV. URLs com /edit ou /view não são aceitas.',
-      };
-    }
+  if (!url || !url.trim()) return { valid: false, error: 'Cole o link da planilha.' };
+  if (!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(url.trim())) {
     return {
       valid: false,
-      error: 'URL inválida. Use: https://docs.google.com/spreadsheets/d/{ID}/export?format=csv&gid={GID}',
+      error: 'URL inválida. Cole um link do Google Sheets (docs.google.com/spreadsheets/...).',
     };
   }
-  
+  if (!extractSheetId(url)) {
+    return { valid: false, error: 'Não foi possível identificar o ID da planilha.' };
+  }
   return { valid: true };
 }
 
-// Extract sheet ID and GID from URL
+// Extract sheet ID and GID from URL (qualquer formato aceito)
 export function parseSheetsCsvUrl(url: string): { sheetId: string; gid: string } | null {
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)\/export\?format=csv(?:&gid=(\d+))?/);
-  if (!match) return null;
-  
-  return {
-    sheetId: match[1],
-    gid: match[2] || '0',
-  };
+  const sheetId = extractSheetId(url);
+  if (!sheetId) return null;
+  return { sheetId, gid: extractGid(url) };
 }
 
 export function useSheetsSources() {
@@ -80,12 +97,15 @@ export function useSheetsSources() {
         throw new Error(validation.error);
       }
 
+      const normalizedUrl = normalizeSheetsUrl(input.url) ?? input.url;
+      const parsed = parseSheetsCsvUrl(normalizedUrl);
+
       const { error } = await supabase
         .from('sheets_sources')
         .insert({
           nome: input.nome,
-          url: input.url,
-          gid: input.gid || '0',
+          url: normalizedUrl,
+          gid: input.gid || parsed?.gid || '0',
           ativo: input.ativo ?? true,
           meta_key: input.meta_key ?? null,
         });
@@ -110,9 +130,14 @@ export function useSheetsSources() {
         }
       }
 
+      const payload = { ...input };
+      if (payload.url) {
+        payload.url = normalizeSheetsUrl(payload.url) ?? payload.url;
+      }
+
       const { error } = await supabase
         .from('sheets_sources')
-        .update(input)
+        .update(payload)
         .eq('id', id);
 
       if (error) throw error;
@@ -170,12 +195,13 @@ export function useSheetsSources() {
         .eq('meta_key', metaKey)
         .eq('ativo', true);
 
-      const parsed = parseSheetsCsvUrl(url);
+      const normalizedUrl = normalizeSheetsUrl(url) ?? url;
+      const parsed = parseSheetsCsvUrl(normalizedUrl);
       const { error } = await supabase
         .from('sheets_sources')
         .insert({
           nome,
-          url,
+          url: normalizedUrl,
           gid: parsed?.gid || '0',
           ativo: true,
           meta_key: metaKey,

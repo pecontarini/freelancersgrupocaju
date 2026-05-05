@@ -244,44 +244,6 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
         </CardContent>
       </Card>
 
-      <Card className="vision-glass">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Como interpretamos esta métrica</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-xs text-white/70">
-          {variant === "salmao" ? (
-            <>
-              <p>
-                <strong className="text-white">CMV Salmão</strong> mede quantos kg de salmão são
-                consumidos para cada R$ 1.000 faturado pela unidade.
-              </p>
-              <p>Quanto menor, mais eficiente o uso da matéria-prima.</p>
-              <ul className="ml-4 list-disc space-y-1 text-white/60">
-                <li>≤ 1,55 kg/R$1k → <span className="text-emerald-300">Excelente</span></li>
-                <li>1,55 a 1,90 kg/R$1k → atenção</li>
-                <li>≥ 1,90 kg/R$1k → <span className="text-red-300">Red Flag</span></li>
-              </ul>
-            </>
-          ) : (
-            <>
-              <p>
-                <strong className="text-white">CMV Carnes</strong> mede o desvio % entre o valor
-                de carnes transferido para a unidade e o consumo real apurado.
-              </p>
-              <ul className="ml-4 list-disc space-y-1 text-white/60">
-                <li>≤ 0,6% → <span className="text-emerald-300">Excelente</span></li>
-                <li>0,6% a 2,0% → atenção</li>
-                <li>≥ 2,0% → <span className="text-red-300">Red Flag</span></li>
-              </ul>
-            </>
-          )}
-          <p className="text-white/50">
-            Detalhamento por corte/lote estará disponível na próxima fase, integrando
-            <code className="mx-1 rounded bg-white/10 px-1 py-0.5">cmv_contagens</code> e
-            <code className="mx-1 rounded bg-white/10 px-1 py-0.5">cmv_movements</code>.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }

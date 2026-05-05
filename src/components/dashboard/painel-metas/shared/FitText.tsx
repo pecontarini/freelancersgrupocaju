@@ -52,12 +52,12 @@ export function FitText({
   }, [children, max, min]);
 
   return (
-    <Tag
-      ref={ref as never}
+    <span
+      ref={ref}
       className={cn("inline-block whitespace-nowrap leading-none", className)}
       style={{ fontSize: `${size}px` }}
     >
       {children}
-    </Tag>
+    </span>
   );
 }

@@ -276,8 +276,6 @@ const Index = () => {
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":
         return isAdmin ? <RedeTab /> : null;
-      case "painel":
-        return <PainelMetasTab selectedUnidadeId={selectedUnidadeId} />;
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:

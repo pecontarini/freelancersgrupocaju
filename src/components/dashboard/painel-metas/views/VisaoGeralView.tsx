@@ -78,7 +78,7 @@ function avg(values: Array<number | null | undefined>): number | null {
 function tierClasses(tier: string | null | undefined): string {
   switch (tier) {
     case "ouro":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200";
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-700 dark:text-amber-200";
     case "prata":
       return "bg-zinc-200 text-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-200";
     case "bronze":

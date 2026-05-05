@@ -114,14 +114,14 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
     return (
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-56 rounded-2xl bg-white/5" />
+          <Skeleton key={i} className="h-56 rounded-2xl bg-foreground/5" />
         ))}
       </div>
     );
   }
   if (error) {
     return (
-      <div className="glass-card p-8 text-center text-red-300 ring-1 ring-red-500/30">
+      <div className="glass-card p-8 text-center text-red-600 dark:text-red-300 ring-1 ring-red-500/30">
         {error}
       </div>
     );
@@ -130,10 +130,10 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-[Sora] text-base font-semibold text-white">
+        <p className="font-display text-base font-semibold text-foreground">
           Aguardando sincronização semanal
         </p>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-muted-foreground">
           Os snapshots de metas ainda não foram gerados para este mês.
         </p>
       </div>
@@ -172,9 +172,9 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
               return (
                 <div
                   key={metric}
-                  className="rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10"
+                  className="rounded-xl bg-foreground/[0.04] p-3 ring-1 ring-border"
                 >
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-white/60">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     {meta.label}
                   </p>
                   <ul className="space-y-1.5">
@@ -184,7 +184,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                       return (
                         <li
                           key={loja.code}
-                          className="flex items-center gap-2 rounded-lg bg-white/5 px-2 py-1.5"
+                          className="flex items-center gap-2 rounded-lg bg-foreground/5 px-2 py-1.5"
                         >
                           <span className="text-base leading-none">{PODIUM_ICONS[idx]}</span>
                           <span
@@ -198,7 +198,7 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                             {b.label}
                           </span>
                           <span className="flex-1 truncate text-xs">{getLojaDisplay(loja.code).nome}</span>
-                          <span className="font-[Sora] text-xs font-semibold tabular-nums">
+                          <span className="font-display text-xs font-semibold tabular-nums">
                             {metric === "nps"
                               ? formatNpsDisplay(value)
                               : value?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
@@ -227,8 +227,8 @@ export function VisaoGeralCompactView({ restrictToLojaCodigo }: VisaoGeralProps 
                         >
                           {bandeiraStyles(worst.bandeira).label}
                         </span>
-                        <span className="flex-1 truncate text-xs text-red-200">{getLojaDisplay(worst.code).nome}</span>
-                        <span className="font-[Sora] text-xs font-semibold tabular-nums text-red-200">
+                        <span className="flex-1 truncate text-xs text-red-700 dark:text-red-200">{getLojaDisplay(worst.code).nome}</span>
+                        <span className="font-display text-xs font-semibold tabular-nums text-red-700 dark:text-red-200">
                           {metric === "nps"
                             ? formatNpsDisplay(worst.values[metric])
                             : worst.values[metric]?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}

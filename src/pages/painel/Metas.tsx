@@ -147,20 +147,20 @@ function NpsSyncBar() {
   }, [lastSync]);
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 ring-1 ring-white/10">
-      <div className="flex items-center gap-2 text-xs text-white/70">
+    <div className="vision-glass-pill mb-4 flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {error ? (
           <>
-            <AlertCircle className="h-3.5 w-3.5 text-red-400" />
-            <span className="text-red-300">Falha: {error}</span>
+            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+            <span className="text-destructive">Falha: {error}</span>
           </>
         ) : lastSync ? (
           <>
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-            Última sincronização: {lastSync.toLocaleString("pt-BR")}
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-foreground/80">Última sincronização: {lastSync.toLocaleString("pt-BR")}</span>
           </>
         ) : (
-          <span className="text-white/50">NPS ainda não sincronizado nesta sessão</span>
+          <span className="text-muted-foreground">NPS ainda não sincronizado nesta sessão</span>
         )}
       </div>
       <Button
@@ -169,7 +169,7 @@ function NpsSyncBar() {
         variant="outline"
         onClick={triggerSync}
         disabled={syncing}
-        className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+        className="vision-glass-pill h-8 gap-1.5 border-0 text-xs"
       >
         <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
         {syncing ? "Sincronizando…" : "Sincronizar NPS"}

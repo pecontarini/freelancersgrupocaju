@@ -23,10 +23,10 @@ const STATUS_BAR: Record<RankingStatus, string> = {
 };
 
 const STATUS_BADGE: Record<RankingStatus, string> = {
-  excelente: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  bom: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
-  regular: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
-  redflag: "bg-red-500/15 text-red-300 ring-red-500/40",
+  excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/30",
+  regular: "bg-orange-500/15 text-orange-700 dark:text-orange-300 ring-orange-500/30",
+  redflag: "bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/40",
 };
 
 const STATUS_LABEL: Record<RankingStatus, string> = {
@@ -95,7 +95,7 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
 
   if (error) {
     return (
-      <div className="glass-card p-8 text-center text-sm text-red-300 ring-1 ring-red-500/30">
+      <div className="glass-card p-8 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/30">
         {error}
       </div>
     );
@@ -105,10 +105,10 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-[Sora] text-xl font-bold text-white">
+          <h2 className="font-display text-xl font-bold text-foreground">
             {variant === "salmao" ? "CMV Salmão · Nazo" : "CMV Carnes · Caminito"}
           </h2>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-muted-foreground">
             {variant === "salmao"
               ? "kg consumidos por R$1.000 faturado · meta 1,55 · red flag 1,90"
               : "Desvio % sobre valor transferido · meta 0,6% · red flag 2,0%"}
@@ -160,7 +160,7 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
         </CardHeader>
         <CardContent>
           {rows.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.02] p-8 text-xs text-white/50 ring-1 ring-white/5">
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] p-8 text-xs text-muted-foreground ring-1 ring-border/60">
               <Clock className="h-4 w-4" />
               Sem snapshots para esta marca neste mês
             </div>
@@ -181,33 +181,33 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
                       "rounded-xl p-3 ring-1 transition-all",
                       r.status === "redflag"
                         ? "bg-red-500/5 ring-red-500/30"
-                        : "bg-white/[0.03] ring-white/10 hover:bg-white/5",
+                        : "bg-foreground/[0.04] ring-border hover:bg-foreground/5",
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="w-6 text-center text-xs font-bold tabular-nums text-white/60">
+                      <span className="w-6 text-center text-xs font-bold tabular-nums text-muted-foreground">
                         {idx + 1}
                       </span>
                       <span
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                         style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                       >
                         {d.sigla}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white">{d.nome}</p>
-                        <p className="text-[10px] text-white/40">{r.code}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{d.nome}</p>
+                        <p className="text-[10px] text-muted-foreground/70">{r.code}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-[Sora] text-base font-bold tabular-nums text-white">
+                        <p className="font-display text-base font-bold tabular-nums text-foreground">
                           {fmt(r.value)}
-                          <span className="ml-1 text-[10px] text-white/50">{meta.suffix}</span>
+                          <span className="ml-1 text-[10px] text-muted-foreground">{meta.suffix}</span>
                         </p>
                         {dlt !== null && (
                           <p
                             className={cn(
                               "text-[10px] tabular-nums",
-                              better ? "text-emerald-300" : "text-red-300",
+                              better ? "text-emerald-700 dark:text-emerald-300" : "text-red-600 dark:text-red-300",
                             )}
                           >
                             {better ? "▼" : "▲"} {Math.abs(dlt).toFixed(2)} vs anterior
@@ -223,7 +223,7 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
                         {STATUS_LABEL[r.status]}
                       </span>
                     </div>
-                    <div className="mt-2 h-1.5 rounded-full bg-white/5">
+                    <div className="mt-2 h-1.5 rounded-full bg-foreground/5">
                       <div
                         className={cn("h-full rounded-full transition-all", STATUS_BAR[r.status])}
                         style={{

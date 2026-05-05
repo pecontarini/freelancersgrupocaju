@@ -52,10 +52,10 @@ const STATUS_BAR: Record<RankingStatus, string> = {
 };
 
 const STATUS_BADGE: Record<RankingStatus, string> = {
-  excelente: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  bom: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
-  regular: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
-  redflag: "bg-red-500/15 text-red-300 ring-red-500/40",
+  excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/30",
+  regular: "bg-orange-500/15 text-orange-700 dark:text-orange-300 ring-orange-500/30",
+  redflag: "bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/40",
 };
 
 interface Props {
@@ -154,7 +154,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
 
   if (error) {
     return (
-      <div className="glass-card p-8 text-center text-sm text-red-300 ring-1 ring-red-500/30">
+      <div className="glass-card p-8 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/30">
         Erro ao carregar métricas: {error}
       </div>
     );
@@ -164,10 +164,10 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-[Sora] text-base font-semibold text-white">
+        <p className="font-display text-base font-semibold text-foreground">
           Aguardando sincronização
         </p>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-muted-foreground">
           Nenhum snapshot de metas para este mês ainda.
         </p>
       </div>
@@ -188,13 +188,13 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="font-[Sora] text-2xl font-bold text-white">{def.label}</h2>
-            <p className="mt-1 font-[DM_Sans] text-sm text-white/60">{def.description}</p>
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-white/40">
+            <h2 className="font-display text-2xl font-bold text-foreground">{def.label}</h2>
+            <p className="mt-1 font-[DM_Sans] text-sm text-muted-foreground">{def.description}</p>
+            <p className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/70">
               {meta.label}
             </p>
           </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs text-white/80 ring-1 ring-white/10">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-3 py-1.5 text-xs text-foreground/90 ring-1 ring-border">
             <CalendarDays className="h-3.5 w-3.5" />
             {formatMonthLabel(mesRef)}
           </div>
@@ -228,7 +228,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
           <div className="overflow-hidden rounded-b-xl">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead>Loja</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
@@ -251,11 +251,11 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: idx * 0.02 }}
                       className={cn(
-                        "border-white/5 transition-colors hover:bg-white/5",
+                        "border-border/60 transition-colors hover:bg-foreground/5",
                         r.isRed && "animate-pulse bg-red-500/5",
                       )}
                     >
-                      <TableCell className="text-center text-xs font-bold tabular-nums text-white/80">
+                      <TableCell className="text-center text-xs font-bold tabular-nums text-foreground/90">
                         {r.naMetric ? "—" : r.position}
                       </TableCell>
                       <TableCell>
@@ -293,7 +293,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                         </>
                       ) : (
                         <>
-                          <TableCell className="text-right tabular-nums font-[Sora] text-sm font-semibold">
+                          <TableCell className="text-right tabular-nums font-display text-sm font-semibold">
                             {formatValue(metric, r.value)}
                             <span className="ml-0.5 text-[10px] text-muted-foreground">
                               {meta.suffix}
@@ -304,7 +304,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                             {meta.suffix}
                           </TableCell>
                           <TableCell>
-                            <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-foreground/5">
                               <div
                                 className={cn("h-full transition-all", STATUS_BAR[r.status])}
                                 style={{ width: `${Math.max(2, r.norm)}%` }}
@@ -345,7 +345,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                           </TableCell>
                           <TableCell className="text-center">
                             {r.isRed ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-300 ring-1 ring-red-500/40">
                                 <AlertTriangle className="h-3 w-3" />
                                 Red Flag
                               </span>
@@ -386,7 +386,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                     className="gap-2 text-[11px] font-semibold uppercase tracking-wide data-[state=active]:bg-primary/15 data-[state=active]:text-primary"
                   >
                     {c.cargoLabel}
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-amber-300">
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-amber-700 dark:text-amber-300">
                       R$ {c.pesoReais.toLocaleString("pt-BR")}
                     </span>
                   </TabsTrigger>
@@ -410,7 +410,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                             <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[s])} />
                             {STATUS_LABEL_PT[s]}
                           </div>
-                          <div className="mt-1 font-[Sora] text-lg font-bold tabular-nums">
+                          <div className="mt-1 font-display text-lg font-bold tabular-nums">
                             R$ {c.faixas[s].toLocaleString("pt-BR")}
                           </div>
                         </div>
@@ -419,10 +419,10 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                   </div>
 
                   {/* Status por loja */}
-                  <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
+                  <div className="overflow-hidden rounded-xl ring-1 ring-border">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-white/10 hover:bg-transparent">
+                        <TableRow className="border-border hover:bg-transparent">
                           <TableHead>Loja</TableHead>
                           <TableHead className="text-right">Valor</TableHead>
                           <TableHead className="text-center">Status</TableHead>
@@ -439,7 +439,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                             <TableRow
                               key={r.loja.code}
                               className={cn(
-                                "border-white/5 hover:bg-white/5",
+                                "border-border/60 hover:bg-foreground/5",
                                 r.isRed && "bg-red-500/5",
                               )}
                             >
@@ -493,10 +493,10 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                                   <TableCell className="text-right tabular-nums">
                                     <span
                                       className={cn(
-                                        "font-[Sora] text-sm font-bold",
-                                        valor === c.pesoReais && "text-emerald-300",
-                                        valor === 0 && "text-red-300",
-                                        valor > 0 && valor < c.pesoReais && "text-amber-300",
+                                        "font-display text-sm font-bold",
+                                        valor === c.pesoReais && "text-emerald-700 dark:text-emerald-300",
+                                        valor === 0 && "text-red-600 dark:text-red-300",
+                                        valor > 0 && valor < c.pesoReais && "text-amber-700 dark:text-amber-300",
                                       )}
                                     >
                                       R$ {valor.toLocaleString("pt-BR")}

@@ -34,10 +34,10 @@ import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
 import { formatNpsDisplay } from "@/lib/metasUtils";
 
 const STATUS_CELL: Record<RankingStatus, string> = {
-  excelente: "bg-emerald-500/15 text-emerald-200 ring-emerald-500/30",
-  bom: "bg-amber-500/15 text-amber-200 ring-amber-500/30",
+  excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-700 dark:text-amber-200 ring-amber-500/30",
   regular: "bg-orange-500/15 text-orange-200 ring-orange-500/30",
-  redflag: "bg-red-500/20 text-red-200 ring-red-500/40",
+  redflag: "bg-red-500/20 text-red-700 dark:text-red-200 ring-red-500/40",
 };
 
 function formatVal(metric: RankingMetric, value: number | null): string {
@@ -101,7 +101,7 @@ export function RankingView() {
               Ordenar por
             </div>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as RankingMetric)}>
-              <SelectTrigger className="vision-glass h-8 w-[200px] border-white/15 text-xs">
+              <SelectTrigger className="vision-glass h-8 w-[200px] border-border text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -118,7 +118,7 @@ export function RankingView() {
               size="sm"
               onClick={exportCSV}
               disabled={isLoading || isEmpty}
-              className="vision-glass h-8 gap-1.5 border-white/15 text-xs"
+              className="vision-glass h-8 gap-1.5 border-border text-xs"
             >
               <Download className="h-3.5 w-3.5" />
               CSV
@@ -134,16 +134,16 @@ export function RankingView() {
             ))}
           </div>
         ) : error ? (
-          <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-300 ring-1 ring-red-500/20">
+          <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/20">
             Erro ao carregar metas: {error}
           </div>
         ) : isEmpty ? (
           <EmptyState />
         ) : (
-          <div className="overflow-x-auto rounded-xl ring-1 ring-white/10">
+          <div className="overflow-x-auto rounded-xl ring-1 ring-border">
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="w-12 text-center">#</TableHead>
                   <TableHead>Loja</TableHead>
                   {RANKING_METRICS.map((m) => (
@@ -171,7 +171,7 @@ export function RankingView() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.2, delay: idx * 0.02 }}
                       className={cn(
-                        "border-white/5 hover:bg-white/5",
+                        "border-border/60 hover:bg-foreground/5",
                         loja.redFlag && "bg-red-500/5",
                       )}
                     >
@@ -181,7 +181,7 @@ export function RankingView() {
                             "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold tabular-nums",
                             isPodium
                               ? "bg-gradient-to-br from-amber-400 to-amber-600 text-black shadow-[0_0_12px_rgba(245,158,11,0.45)]"
-                              : "bg-white/10 text-white/80",
+                              : "bg-foreground/10 text-foreground/90",
                           )}
                         >
                           {idx + 1}
@@ -244,7 +244,7 @@ export function RankingView() {
                           <motion.span
                             animate={{ opacity: [1, 0.4, 1] }}
                             transition={{ duration: 1.6, repeat: Infinity }}
-                            className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300 ring-1 ring-red-500/40"
+                            className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-300 ring-1 ring-red-500/40"
                           >
                             <AlertTriangle className="h-3 w-3" />
                             Red Flag
@@ -267,7 +267,7 @@ export function RankingView() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-white/5 p-10 text-center ring-1 ring-white/10">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-foreground/5 p-10 text-center ring-1 ring-border">
       <Clock className="h-8 w-8 text-amber-400/80" />
       <div>
         <p className="text-sm font-semibold text-foreground">Aguardando sincronização semanal</p>

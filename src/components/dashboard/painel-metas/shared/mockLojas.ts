@@ -114,15 +114,15 @@ export function normalizeMetric(metric: RankingMetric, value: number | null): nu
 export function bandeiraStyles(b: Bandeira): { label: string; ring: string; bg: string; text: string } {
   switch (b) {
     case "CP":
-      return { label: "CP", ring: "ring-red-400/40", bg: "bg-red-500/15", text: "text-red-300" };
+      return { label: "CP", ring: "ring-red-400/40", bg: "bg-red-500/15", text: "text-red-600 dark:text-red-300" };
     case "NZ":
       return { label: "NZ", ring: "ring-sky-400/40", bg: "bg-sky-500/15", text: "text-sky-300" };
     case "CJ":
-      return { label: "CJ", ring: "ring-emerald-400/40", bg: "bg-emerald-500/15", text: "text-emerald-300" };
+      return { label: "CJ", ring: "ring-emerald-400/40", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-300" };
     case "FB":
-      return { label: "FB", ring: "ring-amber-400/40", bg: "bg-amber-500/15", text: "text-amber-300" };
+      return { label: "FB", ring: "ring-amber-400/40", bg: "bg-amber-500/15", text: "text-amber-700 dark:text-amber-300" };
     default:
-      return { label: "—", ring: "ring-white/20", bg: "bg-white/10", text: "text-white/70" };
+      return { label: "—", ring: "ring-white/20", bg: "bg-foreground/10", text: "text-foreground/80" };
   }
 }
 

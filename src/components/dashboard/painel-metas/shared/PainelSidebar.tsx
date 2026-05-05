@@ -148,8 +148,8 @@ export function PainelSidebar({
                         "group relative flex w-full items-center rounded-2xl text-left",
                         "transition-all duration-300 ease-[cubic-bezier(0.65,0,0.35,1)]",
                         isExpanded ? "gap-3 px-1.5 py-1.5" : "justify-center p-1",
-                        "hover:bg-white/40 dark:hover:bg-white/[0.04]",
-                        isActive && "bg-white/50 dark:bg-white/[0.06]"
+                        "hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.04]",
+                        isActive && "bg-foreground/[0.05] dark:bg-foreground/[0.06]"
                       )}
                     >
                       {/* Circular glass icon */}

@@ -26,10 +26,10 @@ interface Props {
 }
 
 const STATUS_BADGE: Record<RankingStatus, string> = {
-  excelente: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  bom: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
-  regular: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
-  redflag: "bg-red-500/15 text-red-300 ring-red-500/40",
+  excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/30",
+  regular: "bg-orange-500/15 text-orange-700 dark:text-orange-300 ring-orange-500/30",
+  redflag: "bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/40",
 };
 
 const STATUS_FILL: Record<RankingStatus, string> = {
@@ -98,7 +98,7 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
   }
   if (error) {
     return (
-      <div className="glass-card p-8 text-center text-sm text-red-300 ring-1 ring-red-500/30">
+      <div className="glass-card p-8 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/30">
         {error}
       </div>
     );
@@ -108,10 +108,10 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-[Sora] text-xl font-bold text-white">
+          <h2 className="font-display text-xl font-bold text-foreground">
             {metric === "kds" ? "KDS · Tempo de Prato" : "Conformidade · Auditorias"}
           </h2>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-muted-foreground">
             {metric === "kds"
               ? "% de pratos fora do target preto · meta ≤ 5% · red flag ≥ 10%"
               : "Score consolidado por unidade · meta ≥ 90 · red flag < 75"}
@@ -164,7 +164,7 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.02] p-8 text-xs text-white/50 ring-1 ring-white/5">
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] p-8 text-xs text-muted-foreground ring-1 ring-border/60">
               <Clock className="h-4 w-4" />
               Sem dados nesta seleção
             </div>
@@ -214,22 +214,22 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
                     "flex items-center gap-3 rounded-xl p-2.5 ring-1 transition-all",
                     r.status === "redflag"
                       ? "bg-red-500/5 ring-red-500/30"
-                      : "bg-white/[0.03] ring-white/10",
+                      : "bg-foreground/[0.04] ring-border",
                   )}
                 >
-                  <span className="w-6 text-center text-xs font-bold tabular-nums text-white/60">
+                  <span className="w-6 text-center text-xs font-bold tabular-nums text-muted-foreground">
                     {idx + 1}
                   </span>
                   <span
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                     style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                   >
                     {d.sigla}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm text-white">{d.nome}</span>
-                  <span className="font-[Sora] text-sm font-bold tabular-nums text-white">
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{d.nome}</span>
+                  <span className="font-display text-sm font-bold tabular-nums text-foreground">
                     {fmt(r.value)}
-                    <span className="ml-0.5 text-[10px] text-white/50">{meta.suffix}</span>
+                    <span className="ml-0.5 text-[10px] text-muted-foreground">{meta.suffix}</span>
                   </span>
                   <span
                     className={cn(

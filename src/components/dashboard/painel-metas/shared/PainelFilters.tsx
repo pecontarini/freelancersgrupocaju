@@ -52,7 +52,7 @@ export function PainelFilters({
   if (lockedLoja) {
     const d = getLojaDisplay(lockedLoja);
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-white/70", className)}>
+      <div className={cn("flex items-center gap-2 text-xs text-foreground/80", className)}>
         <Filter className="h-3.5 w-3.5" />
         <span>Visualizando:</span>
         <span className="rounded-full bg-primary/15 px-2.5 py-1 text-[11px] font-semibold text-primary ring-1 ring-primary/30">
@@ -64,13 +64,13 @@ export function PainelFilters({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/50">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Filter className="h-3.5 w-3.5" />
         Filtros
       </div>
 
       <Select value={brand} onValueChange={(v) => onBrandChange(v as BrandFilter)}>
-        <SelectTrigger className="vision-glass h-8 w-[180px] border-white/15 text-xs">
+        <SelectTrigger className="vision-glass h-8 w-[180px] border-border text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -83,7 +83,7 @@ export function PainelFilters({
       </Select>
 
       <Select value={loja} onValueChange={onLojaChange}>
-        <SelectTrigger className="vision-glass h-8 w-[200px] border-white/15 text-xs">
+        <SelectTrigger className="vision-glass h-8 w-[200px] border-border text-xs">
           <SelectValue placeholder="Loja" />
         </SelectTrigger>
         <SelectContent>
@@ -100,7 +100,7 @@ export function PainelFilters({
 
       {period && onPeriodChange && (
         <Select value={period} onValueChange={(v) => onPeriodChange(v as PeriodFilter)}>
-          <SelectTrigger className="vision-glass h-8 w-[180px] border-white/15 text-xs">
+          <SelectTrigger className="vision-glass h-8 w-[180px] border-border text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

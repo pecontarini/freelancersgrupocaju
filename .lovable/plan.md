@@ -1,95 +1,94 @@
+# Painel de Indicadores — Redesign Light/Dark com Glassmorphism Senior
 
-# Painel de Indicadores — redirect + reconstrução completa
+## Diagnóstico
 
-## Diagnóstico do que está quebrado
+O Painel `/painel/metas` foi construído pensando apenas no tema escuro: usa cores travadas (`text-white`, `bg-white/5`, `ring-white/10`, `from-emerald-500/15`) em ~20 arquivos do diretório `painel-metas/`. No tema light isso resulta em:
 
-1. **Botão "Painel de Indicadores" não abre `/painel/metas`.** Em `src/pages/Index.tsx`, `handleTabChange("painel")` apenas chama `setActiveTab("painel")` e renderiza inline o componente antigo `PainelMetasTab`. O dashboard executivo novo (`src/pages/painel/Metas.tsx`) nunca é alcançado pelo menu lateral / bottom nav.
+- Texto branco sobre fundo claro (ilegível ou invisível)
+- Glass plano, sem o brilho/blur característico do estilo Apple
+- KPIs e heatmap com contraste insuficiente
+- Sidebar de métricas e drawer perdem hierarquia visual
 
-2. **O painel novo só lê `metas_snapshot`.** Hoje a tabela tem **10 linhas** (apenas mês 2026-05) populadas pelo `useSyncNpsSheets`. Os dados reais que dão profundidade vivem em outras tabelas que o painel ainda não consome:
-   - `reclamacoes` (4 linhas) — base de NPS / temas / gravidade
-   - `supervision_audits` (146) e `audit_sector_scores` (86) — Conformidade por setor (back/front), com `pdf_url` da auditoria
-   - `metas_snapshot` é só o agregado mensal e KDS/Conformidade ali estão incompletos
-   
-   Resultado: heatmap, KPIs e drilldown ficam vazios fora de NPS.
+O design system já tem tokens prontos (`--glass-bg`, `--glass-border`, `--vision-glass-*`, `.glass-card`, `.vision-glass`) com variantes light e dark — só não estão sendo usados consistentemente.
 
-3. **Drilldown raso.** `MetricDrawer` mostra meta vs atual e variação MoM, mas não traz histórico, série temporal nem composição (temas de reclamação, scores por setor, evolução de auditoria).
+## Objetivo
 
-4. **Sem fidelidade às planilhas.** Não há indicação de qual fonte alimenta o quê, data da última sincronização por métrica, nem botões para forçar sync individual.
+Entregar uma visualização moderna, profissional e bonita do Painel de Indicadores que funcione com excelência **nos dois temas**, com glassmorphism real (blur, saturate, borda superior luminosa, sombras coloridas suaves) e hierarquia tipográfica clara.
 
----
+## Escopo
 
-## Plano de execução
+### 1. Tokens & utilidades (src/index.css)
 
-### Passo 1 — Redirect do menu para `/painel/metas`
-- Em `src/pages/Index.tsx`, no `handleTabChange`, interceptar `tab === "painel"` e chamar `navigate("/painel/metas")` (mesmo padrão usado para `"agenda"`).
-- Remover o `case "painel"` de `renderTabContent` e o import de `PainelMetasTab`.
-- Validar destaque do menu na nova rota (já passamos `activeTab="painel"` em `Metas.tsx`).
+Adicionar/refinar utilidades reutilizáveis baseadas nos tokens já existentes:
 
-### Passo 2 — Hooks de dados reais (novos)
-Criar hooks que vão alimentar todas as views, retornando dados normalizados por loja/mês, com `fetchAllRows` e respeitando RLS:
+- `.kpi-glass` — card KPI com gradiente sutil de status (emerald/amber/orange/red), funcionando em ambos temas via `color-mix` ou variáveis CSS dedicadas por status (`--status-excelente-bg`, `--status-redflag-bg`, etc.).
+- `.kpi-status-dot-{excelente|bom|regular|redflag}` — pontinhos de status com glow.
+- `.heatmap-cell-{status}` — células do heatmap com contraste adequado em light/dark.
+- `.glass-divider` — separador fino, refletido nos dois temas.
+- Refinar `.vision-glass` com `border-image` opcional para criar a borda luminosa de topo característica do Vision Pro.
 
-- `src/hooks/useConformidadeData.ts` — lê `audit_sector_scores` + `supervision_audits`, agrega por `loja_id`, `month_year`, `sector_code` (back/front), retorna média ponderada e série mensal (últimos 6 meses).
-- `src/hooks/useReclamacoesData.ts` — lê `reclamacoes`, agrega por loja, fonte (google/ifood/tripadvisor/getin), tema (jsonb), gravidade. Retorna pareto de temas + lista ordenada por gravidade + série temporal.
-- `src/hooks/useMetasHistorico.ts` — lê `metas_snapshot` dos últimos 6 meses por loja e métrica, para sparklines no KPI card e linha de evolução no drawer.
-- `useMetasSnapshot` continua sendo a fonte do mês corrente (KPIs hero).
+### 2. Componentes compartilhados (`shared/`)
 
-Todos os hooks aceitam `restrictToLojaCodigo` (mapeado para `loja_id` via `lojaMapping.ts` quando preciso).
+Substituir cores hardcoded por tokens semânticos:
 
-### Passo 3 — Reconectar as views existentes às fontes reais
+| Antes | Depois |
+|---|---|
+| `text-white`, `text-white/60`, `text-white/40` | `text-foreground`, `text-muted-foreground`, `text-foreground/60` |
+| `bg-white/5`, `bg-white/[0.03]` | `bg-foreground/5`, `bg-muted/40` ou `.glass-card` aninhado |
+| `ring-white/10`, `ring-white/15` | `ring-border`, `ring-foreground/10` |
+| `from-emerald-500/15` em gradientes de status | utilidades `.kpi-glass` ou variáveis `--status-*` |
 
-- **`ExecutiveOverviewView`** (visão geral): adicionar mini-sparkline 6m em cada `MetricKpiCard` usando `useMetasHistorico`, e badge "última atualização" por métrica. Heatmap continua igual.
-- **`NpsReclamacoesView`**: trocar mocks por `useReclamacoesData` real → Pareto de temas, heatmap loja×tema, lista de reclamações com `resumo_ia` e flag `is_grave`.
-- **`KdsConformidadeView` (modo `conformidade`)**: passar a usar `useConformidadeData`. Adiciona:
-  - Toggle Back / Front (sector_code)
-  - Bar chart por loja (mês corrente)
-  - Linha de evolução 6m da loja selecionada
-  - Lista de auditorias recentes com link `pdf_url` clicável
-- **`KdsConformidadeView` (modo `kds`)**: manter snapshot agregado + nota explícita "Fonte: Sheets KDS — última sincronização XX". Quando KDS ainda não foi sincronizado, mostrar empty state, não zeros.
-- **`CmvDetailView`** (Salmão / Carnes): manter ranking, adicionar série 6m e atalho "Abrir CMV (Unitários)" para análise profunda da loja.
-- **`RankingView`** e **`ComparativoView`**: já consomem `metas_snapshot`. Adicionar seletor de mês e export CSV.
+Arquivos a refatorar:
+- `MetricKpiCard.tsx` — adotar `.kpi-glass`, ícone com bolha de vidro circular, valor em `text-foreground` com `display-number`, delta com `bg-emerald-500/10 text-emerald-700 dark:text-emerald-300`.
+- `MetricHeatmap.tsx` — header e siglas em tokens semânticos; células usando utilidades de status; linha em hover com `bg-muted/50`.
+- `MetricDrawer.tsx` — fundo `.glass-card-strong`, header com gradiente coral suave, métricas em cards aninhados.
+- `PainelFilters.tsx` — pills `.vision-glass-pill` consistentes nos dois temas.
+- `PainelSidebar.tsx` — já é razoável; ajustar hovers (`hover:bg-foreground/5` em vez de `bg-white/40`) e indicador ativo.
+- `RankingCard.tsx`, `KpiByStoreGrid.tsx`, `SixMonthsCard.tsx`, `MetaPageHeader.tsx` — mesma migração.
 
-### Passo 4 — Drilldown profundo (`MetricDrawer`)
-Expandir o drawer em 3 seções:
-1. **Resumo**: meta vs atual, delta MoM, status colorido (já existe).
-2. **Histórico 6 meses**: line chart via `useMetasHistorico`.
-3. **Composição** (depende da métrica):
-   - NPS → top 5 temas de reclamação da loja
-   - Conformidade → barras por sector_code (back/front) + link `pdf_url` da última auditoria
-   - CMV → atalho para CMV unitário daquela loja
-   - KDS → empty state se ainda não há detalhe disponível
+### 3. Views (`views/`)
 
-### Passo 5 — Barra de status de fontes
-Acima do conteúdo de `/painel/metas`, transformar o `NpsSyncBar` atual em um `DataSourceStatusBar` mostrando, para cada métrica:
-- Última sincronização
-- Botão "Sincronizar agora" (NPS já existe; demais ficam desabilitadas com tooltip "Aguardando ingestão de planilha XYZ" enquanto não houver sync automático).
+Aplicar a mesma migração em:
+- `ExecutiveOverviewView.tsx` — header (h2 + p), seções "Pódio" e "Red Flags Ativos", textos vazios ("Nenhum red flag ativo"), botões da lista. Adicionar fundo aurora muito sutil (`<VisionAuroraBackdrop>` já existe) atrás dos KPIs.
+- `NpsReclamacoesView.tsx`, `KdsConformidadeView.tsx`, `CmvDetailView.tsx`, `ConformidadeDetailView.tsx`, `RankingView.tsx`, `ComparativoView.tsx` — substituir todas as classes hardcoded.
+- `MetricDetailView.tsx`, `VisaoGeralCompactView.tsx`, `VisaoGeralView.tsx` — mesmo tratamento.
 
-Isso dá transparência total sobre a fidelidade dos dados.
+### 4. Página `Metas.tsx`
 
-### Passo 6 — Limpeza
-- Remover `VisaoGeralCompactView.tsx` e `VisaoGeralView.tsx` (substituídos pelo `ExecutiveOverviewView`).
-- Remover `PainelMetasTab` se não tiver mais consumidores.
-- Salvar nota em `mem://architecture/painel-indicadores-route` explicando que o Painel de Indicadores vive exclusivamente em `/painel/metas`.
+- Trocar `bg-white/5` da `NpsSyncBar` por `.vision-glass-pill` ou um mini card glass.
+- Garantir que o `<main>` use o `AppGlassBackground` corretamente atrás de tudo.
+- Texto "Esta seção está disponível…" em `text-muted-foreground`.
 
----
+### 5. Microrrefinamentos visuais
 
-## Detalhes técnicos
+- KPIs com `motion.div` + entrada escalonada (já existe), adicionar `hover-lift`.
+- Heatmap: pequeno gradient overlay no topo das células para reforçar o efeito vidro.
+- Tipografia: títulos de seção em `font-display` (Space Grotesk) com `tracking-tight`, números grandes com `display-number`.
+- Sombras coloridas suaves nos KPIs (sombra coral primária para o card "ativo").
+
+## Fora do escopo
+
+- Mudanças funcionais (hooks, lógica de cálculo, agregações).
+- Novas seções/abas — apenas redesenho do que já existe.
+- Banco de dados / RLS / edge functions.
+
+## Estrutura técnica resumida
 
 ```text
-Fluxo de dados após mudança
-───────────────────────────
-Sheets (Google) ─► useSyncNpsSheets ─► metas_snapshot ─► useMetasSnapshot ───┐
-                                                         useMetasHistorico ──┤
-supervision_audits + audit_sector_scores ─► useConformidadeData ─────────────┼─► views /painel/metas
-reclamacoes ──────────────────────────────► useReclamacoesData ──────────────┤
-(futuro) Sheets KDS ─► nova função sync ─► metas_snapshot.kds ───────────────┘
+src/index.css
+  └─ +utilidades: .kpi-glass, .heatmap-cell-*, --status-*-bg/border (light+dark)
+
+src/components/dashboard/painel-metas/
+  ├─ shared/      → tokens semânticos em todos os arquivos
+  └─ views/       → tokens semânticos em todos os arquivos
+
+src/pages/painel/Metas.tsx → NpsSyncBar refinada
 ```
 
-- `fetchAllRows` em todos os hooks para evitar truncamento em 1000.
-- Datas como `YYYY-MM` strings (mês de referência).
-- `restrictToLojaCodigo` propagado em cada hook via `lojaCodigoFromNome` ↔ `loja_id`.
-- Realtime mantido apenas em `metas_snapshot` (já existe).
+## Validação
 
-## Fora de escopo (sugestões depois)
-- Funções de sync para KDS e Conformidade vindas de Sheets (depende dos IDs das planilhas).
-- Deep-linking via querystring (`?metric=&loja=&periodo=`).
-- Export PNG dos gráficos.
+Após implementação, abrir `/painel/metas` em ambos os temas (toggle no header) e verificar:
+1. Todo texto legível.
+2. Cards com efeito glass real (blur perceptível sobre o aurora background).
+3. Status colors (verde/âmbar/laranja/vermelho) consistentes e acessíveis.
+4. Hover/active states visíveis nos dois modos.

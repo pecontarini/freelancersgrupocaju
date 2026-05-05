@@ -3448,6 +3448,103 @@ export type Database = {
           },
         ]
       }
+      reclamacoes_comentarios: {
+        Row: {
+          action_plan_id: string | null
+          autor: string | null
+          canal: string | null
+          comentario: string
+          created_at: string
+          data_comentario: string | null
+          id: string
+          loja_codigo: string | null
+          loja_id: string | null
+          nota: number | null
+          source_hash: string
+          source_id: string | null
+          status: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          action_plan_id?: string | null
+          autor?: string | null
+          canal?: string | null
+          comentario: string
+          created_at?: string
+          data_comentario?: string | null
+          id?: string
+          loja_codigo?: string | null
+          loja_id?: string | null
+          nota?: number | null
+          source_hash: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          action_plan_id?: string | null
+          autor?: string | null
+          canal?: string | null
+          comentario?: string
+          created_at?: string
+          data_comentario?: string | null
+          id?: string
+          loja_codigo?: string | null
+          loja_id?: string | null
+          nota?: number | null
+          source_hash?: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacoes_comentarios_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sheets_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reclamacoes_config: {
+        Row: {
+          classificador_ai: boolean
+          enabled: boolean
+          id: string
+          singleton: boolean
+          source_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          classificador_ai?: boolean
+          enabled?: boolean
+          id?: string
+          singleton?: boolean
+          source_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          classificador_ai?: boolean
+          enabled?: boolean
+          id?: string
+          singleton?: boolean
+          source_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamacoes_config_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sheets_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_attendance: {
         Row: {
           attendance_date: string
@@ -3871,6 +3968,56 @@ export type Database = {
             columns: ["loja_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sheets_blocks_snapshot: {
+        Row: {
+          block_key: string
+          block_type: string
+          created_at: string
+          id: string
+          loja_codigo: string
+          mes_ref: string
+          meta_key: string
+          ordem: number
+          payload: Json
+          source_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          block_key: string
+          block_type: string
+          created_at?: string
+          id?: string
+          loja_codigo?: string
+          mes_ref: string
+          meta_key: string
+          ordem?: number
+          payload?: Json
+          source_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          block_key?: string
+          block_type?: string
+          created_at?: string
+          id?: string
+          loja_codigo?: string
+          mes_ref?: string
+          meta_key?: string
+          ordem?: number
+          payload?: Json
+          source_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheets_blocks_snapshot_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
           },
         ]

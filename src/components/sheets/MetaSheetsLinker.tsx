@@ -22,8 +22,17 @@ import { META_DEFINITIONS } from "@/components/dashboard/painel-metas/shared/met
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ReclamacoesCommentsToggle } from "./ReclamacoesCommentsToggle";
 
-// Metas que aceitam vínculo com planilha externa
+// Definição leve para metas "extras" não presentes em MetaKey
+type ExtraMetaDef = { key: string; label: string; description: string };
+const EXTRA_LINKABLE_METAS: ExtraMetaDef[] = [
+  { key: "target-preto", label: "KDS · Target Preto (Matriz)", description: "Matriz Categoria × Loja com % de target preta" },
+  { key: "atendimento-medias", label: "Atendimento — Médias (Google/TripAdvisor/iFood)", description: "Médias por canal — placeholder até popular" },
+  { key: "reclamacoes", label: "Reclamações — Distribuição", description: "Distribuição 1–5 estrelas por loja" },
+];
+
+// Metas core do MetaKey
 const LINKABLE_METAS: MetaKey[] = [
   "visao-geral",
   "nps",
@@ -44,11 +53,13 @@ interface PreviewState {
 function MetaSourceCard({
   metaKey,
   source,
+  defOverride,
 }: {
-  metaKey: MetaKey;
+  metaKey: string;
   source: SheetsSource | null;
+  defOverride?: { label: string; description: string };
 }) {
-  const def = META_DEFINITIONS[metaKey];
+  const def = defOverride ?? META_DEFINITIONS[metaKey as MetaKey];
   const { linkSourceToMeta, deleteSource, toggleActive } = useSheetsSources();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(source?.url ?? "");
@@ -315,33 +326,48 @@ export function MetaSheetsLinker() {
   const { sources, isLoading } = useSheetsSources();
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base uppercase">
-            Fontes do Painel de Indicadores
-          </CardTitle>
-        </div>
-        <CardDescription>
-          Vincule uma planilha Google Sheets (formato CSV) a cada meta do painel. Cada
-          visualização lerá automaticamente da planilha vinculada.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    <div className="space-y-4">
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base uppercase">
+              Fontes do Painel de Indicadores
+            </CardTitle>
           </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {LINKABLE_METAS.map((key) => {
-              const source = sources.find((s) => s.meta_key === key) ?? null;
-              return <MetaSourceCard key={key} metaKey={key} source={source} />;
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <CardDescription>
+            Vincule uma planilha Google Sheets (formato CSV) a cada meta do painel. Cada
+            visualização lerá automaticamente da planilha vinculada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {LINKABLE_METAS.map((key) => {
+                const source = sources.find((s) => s.meta_key === key) ?? null;
+                return <MetaSourceCard key={key} metaKey={key} source={source} />;
+              })}
+              {EXTRA_LINKABLE_METAS.map((m) => {
+                const source = sources.find((s) => s.meta_key === m.key) ?? null;
+                return (
+                  <MetaSourceCard
+                    key={m.key}
+                    metaKey={m.key}
+                    source={source}
+                    defOverride={{ label: m.label, description: m.description }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ReclamacoesCommentsToggle />
+    </div>
   );
 }

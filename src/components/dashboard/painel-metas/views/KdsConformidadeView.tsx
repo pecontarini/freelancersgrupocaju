@@ -20,6 +20,7 @@ import {
   Cell,
 } from "recharts";
 import { SheetBlocksSection } from "../blocks/SheetBlocksSection";
+import { KdsTargetPretoDashboard } from "@/components/indicadores/dashboards/KdsTargetPretoDashboard";
 
 interface Props {
   metric: "kds" | "conformidade";

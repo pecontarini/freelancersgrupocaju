@@ -175,7 +175,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     );
   }
 
-  if (isEmpty) {
+  if (isEmpty && !linkedSource) {
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />

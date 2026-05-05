@@ -1278,13 +1278,14 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
   switch (metaKey) {
     case 'conformidade': return parseConformidade(grid);
     case 'kds':
-    case 'target-preto': return parseTargetPretoKds(grid);
-    case 'atendimento-medias':
-    case 'nps': return parseAtendimentoMedias(grid);
-    case 'reclamacoes': return parseReclamacoesDist(grid);
+    case 'kds-target-preto':
+    case 'target-preto': return parseKdsTargetPretoV2(grid);
+    case 'nps': return parseNpsAtendimento(grid);
+    case 'atendimento-medias': return parseAvaliacoesFaturamento(grid);
+    case 'reclamacoes': return parseBaseAvaliacoes(grid);
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
-    case 'ranking-supervisores': return parseGenericMeta(grid);
+    case 'ranking-supervisores': return parseSupervisoresRanking(grid);
     default: return parseGenericMeta(grid);
   }
 }

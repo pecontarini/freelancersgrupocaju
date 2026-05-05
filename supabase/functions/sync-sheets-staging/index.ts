@@ -1006,7 +1006,7 @@ serve(async (req) => {
     }
 
     // Grid principal via gviz
-    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid));
+    const grid = await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));
 
     const parsed = dispatchParser(metaKey, grid);
     console.log('[sync] parsed rows=', parsed.rows.length, 'blocks=', parsed.blocks.length);

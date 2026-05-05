@@ -130,9 +130,14 @@ export function useSheetsSources() {
         }
       }
 
+      const payload = { ...input };
+      if (payload.url) {
+        payload.url = normalizeSheetsUrl(payload.url) ?? payload.url;
+      }
+
       const { error } = await supabase
         .from('sheets_sources')
-        .update(input)
+        .update(payload)
         .eq('id', id);
 
       if (error) throw error;

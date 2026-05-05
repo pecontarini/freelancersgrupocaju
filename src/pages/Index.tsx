@@ -138,9 +138,10 @@ const Index = () => {
     [navigate]
   );
 
-  // If user lands here with ?tab=painel, redirect to /painel/metas
+  // If user lands here with ?tab=painel (legacy entry), redirect to /painel/metas
   useEffect(() => {
-    if (activeTab === "painel") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tab") === "painel" || activeTab === "painel") {
       navigate("/painel/metas", { replace: true });
     }
   }, [activeTab, navigate]);

@@ -83,7 +83,9 @@ export function RankingView() {
   };
 
   return (
-    <Card className="vision-glass">
+    <div className="space-y-4">
+      <SupervisoresRankingDashboard />
+      <Card className="vision-glass">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

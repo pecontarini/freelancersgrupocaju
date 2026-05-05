@@ -3881,6 +3881,7 @@ export type Database = {
           created_at: string
           gid: string | null
           id: string
+          meta_key: string | null
           nome: string
           sync_diario: boolean
           tipo_dado: Database["public"]["Enums"]["import_destino"]
@@ -3894,6 +3895,7 @@ export type Database = {
           created_at?: string
           gid?: string | null
           id?: string
+          meta_key?: string | null
           nome: string
           sync_diario?: boolean
           tipo_dado?: Database["public"]["Enums"]["import_destino"]
@@ -3907,6 +3909,7 @@ export type Database = {
           created_at?: string
           gid?: string | null
           id?: string
+          meta_key?: string | null
           nome?: string
           sync_diario?: boolean
           tipo_dado?: Database["public"]["Enums"]["import_destino"]

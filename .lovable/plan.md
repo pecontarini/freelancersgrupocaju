@@ -1,94 +1,78 @@
-# Painel de Indicadores — Redesign Light/Dark com Glassmorphism Senior
-
-## Diagnóstico
-
-O Painel `/painel/metas` foi construído pensando apenas no tema escuro: usa cores travadas (`text-white`, `bg-white/5`, `ring-white/10`, `from-emerald-500/15`) em ~20 arquivos do diretório `painel-metas/`. No tema light isso resulta em:
-
-- Texto branco sobre fundo claro (ilegível ou invisível)
-- Glass plano, sem o brilho/blur característico do estilo Apple
-- KPIs e heatmap com contraste insuficiente
-- Sidebar de métricas e drawer perdem hierarquia visual
-
-O design system já tem tokens prontos (`--glass-bg`, `--glass-border`, `--vision-glass-*`, `.glass-card`, `.vision-glass`) com variantes light e dark — só não estão sendo usados consistentemente.
-
 ## Objetivo
 
-Entregar uma visualização moderna, profissional e bonita do Painel de Indicadores que funcione com excelência **nos dois temas**, com glassmorphism real (blur, saturate, borda superior luminosa, sombras coloridas suaves) e hierarquia tipográfica clara.
+Criar, na aba **Configurações**, uma seção dedicada onde o admin associa **uma planilha Google Sheets a cada meta** do Painel de Indicadores (NPS, CMV Salmão, CMV Carnes, KDS, Conformidade, Reclamações etc.). A partir daí, cada visualização do painel passa a ter uma fonte de dados oficial, sincronizável e auditável — sem depender de mapeamentos hardcoded em `get-sheets-data` ou de URLs avulsas em `sheets_sources`.
 
-## Escopo
+## Como vai funcionar (visão do usuário)
 
-### 1. Tokens & utilidades (src/index.css)
+1. Admin abre **Configurações → Fontes do Painel de Indicadores**.
+2. Vê um card por meta (NPS & Reclamações, CMV Salmão, CMV Carnes, KDS, Conformidade, Visão Geral / Faturamento).
+3. Para cada meta, pode:
+   - Colar a URL da planilha (formato CSV `…/export?format=csv&gid=…`).
+   - Dar um nome amigável e ativar/desativar.
+   - Clicar **Sincronizar agora** ou **Testar conexão** (lê 1ª linha e mostra colunas detectadas).
+   - Ver **última sincronização**, status (ok / erro / pendente) e nº de linhas.
+4. No Painel de Indicadores, cada view passa a ler a fonte vinculada à sua meta. Se nenhuma fonte estiver vinculada, mostra estado vazio com link “Configurar fonte”.
 
-Adicionar/refinar utilidades reutilizáveis baseadas nos tokens já existentes:
+## Mudanças no banco
 
-- `.kpi-glass` — card KPI com gradiente sutil de status (emerald/amber/orange/red), funcionando em ambos temas via `color-mix` ou variáveis CSS dedicadas por status (`--status-excelente-bg`, `--status-redflag-bg`, etc.).
-- `.kpi-status-dot-{excelente|bom|regular|redflag}` — pontinhos de status com glow.
-- `.heatmap-cell-{status}` — células do heatmap com contraste adequado em light/dark.
-- `.glass-divider` — separador fino, refletido nos dois temas.
-- Refinar `.vision-glass` com `border-image` opcional para criar a borda luminosa de topo característica do Vision Pro.
+Adicionar uma coluna `meta_key` em `sheets_sources` para amarrar cada fonte a uma meta do painel.
 
-### 2. Componentes compartilhados (`shared/`)
+```sql
+ALTER TABLE public.sheets_sources
+  ADD COLUMN meta_key text;
 
-Substituir cores hardcoded por tokens semânticos:
-
-| Antes | Depois |
-|---|---|
-| `text-white`, `text-white/60`, `text-white/40` | `text-foreground`, `text-muted-foreground`, `text-foreground/60` |
-| `bg-white/5`, `bg-white/[0.03]` | `bg-foreground/5`, `bg-muted/40` ou `.glass-card` aninhado |
-| `ring-white/10`, `ring-white/15` | `ring-border`, `ring-foreground/10` |
-| `from-emerald-500/15` em gradientes de status | utilidades `.kpi-glass` ou variáveis `--status-*` |
-
-Arquivos a refatorar:
-- `MetricKpiCard.tsx` — adotar `.kpi-glass`, ícone com bolha de vidro circular, valor em `text-foreground` com `display-number`, delta com `bg-emerald-500/10 text-emerald-700 dark:text-emerald-300`.
-- `MetricHeatmap.tsx` — header e siglas em tokens semânticos; células usando utilidades de status; linha em hover com `bg-muted/50`.
-- `MetricDrawer.tsx` — fundo `.glass-card-strong`, header com gradiente coral suave, métricas em cards aninhados.
-- `PainelFilters.tsx` — pills `.vision-glass-pill` consistentes nos dois temas.
-- `PainelSidebar.tsx` — já é razoável; ajustar hovers (`hover:bg-foreground/5` em vez de `bg-white/40`) e indicador ativo.
-- `RankingCard.tsx`, `KpiByStoreGrid.tsx`, `SixMonthsCard.tsx`, `MetaPageHeader.tsx` — mesma migração.
-
-### 3. Views (`views/`)
-
-Aplicar a mesma migração em:
-- `ExecutiveOverviewView.tsx` — header (h2 + p), seções "Pódio" e "Red Flags Ativos", textos vazios ("Nenhum red flag ativo"), botões da lista. Adicionar fundo aurora muito sutil (`<VisionAuroraBackdrop>` já existe) atrás dos KPIs.
-- `NpsReclamacoesView.tsx`, `KdsConformidadeView.tsx`, `CmvDetailView.tsx`, `ConformidadeDetailView.tsx`, `RankingView.tsx`, `ComparativoView.tsx` — substituir todas as classes hardcoded.
-- `MetricDetailView.tsx`, `VisaoGeralCompactView.tsx`, `VisaoGeralView.tsx` — mesmo tratamento.
-
-### 4. Página `Metas.tsx`
-
-- Trocar `bg-white/5` da `NpsSyncBar` por `.vision-glass-pill` ou um mini card glass.
-- Garantir que o `<main>` use o `AppGlassBackground` corretamente atrás de tudo.
-- Texto "Esta seção está disponível…" em `text-muted-foreground`.
-
-### 5. Microrrefinamentos visuais
-
-- KPIs com `motion.div` + entrada escalonada (já existe), adicionar `hover-lift`.
-- Heatmap: pequeno gradient overlay no topo das células para reforçar o efeito vidro.
-- Tipografia: títulos de seção em `font-display` (Space Grotesk) com `tracking-tight`, números grandes com `display-number`.
-- Sombras coloridas suaves nos KPIs (sombra coral primária para o card "ativo").
-
-## Fora do escopo
-
-- Mudanças funcionais (hooks, lógica de cálculo, agregações).
-- Novas seções/abas — apenas redesenho do que já existe.
-- Banco de dados / RLS / edge functions.
-
-## Estrutura técnica resumida
-
-```text
-src/index.css
-  └─ +utilidades: .kpi-glass, .heatmap-cell-*, --status-*-bg/border (light+dark)
-
-src/components/dashboard/painel-metas/
-  ├─ shared/      → tokens semânticos em todos os arquivos
-  └─ views/       → tokens semânticos em todos os arquivos
-
-src/pages/painel/Metas.tsx → NpsSyncBar refinada
+CREATE UNIQUE INDEX sheets_sources_meta_key_unique
+  ON public.sheets_sources(meta_key)
+  WHERE meta_key IS NOT NULL AND ativo = true;
 ```
 
-## Validação
+Valores aceitos para `meta_key` (validados no app, não no DB para flexibilidade): `nps`, `cmv-salmao`, `cmv-carnes`, `kds`, `conformidade`, `visao-geral`, `reclamacoes`.
 
-Após implementação, abrir `/painel/metas` em ambos os temas (toggle no header) e verificar:
-1. Todo texto legível.
-2. Cards com efeito glass real (blur perceptível sobre o aurora background).
-3. Status colors (verde/âmbar/laranja/vermelho) consistentes e acessíveis.
-4. Hover/active states visíveis nos dois modos.
+Opcional (fase 2): adicionar `parser_type text` para indicar qual parser/edge function processa o CSV (`nps_v1`, `cmv_salmao_v1`, etc.).
+
+## Mudanças no código
+
+### 1. Nova seção em Configurações
+- `src/components/sheets/MetaSheetsLinker.tsx` (novo) — lista as metas do painel (de `META_DEFINITIONS`) e renderiza um `MetaSourceCard` por meta.
+- `MetaSourceCard`: exibe nome da meta, URL atual (mascarada), status, botões **Editar**, **Testar**, **Sincronizar**, **Remover**.
+- Inserir `<MetaSheetsLinker />` em `src/components/ConfigurationsTab.tsx` (somente admin), acima da seção de “Lojas / Funções / Gerências”.
+
+### 2. Hook
+- Estender `src/hooks/useSheetsSources.ts`:
+  - Tipo `SheetsSource` ganha `meta_key: string | null`.
+  - Novo helper `useSourceForMeta(metaKey)` que retorna a fonte ativa daquela meta.
+  - Mutation `linkSourceToMeta({ metaKey, url, nome })` faz upsert (1 fonte ativa por meta).
+
+### 3. Edge function de teste/preview
+- `supabase/functions/test-sheet-source/index.ts` (nova): recebe `{ url }`, baixa as primeiras ~5 linhas do CSV e devolve `{ headers, sampleRows, rowCount }`. Usada pelo botão **Testar conexão**.
+
+### 4. Sincronização por meta
+- Reaproveitar `sync-sheets-staging` (NPS/Reclamações) como está.
+- Para CMV Salmão, CMV Carnes, KDS e Conformidade, criar (ou estender) uma função `sync-meta-sheet` que recebe `{ sourceId, metaKey }` e roteia para o parser certo. Nesta fase, basta o esqueleto + parser de NPS/Reclamações funcionando; os demais ficam stub com `TODO` até definirmos o layout das planilhas correspondentes.
+
+### 5. Consumo no Painel
+- Cada hook de view (`useReclamacoesData`, `useConformidadeData`, futuros `useCmvSalmaoData` etc.) ganha um fallback: se `useSourceForMeta(metaKey)` não retornar fonte vinculada, devolve `isEmpty=true` com flag `needsSource=true`.
+- Componentes de view (`NpsReclamacoesView`, `CmvDetailView`, etc.) exibem um placeholder “Vincule uma planilha em Configurações → Fontes do Painel” quando `needsSource`.
+
+## O que NÃO muda
+
+- `MultiLinkSheetsSync` e `GoogleSheetsSync` continuam existindo (para imports avulsos / históricos). A nova seção é só para o vínculo **meta → planilha**.
+- Estrutura visual do Painel de Indicadores (glassmorphism etc.) permanece.
+
+## Entrega em fases
+
+**Fase 1 (este ciclo):**
+- Migration `meta_key`.
+- UI `MetaSheetsLinker` + `MetaSourceCard` na aba Configurações.
+- Hook estendido + mutation de vínculo.
+- Edge function `test-sheet-source`.
+- Vincular meta `nps` e `reclamacoes` ao fluxo já existente (`sync-sheets-staging`).
+
+**Fase 2 (próximo ciclo, após validar layout das planilhas):**
+- Parsers para `cmv-salmao`, `cmv-carnes`, `kds`, `conformidade`.
+- Cron diário por meta (reaproveita `cron-import-sheets`).
+
+## Perguntas a confirmar antes de implementar
+
+1. As planilhas das metas **CMV Salmão**, **CMV Carnes**, **KDS** e **Conformidade** já existem hoje? Se sim, posso pedir um link de exemplo para definir o parser na Fase 2?
+2. Posso assumir **uma planilha ativa por meta** (ao vincular nova, a anterior é desativada)? Ou você quer permitir múltiplas fontes empilhadas por meta?

@@ -845,3 +845,124 @@
     box-shadow: 0 1px 8px rgba(0, 0, 0, 0.06);
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   KPI STATUS GLASS — Painel de Indicadores (light + dark)
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+  :root {
+    /* status: excelente (emerald) */
+    --status-excelente:    152 60% 42%;
+    --status-bom:          38 92% 50%;
+    --status-regular:      24 90% 55%;
+    --status-redflag:      0 78% 56%;
+    --status-neutro:       220 10% 55%;
+  }
+  .dark {
+    --status-excelente:    152 65% 55%;
+    --status-bom:          38 92% 60%;
+    --status-regular:      24 92% 62%;
+    --status-redflag:      0 80% 65%;
+    --status-neutro:       220 8% 65%;
+  }
+
+  /* Hero KPI card — inherits .vision-glass + status tinted gradient */
+  .kpi-glass {
+    position: relative;
+    border-radius: 22px;
+    background:
+      linear-gradient(180deg, hsl(var(--kpi-status, var(--status-neutro)) / 0.10) 0%, transparent 55%),
+      var(--vision-glass-bg);
+    backdrop-filter: blur(32px) saturate(190%);
+    -webkit-backdrop-filter: blur(32px) saturate(190%);
+    border: 1px solid var(--vision-glass-border-top);
+    border-bottom-color: var(--vision-glass-border-bot);
+    border-right-color: var(--vision-glass-border-bot);
+    box-shadow:
+      0 10px 30px -12px hsl(var(--kpi-status, var(--status-neutro)) / 0.25),
+      0 4px 14px rgba(20,20,30,0.06),
+      inset 0 1px 0 rgba(255,255,255,0.7);
+    overflow: hidden;
+    transition: transform 280ms cubic-bezier(0.65,0,0.35,1),
+                box-shadow 280ms cubic-bezier(0.65,0,0.35,1);
+  }
+  .dark .kpi-glass {
+    box-shadow:
+      0 10px 30px -12px hsl(var(--kpi-status, var(--status-neutro)) / 0.45),
+      0 4px 14px rgba(0,0,0,0.40),
+      inset 0 1px 0 rgba(255,255,255,0.10);
+  }
+  .kpi-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.30) 0%, transparent 100%);
+    pointer-events: none;
+    border-radius: 22px 22px 0 0;
+  }
+  .dark .kpi-glass::before {
+    background: linear-gradient(to bottom, rgba(255,255,255,0.06) 0%, transparent 100%);
+  }
+  .kpi-glass:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 18px 40px -10px hsl(var(--kpi-status, var(--status-neutro)) / 0.35),
+      0 6px 18px rgba(20,20,30,0.08),
+      inset 0 1px 0 rgba(255,255,255,0.75);
+  }
+  .kpi-status-excelente { --kpi-status: var(--status-excelente); }
+  .kpi-status-bom       { --kpi-status: var(--status-bom); }
+  .kpi-status-regular   { --kpi-status: var(--status-regular); }
+  .kpi-status-redflag   { --kpi-status: var(--status-redflag); }
+  .kpi-status-neutro    { --kpi-status: var(--status-neutro); }
+
+  /* Status dot with subtle glow */
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: hsl(var(--kpi-status, var(--status-neutro)));
+    box-shadow:
+      0 0 0 3px hsl(var(--kpi-status, var(--status-neutro)) / 0.18),
+      0 0 10px hsl(var(--kpi-status, var(--status-neutro)) / 0.55);
+  }
+
+  /* Heatmap cells — status-tinted glass */
+  .heatmap-cell {
+    background: hsl(var(--kpi-status, var(--status-neutro)) / 0.14);
+    border: 1px solid hsl(var(--kpi-status, var(--status-neutro)) / 0.28);
+    color: hsl(var(--foreground));
+    border-radius: 10px;
+    transition: all 220ms cubic-bezier(0.65,0,0.35,1);
+    backdrop-filter: blur(8px);
+  }
+  .heatmap-cell:hover {
+    background: hsl(var(--kpi-status, var(--status-neutro)) / 0.26);
+    border-color: hsl(var(--kpi-status, var(--status-neutro)) / 0.55);
+    box-shadow: 0 6px 20px -6px hsl(var(--kpi-status, var(--status-neutro)) / 0.45);
+  }
+  .heatmap-cell-na {
+    background: hsl(var(--muted) / 0.4);
+    border: 1px dashed hsl(var(--border));
+    color: hsl(var(--muted-foreground) / 0.6);
+    border-radius: 10px;
+  }
+
+  /* Status badge utility */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: hsl(var(--kpi-status, var(--status-neutro)) / 0.14);
+    color: hsl(var(--kpi-status, var(--status-neutro)));
+    border: 1px solid hsl(var(--kpi-status, var(--status-neutro)) / 0.30);
+  }
+
+  /* Section title — Apple-display style */
+  .section-title {
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: hsl(var(--foreground));
+  }
+}

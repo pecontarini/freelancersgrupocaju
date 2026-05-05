@@ -105,7 +105,14 @@ function MetaSourceCard({
         },
       });
       if (error) throw error;
-      toast.success(`Sincronizado: ${data?.rowsImported ?? 0} linhas.`);
+      if (data?.success === false) {
+        toast.error(data.error || "Erro ao sincronizar.");
+        return;
+      }
+      toast.success(
+        data?.message ||
+          `Sincronizado: ${data?.rowsImported ?? 0} loja(s) atualizadas no Painel.`
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao sincronizar.");
     }

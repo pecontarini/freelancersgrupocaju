@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ClipboardCheck,
@@ -9,6 +10,7 @@ import {
   FileText,
   ChevronRight,
   Layers,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MetricKpiCard } from "../shared/MetricKpiCard";
@@ -17,6 +19,10 @@ import { getLojaDisplay } from "@/lib/lojaUtils";
 import { useConformidadeData, type SectorGroup } from "@/hooks/useConformidadeData";
 import { useLojaCodigoMap } from "../shared/useLojaCodigoMap";
 import { calcConformidadeStatus } from "@/lib/metasUtils";
+import { useSourceForMeta } from "@/hooks/useSheetsSources";
+import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   BarChart,
   Bar,

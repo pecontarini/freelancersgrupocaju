@@ -11,6 +11,9 @@ import { ExecutiveOverviewView } from "@/components/dashboard/painel-metas/views
 import { MetricDetailView } from "@/components/dashboard/painel-metas/views/MetricDetailView";
 import { RankingView } from "@/components/dashboard/painel-metas/views/RankingView";
 import { ComparativoView } from "@/components/dashboard/painel-metas/views/ComparativoView";
+import { NpsReclamacoesView } from "@/components/dashboard/painel-metas/views/NpsReclamacoesView";
+import { CmvDetailView } from "@/components/dashboard/painel-metas/views/CmvDetailView";
+import { KdsConformidadeView } from "@/components/dashboard/painel-metas/views/KdsConformidadeView";
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import type { RankingMetric } from "@/components/dashboard/painel-metas/shared/mockLojas";
 import { useMetasSnapshot } from "@/hooks/useMetasSnapshot";

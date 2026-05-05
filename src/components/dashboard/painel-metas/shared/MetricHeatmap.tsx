@@ -66,7 +66,7 @@ export function MetricHeatmap({ snapshots, onCellClick }: Props) {
                 key={m}
                 className={cn(
                   "px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider transition-colors",
-                  hover?.col === m ? "text-primary" : "text-white/60",
+                  hover?.col === m ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 {METRIC_META[m].label}
@@ -78,11 +78,11 @@ export function MetricHeatmap({ snapshots, onCellClick }: Props) {
                 <div
                   className={cn(
                     "flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors",
-                    hover?.row === loja.code && "bg-white/5",
+                    hover?.row === loja.code && "bg-foreground/5",
                   )}
                 >
                   <span
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                     style={{ backgroundColor: `${getLojaDisplay(loja.code).cor}30`, color: getLojaDisplay(loja.code).cor }}
                   >
                     {getLojaDisplay(loja.code).sigla}
@@ -96,7 +96,7 @@ export function MetricHeatmap({ snapshots, onCellClick }: Props) {
                     return (
                       <div
                         key={m}
-                        className="flex items-center justify-center rounded-lg bg-white/[0.02] py-2 text-xs text-white/30 ring-1 ring-white/5"
+                        className="flex items-center justify-center rounded-lg bg-foreground/[0.03] py-2 text-xs text-muted-foreground/60 ring-1 ring-border/60"
                       >
                         —
                       </div>

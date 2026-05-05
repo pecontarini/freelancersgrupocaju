@@ -210,17 +210,17 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
   }
 
   if (error) {
-    return <div className="glass-card p-8 text-center text-red-300 ring-1 ring-red-500/30">{error}</div>;
+    return <div className="glass-card p-8 text-center text-red-600 dark:text-red-300 ring-1 ring-red-500/30">{error}</div>;
   }
 
   if (isEmpty) {
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-[Sora] text-base font-semibold text-white">
+        <p className="font-display text-base font-semibold text-foreground">
           Aguardando sincronização semanal
         </p>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-muted-foreground">
           Os snapshots de metas ainda não foram gerados para este mês.
         </p>
       </div>
@@ -231,8 +231,8 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-[Sora] text-xl font-bold text-white">Dashboard Executivo</h2>
-          <p className="text-xs text-white/60">
+          <h2 className="font-display text-xl font-bold text-foreground">Dashboard Executivo</h2>
+          <p className="text-xs text-muted-foreground">
             Visão consolidada de {lojas.length} loja{lojas.length === 1 ? "" : "s"} · clique em qualquer indicador para explorar
           </p>
         </div>
@@ -294,7 +294,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                   key={l.code}
                   type="button"
                   onClick={() => setDrawer({ loja: l.code, metric: ranking.metric })}
-                  className="flex w-full items-center gap-3 rounded-xl bg-white/[0.03] p-2.5 text-left ring-1 ring-white/5 transition-all hover:bg-white/10 hover:ring-primary/30"
+                  className="flex w-full items-center gap-3 rounded-xl bg-foreground/[0.04] p-2.5 text-left ring-1 ring-border/60 transition-all hover:bg-foreground/10 hover:ring-primary/30"
                 >
                   <span
                     className={cn(
@@ -307,13 +307,13 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                     {idx + 1}
                   </span>
                   <span
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                     style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                   >
                     {d.sigla}
                   </span>
                   <span className="flex-1 truncate text-sm">{d.nome}</span>
-                  <span className="font-[Sora] text-sm font-semibold tabular-nums">
+                  <span className="font-display text-sm font-semibold tabular-nums">
                     {formatNpsDisplay(l.values[ranking.metric])}
                   </span>
                 </button>
@@ -321,7 +321,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
             })}
             {ranking.bottom.length > 0 && (
               <div className="mt-3 border-t border-white/5 pt-3">
-                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-red-300/70">
+                <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-red-600/70 dark:text-red-600 dark:text-red-300/70">
                   Atenção · piores
                 </p>
                 {ranking.bottom.map((l) => {
@@ -334,13 +334,13 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                       className="mt-1 flex w-full items-center gap-3 rounded-xl bg-red-500/5 p-2.5 text-left ring-1 ring-red-500/20 transition-all hover:bg-red-500/15"
                     >
                       <span
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                         style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                       >
                         {d.sigla}
                       </span>
-                      <span className="flex-1 truncate text-sm text-red-100">{d.nome}</span>
-                      <span className="font-[Sora] text-sm font-semibold tabular-nums text-red-200">
+                      <span className="flex-1 truncate text-sm text-red-700 dark:text-red-100">{d.nome}</span>
+                      <span className="font-display text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
                         {formatNpsDisplay(l.values[ranking.metric])}
                       </span>
                     </button>
@@ -357,7 +357,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
               <AlertTriangle className="h-4 w-4 text-red-400" />
               Red Flags Ativos
               {redFlagItems.length > 0 && (
-                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-200 ring-1 ring-red-500/40">
+                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-700 dark:text-red-200 ring-1 ring-red-500/40">
                   {redFlagItems.length}
                 </span>
               )}
@@ -370,10 +370,10 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
             {redFlagItems.length === 0 ? (
               <div className="flex flex-col items-center gap-2 rounded-xl bg-emerald-500/5 p-8 text-center ring-1 ring-emerald-500/20">
                 <Sparkles className="h-7 w-7 text-emerald-400" />
-                <p className="text-sm font-semibold text-emerald-200">
+                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">
                   Nenhum red flag ativo
                 </p>
-                <p className="text-[11px] text-emerald-200/60">
+                <p className="text-[11px] text-emerald-700/70 dark:text-emerald-700 dark:text-emerald-200/60">
                   Todos os indicadores acima do mínimo aceitável
                 </p>
               </div>
@@ -390,18 +390,18 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                         className="flex w-full items-center gap-3 rounded-xl bg-red-500/10 p-2.5 text-left ring-1 ring-red-500/30 transition-all hover:bg-red-500/20 hover:ring-red-500/60"
                       >
                         <span
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                           style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                         >
                           {d.sigla}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-medium text-red-100">{d.nome}</p>
-                          <p className="text-[10px] uppercase tracking-wider text-red-200/60">
+                          <p className="truncate text-xs font-medium text-red-700 dark:text-red-100">{d.nome}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-red-700/70 dark:text-red-700 dark:text-red-200/60">
                             {m.label}
                           </p>
                         </div>
-                        <span className="font-[Sora] text-sm font-semibold tabular-nums text-red-200">
+                        <span className="font-display text-sm font-semibold tabular-nums text-red-700 dark:text-red-200">
                           {it.metric === "nps"
                             ? formatNpsDisplay(it.value)
                             : it.value?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}

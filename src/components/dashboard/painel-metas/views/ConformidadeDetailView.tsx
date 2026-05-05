@@ -144,7 +144,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
 
   if (error) {
     return (
-      <div className="glass-card p-8 text-center text-sm text-red-300 ring-1 ring-red-500/30">
+      <div className="glass-card p-8 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/30">
         {error}
       </div>
     );
@@ -154,10 +154,10 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-[Sora] text-base font-semibold text-white">
+        <p className="font-display text-base font-semibold text-foreground">
           Sem auditorias registradas
         </p>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-muted-foreground">
           Os scores de conformidade aparecerão aqui quando houver auditorias publicadas.
         </p>
       </div>
@@ -168,10 +168,10 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-[Sora] text-xl font-bold text-white">
+          <h2 className="font-display text-xl font-bold text-foreground">
             Conformidade · Auditorias
           </h2>
-          <p className="text-xs text-white/60">
+          <p className="text-xs text-muted-foreground">
             Score consolidado por unidade · Back/Front · meta ≥ 90 · red flag &lt; 75
           </p>
         </div>
@@ -188,7 +188,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
       </div>
 
       {/* Toggle Back/Front/Total */}
-      <div className="inline-flex rounded-full bg-white/5 p-1 ring-1 ring-white/10">
+      <div className="inline-flex rounded-full bg-foreground/5 p-1 ring-1 ring-border">
         {(["all", "back", "front"] as const).map((g) => (
           <button
             key={g}
@@ -198,7 +198,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
               "rounded-full px-3 py-1.5 text-xs font-semibold transition-all",
               grupo === g
                 ? "bg-primary text-primary-foreground shadow"
-                : "text-white/60 hover:text-white",
+                : "text-muted-foreground hover:text-foreground",
             )}
           >
             {g === "all" ? "Total" : g === "back" ? "Back" : "Front"}
@@ -326,16 +326,16 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
                       "flex items-center gap-3 rounded-xl p-2.5 ring-1",
                       status === "redflag"
                         ? "bg-red-500/5 ring-red-500/30"
-                        : "bg-white/[0.03] ring-white/10",
+                        : "bg-foreground/[0.04] ring-border",
                     )}
                   >
-                    <span className="w-20 truncate text-[10px] font-bold uppercase tracking-wider text-white/50">
+                    <span className="w-20 truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                       {s.grupo}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-white">{s.code}</span>
-                    <span className="text-[10px] text-white/40">n={s.n}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm text-foreground">{s.code}</span>
+                    <span className="text-[10px] text-muted-foreground/70">n={s.n}</span>
                     <span
-                      className="font-[Sora] text-sm font-bold tabular-nums"
+                      className="font-display text-sm font-bold tabular-nums"
                       style={{ color: STATUS_FILL[status] }}
                     >
                       {fmt(s.score)}
@@ -385,30 +385,30 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
                       className={cn(
                         "flex items-center gap-3 rounded-xl p-2.5 ring-1 transition-all",
                         a.pdf_url
-                          ? "bg-white/[0.03] ring-white/10 hover:bg-white/[0.08] hover:ring-primary/30"
-                          : "bg-white/[0.02] ring-white/5 cursor-not-allowed opacity-60",
+                          ? "bg-foreground/[0.04] ring-border hover:bg-white/[0.08] hover:ring-primary/30"
+                          : "bg-foreground/[0.03] ring-border/60 cursor-not-allowed opacity-60",
                       )}
                     >
                       {d && (
                         <span
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                           style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                         >
                           {d.sigla}
                         </span>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white">{d?.nome ?? "—"}</p>
-                        <p className="text-[11px] text-white/50">{a.audit_date}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{d?.nome ?? "—"}</p>
+                        <p className="text-[11px] text-muted-foreground">{a.audit_date}</p>
                       </div>
                       <span
-                        className="font-[Sora] text-sm font-bold tabular-nums"
+                        className="font-display text-sm font-bold tabular-nums"
                         style={{ color: STATUS_FILL[status] }}
                       >
                         {fmt(a.global_score)}
                         <span className="ml-0.5 text-[10px] opacity-70">%</span>
                       </span>
-                      <ChevronRight className="h-4 w-4 text-white/40" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/70" />
                     </a>
                   </motion.li>
                 );
@@ -423,7 +423,7 @@ export function ConformidadeDetailView({ restrictToLojaCodigo }: Props) {
 
 function EmptyMsg({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.02] p-8 text-xs text-white/50 ring-1 ring-white/5">
+    <div className="flex items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] p-8 text-xs text-muted-foreground ring-1 ring-border/60">
       <Clock className="h-4 w-4" /> {label}
     </div>
   );

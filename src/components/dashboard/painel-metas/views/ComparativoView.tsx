@@ -112,11 +112,11 @@ export function ComparativoView() {
             <Skeleton className="h-40 w-full" />
           </div>
         ) : error ? (
-          <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-300 ring-1 ring-red-500/20">
+          <div className="rounded-xl bg-red-500/5 p-6 text-center text-sm text-red-600 dark:text-red-300 ring-1 ring-red-500/20">
             Erro ao carregar metas: {error}
           </div>
         ) : isEmpty || lojas.length < MIN_SELECTED ? (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-white/5 p-10 text-center ring-1 ring-white/10">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-foreground/5 p-10 text-center ring-1 ring-border">
             <Clock className="h-8 w-8 text-amber-400/80" />
             <div>
               <p className="text-sm font-semibold text-foreground">
@@ -144,7 +144,7 @@ export function ComparativoView() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2.5 py-1 text-xs ring-1 ring-white/15"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-foreground/5 px-2.5 py-1 text-xs ring-1 ring-border"
                   >
                     <span
                       className="inline-block h-2 w-2 rounded-full"
@@ -156,7 +156,7 @@ export function ComparativoView() {
                       type="button"
                       onClick={() => toggle(code)}
                       disabled={selected.length <= MIN_SELECTED}
-                      className="rounded-full p-0.5 text-muted-foreground hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-full p-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Remover loja"
                     >
                       <X className="h-3 w-3" />
@@ -171,7 +171,7 @@ export function ComparativoView() {
                     variant="outline"
                     size="sm"
                     disabled={selected.length >= MAX_SELECTED}
-                    className="vision-glass h-7 gap-1 border-white/15 px-2 text-xs"
+                    className="vision-glass h-7 gap-1 border-border px-2 text-xs"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Adicionar loja
@@ -191,7 +191,7 @@ export function ComparativoView() {
                           disabled={disabled}
                           className={cn(
                             "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                            "hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40",
+                            "hover:bg-foreground/10 disabled:cursor-not-allowed disabled:opacity-40",
                             isSel && "bg-primary/15 ring-1 ring-primary/30",
                           )}
                         >
@@ -210,7 +210,7 @@ export function ComparativoView() {
 
             {/* Radar */}
             <div
-              className="rounded-2xl p-3 ring-1 ring-white/10"
+              className="rounded-2xl p-3 ring-1 ring-border"
               style={{
                 background:
                   "radial-gradient(80% 80% at 50% 30%, rgba(167,139,250,0.10), transparent 70%)",
@@ -257,10 +257,10 @@ export function ComparativoView() {
             </div>
 
             {/* Tabela de delta */}
-            <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
+            <div className="overflow-hidden rounded-xl ring-1 ring-border">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead>Métrica</TableHead>
                     {selected.map((code, idx) => (
                       <TableHead key={code} className="text-center">
@@ -281,7 +281,7 @@ export function ComparativoView() {
                     const max = Math.max(...r.norms);
                     const min = Math.min(...r.norms);
                     return (
-                      <TableRow key={r.metric} className="border-white/5 hover:bg-white/5">
+                      <TableRow key={r.metric} className="border-white/5 hover:bg-foreground/5">
                         <TableCell className="text-sm">{METRIC_META[r.metric].label}</TableCell>
                         {r.norms.map((n, i) => {
                           const isMax = n === max && max !== min;
@@ -291,8 +291,8 @@ export function ComparativoView() {
                               <span
                                 className={cn(
                                   "inline-flex min-w-[3rem] items-center justify-center rounded-md px-2 py-0.5 text-xs font-semibold",
-                                  isMax && "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30",
-                                  isMin && "bg-red-500/15 text-red-300 ring-1 ring-red-500/30",
+                                  isMax && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/30",
+                                  isMin && "bg-red-500/15 text-red-600 dark:text-red-300 ring-1 ring-red-500/30",
                                   !isMax && !isMin && "text-foreground/80",
                                 )}
                               >

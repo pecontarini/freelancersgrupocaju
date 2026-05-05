@@ -136,8 +136,8 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-[Sora] text-xl font-bold text-white">NPS · Reclamações</h2>
-          <p className="text-xs text-white/60">
+          <h2 className="font-display text-xl font-bold text-foreground">NPS · Reclamações</h2>
+          <p className="text-xs text-muted-foreground">
             Análise temática · Pareto · Heatmap loja × tema
           </p>
         </div>
@@ -259,12 +259,12 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                   return (
                     <div key={f} className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-white/80">{FONTE_LABEL[f as FonteReclamacao] ?? f}</span>
-                        <span className="tabular-nums text-white/60">
-                          {n} <span className="text-white/40">({pct.toFixed(0)}%)</span>
+                        <span className="text-foreground/90">{FONTE_LABEL[f as FonteReclamacao] ?? f}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {n} <span className="text-muted-foreground/70">({pct.toFixed(0)}%)</span>
                         </span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-white/5">
+                      <div className="h-1.5 rounded-full bg-foreground/5">
                         <div
                           className="h-full rounded-full bg-primary/70"
                           style={{ width: `${pct}%` }}
@@ -298,7 +298,7 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                 {heatmapLojaTema.temas.map((t) => (
                   <div
                     key={t}
-                    className="px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider text-white/60"
+                    className="px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
                   >
                     {t}
                   </div>
@@ -309,12 +309,12 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                     <div key={l} className="contents">
                       <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
                         <span
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-white/15"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold ring-1 ring-border"
                           style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                         >
                           {d.sigla}
                         </span>
-                        <span className="truncate font-medium text-white/80">{d.nome}</span>
+                        <span className="truncate font-medium text-foreground/90">{d.nome}</span>
                       </div>
                       {heatmapLojaTema.temas.map((t) => {
                         const v = heatmapLojaTema.matrix[l]?.[t] ?? 0;
@@ -325,7 +325,7 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                             type="button"
                             onClick={() => setTema(t)}
                             className={cn(
-                              "rounded-lg px-2 py-2 text-center text-xs font-semibold tabular-nums ring-1 ring-white/5 transition-all hover:ring-primary",
+                              "rounded-lg px-2 py-2 text-center text-xs font-semibold tabular-nums ring-1 ring-border/60 transition-all hover:ring-primary",
                             )}
                             style={{
                               background: `rgba(239,68,68,${0.05 + intensity * 0.55})`,
@@ -408,41 +408,41 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                         "rounded-xl p-3 ring-1 transition-all",
                         r.is_grave
                           ? "bg-red-500/5 ring-red-500/30"
-                          : "bg-white/[0.03] ring-white/10",
+                          : "bg-foreground/[0.04] ring-border",
                       )}
                     >
                       <div className="flex flex-wrap items-center gap-2 text-[11px]">
                         {d && (
                           <span
-                            className="inline-flex h-5 items-center rounded-md px-1.5 text-[10px] font-bold ring-1 ring-white/15"
+                            className="inline-flex h-5 items-center rounded-md px-1.5 text-[10px] font-bold ring-1 ring-border"
                             style={{ backgroundColor: `${d.cor}30`, color: d.cor }}
                           >
                             {d.sigla}
                           </span>
                         )}
-                        <span className="font-semibold text-white/90">
+                        <span className="font-semibold text-foreground">
                           {d?.nome ?? "—"}
                         </span>
-                        <span className="text-white/40">·</span>
-                        <span className="text-white/60">{FONTE_LABEL[r.fonte] ?? r.fonte}</span>
-                        <span className="text-white/40">·</span>
-                        <span className="text-white/60">{r.tipo_operacao}</span>
-                        <span className="text-white/40">·</span>
-                        <span className="text-white/60">{r.data_reclamacao}</span>
+                        <span className="text-muted-foreground/70">·</span>
+                        <span className="text-muted-foreground">{FONTE_LABEL[r.fonte] ?? r.fonte}</span>
+                        <span className="text-muted-foreground/70">·</span>
+                        <span className="text-muted-foreground">{r.tipo_operacao}</span>
+                        <span className="text-muted-foreground/70">·</span>
+                        <span className="text-muted-foreground">{r.data_reclamacao}</span>
                         {r.is_grave && (
                           <Badge
                             variant="outline"
-                            className="bg-red-500/15 text-[10px] text-red-300 ring-red-500/40"
+                            className="bg-red-500/15 text-[10px] text-red-600 dark:text-red-300 ring-red-500/40"
                           >
                             <AlertTriangle className="mr-1 h-3 w-3" /> Grave
                           </Badge>
                         )}
-                        <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                        <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
                           {r.nota_reclamacao}★
                         </span>
                       </div>
                       {r.resumo_ia && (
-                        <p className="mt-2 text-xs text-white/80">{r.resumo_ia}</p>
+                        <p className="mt-2 text-xs text-foreground/90">{r.resumo_ia}</p>
                       )}
                       {r.temas?.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -455,7 +455,7 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
                                 "rounded-full px-2 py-0.5 text-[10px] ring-1 transition-colors",
                                 t === tema
                                   ? "bg-primary/20 text-primary ring-primary/40"
-                                  : "bg-white/5 text-white/60 ring-white/10 hover:bg-white/10",
+                                  : "bg-foreground/5 text-muted-foreground ring-border hover:bg-foreground/10",
                               )}
                             >
                               {t}
@@ -476,7 +476,7 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
 
 function EmptyMsg({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 rounded-xl bg-white/[0.02] p-8 text-xs text-white/50 ring-1 ring-white/5">
+    <div className="flex items-center justify-center gap-2 rounded-xl bg-foreground/[0.03] p-8 text-xs text-muted-foreground ring-1 ring-border/60">
       <Clock className="h-4 w-4" />
       {label}
     </div>

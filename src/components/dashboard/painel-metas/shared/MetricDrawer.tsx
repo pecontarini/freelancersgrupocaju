@@ -27,10 +27,10 @@ interface Props {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  excelente: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  bom: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
-  regular: "bg-orange-500/15 text-orange-300 ring-orange-500/30",
-  redflag: "bg-red-500/15 text-red-300 ring-red-500/40",
+  excelente: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/30",
+  bom: "bg-amber-500/15 text-amber-700 dark:text-amber-300 ring-amber-500/30",
+  regular: "bg-orange-500/15 text-orange-700 dark:text-orange-300 ring-orange-500/30",
+  redflag: "bg-red-500/15 text-red-600 dark:text-red-300 ring-red-500/40",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -82,7 +82,7 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
         <SheetHeader className="space-y-3 pb-4">
           <div className="flex items-center gap-2">
             <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ring-1 ring-white/15"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ring-1 ring-border"
               style={{ backgroundColor: `${display.cor}30`, color: display.cor }}
             >
               {display.sigla}
@@ -97,15 +97,15 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
         </SheetHeader>
 
         <div className="space-y-4">
-          <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+          <div className="rounded-2xl bg-foreground/5 p-4 ring-1 ring-border">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               Valor atual
             </p>
             <div className="mt-1 flex items-baseline gap-2">
-              <span className="font-[Sora] text-4xl font-bold text-white">
+              <span className="font-display text-4xl font-bold text-foreground">
                 {formatVal(metric, value)}
               </span>
-              <span className="text-sm text-white/50">{meta.suffix}</span>
+              <span className="text-sm text-muted-foreground">{meta.suffix}</span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge
@@ -115,7 +115,7 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
                 {STATUS_LABEL[status]}
               </Badge>
               {snapshot.red_flag && (
-                <Badge variant="outline" className="bg-red-500/15 text-red-300 ring-1 ring-red-500/40">
+                <Badge variant="outline" className="bg-red-500/15 text-red-600 dark:text-red-300 ring-1 ring-red-500/40">
                   <AlertTriangle className="mr-1 h-3 w-3" /> Red Flag ativo
                 </Badge>
               )}
@@ -123,29 +123,29 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+            <div className="rounded-xl bg-foreground/5 p-3 ring-1 ring-border">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Meta
               </p>
-              <p className="mt-1 font-[Sora] text-xl font-bold tabular-nums">
+              <p className="mt-1 font-display text-xl font-bold tabular-nums">
                 {meta.meta}
-                <span className="ml-1 text-xs text-white/50">{meta.suffix}</span>
+                <span className="ml-1 text-xs text-muted-foreground">{meta.suffix}</span>
               </p>
             </div>
-            <div className="rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">
+            <div className="rounded-xl bg-foreground/5 p-3 ring-1 ring-border">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Mês anterior
               </p>
               <div className="mt-1 flex items-baseline gap-2">
-                <p className="font-[Sora] text-xl font-bold tabular-nums">
+                <p className="font-display text-xl font-bold tabular-nums">
                   {formatVal(metric, prev)}
                 </p>
                 <span
                   className={cn(
                     "inline-flex items-center gap-0.5 text-[11px] tabular-nums",
-                    isUp && "text-emerald-300",
-                    isDown && "text-red-300",
-                    !isUp && !isDown && "text-white/40",
+                    isUp && "text-emerald-700 dark:text-emerald-300",
+                    isDown && "text-red-600 dark:text-red-300",
+                    !isUp && !isDown && "text-muted-foreground/70",
                   )}
                 >
                   {isUp ? <TrendingUp className="h-3 w-3" /> : isDown ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
@@ -156,15 +156,15 @@ export function MetricDrawer({ open, onOpenChange, lojaCodigo, metric, snapshot 
           </div>
 
           {snapshot.observacoes && (
-            <div className="rounded-xl bg-white/[0.03] p-3 text-xs text-white/70 ring-1 ring-white/10">
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/40">
+            <div className="rounded-xl bg-foreground/[0.04] p-3 text-xs text-foreground/80 ring-1 ring-border">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                 Observações
               </p>
               {snapshot.observacoes}
             </div>
           )}
 
-          <div className="rounded-xl bg-primary/5 p-3 text-[11px] text-white/60 ring-1 ring-primary/20">
+          <div className="rounded-xl bg-primary/5 p-3 text-[11px] text-muted-foreground ring-1 ring-primary/20">
             Atualizado em {new Date(snapshot.updated_at).toLocaleString("pt-BR")}
           </div>
         </div>

@@ -95,10 +95,15 @@ function matchLojaCodigo(raw: string): string | null {
 // ============================================================
 // Google Sheets — gviz/tq helpers
 // ============================================================
-function extractSheetParams(url: string): { sheetId: string; gid: string | null } {
+function extractSheetParams(url: string): { sheetId: string; gid: string | null; sheetName: string | null } {
   const idMatch = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
   const gidMatch = (url || '').match(/[#&?]gid=(\d+)/);
-  return { sheetId: idMatch?.[1] ?? '', gid: gidMatch?.[1] ?? null };
+  const sheetMatch = (url || '').match(/[#&?]sheet=([^&]+)/);
+  return {
+    sheetId: idMatch?.[1] ?? '',
+    gid: gidMatch?.[1] ?? null,
+    sheetName: sheetMatch ? decodeURIComponent(sheetMatch[1]) : null,
+  };
 }
 
 function buildGvizUrl(sheetId: string, gidOrName: string | null): string {

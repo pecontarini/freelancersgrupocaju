@@ -7,7 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
 import { PainelSidebar } from "@/components/dashboard/painel-metas/shared/PainelSidebar";
-import { VisaoGeralCompactView } from "@/components/dashboard/painel-metas/views/VisaoGeralCompactView";
+import { ExecutiveOverviewView } from "@/components/dashboard/painel-metas/views/ExecutiveOverviewView";
 import { MetricDetailView } from "@/components/dashboard/painel-metas/views/MetricDetailView";
 import { RankingView } from "@/components/dashboard/painel-metas/views/RankingView";
 import { ComparativoView } from "@/components/dashboard/painel-metas/views/ComparativoView";
@@ -98,7 +98,7 @@ export default function MetasPage() {
               {/* Conteúdo */}
               <div className="min-w-0 flex-1">
                 {safeView === "visao-geral" && (
-                  <VisaoGeralCompactView restrictToLojaCodigo={restrictToLojaCodigo} />
+                  <ExecutiveOverviewView restrictToLojaCodigo={restrictToLojaCodigo} onNavigate={setView} />
                 )}
                 {isMetricKey(safeView) && (
                   <MetricDetailView

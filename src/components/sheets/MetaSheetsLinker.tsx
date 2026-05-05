@@ -326,33 +326,48 @@ export function MetaSheetsLinker() {
   const { sources, isLoading } = useSheetsSources();
 
   return (
-    <Card className="rounded-2xl">
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-5 w-5 text-primary" />
-          <CardTitle className="text-base uppercase">
-            Fontes do Painel de Indicadores
-          </CardTitle>
-        </div>
-        <CardDescription>
-          Vincule uma planilha Google Sheets (formato CSV) a cada meta do painel. Cada
-          visualização lerá automaticamente da planilha vinculada.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    <div className="space-y-4">
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base uppercase">
+              Fontes do Painel de Indicadores
+            </CardTitle>
           </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {LINKABLE_METAS.map((key) => {
-              const source = sources.find((s) => s.meta_key === key) ?? null;
-              return <MetaSourceCard key={key} metaKey={key} source={source} />;
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <CardDescription>
+            Vincule uma planilha Google Sheets (formato CSV) a cada meta do painel. Cada
+            visualização lerá automaticamente da planilha vinculada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {LINKABLE_METAS.map((key) => {
+                const source = sources.find((s) => s.meta_key === key) ?? null;
+                return <MetaSourceCard key={key} metaKey={key} source={source} />;
+              })}
+              {EXTRA_LINKABLE_METAS.map((m) => {
+                const source = sources.find((s) => s.meta_key === m.key) ?? null;
+                return (
+                  <MetaSourceCard
+                    key={m.key}
+                    metaKey={m.key}
+                    source={source}
+                    defOverride={{ label: m.label, description: m.description }}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <ReclamacoesCommentsToggle />
+    </div>
   );
 }

@@ -19,7 +19,6 @@ export function FitText({
   max = 30,
   min = 12,
   className,
-  as: Tag = "span",
 }: FitTextProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState(max);

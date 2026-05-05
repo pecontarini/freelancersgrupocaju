@@ -195,12 +195,13 @@ export function useSheetsSources() {
         .eq('meta_key', metaKey)
         .eq('ativo', true);
 
-      const parsed = parseSheetsCsvUrl(url);
+      const normalizedUrl = normalizeSheetsUrl(url) ?? url;
+      const parsed = parseSheetsCsvUrl(normalizedUrl);
       const { error } = await supabase
         .from('sheets_sources')
         .insert({
           nome,
-          url,
+          url: normalizedUrl,
           gid: parsed?.gid || '0',
           ativo: true,
           meta_key: metaKey,

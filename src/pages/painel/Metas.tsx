@@ -114,7 +114,7 @@ export default function MetasPage() {
                   <KdsConformidadeView metric="kds" restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "conformidade" && (
-                  <KdsConformidadeView metric="conformidade" restrictToLojaCodigo={restrictToLojaCodigo} />
+                  <ConformidadeDetailView restrictToLojaCodigo={restrictToLojaCodigo} />
                 )}
                 {safeView === "ranking" && showManagerPlus && <RankingView />}
                 {safeView === "comparativo" && showManagerPlus && <ComparativoView />}

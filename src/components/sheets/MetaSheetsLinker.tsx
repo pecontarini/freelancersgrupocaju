@@ -53,11 +53,13 @@ interface PreviewState {
 function MetaSourceCard({
   metaKey,
   source,
+  defOverride,
 }: {
-  metaKey: MetaKey;
+  metaKey: string;
   source: SheetsSource | null;
+  defOverride?: { label: string; description: string };
 }) {
-  const def = META_DEFINITIONS[metaKey];
+  const def = defOverride ?? META_DEFINITIONS[metaKey as MetaKey];
   const { linkSourceToMeta, deleteSource, toggleActive } = useSheetsSources();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState(source?.url ?? "");

@@ -20,6 +20,7 @@ import {
   Cell,
 } from "recharts";
 import { SheetBlocksSection } from "../blocks/SheetBlocksSection";
+import { KdsTargetPretoDashboard } from "@/components/indicadores/dashboards/KdsTargetPretoDashboard";
 
 interface Props {
   metric: "kds" | "conformidade";
@@ -249,14 +250,12 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Visualizações da Planilha
+          {metric === "kds" ? "Indicadores (Upload Manual)" : "Visualizações da Planilha"}
         </h3>
-        <SheetBlocksSection metaKey={metric === "kds" ? "kds" : "conformidade"} />
-        {metric === "kds" && (
-          <SheetBlocksSection
-            metaKey="target-preto"
-            emptyMessage="Vincule a planilha de Target Preto (KDS) em Configurações."
-          />
+        {metric === "kds" ? (
+          <KdsTargetPretoDashboard />
+        ) : (
+          <SheetBlocksSection metaKey="conformidade" />
         )}
       </section>
     </div>

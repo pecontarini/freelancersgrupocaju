@@ -2160,6 +2160,42 @@ export type Database = {
         }
         Relationships: []
       }
+      indicadores_snapshots: {
+        Row: {
+          arquivo_nome: string | null
+          created_at: string
+          dados: Json
+          id: string
+          linhas_importadas: number | null
+          meta_key: string
+          referencia_label: string
+          referencia_mes: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          created_at?: string
+          dados: Json
+          id?: string
+          linhas_importadas?: number | null
+          meta_key: string
+          referencia_label: string
+          referencia_mes: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          arquivo_nome?: string | null
+          created_at?: string
+          dados?: Json
+          id?: string
+          linhas_importadas?: number | null
+          meta_key?: string
+          referencia_label?: string
+          referencia_mes?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       inventario_items: {
         Row: {
           created_at: string

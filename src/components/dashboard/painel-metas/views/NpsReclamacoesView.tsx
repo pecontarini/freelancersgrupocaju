@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { NpsAtendimentoDashboard } from "@/components/indicadores/dashboards/NpsAtendimentoDashboard";
+import { AvaliacoesFaturamentoDashboard } from "@/components/indicadores/dashboards/AvaliacoesFaturamentoDashboard";
+import { ReclamacoesCommentsDashboard } from "@/components/indicadores/dashboards/ReclamacoesCommentsDashboard";
 import { useReclamacoes, type FonteReclamacao } from "@/hooks/useReclamacoes";
 import { useLojaCodigoMap } from "../shared/useLojaCodigoMap";
 import { getLojaDisplay } from "@/lib/lojaUtils";
@@ -474,15 +477,14 @@ export function NpsReclamacoesView({ restrictToLojaCodigo }: Props) {
         </CardContent>
       </Card>
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Visualizações da Planilha
+          Indicadores (Upload Manual)
         </h3>
-        <SheetBlocksSection metaKey="reclamacoes" />
-        <SheetBlocksSection metaKey="nps" emptyMessage="Vincule a planilha de NPS em Configurações." />
+        <NpsAtendimentoDashboard />
+        <AvaliacoesFaturamentoDashboard />
+        <ReclamacoesCommentsDashboard />
       </section>
-
-      <ReclamacoesCommentsWall restrictToLojaCodigo={restrictToLojaCodigo ?? null} />
     </div>
   );
 }

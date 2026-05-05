@@ -108,7 +108,7 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground">
+          <h2 className="text-xl font-bold text-foreground">
             {metric === "kds" ? "KDS · Tempo de Prato" : "Conformidade · Auditorias"}
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -227,7 +227,7 @@ export function KdsConformidadeView({ metric, restrictToLojaCodigo }: Props) {
                     {d.sigla}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm text-foreground">{d.nome}</span>
-                  <span className="font-display text-sm font-bold tabular-nums text-foreground">
+                  <span className="text-sm font-bold tabular-nums text-foreground">
                     {fmt(r.value)}
                     <span className="ml-0.5 text-[10px] text-muted-foreground">{meta.suffix}</span>
                   </span>

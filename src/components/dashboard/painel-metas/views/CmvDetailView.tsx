@@ -105,7 +105,7 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground">
+          <h2 className="text-xl font-bold text-foreground">
             {variant === "salmao" ? "CMV Salmão · Nazo" : "CMV Carnes · Caminito"}
           </h2>
           <p className="text-xs text-muted-foreground">
@@ -199,7 +199,7 @@ export function CmvDetailView({ variant, restrictToLojaCodigo }: Props) {
                         <p className="text-[10px] text-muted-foreground/70">{r.code}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-display text-base font-bold tabular-nums text-foreground">
+                        <p className="text-base font-bold tabular-nums text-foreground">
                           {fmt(r.value)}
                           <span className="ml-1 text-[10px] text-muted-foreground">{meta.suffix}</span>
                         </p>

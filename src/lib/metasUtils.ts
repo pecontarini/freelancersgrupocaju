@@ -39,11 +39,15 @@ export function calcNpsStatus(
   return "redflag";
 }
 
-/** Formata R$/reclamação para exibição (ex.: 311545 → "R$ 311,5k"). */
+/** Formata R$/reclamação para exibição (ex.: 311545 → "R$ 311.545,00"). */
 export function formatNpsDisplay(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1).replace(".", ",")}k`;
-  return `R$ ${value.toFixed(0)}`;
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 /** CMV Carnes — % de desvio sobre valor transferido (menor é melhor) */

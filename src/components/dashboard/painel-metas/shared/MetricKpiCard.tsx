@@ -64,7 +64,7 @@ export function MetricKpiCard({
       </div>
 
       <div className="relative flex items-baseline gap-1.5">
-        <span className="display-number font-display text-3xl font-bold tabular-nums text-foreground">
+        <span className="text-3xl font-bold tabular-nums text-foreground">
           {value}
         </span>
         {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}

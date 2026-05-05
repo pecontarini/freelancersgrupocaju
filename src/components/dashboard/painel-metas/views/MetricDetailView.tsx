@@ -164,7 +164,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
     return (
       <div className="glass-card flex flex-col items-center gap-3 p-12 text-center ring-1 ring-amber-500/20">
         <Clock className="h-10 w-10 text-amber-400" />
-        <p className="font-display text-base font-semibold text-foreground">
+        <p className="text-base font-semibold text-foreground">
           Aguardando sincronização
         </p>
         <p className="text-xs text-muted-foreground">
@@ -188,7 +188,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-2xl font-bold text-foreground">{def.label}</h2>
+            <h2 className="text-2xl font-bold text-foreground">{def.label}</h2>
             <p className="mt-1 font-[DM_Sans] text-sm text-muted-foreground">{def.description}</p>
             <p className="mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/70">
               {meta.label}
@@ -293,7 +293,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                         </>
                       ) : (
                         <>
-                          <TableCell className="text-right tabular-nums font-display text-sm font-semibold">
+                          <TableCell className="text-right tabular-nums text-sm font-semibold">
                             {formatValue(metric, r.value)}
                             <span className="ml-0.5 text-[10px] text-muted-foreground">
                               {meta.suffix}
@@ -410,7 +410,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                             <span className={cn("h-2 w-2 rounded-full ring-2", STATUS_DOT[s])} />
                             {STATUS_LABEL_PT[s]}
                           </div>
-                          <div className="mt-1 font-display text-lg font-bold tabular-nums">
+                          <div className="mt-1 text-lg font-bold tabular-nums">
                             R$ {c.faixas[s].toLocaleString("pt-BR")}
                           </div>
                         </div>
@@ -493,7 +493,7 @@ export function MetricDetailView({ metric, restrictToLojaCodigo, hideCargoTabs }
                                   <TableCell className="text-right tabular-nums">
                                     <span
                                       className={cn(
-                                        "font-display text-sm font-bold",
+                                        "text-sm font-bold",
                                         valor === c.pesoReais && "text-emerald-700 dark:text-emerald-300",
                                         valor === 0 && "text-red-600 dark:text-red-300",
                                         valor > 0 && valor < c.pesoReais && "text-amber-700 dark:text-amber-300",

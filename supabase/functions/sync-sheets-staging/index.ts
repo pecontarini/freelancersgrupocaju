@@ -940,6 +940,7 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
     case 'reclamacoes': return parseReclamacoesDist(grid);
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
+    case 'ranking-supervisores': return parseGenericMeta(grid);
     default: return parseGenericMeta(grid);
   }
 }

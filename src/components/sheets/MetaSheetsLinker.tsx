@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useSheetsSources, validateSheetsCsvUrl, type SheetsSource } from "@/hooks/useSheetsSources";
+import { useSheetsSources, validateSheetsCsvUrl, normalizeSheetsUrl, type SheetsSource } from "@/hooks/useSheetsSources";
 import { META_DEFINITIONS } from "@/components/dashboard/painel-metas/shared/metas";
 import type { MetaKey } from "@/components/dashboard/painel-metas/shared/types";
 import { supabase } from "@/integrations/supabase/client";

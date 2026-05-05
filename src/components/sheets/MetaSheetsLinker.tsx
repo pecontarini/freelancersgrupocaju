@@ -195,8 +195,9 @@ function MetaSourceCard({
           <DialogHeader>
             <DialogTitle>Vincular planilha — {def.label}</DialogTitle>
             <DialogDescription>
-              Cole o link CSV da planilha do Google Sheets. A planilha precisa estar
-              compartilhada como "Qualquer pessoa com o link pode visualizar".
+              Cole o link da planilha do Google Sheets em qualquer formato (/edit, /view ou /export).
+              Convertemos automaticamente para CSV. A planilha precisa estar compartilhada como
+              "Qualquer pessoa com o link pode visualizar".
             </DialogDescription>
           </DialogHeader>
 
@@ -210,11 +211,11 @@ function MetaSourceCard({
               />
             </div>
             <div className="space-y-2">
-              <Label>URL CSV</Label>
+              <Label>URL da planilha</Label>
               <Input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv&gid=0"
+                placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=0"
                 className={url && !validation.valid ? "border-destructive" : ""}
               />
               {url && !validation.valid && (
@@ -223,10 +224,12 @@ function MetaSourceCard({
                   {validation.error}
                 </p>
               )}
-              <p className="text-[11px] text-muted-foreground">
-                Formato esperado:{" "}
-                <code className="text-[11px]">/export?format=csv&amp;gid=...</code>
-              </p>
+              {normalizedUrl && normalizedUrl !== url && (
+                <p className="text-[11px] text-muted-foreground break-all">
+                  → vai ler:{" "}
+                  <code className="text-[11px] text-foreground/80">{normalizedUrl}</code>
+                </p>
+              )}
             </div>
 
             <div className="flex gap-2">

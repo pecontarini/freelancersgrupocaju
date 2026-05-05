@@ -1126,8 +1126,9 @@ serve(async (req) => {
       }
     } catch { /* noop */ }
     return new Response(
-      JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Erro desconhecido' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Erro desconhecido', fallback: true }),
+      // Retornamos 200 para que o supabase-js não lance exceção e a UI consiga ler o corpo do erro
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   }
 });

@@ -1,4 +1,4 @@
-import { IndicadorDashboardShell } from "./IndicadorDashboardShell";
+import { IndicadorDashboardShell } from "../IndicadorDashboardShell";
 import type { SupervisoresRanking } from "@/lib/indicadores-parsers";
 import { Trophy, Medal, Award } from "lucide-react";
 import { cn } from "@/lib/utils";

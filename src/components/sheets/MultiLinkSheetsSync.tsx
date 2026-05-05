@@ -123,8 +123,11 @@ export function MultiLinkSheetsSync() {
       });
 
       if (error) throw error;
-
-      toast.success(`Sincronização concluída! ${data?.rowsImported || 0} linhas importadas.`);
+      if (data?.success === false) {
+        toast.error(data.error || 'Erro ao sincronizar.');
+      } else {
+        toast.success(`Sincronização concluída! ${data?.rowsImported || 0} linhas importadas.`);
+      }
     } catch (err) {
       console.error('Sync error:', err);
       toast.error('Erro ao sincronizar. Verifique se a planilha está pública.');

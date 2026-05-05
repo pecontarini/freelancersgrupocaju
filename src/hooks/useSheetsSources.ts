@@ -180,11 +180,29 @@ export function useSheetsSources() {
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, ativo }: { id: string; ativo: boolean }) => {
+      // Se for ativar, desativar primeiro qualquer outra fonte ativa com mesmo meta_key
+      // (constraint sheets_sources_meta_key_active_unique permite apenas 1 ativa por meta_key)
+      if (ativo) {
+        const { data: cur } = await supabase
+          .from('sheets_sources')
+          .select('meta_key')
+          .eq('id', id)
+          .maybeSingle();
+        if (cur?.meta_key) {
+          await supabase
+            .from('sheets_sources')
+            .update({ ativo: false })
+            .eq('meta_key', cur.meta_key)
+            .eq('ativo', true)
+            .neq('id', id);
+        }
+      }
+
       const { data, error } = await supabase
         .from('sheets_sources')
         .update({ ativo })
         .eq('id', id)
-        .select('id')
+        .select('id, meta_key')
         .maybeSingle();
 
       if (error) throw error;
@@ -192,7 +210,7 @@ export function useSheetsSources() {
     },
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: ['sheets_sources'] });
-      toast.success(vars.ativo ? 'Fonte ativada.' : 'Fonte desativada.');
+      toast.success(vars.ativo ? 'Fonte ativada (substituiu a anterior do mesmo indicador).' : 'Fonte desativada.');
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Erro ao alterar status da fonte.');

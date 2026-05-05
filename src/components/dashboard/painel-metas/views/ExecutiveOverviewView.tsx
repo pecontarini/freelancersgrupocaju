@@ -316,7 +316,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                   <span className="font-[Sora] text-sm font-semibold tabular-nums">
                     {ranking.metric === "nps"
                       ? formatNpsDisplay(l.values[ranking.metric])
-                      : l.values[ranking.metric]?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                      : (l.values[ranking.metric] as number | null)?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                   </span>
                 </button>
               );
@@ -345,7 +345,7 @@ export function ExecutiveOverviewView({ restrictToLojaCodigo, onNavigate }: Prop
                       <span className="font-[Sora] text-sm font-semibold tabular-nums text-red-200">
                         {ranking.metric === "nps"
                           ? formatNpsDisplay(l.values[ranking.metric])
-                          : l.values[ranking.metric]?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                          : (l.values[ranking.metric] as number | null)?.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                       </span>
                     </button>
                   );

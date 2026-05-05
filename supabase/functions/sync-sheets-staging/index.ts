@@ -1391,9 +1391,19 @@ serve(async (req) => {
     // ===== Grava blocos estruturados =====
     let blocksWritten = 0;
     for (const block of parsed.blocks) {
+      // Delete existing then insert (constraint usa COALESCE, não compatível com onConflict por colunas)
+      const delQ = supabase
+        .from('sheets_blocks_snapshot')
+        .delete()
+        .eq('meta_key', metaKey)
+        .eq('mes_ref', referenciaMes)
+        .eq('block_key', block.block_key);
+      if (block.loja_codigo) await delQ.eq('loja_codigo', block.loja_codigo);
+      else await delQ.is('loja_codigo', null);
+
       const { error: bErr } = await supabase
         .from('sheets_blocks_snapshot')
-        .upsert({
+        .insert({
           source_id: source.id,
           meta_key: metaKey,
           block_key: block.block_key,
@@ -1403,9 +1413,9 @@ serve(async (req) => {
           payload: block.payload,
           ordem: block.ordem ?? 0,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'meta_key,mes_ref,block_key,loja_codigo' });
+        });
       if (bErr) {
-        console.error('[sync] block upsert err', block.block_key, bErr.message);
+        console.error('[sync] block insert err', block.block_key, bErr.message);
       } else {
         blocksWritten++;
       }

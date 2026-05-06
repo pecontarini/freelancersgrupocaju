@@ -89,6 +89,14 @@ import { PracaBadge } from "./PracaBadge";
 import { PlanoChaoStatus } from "./PlanoChaoStatus";
 import { usePracasByUnit } from "@/hooks/usePracas";
 import { toast } from "sonner";
+import {
+  useDraftSlotsFor,
+  removeDraftSlot,
+  updateDraftSlotDay,
+  type DraftSlot,
+} from "@/hooks/useAIDraftSlots";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Sparkles as SparklesIcon, X } from "lucide-react";
 
 const DAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
 

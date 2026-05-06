@@ -147,10 +147,15 @@ Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
     "demanda_pessoa_dia_semana": 48,
     "dias_uteis_por_pessoa": 6,
     "demanda_por_dia": { "SEG": 5, "TER": 6, "QUA": 7, "QUI": 8, "SEX": 8, "SAB": 8, "DOM": 6 },
+    "minimos_por_papel": { "abridor": 2, "fechador": 2, "intermediario": 1 },
+    "cobertura_por_dia": {
+      "SEG": { "abridor_em_campo": 2, "fechador_em_campo": 2, "intermediario_em_campo": 1, "headcount_total": 5 }
+    },
     "vagas": [
       {
         "id_vaga": "v1",
         "tipo": "ABRIDOR-DOBRA",
+        "papel": "abridor",
         "responsavel": false,
         "folgas": ["SEG"],
         "horario_padrao": {
@@ -174,10 +179,12 @@ REGRAS DE VALIDAÇÃO DE FOLGAS:
 - Se 6x1 e alguma vaga tiver folgas.length != 1 → adicione em alertas_folga.
 - Se 5x2 e alguma vaga tiver folgas.length != 2 → adicione em alertas_folga.
 - Se em algum dia (headcount_total - vagas_em_folga) < demanda_dia → adicione em alertas_folga.
+- Se em algum dia cobertura_por_dia[d].papel_em_campo < minimos_por_papel.papel → adicione em alertas_folga (FATAL).
 - A soma de horario_padrao expandido por todas as vagas (excluindo folgas) deve cobrir o POP de cada dia.
 
 CHECKLIST: □ Tipo C: nenhum fechador tem T1  □ Tipo C: abridores saem 21h
 □ T1+T2 ≤ 10h ef  □ POP almoço e jantar cobertos em todos dias
+□ Mín. abridores/fechadores/intermediários atendido nos 7 dias
 □ Dias com +X têm slots EXTRA  □ Break sempre 180min  □ JSON válido sem texto extra
 `;
 

@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { EscalaApprovalPanel } from "./EscalaApprovalPanel";
 import { EscalaVinculacaoBuilder } from "./EscalaVinculacaoBuilder";
+import { CooApprovalLinkBox } from "./CooApprovalLinkBox";
 
 const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 

@@ -149,9 +149,37 @@ function SlotCell({
   );
 }
 
-export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload }: Props) {
+export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload, semanaInicio, semanaFim }: Props) {
   const [busca, setBusca] = useState("");
   const [draggingName, setDraggingName] = useState<string | null>(null);
+
+  // Template approval info
+  const { data: tplInfo } = useQuery({
+    queryKey: ["tpl-approval", templateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("escala_template")
+        .select("aprovado_por, aprovado_em")
+        .eq("id", templateId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // POP minimum per day/turno for this setor
+  const { data: minima = [] } = useQuery({
+    queryKey: ["minima-export", unidadeId, setor],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("escala_minima")
+        .select("dia_semana, turno, qtd_efetivos, qtd_extras")
+        .eq("unidade_id", unidadeId)
+        .eq("setor", setor);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
 
   // Funcionários da unidade
   const { data: employees = [] } = useQuery({

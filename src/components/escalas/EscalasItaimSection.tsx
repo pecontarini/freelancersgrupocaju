@@ -440,13 +440,18 @@ export function EscalasItaimSection() {
           </Badge>
         )}
         {template?.status === "aprovado" && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="space-y-4">
             <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Aprovado
             </Badge>
-            <Button variant="outline" size="sm">
-              <Link2 className="mr-2 h-4 w-4" /> Vincular funcionários
-            </Button>
+            {template.id && template.payload && (
+              <EscalaVinculacaoBuilder
+                templateId={template.id}
+                unidadeId={UNIDADE_ID_ITAIM}
+                setor={setorAtivo}
+                payload={template.payload}
+              />
+            )}
           </div>
         )}
         {template?.status === "rejeitado" && (

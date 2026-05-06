@@ -2391,8 +2391,29 @@ function ScheduleCell({
   const endStr = schedule.end_time?.slice(0, 5) || "";
   const hasBreak = schedule.break_duration > 0;
 
+  // Tooltip detalhado quando há intervalo: mostra T1, intervalo (h/min) e T2
+  let tooltip = "";
+  if (startStr && endStr && hasBreak && schedule.break_duration > 0) {
+    const brkH = Math.floor(schedule.break_duration / 60);
+    const brkM = schedule.break_duration % 60;
+    const brkStr = brkH > 0 ? `${brkH}h${brkM > 0 ? String(brkM).padStart(2, "0") : ""}` : `${brkM}min`;
+    // Calcular fim do T1 e início do T2 a partir de start/end/break (jornada partida)
+    const [sh, sm] = startStr.split(":").map(Number);
+    const [eh, em] = endStr.split(":").map(Number);
+    let totalMin = (eh * 60 + em) - (sh * 60 + sm);
+    if (totalMin < 0) totalMin += 24 * 60;
+    const workMin = totalMin - schedule.break_duration;
+    const t1Min = Math.round(workMin / 2);
+    const t1EndAbs = sh * 60 + sm + t1Min;
+    const t2StartAbs = t1EndAbs + schedule.break_duration;
+    const fmt = (m: number) => `${String(Math.floor((m % (24 * 60)) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    tooltip = `T1 ${startStr}–${fmt(t1EndAbs)}  •  Intervalo ${brkStr}  •  T2 ${fmt(t2StartAbs)}–${endStr}`;
+  } else if (startStr && endStr) {
+    tooltip = `${startStr} – ${endStr}`;
+  }
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5" title={tooltip}>
       <div
         className={`h-10 w-full flex items-center justify-center rounded-md text-[11px] font-medium px-1 ${
           isFreelancer

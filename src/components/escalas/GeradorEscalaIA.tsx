@@ -470,6 +470,57 @@ export function GeradorEscalaIA() {
                 ))}
               </div>
             )}
+            {resultado.validacao?.alertas_folga && resultado.validacao.alertas_folga.length > 0 && (
+              <div className="space-y-2">
+                {resultado.validacao.alertas_folga.map((a, i) => (
+                  <div key={`folga-${i}`} className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">FOLGA: {a}</div>
+                ))}
+              </div>
+            )}
+
+            {resultado.plano_folgas && resultado.plano_folgas.vagas?.length > 0 && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="font-semibold text-sm">Plano de folgas — {resultado.plano_folgas.headcount_total} vagas ({resultado.modelo_folga})</div>
+                  {resultado.plano_folgas.demanda_por_dia && (
+                    <div className="text-xs text-muted-foreground">
+                      Demanda: {DIAS.map(d => `${d} ${resultado.plano_folgas!.demanda_por_dia![d] ?? 0}`).join(" · ")}
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Vaga</TableHead>
+                        {DIAS.map(d => <TableHead key={d} className="text-xs text-center">{d}</TableHead>)}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resultado.plano_folgas.vagas.map((v, idx) => {
+                        const folgasSet = new Set(v.folgas ?? []);
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell className="text-xs font-medium">
+                              {v.tipo}{v.responsavel ? " ★" : ""}
+                            </TableCell>
+                            {DIAS.map(d => (
+                              <TableCell key={d} className="text-xs text-center">
+                                {folgasSet.has(d) ? (
+                                  <Badge variant="secondary" className="text-[10px]">FOLGA</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">✓</span>
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-3 md:grid-cols-2">
               {DIAS.map((dia) => {

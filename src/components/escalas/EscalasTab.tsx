@@ -107,6 +107,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="scheduler">
         <ManualScheduleGrid />
       </TabsContent>
+      {isItaim && (
+        <TabsContent value="ia-mvp">
+          <EscalasItaimSection />
+        </TabsContent>
+      )}
       <TabsContent value="d1">
         <D1ManagementPanel />
       </TabsContent>

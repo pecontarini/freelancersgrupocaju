@@ -22,6 +22,7 @@ import ContagemUtensilios from "./pages/ContagemUtensilios";
 import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
 import MetasPage from "./pages/painel/Metas";
+import AprovarEscala from "./pages/AprovarEscala";
 import { PageTransition } from "@/components/motion";
 
 const queryClient = new QueryClient();

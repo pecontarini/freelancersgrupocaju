@@ -50,6 +50,18 @@ interface SlotResponse {
   obs?: string;
 }
 
+interface VagaPlanejada {
+  id_vaga?: string;
+  tipo: string;
+  responsavel?: boolean;
+  folgas: string[]; // ["SEG", ...]
+  horario_padrao: {
+    t1?: { entrada: string; saida: string; efetivo_min?: number };
+    break_min?: number;
+    t2?: { entrada: string; saida: string; cruza_meia_noite?: boolean; efetivo_min?: number };
+  };
+}
+
 interface EscalaResponse {
   setor: string;
   semana_inicio: string;
@@ -67,8 +79,15 @@ interface EscalaResponse {
     slots: SlotResponse[];
     extras?: SlotResponse[];
   }>;
+  plano_folgas?: {
+    headcount_total: number;
+    demanda_pessoa_dia_semana?: number;
+    dias_uteis_por_pessoa?: number;
+    demanda_por_dia?: Record<string, number>;
+    vagas: VagaPlanejada[];
+  };
   resumo_semanal?: any;
-  validacao?: { aprovado: boolean; alertas_clt?: string[]; alertas_pop?: string[]; alertas_operacionais?: string[] };
+  validacao?: { aprovado: boolean; alertas_clt?: string[]; alertas_pop?: string[]; alertas_folga?: string[]; alertas_operacionais?: string[] };
 }
 
 function formatSlot(s: SlotResponse): string {

@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { setDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
 

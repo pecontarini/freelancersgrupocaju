@@ -62,6 +62,8 @@ type Props = {
   unidadeId: string;
   setor: string;
   payload: any;
+  semanaInicio: Date;
+  semanaFim: Date;
 };
 
 function EmployeeCard({ emp, hours }: { emp: Employee; hours: number }) {

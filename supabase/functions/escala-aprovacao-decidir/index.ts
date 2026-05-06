@@ -12,9 +12,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
     const body = await req.json();
-    const { token, decisao, comentario, payload_editado, aprovador_nome } = body ?? {};
+    const { token, decisao, comentario, payload_editado, aprovador_nome, pin } = body ?? {};
     if (!token || !["aprovar", "rejeitar"].includes(decisao)) {
       return json({ error: "Parâmetros inválidos" }, 400);
+    }
+
+    const expectedPin = Deno.env.get("COO_APPROVAL_PIN");
+    if (!expectedPin) {
+      return json({ error: "PIN não configurado no servidor" }, 500);
+    }
+    if (!pin || String(pin).trim() !== expectedPin) {
+      return json({ error: "PIN inválido" }, 401);
     }
 
     const supabase = createClient(

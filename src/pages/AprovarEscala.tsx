@@ -47,6 +47,7 @@ export default function AprovarEscala() {
   const [linkInfo, setLinkInfo] = useState<any>(null);
   const [comentario, setComentario] = useState("");
   const [aprovador, setAprovador] = useState("");
+  const [pin, setPin] = useState("");
   const [acao, setAcao] = useState<"aprovar" | "rejeitar" | null>(null);
 
   useEffect(() => {
@@ -83,10 +84,14 @@ export default function AprovarEscala() {
   }, [tpl]);
 
   const decidir = async (decisao: "aprovar" | "rejeitar") => {
+    if (!pin.trim()) {
+      toast.error("Informe o PIN do COO");
+      return;
+    }
     setAcao(decisao);
     try {
       const { data, error } = await supabase.functions.invoke("escala-aprovacao-decidir", {
-        body: { token, decisao, comentario, aprovador_nome: aprovador || undefined },
+        body: { token, decisao, comentario, aprovador_nome: aprovador || undefined, pin: pin.trim() },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -94,7 +99,8 @@ export default function AprovarEscala() {
       setLinkInfo({ usado_em: new Date().toISOString(), decisao });
       setTpl((t: any) => ({ ...t, status: decisao === "aprovar" ? "aprovado" : "rejeitado" }));
     } catch (e: any) {
-      toast.error(e.message ?? "Falha");
+      const msg = String(e?.message ?? "Falha");
+      toast.error(msg.includes("PIN") ? "PIN inválido" : msg);
     } finally {
       setAcao(null);
     }
@@ -238,6 +244,14 @@ export default function AprovarEscala() {
                 placeholder="Seu nome (opcional)"
                 value={aprovador}
                 onChange={(e) => setAprovador(e.target.value)}
+              />
+              <Input
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="PIN do COO"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
               />
               <Textarea
                 placeholder="Comentário (obrigatório se rejeitar)"

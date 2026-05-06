@@ -297,12 +297,14 @@ export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload 
     }
 
     // 4. Insert
-    const { error } = await supabase.from("escala_vinculacao").insert({
+    const tipoDia = payload?.dias?.[dia]?.tipo_dia ?? "A";
+    const { error } = await supabase.from("escala_vinculacao").insert([{
       template_id: templateId,
       funcionario_id: funcionarioId,
       dia_semana: dia,
       tipo_turno: tipo,
-    });
+      tipo_dia: tipoDia,
+    }]);
     if (error) {
       toast.error(error.message);
       return;

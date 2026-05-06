@@ -88,6 +88,7 @@ export function GeradorEscalaIA() {
   });
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<EscalaResponse | null>(null);
+  const [modeloFolga, setModeloFolga] = useState<"5x2" | "6x1">("6x1");
 
   const { data: turnoConfigs } = useQuery({
     queryKey: ["turno_config", effectiveUnidadeId],

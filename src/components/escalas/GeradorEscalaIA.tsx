@@ -354,14 +354,21 @@ export function GeradorEscalaIA() {
       }
 
       setDraftSlots(drafts);
-      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`);
+
+      const fireDrafts = () =>
+        window.dispatchEvent(
+          new CustomEvent("ai-drafts-ready", {
+            detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
+          }),
+        );
+
+      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`, {
+        action: { label: "Abrir Editor agora", onClick: fireDrafts },
+        duration: 6000,
+      });
 
       // 5) Navegar para o Editor (Gestão de Pessoas → Escalas → Editor)
-      window.dispatchEvent(
-        new CustomEvent("ai-drafts-ready", {
-          detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
-        }),
-      );
+      fireDrafts();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Falha ao enviar para o Editor");

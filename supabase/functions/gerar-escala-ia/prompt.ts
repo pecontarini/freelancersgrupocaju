@@ -207,12 +207,16 @@ SETOR: ${p.setor}
 SEMANA: ${p.semana}
 MODELO DE FOLGA: ${p.modeloFolga}
 
-ESTRUTURA DE TURNOS (COO Felipe Carneiro):
-  Abridores:       ${p.config.qtd_abridores}
-  Fechadores:      ${p.config.qtd_fechadores}
-  Intermediários:  ${p.config.qtd_intermediarios}
-  Total headcount: ${p.config.qtd_abridores + p.config.qtd_fechadores + p.config.qtd_intermediarios}
+ESTRUTURA DE TURNOS (COO Felipe Carneiro) — MÍNIMOS DIÁRIOS POR PAPEL (INEGOCIÁVEIS):
+  Abridores:       ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias
+  Fechadores:      ${p.config.qtd_fechadores}   ← em campo TODOS os 7 dias
+  Intermediários:  ${p.config.qtd_intermediarios}   ← em campo TODOS os 7 dias
+  Mínimo no pico: ${p.config.qtd_abridores + p.config.qtd_fechadores + p.config.qtd_intermediarios}
   ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ""}
+
+ATENÇÃO: nenhuma folga pode reduzir abridores/fechadores/intermediários em
+campo abaixo desses mínimos em NENHUM dia. Dimensione
+vagas_papel = ceil((qtd_papel * 7) / dias_uteis_por_pessoa).
 
 TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):
 ${tabela}

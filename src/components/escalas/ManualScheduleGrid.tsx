@@ -1670,6 +1670,113 @@ export function ManualScheduleGrid() {
                           })}
                         </React.Fragment>
                       ))}
+                      {/* AI DRAFT SLOTS — vagas vindas do Gerador IA */}
+                      {draftSlots.map((slot) => {
+                        const linkableEmps = scheduledEmployees.length > 0 || sectorBaseEmployees.length > 0
+                          ? [...employees]
+                          : employees;
+                        const candidates = linkableEmps
+                          .filter((e) => {
+                            if (!sectorLinkedJobTitleIds.size) return true;
+                            return e.job_title_id && sectorLinkedJobTitleIds.has(e.job_title_id);
+                          })
+                          .sort((a, b) => a.name.localeCompare(b.name));
+                        return (
+                          <TableRow key={`draft-${slot.id}`} className="bg-primary/5">
+                            <TableCell className="font-medium sticky left-0 z-10 border-r bg-primary/10 backdrop-blur">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <SparklesIcon className="h-3 w-3 text-primary shrink-0" />
+                                <span className="text-xs font-semibold uppercase truncate max-w-[110px]">{slot.label}</span>
+                                <Popover open={linkPickerOpen === slot.id} onOpenChange={(o) => setLinkPickerOpen(o ? slot.id : null)}>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      className="ml-auto shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-primary/40 bg-background hover:bg-primary/10 text-primary text-[10px] font-semibold"
+                                      title="Vincular a um funcionário ativo"
+                                      disabled={linkingId === slot.id}
+                                    >
+                                      <Link2 className="h-3 w-3" />
+                                      <span>Vincular</span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="p-0 w-64" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Buscar funcionário..." />
+                                      <CommandList>
+                                        <CommandEmpty>Nenhum funcionário</CommandEmpty>
+                                        <CommandGroup>
+                                          {candidates.map((emp) => (
+                                            <CommandItem
+                                              key={emp.id}
+                                              onSelect={() => linkDraftToEmployee(slot, emp.id)}
+                                            >
+                                              <span className="uppercase text-xs">{emp.name}</span>
+                                              {emp.job_title && (
+                                                <span className="ml-auto text-[10px] text-muted-foreground">{emp.job_title}</span>
+                                              )}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                <button
+                                  className="shrink-0 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                  title="Descartar vaga"
+                                  onClick={() => removeDraftSlot(slot.id)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Sugerida pela IA</div>
+                            </TableCell>
+                            {weekDays.map((day, i) => {
+                              const dateStr = format(day, "yyyy-MM-dd");
+                              const d = slot.days[dateStr];
+                              const synthetic: ManualSchedule | undefined = d
+                                ? d.kind === "off"
+                                  ? ({
+                                      id: `draft-${slot.id}-${dateStr}`,
+                                      schedule_type: "off",
+                                      start_time: null,
+                                      end_time: null,
+                                      break_duration: 0,
+                                    } as any)
+                                  : ({
+                                      id: `draft-${slot.id}-${dateStr}`,
+                                      schedule_type: "working",
+                                      start_time: d.start_time,
+                                      end_time: d.end_time,
+                                      break_duration: d.break_min,
+                                    } as any)
+                                : undefined;
+                              return (
+                                <TableCell
+                                  key={i}
+                                  className="text-center p-1 cursor-pointer hover:bg-muted/40"
+                                  title="Clique para alternar entre TRABALHO e FOLGA"
+                                  onClick={() => {
+                                    if (!d || d.kind === "work") {
+                                      updateDraftSlotDay(slot.id, dateStr, { kind: "off" });
+                                    } else {
+                                      // Restore to work using first non-off day in slot as template
+                                      const tmpl = Object.values(slot.days).find((x) => x.kind === "work") as any;
+                                      if (tmpl) {
+                                        updateDraftSlotDay(slot.id, dateStr, { ...tmpl });
+                                      } else {
+                                        updateDraftSlotDay(slot.id, dateStr, { kind: "off" });
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <ScheduleCell schedule={synthetic} isFreelancer={false} pracaName={null} />
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
+
                       {/* VAGA EXTRA placeholder rows — always at least 1 free slot per day */}
                       {extraSlots > 0 && Array.from({ length: extraSlots }, (_, slotIdx) => {
                         const isQuotaRowAnyDay = weekDays.some((day) => {

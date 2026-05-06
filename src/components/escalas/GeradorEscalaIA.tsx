@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -88,6 +88,7 @@ export function GeradorEscalaIA() {
   });
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<EscalaResponse | null>(null);
+  const [modeloFolga, setModeloFolga] = useState<"5x2" | "6x1">("6x1");
 
   const { data: turnoConfigs } = useQuery({
     queryKey: ["turno_config", effectiveUnidadeId],
@@ -122,6 +123,16 @@ export function GeradorEscalaIA() {
     [turnoConfigs, setor],
   );
 
+  // Quando o setor muda, sincronizar o modelo de folga com o padrão do setor
+  // (mas o usuário pode sobrescrever depois).
+  const lastSyncedSetor = useRef<string>("");
+  if (setor && config && lastSyncedSetor.current !== setor) {
+    lastSyncedSetor.current = setor;
+    if (config.modelo_folga === "5x2" || config.modelo_folga === "6x1") {
+      queueMicrotask(() => setModeloFolga(config.modelo_folga as "5x2" | "6x1"));
+    }
+  }
+
   const tabelaMinima = useMemo(() => {
     if (!escalaMinimas) return [];
     return DIAS.map((dia) => {
@@ -153,6 +164,7 @@ export function GeradorEscalaIA() {
           setor,
           semana_inicio: semana,
           unidade_id: effectiveUnidadeId,
+          modelo_folga: modeloFolga,
         },
       });
       if (error) throw error;
@@ -209,7 +221,16 @@ export function GeradorEscalaIA() {
             </div>
             <div className="space-y-2">
               <Label>Modelo de folga</Label>
-              <Input value={config?.modelo_folga ?? "—"} disabled />
+              <Select value={modeloFolga} onValueChange={(v) => setModeloFolga(v as "5x2" | "6x1")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6x1">6x1 (1 folga/semana)</SelectItem>
+                  <SelectItem value="5x2">5x2 (2 folgas/semana)</SelectItem>
+                </SelectContent>
+              </Select>
+              {config?.modelo_folga && config.modelo_folga !== modeloFolga && (
+                <p className="text-xs text-muted-foreground">Padrão do setor: {config.modelo_folga}</p>
+              )}
             </div>
           </div>
 

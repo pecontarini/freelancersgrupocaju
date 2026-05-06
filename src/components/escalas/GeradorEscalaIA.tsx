@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import { setDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
+import { insertDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
 

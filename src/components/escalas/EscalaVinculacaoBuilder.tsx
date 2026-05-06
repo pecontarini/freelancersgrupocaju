@@ -598,6 +598,20 @@ export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload,
             )}
           </DragOverlay>
         </DndContext>
+
+        {completo && (
+          <div className="mt-6 space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-muted-foreground uppercase">
+                Texto para WhatsApp
+              </div>
+              <Button onClick={copiarWhatsApp} size="sm" variant="outline">
+                <Copy className="mr-1.5 h-4 w-4" /> Copiar para WhatsApp
+              </Button>
+            </div>
+            <Textarea readOnly value={textoWhatsApp} className="font-mono text-xs min-h-[260px]" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

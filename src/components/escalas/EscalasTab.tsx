@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2 } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
+import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";
@@ -78,6 +79,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Configurações</span>
           <span className="sm:hidden">Config</span>
         </TabsTrigger>
+        <TabsTrigger value="gerador-ia" className="gap-1.5">
+          <Sparkles className="h-4 w-4" />
+          <span className="hidden sm:inline">Gerador IA</span>
+          <span className="sm:hidden">IA</span>
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="scheduler">
@@ -110,6 +116,9 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       )}
       <TabsContent value="matrix">
         <StaffingMatrixConfig />
+      </TabsContent>
+      <TabsContent value="gerador-ia">
+        <GeradorEscalaIA />
       </TabsContent>
     </Tabs>
   );

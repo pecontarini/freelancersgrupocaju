@@ -4745,15 +4745,20 @@ export type Database = {
           created_at: string
           cruza_meia_noite_1: boolean
           cruza_meia_noite_2: boolean
-          dia_tipo: string
-          entrada_1: string
+          dia_tipo: string | null
+          entrada_1: string | null
           entrada_2: string | null
           gap_min: number
           id: string
-          saida_1: string
+          modelo_folga: string | null
+          observacoes: string | null
+          qtd_abridores: number
+          qtd_fechadores: number
+          qtd_intermediarios: number
+          saida_1: string | null
           saida_2: string | null
           setor: string
-          tipo_turno: string
+          tipo_turno: string | null
           unidade_id: string
           updated_at: string
         }
@@ -4762,15 +4767,20 @@ export type Database = {
           created_at?: string
           cruza_meia_noite_1?: boolean
           cruza_meia_noite_2?: boolean
-          dia_tipo: string
-          entrada_1: string
+          dia_tipo?: string | null
+          entrada_1?: string | null
           entrada_2?: string | null
           gap_min?: number
           id?: string
-          saida_1: string
+          modelo_folga?: string | null
+          observacoes?: string | null
+          qtd_abridores?: number
+          qtd_fechadores?: number
+          qtd_intermediarios?: number
+          saida_1?: string | null
           saida_2?: string | null
           setor: string
-          tipo_turno: string
+          tipo_turno?: string | null
           unidade_id: string
           updated_at?: string
         }
@@ -4779,15 +4789,20 @@ export type Database = {
           created_at?: string
           cruza_meia_noite_1?: boolean
           cruza_meia_noite_2?: boolean
-          dia_tipo?: string
-          entrada_1?: string
+          dia_tipo?: string | null
+          entrada_1?: string | null
           entrada_2?: string | null
           gap_min?: number
           id?: string
-          saida_1?: string
+          modelo_folga?: string | null
+          observacoes?: string | null
+          qtd_abridores?: number
+          qtd_fechadores?: number
+          qtd_intermediarios?: number
+          saida_1?: string | null
           saida_2?: string | null
           setor?: string
-          tipo_turno?: string
+          tipo_turno?: string | null
           unidade_id?: string
           updated_at?: string
         }

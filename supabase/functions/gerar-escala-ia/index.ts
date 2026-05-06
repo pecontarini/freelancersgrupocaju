@@ -164,7 +164,9 @@ Deno.serve(async (req) => {
           porPapel[papelDe(v.papel ?? v.tipo)]++;
         }
         cobertura[dia] = { ...porPapel, headcount_total: emCampo };
-        for (const p of ["abridor", "fechador", "intermediario"] as const) {
+        // Apenas abridor/fechador são mínimos POP duros (abertura/fechamento).
+        // Intermediário é flexível: cobre demanda variável + folgas via headcount total.
+        for (const p of ["abridor", "fechador"] as const) {
           if (minimos[p] > 0 && porPapel[p] < minimos[p]) {
             alertasFolga.push(`${dia}: ${porPapel[p]} ${p}(es) em campo < mínimo ${minimos[p]} (POP de abertura/fechamento).`);
           }

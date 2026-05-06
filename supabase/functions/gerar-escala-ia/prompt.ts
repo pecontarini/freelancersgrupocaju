@@ -88,9 +88,11 @@ PAPEL DE CADA VAGA (derivado do tipo):
   - INTERMEDIARIO → tipo começa com "INTERMEDIARIO"
   (garçons e demais seguem regra de demanda_dia, sem mínimo por papel.)
 
-MÍNIMOS DIÁRIOS POR PAPEL (recebidos no prompt como qtd_abridores, qtd_fechadores, qtd_intermediarios):
-  Em TODO dia d: papel_em_campo[d] >= qtd_papel.
-  Isso é o POP de abertura/fechamento — INEGOCIÁVEL. Se furar, a escala é inválida.
+MÍNIMOS DIÁRIOS POR PAPEL (POP de abertura/fechamento — INEGOCIÁVEL):
+  Em TODO dia d: abridor_em_campo[d] >= qtd_abridores
+                 fechador_em_campo[d] >= qtd_fechadores
+  qtd_intermediarios = HEADCOUNT TOTAL contratado (NÃO é mínimo diário).
+  Intermediários cobrem demanda variável e podem folgar livremente.
 
 ALGORITMO OBRIGATÓRIO:
 1. demanda_dia[d] = nº máximo de pessoas em campo simultaneamente naquele dia
@@ -211,15 +213,14 @@ SETOR: ${p.setor}
 SEMANA: ${p.semana}
 MODELO DE FOLGA: ${p.modeloFolga}
 
-ESTRUTURA DE TURNOS (COO Felipe Carneiro) — MÍNIMOS DIÁRIOS POR PAPEL (INEGOCIÁVEIS):
-  Abridores:       ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias
-  Fechadores:      ${p.config.qtd_fechadores}   ← em campo TODOS os 7 dias
-  Intermediários:  ${p.config.qtd_intermediarios}   ← em campo TODOS os 7 dias
-  Mínimo no pico: ${p.config.qtd_abridores + p.config.qtd_fechadores + p.config.qtd_intermediarios}
+ESTRUTURA DE TURNOS (COO Felipe Carneiro):
+  Abridores (mín. diário POP):  ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias
+  Fechadores (mín. diário POP): ${p.config.qtd_fechadores}   ← em campo TODOS os 7 dias
+  Intermediários (headcount contratado): ${p.config.qtd_intermediarios}   ← podem folgar
   ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ""}
 
-ATENÇÃO: nenhuma folga pode reduzir abridores/fechadores/intermediários em
-campo abaixo desses mínimos em NENHUM dia. Dimensione
+ATENÇÃO: nenhuma folga pode reduzir abridores/fechadores em campo
+abaixo do mínimo em NENHUM dia. Para abridor/fechador dimensione
 vagas_papel = ceil((qtd_papel * 7) / dias_uteis_por_pessoa).
 
 TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):

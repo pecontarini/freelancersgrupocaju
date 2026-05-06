@@ -137,32 +137,32 @@ export function GeradorEscalaIA() {
     });
   }, [escalaMinimas]);
 
+  const [templateId, setTemplateId] = useState<string | null>(null);
+
   const handleGerar = async () => {
-    if (!config) {
-      toast.error("Selecione um setor com configuração de turnos");
+    if (!config || !effectiveUnidadeId) {
+      toast.error("Selecione uma unidade e um setor com configuração de turnos");
       return;
     }
     setLoading(true);
     setResultado(null);
+    setTemplateId(null);
     try {
       const { data, error } = await supabase.functions.invoke("gerar-escala-ia", {
         body: {
           setor,
-          semana,
-          modeloFolga: config.modelo_folga ?? "6x1",
-          config: {
-            qtd_abridores: config.qtd_abridores,
-            qtd_fechadores: config.qtd_fechadores,
-            qtd_intermediarios: config.qtd_intermediarios,
-            observacoes: config.observacoes,
-          },
-          tabelaMinima,
+          semana_inicio: semana,
+          unidade_id: effectiveUnidadeId,
         },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) {
+        if (data.escala) setResultado(data.escala as EscalaResponse);
+        throw new Error(data.error + (data.alertas?.length ? `: ${data.alertas.join("; ")}` : ""));
+      }
       setResultado(data.escala as EscalaResponse);
-      toast.success("Escala gerada com sucesso");
+      setTemplateId(data.template_id ?? null);
+      toast.success("Escala gerada e salva como pendente de aprovação");
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Falha ao gerar escala");
@@ -274,6 +274,7 @@ export function GeradorEscalaIA() {
               </CardTitle>
               <CardDescription>
                 Semana {resultado.semana_inicio} • {resultado.modelo_folga}
+                {templateId ? ` • salvo (pendente aprovação)` : ""}
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>

@@ -1,6 +1,9 @@
 // Edge function: gerar-escala-ia
-// Gera template de horários por setor (Caju Limão Itaim) usando Lovable AI Gateway.
-// Retorna JSON estruturado com slots de turnos cobrindo POP almoço + jantar.
+// Lê turno_config + escala_minima da unidade/setor, chama Lovable AI Gateway (gpt-5),
+// valida, persiste em escala_template e retorna { template_id, escala }.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,176 +11,74 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `
-Você é o Agente Gerador de Escalas do Caju Limão Itaim (Grupo CajuPAR).
-Sua missão: definir o TEMPLATE DE HORÁRIOS por tipo de turno que satisfaça
-o POP mínimo de ALMOÇO e o POP mínimo de JANTAR de cada dia da semana.
-Você não atribui nomes — apenas define horários.
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 
-═══════════════════════════════
-CONTEXTO OPERACIONAL
-═══════════════════════════════
-Abertura ao cliente:  11h30
-Pico almoço:          11h30 – 15h00
-Vale:                 15h00 – 17h00
-Pico jantar:          17h00 – 21h00 ← MÁXIMA PRIORIDADE
-Fechamento + limpeza:
-  Seg, Ter, Qua → 00h30
-  Qui, Sex, Sáb → 02h30
-  Dom           → 23h30
-
-═══════════════════════════════
-REGRA FUNDAMENTAL — DUPLO POP
-═══════════════════════════════
-POP exige mínimos SEPARADOS para almoço e jantar.
-Trabalhador puro cobre 1 POP. Trabalhador em DOBRA cobre os 2 POPs.
-Maximizar dobras = fechar ambos os POPs com menor headcount.
-  Abridor puro  → conta: ALMOÇO apenas
-  Fechador puro → conta: JANTAR apenas
-  Dobra         → conta: ALMOÇO + JANTAR ← sempre preferir
-
-═══════════════════════════════
-TIPOS DE DIA
-═══════════════════════════════
-TIPO A — Seg, Ter, Qua (fecha 00h30): T2 ef = 6h → DOBRA VIÁVEL
-TIPO B — Dom (fecha 23h30): T2 ef = 5h30 → DOBRA VIÁVEL
-TIPO C — Qui, Sex, Sáb (fecha 02h30):
-  T2 ef = 8h30 → DOBRA INVIÁVEL p/ fechadores
-  Fechadores = PUROS (só jantar)
-  Abridores = DOBRA PARCIAL (saem 21h, não ficam até fechar)
-
-═══════════════════════════════
-BIBLIOTECA DE TEMPLATES
-═══════════════════════════════
-TIPO A e B:
-  ABRIDOR-DOBRA       → T1: 09h→14h | break 3h | T2: 17h→21h = 9h
-  INTERMEDIARIO-DOBRA → T1: 11h→14h | break 3h | T2: 17h→fechamento
-  FECHADOR-DOBRA      → T1: 12h→15h | break 3h | T2: 18h→fechamento
-  Dom T2: intermediario 17h→23h30; fechador 18h→23h30
-TIPO C:
-  ABRIDOR-DOBRA-PARCIAL → T1: 09h→14h | break 3h | T2: 17h→21h
-  FECHADOR-PURO         → T2: 17h→02h30 (8h30 ef.)
-GARÇOM:
-  TIPO-ALMOCO    → 10h30→16h
-  TIPO-FECHAMENTO Tipo A/B → 17h→00h30 ou 17h→23h30
-  TIPO-FECHAMENTO Tipo C   → 17h→02h30
-
-REGRAS DOS TEMPLATES:
-- T1 + T2 = MESMA pessoa, MESMO dia
-- Break = exatamente 180min (3h), inegociável
-- Jornada efetiva: se bruto ≤6h → ef = bruto; se bruto >6h → ef = bruto - 1h
-
-═══════════════════════════════
-REGRAS CLT — HARD LIMITS
-═══════════════════════════════
-1. Máximo 10h efetivas/dia (T1 + T2 combinados)
-2. Interjornada Art.66: mínimo 11h
-3. DSR Art.67: 1 folga/semana mínimo
-4. Carga semanal: 44h por colaborador
-
-═══════════════════════════════
-REGRAS POP 02 — INEGOCIÁVEIS
-═══════════════════════════════
-1. POP mínimo = piso absoluto. Nunca gerar abaixo.
-2. Extras (+X): criar slots EXTRA-ALMOCO ou EXTRA-JANTAR separados.
-3. Pico 17h–21h: todos os slots de jantar devem iniciar até 18h no máximo.
-4. Tipo C: NENHUM fechador tem T1.
-5. Cozinha e Bar: 1 slot responsavel=true na abertura E no fechamento.
-
-═══════════════════════════════
-FORMATO DE SAÍDA — JSON PURO
-═══════════════════════════════
-Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
-{
-  "setor": "string",
-  "semana_inicio": "YYYY-MM-DD",
-  "modelo_folga": "6x1",
-  "dias_folga_sugeridos": ["SEG"],
-  "justificativa_folga": "string",
-  "dias": {
-    "SEG": {
-      "tipo_dia": "A",
-      "fechamento": "00:30",
-      "pop_almoco": 7, "pop_jantar": 5,
-      "pop_almoco_coberto": 7, "pop_jantar_coberto": 5,
-      "pops_atendidos": true,
-      "slots": [
-        {
-          "tipo": "ABRIDOR-DOBRA",
-          "quantidade": 2,
-          "responsavel": false,
-          "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },
-          "break_min": 180,
-          "t2": { "entrada": "17:00", "saida": "21:00", "cruza_meia_noite": false, "efetivo_min": 240 },
-          "jornada_dia_min": 540,
-          "cobre_almoco": true, "cobre_jantar": true,
-          "obs": "string"
-        }
-      ],
-      "extras": []
-    }
-  },
-  "resumo_semanal": {
-    "modelo": "6x1",
-    "distribuicao_tipica": { "dias_tipo_a_ou_b": 3, "dias_tipo_c": 2, "dias_folga": 1, "total_horas_estimado": "44h00" },
-    "dias_com_extras": [],
-    "interjornada_alertas": []
-  },
-  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_operacionais": [] }
-}
-
-CHECKLIST: □ Tipo C: nenhum fechador tem T1  □ Tipo C: abridores saem 21h
-□ T1+T2 ≤ 10h ef  □ POP almoço e jantar cobertos em todos dias
-□ Dias com +X têm slots EXTRA  □ Break sempre 180min  □ JSON válido sem texto extra
-`;
-
-function buildUserPrompt(p: {
-  setor: string; semana: string; modeloFolga: string;
-  config: { qtd_abridores: number; qtd_fechadores: number; qtd_intermediarios: number; observacoes?: string | null; };
-  tabelaMinima: Array<{ dia: string; almoco_efetivos: number; almoco_extras: number; jantar_efetivos: number; jantar_extras: number; }>;
-}): string {
-  const tabela = p.tabelaMinima.map(d => {
-    const al = d.almoco_extras > 0 ? `${d.almoco_efetivos}+${d.almoco_extras}ext` : `${d.almoco_efetivos}`;
-    const ja = d.jantar_extras > 0 ? `${d.jantar_efetivos}+${d.jantar_extras}ext` : `${d.jantar_efetivos}`;
-    return `  ${d.dia.padEnd(4)}: Almoço ${al.padEnd(12)} | Jantar ${ja}`;
-  }).join('\n');
-
-  return `Gere a escala de horários para o setor abaixo.
-
-SETOR: ${p.setor}
-SEMANA: ${p.semana}
-MODELO DE FOLGA: ${p.modeloFolga}
-
-ESTRUTURA DE TURNOS (COO Felipe Carneiro):
-  Abridores:       ${p.config.qtd_abridores}
-  Fechadores:      ${p.config.qtd_fechadores}
-  Intermediários:  ${p.config.qtd_intermediarios}
-  Total headcount: ${p.config.qtd_abridores + p.config.qtd_fechadores + p.config.qtd_intermediarios}
-  ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ''}
-
-TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):
-${tabela}
-
-Aplique os templates corretos por tipo de dia (A/B/C). Verifique ambos os POPs. Retorne o JSON completo conforme formato.`;
-}
+const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json();
-    const { setor, semana, modeloFolga, config, tabelaMinima } = body ?? {};
+    const { setor, semana_inicio, unidade_id } = await req.json();
 
-    if (!setor || !semana || !modeloFolga || !config || !Array.isArray(tabelaMinima)) {
-      return new Response(JSON.stringify({ error: "Parâmetros obrigatórios: setor, semana, modeloFolga, config, tabelaMinima" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!setor || !semana_inicio || !unidade_id) {
+      return json({ error: "Parâmetros obrigatórios: setor, semana_inicio, unidade_id" }, 400);
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
-    const userPrompt = buildUserPrompt({ setor, semana, modeloFolga, config, tabelaMinima });
+    const [{ data: pop }, { data: config }] = await Promise.all([
+      supabase
+        .from("escala_minima")
+        .select("dia_semana, turno, qtd_efetivos, qtd_extras")
+        .eq("unidade_id", unidade_id)
+        .eq("setor", setor),
+      supabase
+        .from("turno_config")
+        .select("*")
+        .eq("unidade_id", unidade_id)
+        .eq("setor", setor)
+        .maybeSingle(),
+    ]);
+
+    if (!pop?.length || !config) {
+      return json({ error: "Configuração não encontrada para este setor." }, 404);
+    }
+
+    const tabelaMinima = DIAS.map((dia) => {
+      const al = pop.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));
+      const ja = pop.find((r) => r.dia_semana === dia && r.turno === "JANTAR");
+      return {
+        dia,
+        almoco_efetivos: al?.qtd_efetivos ?? 0,
+        almoco_extras: al?.qtd_extras ?? 0,
+        jantar_efetivos: ja?.qtd_efetivos ?? 0,
+        jantar_extras: ja?.qtd_extras ?? 0,
+      };
+    });
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
+
+    const userPrompt = buildUserPrompt({
+      setor,
+      semana: semana_inicio,
+      modeloFolga: config.modelo_folga ?? "6x1",
+      config: {
+        qtd_abridores: config.qtd_abridores,
+        qtd_fechadores: config.qtd_fechadores,
+        qtd_intermediarios: config.qtd_intermediarios,
+        observacoes: config.observacoes,
+      },
+      tabelaMinima,
+    });
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -193,40 +94,51 @@ Deno.serve(async (req) => {
     });
 
     if (!aiResp.ok) {
-      if (aiResp.status === 429) {
-        return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns instantes." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResp.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos da Lovable AI esgotados. Adicione créditos em Settings → Workspace → Usage." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      if (aiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+      if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
       const t = await aiResp.text();
       console.error("AI gateway error:", aiResp.status, t);
-      return new Response(JSON.stringify({ error: "Erro no AI Gateway", detail: t }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Erro no AI Gateway", detail: t }, 500);
     }
 
-    const data = await aiResp.json();
-    const content = data.choices?.[0]?.message?.content ?? "{}";
+    const aiData = await aiResp.json();
+    const rawText = aiData.choices?.[0]?.message?.content ?? "";
 
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(content); } catch (_e) {
-      return new Response(JSON.stringify({ error: "Resposta da IA não é JSON válido", raw: content }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let escala: any;
+    try { escala = JSON.parse(rawText); }
+    catch {
+      return json({ error: "IA retornou JSON inválido.", raw: rawText }, 422);
     }
 
-    return new Response(JSON.stringify({ escala: parsed, prompt_user: userPrompt }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    console.error("gerar-escala-ia error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const cltAlerts = escala?.validacao?.alertas_clt ?? [];
+    if (!escala?.validacao?.aprovado || cltAlerts.length > 0) {
+      return json({ error: "Violações CLT detectadas.", alertas: cltAlerts, escala }, 422);
+    }
+
+    const { data: template, error: saveError } = await supabase
+      .from("escala_template")
+      .upsert(
+        {
+          unidade_id,
+          setor,
+          semana_inicio,
+          status: "pendente_aprovacao",
+          payload: escala,
+          gerado_em: new Date().toISOString(),
+        },
+        { onConflict: "unidade_id,setor,semana_inicio" },
+      )
+      .select()
+      .single();
+
+    if (saveError) {
+      console.error("save error", saveError);
+      return json({ error: "Erro ao salvar.", detail: saveError.message }, 500);
+    }
+
+    return json({ template_id: template.id, escala });
+  } catch (err) {
+    console.error("gerar-escala-ia error:", err);
+    return json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });

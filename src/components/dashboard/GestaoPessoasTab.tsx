@@ -30,5 +30,7 @@ export function GestaoPessoasTab({ selectedUnidadeId }: GestaoPessoasTabProps) {
         <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />
       </TabsContent>
     </Tabs>
+    <EscalasItaimSection />
+    </div>
   );
 }

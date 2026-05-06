@@ -248,7 +248,7 @@ export function GeradorEscalaIA() {
         return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
       };
 
-      const slotToDay = (slot: SlotResponse): DraftDay | null => {
+      const slotToDay = (slot: SlotResponse, fechamento?: string): DraftDay | null => {
         if (slot.t1 && slot.t2) {
           // Dobra: jornada bruta entrada T1 → saída T2, com break padrão de 180min
           return {
@@ -261,10 +261,8 @@ export function GeradorEscalaIA() {
         }
         const t = slot.t1 ?? slot.t2;
         if (!t) return null;
-        // Turno único: end_time = entrada + jornada efetiva + 180min de intervalo
-        // (entrada e saída exibidas já representam a jornada bruta com intervalo embutido)
-        const efetivo = Math.max(Number(t.efetivo_min) || 0, diffMin(t.entrada, t.saida));
-        const endTime = addMinutes(t.entrada, efetivo + 180);
+        // Turno único: jornada bruta = entrada → fechamento da loja, com 3h de intervalo embutidas
+        const endTime = fechamento && /^\d{2}:\d{2}$/.test(fechamento) ? fechamento : t.saida;
         return {
           kind: "work",
           start_time: t.entrada,

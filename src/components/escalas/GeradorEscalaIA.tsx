@@ -487,14 +487,19 @@ export function GeradorEscalaIA() {
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
-                {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-                Enviar para o Editor de Escalas
-              </Button>
-              <Button variant="outline" size="sm" onClick={copyJSON}>
-                <Copy className="mr-2 h-4 w-4" /> Copiar JSON
-              </Button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
+                  {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                  Enviar para o Editor de Escalas
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyJSON}>
+                  <Copy className="mr-2 h-4 w-4" /> Copiar JSON
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground max-w-xs text-right">
+                As vagas aparecem como linhas <strong>"Vaga Aberta"</strong> no Editor. Vincule cada uma a uma pessoa ativa para gravar a escala.
+              </p>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

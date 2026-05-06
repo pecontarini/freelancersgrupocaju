@@ -338,7 +338,7 @@ export function GeradorEscalaIA() {
         );
 
       toast.success(
-        `${inserted} vaga(s) — pico ${weekPeak.dia} ${peakHourStr} (${composicao})`,
+        `${inserted} vaga(s) enviadas — folgas distribuídas (${resultado.modelo_folga})`,
         {
           action: { label: "Abrir Editor agora", onClick: fireDrafts },
           duration: 8000,

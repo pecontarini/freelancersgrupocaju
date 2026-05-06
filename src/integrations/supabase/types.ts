@@ -1710,6 +1710,50 @@ export type Database = {
           },
         ]
       }
+      escala_aprovacao_links: {
+        Row: {
+          criado_em: string
+          criado_por: string | null
+          decisao: string | null
+          expira_em: string
+          id: string
+          ip_aprovador: string | null
+          template_id: string
+          token: string
+          usado_em: string | null
+        }
+        Insert: {
+          criado_em?: string
+          criado_por?: string | null
+          decisao?: string | null
+          expira_em?: string
+          id?: string
+          ip_aprovador?: string | null
+          template_id: string
+          token: string
+          usado_em?: string | null
+        }
+        Update: {
+          criado_em?: string
+          criado_por?: string | null
+          decisao?: string | null
+          expira_em?: string
+          id?: string
+          ip_aprovador?: string | null
+          template_id?: string
+          token?: string
+          usado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escala_aprovacao_links_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "escala_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       escala_minima: {
         Row: {
           created_at: string

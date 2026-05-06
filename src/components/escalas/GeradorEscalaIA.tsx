@@ -332,7 +332,7 @@ export function GeradorEscalaIA() {
         for (const d of DIAS) {
           for (const s of allDaySlots[d]) {
             if (s.tipo !== info.tipo || !!s.responsavel !== info.responsavel) continue;
-            const day = slotToDay(s);
+            const day = slotToDay(s, resultado.dias?.[d]?.fechamento);
             if (!day || day.kind !== "work") continue;
             const k = `${day.start_time}|${day.end_time}|${day.break_min}|${day.shift_type}`;
             const prev = freq.get(k);

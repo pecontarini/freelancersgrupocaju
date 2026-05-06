@@ -250,13 +250,24 @@ export function GeradorEscalaIA() {
       let counter = 0;
       const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
 
+      // Diferença entre HH:MM em minutos (suporta cruzamento de meia-noite)
+      const diffMin = (a: string, b: string): number => {
+        const [ah, am] = a.split(":").map(Number);
+        const [bh, bm] = b.split(":").map(Number);
+        let d = (bh * 60 + bm) - (ah * 60 + am);
+        if (d < 0) d += 24 * 60;
+        return d;
+      };
+
       const slotToDay = (slot: SlotResponse): DraftDay | null => {
         if (slot.t1 && slot.t2) {
+          // Intervalo REAL = T2.entrada - T1.saida
+          const realBreak = diffMin(slot.t1.saida, slot.t2.entrada);
           return {
             kind: "work",
             start_time: slot.t1.entrada,
             end_time: slot.t2.saida,
-            break_min: slot.break_min ?? 0,
+            break_min: realBreak,
             shift_type: "T3",
           };
         }

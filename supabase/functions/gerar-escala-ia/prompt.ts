@@ -108,6 +108,10 @@ ALGORITMO OBRIGATÓRIO:
    - 5x2: prefira pares consecutivos (SEG+TER, TER+QUA, DOM+SEG); evite SEX+SAB.
    - Distribua de forma BALANCEADA — nunca concentre folgas do mesmo papel num único dia.
 6. Cada vaga tem horário-padrão (template predominante do seu papel/dia).
+7. EXTRAS (EXTRA-ALMOCO, EXTRA-JANTAR) NÃO entram em plano_folgas.vagas — são
+   reforços situacionais por dia, vão apenas em dias[d].extras.
+8. Se em algum dia papel_em_campo < qtd_papel, AUMENTE vagas_papel até cobrir
+   (não reduza folgas — adicione mais vagas regulares daquele papel).
 
 ═══════════════════════════════
 FORMATO DE SAÍDA — JSON PURO

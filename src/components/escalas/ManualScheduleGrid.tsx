@@ -470,7 +470,9 @@ export function ManualScheduleGrid() {
     try {
       const sectorId = resolveSectorForEmployee(employeeId) || slot.sector_id;
       const tasks: Promise<any>[] = [];
+      const taskLabels: string[] = [];
       for (const [date, day] of Object.entries(slot.days)) {
+        taskLabels.push(date);
         if (day.kind === "off") {
           tasks.push(
             upsertSchedule.mutateAsync({
@@ -494,16 +496,29 @@ export function ManualScheduleGrid() {
               shift_type: day.shift_type,
               start_time: day.start_time,
               end_time: day.end_time,
-              break_duration: day.break_min ?? 0,
+              break_duration: Math.max(0, Math.min(600, Number(day.break_min) || 0)),
               agreed_rate: 0,
             }),
           );
         }
       }
-      await Promise.allSettled(tasks);
-      removeDraftSlot(slot.id);
+      const results = await Promise.allSettled(tasks);
+      const fails: string[] = [];
+      results.forEach((r, i) => {
+        if (r.status === "rejected") fails.push(taskLabels[i]);
+      });
+      if (fails.length > 0) {
+        toast.error(
+          `Vínculo parcial: ${results.length - fails.length}/${results.length} dias salvos. Falha em: ${fails.join(", ")}`,
+          { duration: 8000 },
+        );
+        return; // Não remove o draft — operador pode tentar de novo
+      }
+      await removeDraftSlot(slot.id);
       setLinkPickerOpen(null);
-      toast.success("Vaga vinculada ao funcionário.");
+      toast.success(`Vaga vinculada (${results.length} dias gravados).`);
+    } catch (e: any) {
+      toast.error(`Falha ao vincular: ${e?.message || "erro desconhecido"}`);
     } finally {
       setLinkingId(null);
     }

@@ -27,6 +27,7 @@ import {
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { EscalaApprovalPanel } from "./EscalaApprovalPanel";
 
 const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 

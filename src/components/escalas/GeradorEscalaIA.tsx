@@ -224,33 +224,13 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      // 3) Agregar slots por (tipo, responsavel) e maxQuantidade
-      type Key = string;
-      const allDaySlots: Record<string, SlotResponse[]> = {};
-      for (const d of DIAS) {
-        const dia = resultado.dias?.[d];
-        allDaySlots[d] = dia ? [...(dia.slots ?? []), ...(dia.extras ?? [])] : [];
-      }
-      const groupMap = new Map<Key, { tipo: string; responsavel: boolean; maxQty: number }>();
-      for (const d of DIAS) {
-        for (const s of allDaySlots[d]) {
-          const key = `${s.tipo}|${s.responsavel ? "1" : "0"}`;
-          const prev = groupMap.get(key);
-          const qty = s.quantidade ?? 1;
-          if (!prev || qty > prev.maxQty) {
-            groupMap.set(key, { tipo: s.tipo, responsavel: !!s.responsavel, maxQty: qty });
-          }
-        }
-      }
+      // ===== Estratégia "Vaga por pessoa do PICO" =====
+      // 1) Coletar TODOS os slots por dia (slots fixos + extras), expandidos por quantidade.
+      // 2) Para cada dia, calcular ocupação por hora (00..23) e identificar o PICO do dia.
+      // 3) Pegar o maior pico da semana e a composição por cargo nesse momento.
+      // 4) Gerar 1 linha-vaga por pessoa do pico, preenchendo todos os 7 dias com o
+      //    horário-padrão (moda) daquele cargo. Folgas só nos dias sugeridos pela IA.
 
-      // 4) Para cada grupo, gerar maxQty linhas-vaga
-      // Estratégia: cada linha começa preenchida em TODOS os dias com um horário
-      // padrão derivado do quadro (moda). Folgas só nos dias sugeridos pela IA.
-      const drafts: DraftSlot[] = [];
-      let counter = 0;
-      const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
-
-      // Diferença entre HH:MM em minutos (suporta cruzamento de meia-noite)
       const diffMin = (a: string, b: string): number => {
         const [ah, am] = a.split(":").map(Number);
         const [bh, bm] = b.split(":").map(Number);
@@ -261,8 +241,7 @@ export function GeradorEscalaIA() {
 
       const slotToDay = (slot: SlotResponse): DraftDay | null => {
         if (slot.t1 && slot.t2) {
-          // Intervalo REAL = T2.entrada - T1.saida
-          const realBreak = diffMin(slot.t1.saida, slot.t2.entrada);
+          const realBreak = Math.max(0, Math.min(600, diffMin(slot.t1.saida, slot.t2.entrada)));
           return {
             kind: "work",
             start_time: slot.t1.entrada,
@@ -277,72 +256,111 @@ export function GeradorEscalaIA() {
           kind: "work",
           start_time: t.entrada,
           end_time: t.saida,
-          break_min: slot.break_min ?? 0,
+          break_min: Math.max(0, Math.min(600, Number(slot.break_min) || 0)),
           shift_type: slot.t1 ? "T1" : "T2",
         };
       };
 
-      for (const [, g] of groupMap) {
-        // Coletar todos os slots desse grupo na semana para derivar horário padrão
-        const allSlotsOfGroup: SlotResponse[] = [];
-        for (const d of DIAS) {
-          for (const s of allDaySlots[d] || []) {
-            if (s.tipo === g.tipo && !!s.responsavel === g.responsavel) {
-              for (let k = 0; k < (s.quantidade ?? 1); k++) allSlotsOfGroup.push(s);
-            }
+      // Verifica se um slot está cobrindo a hora H (em minutos do dia)
+      const slotCobreHora = (slot: SlotResponse, hMin: number): boolean => {
+        const intervalos: Array<[string, string]> = [];
+        if (slot.t1) intervalos.push([slot.t1.entrada, slot.t1.saida]);
+        if (slot.t2) intervalos.push([slot.t2.entrada, slot.t2.saida]);
+        for (const [s, e] of intervalos) {
+          const [sh, sm] = s.split(":").map(Number);
+          let [eh, em] = e.split(":").map(Number);
+          let sMin = sh * 60 + sm;
+          let eMin = eh * 60 + em;
+          if (eMin <= sMin) eMin += 24 * 60; // cruza meia-noite
+          if (hMin >= sMin && hMin < eMin) return true;
+          if (hMin + 24 * 60 >= sMin && hMin + 24 * 60 < eMin) return true;
+        }
+        return false;
+      };
+
+      const allDaySlots: Record<string, SlotResponse[]> = {};
+      for (const d of DIAS) {
+        const dia = resultado.dias?.[d];
+        allDaySlots[d] = dia ? [...(dia.slots ?? []), ...(dia.extras ?? [])] : [];
+      }
+
+      // Para cada dia, achar o pico (hora com mais pessoas em campo)
+      type DayPeak = { dia: string; horaMin: number; total: number; porCargo: Map<string, { tipo: string; responsavel: boolean; qty: number }> };
+      let weekPeak: DayPeak | null = null;
+      for (const d of DIAS) {
+        const slotsDia = allDaySlots[d];
+        if (slotsDia.length === 0) continue;
+        for (let h = 0; h < 24; h++) {
+          const hMin = h * 60;
+          const porCargo = new Map<string, { tipo: string; responsavel: boolean; qty: number }>();
+          let total = 0;
+          for (const s of slotsDia) {
+            if (!slotCobreHora(s, hMin)) continue;
+            const qty = s.quantidade ?? 1;
+            total += qty;
+            const k = `${s.tipo}|${s.responsavel ? "1" : "0"}`;
+            const prev = porCargo.get(k);
+            if (prev) prev.qty += qty;
+            else porCargo.set(k, { tipo: s.tipo, responsavel: !!s.responsavel, qty });
+          }
+          if (!weekPeak || total > weekPeak.total) {
+            weekPeak = { dia: d, horaMin: hMin, total, porCargo };
           }
         }
-        // Moda do horário (entrada|saida|break)
+      }
+
+      if (!weekPeak || weekPeak.total === 0) {
+        toast.warning("Nenhum pico identificado — nada para enviar.");
+        return;
+      }
+
+      // Para cada cargo, derivar horário-padrão (moda) usando todos os slots da semana
+      const defaultByGrupo = new Map<string, DraftDay>();
+      for (const [grupoKey, info] of weekPeak.porCargo) {
         const freq = new Map<string, { count: number; day: DraftDay }>();
-        for (const s of allSlotsOfGroup) {
-          const day = slotToDay(s);
-          if (!day || day.kind !== "work") continue;
-          const key = `${day.start_time}|${day.end_time}|${day.break_min}|${day.shift_type}`;
-          const prev = freq.get(key);
-          if (prev) prev.count++;
-          else freq.set(key, { count: 1, day });
+        for (const d of DIAS) {
+          for (const s of allDaySlots[d]) {
+            if (s.tipo !== info.tipo || !!s.responsavel !== info.responsavel) continue;
+            const day = slotToDay(s);
+            if (!day || day.kind !== "work") continue;
+            const k = `${day.start_time}|${day.end_time}|${day.break_min}|${day.shift_type}`;
+            const prev = freq.get(k);
+            if (prev) prev.count += s.quantidade ?? 1;
+            else freq.set(k, { count: s.quantidade ?? 1, day });
+          }
         }
-        let defaultDay: DraftDay | null = null;
+        let best: DraftDay | null = null;
         let bestCount = 0;
         for (const { count, day } of freq.values()) {
           if (count > bestCount) {
             bestCount = count;
-            defaultDay = day;
+            best = day;
           }
         }
-        if (!defaultDay) continue; // grupo sem horário válido — pular
+        if (best) defaultByGrupo.set(grupoKey, best);
+      }
 
-        for (let i = 0; i < g.maxQty; i++) {
+      const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
+      const drafts: Omit<DraftSlot, "id" | "created_at" | "created_by">[] = [];
+
+      // 1 linha-vaga por pessoa do pico, agrupadas por cargo
+      for (const [grupoKey, info] of weekPeak.porCargo) {
+        const defaultDay = defaultByGrupo.get(grupoKey);
+        if (!defaultDay) continue;
+        for (let i = 0; i < info.qty; i++) {
           const days: Record<string, DraftDay> = {};
           for (const d of DIAS) {
             const dateStr = dayDates[d];
-            // Tenta usar slot específico do dia/instância para preservar variação real
-            const slotsOfDay = (allDaySlots[d] || []).filter(
-              (s) => s.tipo === g.tipo && !!s.responsavel === g.responsavel,
-            );
-            const expanded: SlotResponse[] = [];
-            for (const s of slotsOfDay) {
-              for (let k = 0; k < (s.quantidade ?? 1); k++) expanded.push(s);
-            }
-            const slot = expanded[i];
-            const specificDay = slot ? slotToDay(slot) : null;
-            days[dateStr] = specificDay ?? defaultDay;
-          }
-          // Aplicar folgas sugeridas pela IA por cima
-          for (const d of DIAS) {
-            if (folgasSugeridas.has(d)) {
-              days[dayDates[d]] = { kind: "off" };
-            }
+            days[dateStr] = folgasSugeridas.has(d) ? { kind: "off" } : defaultDay;
           }
           drafts.push({
-            id: `ai-${Date.now()}-${counter++}`,
             unit_id: effectiveUnidadeId,
             sector_id: sector.id,
             sector_name: sector.name,
             week_start: semana,
-            label: `Vaga ${g.tipo}${g.responsavel ? " ★" : ""}`,
-            tipo: g.tipo,
-            responsavel: g.responsavel,
+            label: `Vaga ${info.tipo}${info.responsavel ? " ★" : ""}`,
+            tipo: info.tipo,
+            responsavel: info.responsavel,
             days,
           });
         }
@@ -353,7 +371,20 @@ export function GeradorEscalaIA() {
         return;
       }
 
-      setDraftSlots(drafts);
+      const peakHourStr = `${String(Math.floor(weekPeak.horaMin / 60)).padStart(2, "0")}:00`;
+      const composicao = Array.from(weekPeak.porCargo.values())
+        .map((c) => `${c.qty} ${c.tipo}${c.responsavel ? "★" : ""}`)
+        .join(" + ");
+
+      console.info("[AI Draft] Pico semanal:", {
+        dia: weekPeak.dia,
+        hora: peakHourStr,
+        total: weekPeak.total,
+        composicao,
+        drafts_gerados: drafts.length,
+      });
+
+      const { inserted } = await insertDraftSlots(drafts);
 
       const fireDrafts = () =>
         window.dispatchEvent(
@@ -362,10 +393,13 @@ export function GeradorEscalaIA() {
           }),
         );
 
-      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`, {
-        action: { label: "Abrir Editor agora", onClick: fireDrafts },
-        duration: 6000,
-      });
+      toast.success(
+        `${inserted} vaga(s) — pico ${weekPeak.dia} ${peakHourStr} (${composicao})`,
+        {
+          action: { label: "Abrir Editor agora", onClick: fireDrafts },
+          duration: 8000,
+        },
+      );
 
       // 5) Navegar para o Editor (Gestão de Pessoas → Escalas → Editor)
       fireDrafts();

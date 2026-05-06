@@ -426,6 +426,72 @@ export function ManualScheduleGrid() {
   // ====================================================================
   const upsertSchedule = useUpsertSchedule();
   const cancelSchedule = useCancelSchedule();
+
+  // ===== AI Draft Slots (vagas geradas pela IA) =====
+  const draftSlots = useDraftSlotsFor(selectedUnit, activeSectorId, weekStart);
+  const [linkPickerOpen, setLinkPickerOpen] = useState<string | null>(null);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+
+  // Quando vagas chegam, garante que o setor delas esteja ativo
+  useEffect(() => {
+    function onDrafts(e: any) {
+      const d = e?.detail;
+      if (!d) return;
+      if (d.unitId && d.unitId !== selectedUnit) setLocalUnitId(d.unitId);
+      if (d.sectorId) setSelectedSectorId(d.sectorId);
+      if (d.weekStart) {
+        try { setCurrentWeekBase(new Date(`${d.weekStart}T12:00:00`)); } catch {}
+      }
+    }
+    window.addEventListener("ai-drafts-ready", onDrafts as any);
+    return () => window.removeEventListener("ai-drafts-ready", onDrafts as any);
+  }, [selectedUnit]);
+
+  async function linkDraftToEmployee(slot: DraftSlot, employeeId: string) {
+    setLinkingId(slot.id);
+    try {
+      const sectorId = resolveSectorForEmployee(employeeId) || slot.sector_id;
+      const tasks: Promise<any>[] = [];
+      for (const [date, day] of Object.entries(slot.days)) {
+        if (day.kind === "off") {
+          tasks.push(
+            upsertSchedule.mutateAsync({
+              employee_id: employeeId,
+              schedule_date: date,
+              sector_id: sectorId,
+              schedule_type: "off",
+              start_time: null,
+              end_time: null,
+              break_duration: 0,
+              agreed_rate: 0,
+            }),
+          );
+        } else {
+          tasks.push(
+            upsertSchedule.mutateAsync({
+              employee_id: employeeId,
+              schedule_date: date,
+              sector_id: sectorId,
+              schedule_type: "working",
+              shift_type: day.shift_type,
+              start_time: day.start_time,
+              end_time: day.end_time,
+              break_duration: day.break_min ?? 0,
+              agreed_rate: 0,
+            }),
+          );
+        }
+      }
+      await Promise.allSettled(tasks);
+      removeDraftSlot(slot.id);
+      setLinkPickerOpen(null);
+      toast.success("Vaga vinculada ao funcionário.");
+    } finally {
+      setLinkingId(null);
+    }
+  }
+
+
   const grid = useGridSelection();
   const gridContainerRef = useRef<HTMLDivElement>(null);
 

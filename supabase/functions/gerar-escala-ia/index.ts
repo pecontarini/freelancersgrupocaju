@@ -115,13 +115,28 @@ Deno.serve(async (req) => {
       return json({ error: "Violações CLT detectadas.", alertas: cltAlerts, escala }, 422);
     }
 
-    // Validação extra: plano_folgas deve respeitar 6x1/5x2 e cobrir demanda diária
+    // Validação extra: plano_folgas deve respeitar 6x1/5x2, demanda diária E mínimos por papel
     const plano = escala?.plano_folgas;
     const modeloUsado = (modelo_folga === "5x2" || modelo_folga === "6x1")
       ? modelo_folga
       : (config.modelo_folga ?? "6x1");
     const folgasPorVaga = modeloUsado === "5x2" ? 2 : 1;
     const alertasFolga: string[] = [];
+
+    const papelDe = (tipo: string): "abridor" | "fechador" | "intermediario" | "outro" => {
+      const t = String(tipo ?? "").toUpperCase();
+      if (t.startsWith("ABRIDOR")) return "abridor";
+      if (t.startsWith("FECHADOR")) return "fechador";
+      if (t.startsWith("INTERMEDIARIO") || t.startsWith("INTERMEDIÁRIO")) return "intermediario";
+      return "outro";
+    };
+
+    const minimos = {
+      abridor: Number(config.qtd_abridores ?? 0),
+      fechador: Number(config.qtd_fechadores ?? 0),
+      intermediario: Number(config.qtd_intermediarios ?? 0),
+    };
+
     if (!plano || !Array.isArray(plano.vagas) || plano.vagas.length === 0) {
       alertasFolga.push("plano_folgas.vagas ausente ou vazio.");
     } else {
@@ -132,18 +147,36 @@ Deno.serve(async (req) => {
         }
       }
       const demanda = plano.demanda_por_dia ?? {};
+      const cobertura: Record<string, any> = {};
       for (const dia of DIAS) {
-        const emFolga = plano.vagas.filter((v: any) => Array.isArray(v.folgas) && v.folgas.includes(dia)).length;
-        const emCampo = plano.vagas.length - emFolga;
+        const vagasNoDia = plano.vagas.filter((v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)));
+        const emCampo = vagasNoDia.length;
         const need = Number(demanda[dia] ?? 0);
         if (need > 0 && emCampo < need) {
           alertasFolga.push(`${dia}: ${emCampo} em campo < demanda ${need}.`);
         }
+        const porPapel = { abridor: 0, fechador: 0, intermediario: 0, outro: 0 };
+        for (const v of vagasNoDia) {
+          porPapel[papelDe(v.papel ?? v.tipo)]++;
+        }
+        cobertura[dia] = { ...porPapel, headcount_total: emCampo };
+        for (const p of ["abridor", "fechador", "intermediario"] as const) {
+          if (minimos[p] > 0 && porPapel[p] < minimos[p]) {
+            alertasFolga.push(`${dia}: ${porPapel[p]} ${p}(es) em campo < mínimo ${minimos[p]} (POP de abertura/fechamento).`);
+          }
+        }
       }
+      plano.cobertura_por_dia_calc = cobertura;
+      plano.minimos_por_papel_calc = minimos;
     }
     if (alertasFolga.length > 0) {
       escala.validacao = escala.validacao ?? {};
       escala.validacao.alertas_folga = alertasFolga;
+      return json({
+        error: "Plano de folgas viola mínimos POP por papel ou demanda diária.",
+        alertas_folga: alertasFolga,
+        escala,
+      }, 422);
     }
 
     const { data: template, error: saveError } = await supabase

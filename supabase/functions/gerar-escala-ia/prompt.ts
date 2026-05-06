@@ -77,23 +77,37 @@ REGRAS POP 02 — INEGOCIÁVEIS
 5. Cozinha e Bar: 1 slot responsavel=true na abertura E no fechamento.
 
 ═══════════════════════════════
-PLANEJAMENTO DE FOLGAS — DISTRIBUÍDO POR VAGA
+PLANEJAMENTO DE FOLGAS — POR PAPEL (ABERTURA/FECHAMENTO INEGOCIÁVEL)
 ═══════════════════════════════
 6x1 → cada vaga tem EXATAMENTE 1 folga/semana.
 5x2 → cada vaga tem EXATAMENTE 2 folgas/semana (preferencialmente consecutivas).
 
+PAPEL DE CADA VAGA (derivado do tipo):
+  - ABRIDOR → tipo começa com "ABRIDOR"
+  - FECHADOR → tipo começa com "FECHADOR"
+  - INTERMEDIARIO → tipo começa com "INTERMEDIARIO"
+  (garçons e demais seguem regra de demanda_dia, sem mínimo por papel.)
+
+MÍNIMOS DIÁRIOS POR PAPEL (recebidos no prompt como qtd_abridores, qtd_fechadores, qtd_intermediarios):
+  Em TODO dia d: papel_em_campo[d] >= qtd_papel.
+  Isso é o POP de abertura/fechamento — INEGOCIÁVEL. Se furar, a escala é inválida.
+
 ALGORITMO OBRIGATÓRIO:
 1. demanda_dia[d] = nº máximo de pessoas em campo simultaneamente naquele dia
-   (considere o pico de cada dia entre almoço e jantar; dobras contam 1 pessoa).
-2. demanda_pessoa_dia_semana = SOMA(demanda_dia[d]) para d em SEG..DOM.
-3. dias_uteis_por_pessoa = 6 (se 6x1) ou 5 (se 5x2).
-4. headcount_total = ceil(demanda_pessoa_dia_semana / dias_uteis_por_pessoa).
-5. Para cada vaga (1..headcount_total) atribua folgas escalonadas, garantindo:
-   - Em todo dia d: (headcount_total - vagas_em_folga[d]) >= demanda_dia[d].
-   - Priorize folgar nos dias de MENOR demanda (geralmente SEG/TER/QUA).
+   (pico entre almoço e jantar; dobras contam 1 pessoa).
+2. dias_uteis_por_pessoa = 6 (6x1) ou 5 (5x2).
+3. Para cada PAPEL (abridor/fechador/intermediario):
+   vagas_papel = ceil( (qtd_papel * 7) / dias_uteis_por_pessoa )
+   (ex.: qtd_fechadores=2 em 6x1 → ceil(14/6) = 3 vagas de fechador na semana).
+4. headcount_total = soma(vagas_papel) + vagas adicionais necessárias para cobrir
+   demanda_dia[d] em todos os dias (se a soma por papel já cobre, headcount_total = soma).
+5. Atribua folgas RODANDO DENTRO DE CADA PAPEL, validando após cada folga:
+   - papel_em_campo[d] >= qtd_papel para TODO d (regra dura).
+   - headcount_total - vagas_em_folga[d] >= demanda_dia[d].
+   - Priorize folgar em dias de MENOR demanda (SEG/TER/QUA).
    - 5x2: prefira pares consecutivos (SEG+TER, TER+QUA, DOM+SEG); evite SEX+SAB.
-   - Distribua as folgas de forma balanceada — não concentre todas no mesmo dia.
-6. Cada vaga deve ter horário-padrão (o template predominante do seu cargo).
+   - Distribua de forma BALANCEADA — nunca concentre folgas do mesmo papel num único dia.
+6. Cada vaga tem horário-padrão (template predominante do seu papel/dia).
 
 ═══════════════════════════════
 FORMATO DE SAÍDA — JSON PURO

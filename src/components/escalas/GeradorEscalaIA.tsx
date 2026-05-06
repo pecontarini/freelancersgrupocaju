@@ -211,7 +211,16 @@ export function GeradorEscalaIA() {
             </div>
             <div className="space-y-2">
               <Label>Modelo de folga</Label>
-              <Input value={config?.modelo_folga ?? "—"} disabled />
+              <Select value={modeloFolga} onValueChange={(v) => setModeloFolga(v as "5x2" | "6x1")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6x1">6x1 (1 folga/semana)</SelectItem>
+                  <SelectItem value="5x2">5x2 (2 folgas/semana)</SelectItem>
+                </SelectContent>
+              </Select>
+              {config?.modelo_folga && config.modelo_folga !== modeloFolga && (
+                <p className="text-xs text-muted-foreground">Padrão do setor: {config.modelo_folga}</p>
+              )}
             </div>
           </div>
 

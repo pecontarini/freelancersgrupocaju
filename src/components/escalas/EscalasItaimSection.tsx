@@ -332,7 +332,12 @@ export function EscalasItaimSection() {
           )}
 
         <Accordion type="multiple" className="w-full">
-          {(escalaParaExibir?.dias ?? []).map((dia: any, idx: number) => (
+          {(Array.isArray(escalaParaExibir?.dias)
+            ? escalaParaExibir.dias
+            : escalaParaExibir?.dias && typeof escalaParaExibir.dias === "object"
+              ? Object.entries(escalaParaExibir.dias).map(([dia, v]: [string, any]) => ({ dia, ...(v ?? {}) }))
+              : []
+          ).map((dia: any, idx: number) => (
             <AccordionItem key={idx} value={`dia-${idx}`}>
               <AccordionTrigger className="text-sm">
                 <div className="flex flex-wrap items-center gap-2">

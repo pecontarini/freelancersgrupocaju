@@ -117,6 +117,9 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="matrix">
         <StaffingMatrixConfig />
       </TabsContent>
+      <TabsContent value="gerador-ia">
+        <GeradorEscalaIA />
+      </TabsContent>
     </Tabs>
   );
 }

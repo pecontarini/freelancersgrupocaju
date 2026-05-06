@@ -239,24 +239,37 @@ export function GeradorEscalaIA() {
         return d;
       };
 
+      const addMinutes = (hhmm: string, mins: number): string => {
+        const [h, m] = hhmm.split(":").map(Number);
+        let total = h * 60 + m + mins;
+        total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+        const nh = Math.floor(total / 60);
+        const nm = total % 60;
+        return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+      };
+
       const slotToDay = (slot: SlotResponse): DraftDay | null => {
         if (slot.t1 && slot.t2) {
-          const realBreak = Math.max(0, Math.min(600, diffMin(slot.t1.saida, slot.t2.entrada)));
+          // Dobra: jornada bruta entrada T1 → saída T2, com break padrão de 180min
           return {
             kind: "work",
             start_time: slot.t1.entrada,
             end_time: slot.t2.saida,
-            break_min: realBreak,
+            break_min: 180,
             shift_type: "T3",
           };
         }
         const t = slot.t1 ?? slot.t2;
         if (!t) return null;
+        // Turno único: end_time = entrada + jornada efetiva + 180min de intervalo
+        // (entrada e saída exibidas já representam a jornada bruta com intervalo embutido)
+        const efetivo = Math.max(Number(t.efetivo_min) || 0, diffMin(t.entrada, t.saida));
+        const endTime = addMinutes(t.entrada, efetivo + 180);
         return {
           kind: "work",
           start_time: t.entrada,
-          end_time: t.saida,
-          break_min: Math.max(0, Math.min(600, Number(slot.break_min) || 0)),
+          end_time: endTime,
+          break_min: 180,
           shift_type: slot.t1 ? "T1" : "T2",
         };
       };

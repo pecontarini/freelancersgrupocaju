@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles, Wand2 } from "lucide-react";
 import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
@@ -11,9 +11,13 @@ import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
 import { PracasConfig } from "./PracasConfig";
 import { HoldingOperationalConfigTab } from "./HoldingOperationalConfigTab";
+import { EscalasItaimSection } from "./EscalasItaimSection";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useUnidade } from "@/contexts/UnidadeContext";
+
+const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 
 interface EscalasTabProps {
   defaultTab?: string;
@@ -23,6 +27,8 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
   
   const { data: confirmations } = usePendingConfirmations();
   const { isAdmin, isOperator } = useUserProfile();
+  const { effectiveUnidadeId } = useUnidade();
+  const isItaim = effectiveUnidadeId === UNIDADE_ID_ITAIM;
 
   const hasRisk = (confirmations?.pending ?? 0) > 0 || (confirmations?.denied ?? 0) > 0;
   const [tab, setTab] = useState(defaultTab || "scheduler");

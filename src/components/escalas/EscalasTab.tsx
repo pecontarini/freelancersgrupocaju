@@ -79,6 +79,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Configurações</span>
           <span className="sm:hidden">Config</span>
         </TabsTrigger>
+        <TabsTrigger value="gerador-ia" className="gap-1.5">
+          <Sparkles className="h-4 w-4" />
+          <span className="hidden sm:inline">Gerador IA</span>
+          <span className="sm:hidden">IA</span>
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="scheduler">

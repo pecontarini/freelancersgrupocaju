@@ -248,9 +248,9 @@ export function GeradorEscalaIA() {
         return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
       };
 
-      const slotToDay = (slot: SlotResponse, fechamento?: string): DraftDay | null => {
+      const slotToDay = (slot: SlotResponse): DraftDay | null => {
         if (slot.t1 && slot.t2) {
-          // Dobra: jornada bruta entrada T1 → saída T2, com break padrão de 180min
+          // Dobra: entrada T1 → saída T2, com break padrão de 180min
           return {
             kind: "work",
             start_time: slot.t1.entrada,
@@ -261,12 +261,11 @@ export function GeradorEscalaIA() {
         }
         const t = slot.t1 ?? slot.t2;
         if (!t) return null;
-        // Turno único: jornada bruta = entrada → fechamento da loja, com 3h de intervalo embutidas
-        const endTime = fechamento && /^\d{2}:\d{2}$/.test(fechamento) ? fechamento : t.saida;
+        // Turno único: usa entrada e saída sugeridas pela IA, com 3h de intervalo padrão
         return {
           kind: "work",
           start_time: t.entrada,
-          end_time: endTime,
+          end_time: t.saida,
           break_min: 180,
           shift_type: slot.t1 ? "T1" : "T2",
         };

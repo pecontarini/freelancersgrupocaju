@@ -1714,7 +1714,7 @@ export function ManualScheduleGrid() {
                         </React.Fragment>
                       ))}
                       {/* AI DRAFT SLOTS — vagas vindas do Gerador IA */}
-                      {draftSlots.map((slot) => {
+                      {draftSlots.map((slot, draftIdx) => {
                         const linkableEmps = scheduledEmployees.length > 0 || sectorBaseEmployees.length > 0
                           ? [...employees]
                           : employees;
@@ -1725,7 +1725,11 @@ export function ManualScheduleGrid() {
                           })
                           .sort((a, b) => a.name.localeCompare(b.name));
                         return (
-                          <TableRow key={`draft-${slot.id}`} className="bg-primary/5">
+                          <TableRow
+                            key={`draft-${slot.id}`}
+                            ref={draftIdx === 0 ? firstDraftRowRef : undefined}
+                            className={`bg-primary/5 transition-shadow ${pulseDrafts ? "ring-2 ring-primary/60 ring-inset animate-pulse" : ""}`}
+                          >
                             <TableCell className="font-medium sticky left-0 z-10 border-r bg-primary/10 backdrop-blur">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <SparklesIcon className="h-3 w-3 text-primary shrink-0" />

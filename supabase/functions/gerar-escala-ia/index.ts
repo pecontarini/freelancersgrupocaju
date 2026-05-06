@@ -140,7 +140,11 @@ Deno.serve(async (req) => {
     if (!plano || !Array.isArray(plano.vagas) || plano.vagas.length === 0) {
       alertasFolga.push("plano_folgas.vagas ausente ou vazio.");
     } else {
-      for (const v of plano.vagas) {
+      // Extras (reforços situacionais) não entram no ciclo semanal de folgas
+      const isExtra = (v: any) => String(v.tipo ?? "").toUpperCase().startsWith("EXTRA");
+      const vagasRegulares = plano.vagas.filter((v: any) => !isExtra(v));
+
+      for (const v of vagasRegulares) {
         const f = Array.isArray(v.folgas) ? v.folgas.length : 0;
         if (f !== folgasPorVaga) {
           alertasFolga.push(`Vaga ${v.id_vaga ?? v.tipo}: ${f} folga(s), esperado ${folgasPorVaga} (${modeloUsado}).`);
@@ -149,7 +153,7 @@ Deno.serve(async (req) => {
       const demanda = plano.demanda_por_dia ?? {};
       const cobertura: Record<string, any> = {};
       for (const dia of DIAS) {
-        const vagasNoDia = plano.vagas.filter((v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)));
+        const vagasNoDia = vagasRegulares.filter((v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)));
         const emCampo = vagasNoDia.length;
         const need = Number(demanda[dia] ?? 0);
         if (need > 0 && emCampo < need) {

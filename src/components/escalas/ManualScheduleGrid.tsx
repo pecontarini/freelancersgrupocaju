@@ -432,6 +432,22 @@ export function ManualScheduleGrid() {
   const draftSlots = useDraftSlotsFor(selectedUnit, activeSectorId, weekStart);
   const [linkPickerOpen, setLinkPickerOpen] = useState<string | null>(null);
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const firstDraftRowRef = useRef<HTMLTableRowElement>(null);
+  const [pulseDrafts, setPulseDrafts] = useState(false);
+  const prevDraftCountRef = useRef(0);
+
+  // Quando novas vagas chegam, scroll + pulse de destaque
+  useEffect(() => {
+    if (draftSlots.length > prevDraftCountRef.current && draftSlots.length > 0) {
+      setPulseDrafts(true);
+      setTimeout(() => {
+        firstDraftRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      const t = setTimeout(() => setPulseDrafts(false), 2000);
+      return () => clearTimeout(t);
+    }
+    prevDraftCountRef.current = draftSlots.length;
+  }, [draftSlots.length]);
 
   // Quando vagas chegam, garante que o setor delas esteja ativo
   useEffect(() => {

@@ -159,6 +159,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_draft_slots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          days: Json
+          id: string
+          label: string
+          responsavel: boolean
+          sector_id: string
+          tipo: string
+          unit_id: string
+          updated_at: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          days?: Json
+          id?: string
+          label: string
+          responsavel?: boolean
+          sector_id: string
+          tipo: string
+          unit_id: string
+          updated_at?: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          days?: Json
+          id?: string
+          label?: string
+          responsavel?: boolean
+          sector_id?: string
+          tipo?: string
+          unit_id?: string
+          updated_at?: string
+          week_start?: string
+        }
+        Relationships: []
+      }
       audit_alerts: {
         Row: {
           alert_type: string

@@ -1,295 +1,232 @@
 // Edge function: gerar-escala-ia
-// Recebe contexto operacional (funcionários, matriz POP, escalas existentes, ausências)
-// + mensagens do chat e devolve uma proposta de escala via tool calling.
-// O modelo é instruído a respeitar POP de Escalas + CLT, e a recusar
-// qualquer pergunta fora desse escopo.
+// Gera template de horários por setor (Caju Limão Itaim) usando Lovable AI Gateway.
+// Retorna JSON estruturado com slots de turnos cobrindo POP almoço + jantar.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const POP_RULES = `
-# POP DE ESCALAS — REGRAS OBRIGATÓRIAS (Grupo Mult Foods / CajuPAR)
+const SYSTEM_PROMPT = `
+Você é o Agente Gerador de Escalas do Caju Limão Itaim (Grupo CajuPAR).
+Sua missão: definir o TEMPLATE DE HORÁRIOS por tipo de turno que satisfaça
+o POP mínimo de ALMOÇO e o POP mínimo de JANTAR de cada dia da semana.
+Você não atribui nomes — apenas define horários.
 
-## Princípio
-A escala existe para garantir o número MÍNIMO de colaboradores por setor/turno
-da Tabela Mínima (POP 4.1). Nenhuma escala pode ficar abaixo desse piso.
-Freelancer só depois de tentar realocação interna e banco de horas (POP 3.3.2 / 5.1.3).
+═══════════════════════════════
+CONTEXTO OPERACIONAL
+═══════════════════════════════
+Abertura ao cliente:  11h30
+Pico almoço:          11h30 – 15h00
+Vale:                 15h00 – 17h00
+Pico jantar:          17h00 – 21h00 ← MÁXIMA PRIORIDADE
+Fechamento + limpeza:
+  Seg, Ter, Qua → 00h30
+  Qui, Sex, Sáb → 02h30
+  Dom           → 23h30
 
-## Tabela Mínima (POP 4.1) — piso obrigatório + dobras planejadas
-- Define efetivo mínimo (required_count) por setor + dia + turno (almoço/jantar).
-- Cada turno também pode ter "dobras" (extras_count): reposição autorizada pela liderança
-  quando faltas/folgas comprometerem o mínimo. Use dobras APENAS se o mínimo não puder
-  ser atingido com o efetivo regular. NUNCA escale mais que (required_count + extras_count)
-  pessoas no mesmo turno.
-- Reduzir abaixo de required_count é proibido. A escala parte SEMPRE da Tabela Mínima.
+═══════════════════════════════
+REGRA FUNDAMENTAL — DUPLO POP
+═══════════════════════════════
+POP exige mínimos SEPARADOS para almoço e jantar.
+Trabalhador puro cobre 1 POP. Trabalhador em DOBRA cobre os 2 POPs.
+Maximizar dobras = fechar ambos os POPs com menor headcount.
+  Abridor puro  → conta: ALMOÇO apenas
+  Fechador puro → conta: JANTAR apenas
+  Dobra         → conta: ALMOÇO + JANTAR ← sempre preferir
 
-## Montagem (POP 4.2.5)
-- Não escalar quem está em férias/aviso prévio/atestado/afastamento.
-- Banco de horas perto de zero — nem positivo demais nem negativo.
-- Equilibrar competência: não concentrar todos os experientes num único turno.
+═══════════════════════════════
+TIPOS DE DIA
+═══════════════════════════════
+TIPO A — Seg, Ter, Qua (fecha 00h30): T2 ef = 6h → DOBRA VIÁVEL
+TIPO B — Dom (fecha 23h30): T2 ef = 5h30 → DOBRA VIÁVEL
+TIPO C — Qui, Sex, Sáb (fecha 02h30):
+  T2 ef = 8h30 → DOBRA INVIÁVEL p/ fechadores
+  Fechadores = PUROS (só jantar)
+  Abridores = DOBRA PARCIAL (saem 21h, não ficam até fechar)
 
-## Jornada (POP 4.2.5 + CLT)
-- 44h/semana. Máx 10h/dia (8 + 2 extras), descontado intervalo.
-- Dobra: intervalo entre os dois turnos do mesmo dia <= 4h.
-- Intrajornada: 1h obrigatória se jornada > 6h (CLT art. 71).
+═══════════════════════════════
+BIBLIOTECA DE TEMPLATES
+═══════════════════════════════
+TIPO A e B:
+  ABRIDOR-DOBRA       → T1: 09h→14h | break 3h | T2: 17h→21h = 9h
+  INTERMEDIARIO-DOBRA → T1: 11h→14h | break 3h | T2: 17h→fechamento
+  FECHADOR-DOBRA      → T1: 12h→15h | break 3h | T2: 18h→fechamento
+  Dom T2: intermediario 17h→23h30; fechador 18h→23h30
+TIPO C:
+  ABRIDOR-DOBRA-PARCIAL → T1: 09h→14h | break 3h | T2: 17h→21h
+  FECHADOR-PURO         → T2: 17h→02h30 (8h30 ef.)
+GARÇOM:
+  TIPO-ALMOCO    → 10h30→16h
+  TIPO-FECHAMENTO Tipo A/B → 17h→00h30 ou 17h→23h30
+  TIPO-FECHAMENTO Tipo C   → 17h→02h30
 
-## Descanso (POP 4.2.5 + CLT)
-- 1 folga semanal (DSR). Pelo menos 1 domingo de folga no mês.
-- Interjornada: mínimo 11h entre fim de um turno e início do próximo (CLT art. 66).
+REGRAS DOS TEMPLATES:
+- T1 + T2 = MESMA pessoa, MESMO dia
+- Break = exatamente 180min (3h), inegociável
+- Jornada efetiva: se bruto ≤6h → ef = bruto; se bruto >6h → ef = bruto - 1h
 
-## Presença válida no turno (POP 5.2.4)
-- Almoço: 2h consecutivas entre 12h-15h.
-- Jantar: 2h consecutivas entre 19h-22h.
+═══════════════════════════════
+REGRAS CLT — HARD LIMITS
+═══════════════════════════════
+1. Máximo 10h efetivas/dia (T1 + T2 combinados)
+2. Interjornada Art.66: mínimo 11h
+3. DSR Art.67: 1 folga/semana mínimo
+4. Carga semanal: 44h por colaborador
 
-## Turnos canônicos
-- T1 (almoço): 10:00-16:00 ou 09:30-17:30 com 1h pausa.
-- T2 (jantar): 17:00-23:00 ou 18:00-00:00.
-- T3 (corrido): 11:00-23:00 com pausa 15:00-18:00.
-- meia: jornada curta (4-6h) sem pausa.
-- off / vacation / sick_leave: sem trabalho.
+═══════════════════════════════
+REGRAS POP 02 — INEGOCIÁVEIS
+═══════════════════════════════
+1. POP mínimo = piso absoluto. Nunca gerar abaixo.
+2. Extras (+X): criar slots EXTRA-ALMOCO ou EXTRA-JANTAR separados.
+3. Pico 17h–21h: todos os slots de jantar devem iniciar até 18h no máximo.
+4. Tipo C: NENHUM fechador tem T1.
+5. Cozinha e Bar: 1 slot responsavel=true na abertura E no fechamento.
 
-## Prioridade ao faltar gente
-1) Realocar de setor com sobra. 2) Banco de horas negativo. 3) Freelancer.
-NUNCA reduzir abaixo do piso da Tabela Mínima sem comunicar.
-
-## Escopo do assistente
-- Você só responde sobre escalas. Para qualquer outra pergunta, responda exatamente:
-  "Sou o assistente de escalas do POP CajuPAR. Só consigo ajudar com montagem
-  de escala respeitando o POP e a CLT."
-- Use APENAS funcionários da lista fornecida no contexto. Nunca invente nome/id.
-- Sempre que propor escala, USE A FERRAMENTA propor_escala. Não devolva escala em texto.
-- Antes da chamada da ferramenta, escreva 1-3 linhas explicando a estratégia
-  (quem ficou de folga em qual dia, onde sobra/falta gente, etc.).
-`.trim();
-
-interface ContextEmployee {
-  id: string;
-  name: string;
-  job_title: string | null;
-  worker_type: string | null;
-  weekly_hours_target: number;
-}
-interface ContextStaffing {
-  sector_id: string;
-  sector_name: string;
-  day_of_week: number;
-  shift_type: string;
-  required_count: number;
-  extras_count?: number;
-}
-interface ContextShift {
-  employee_id: string;
-  employee_name: string;
-  date: string;
-  schedule_type: string;
-  shift_type?: string;
-  start_time?: string | null;
-  end_time?: string | null;
-  break_min?: number;
-  sector_id?: string | null;
-}
-interface ContextAbsence {
-  employee_id: string;
-  employee_name: string;
-  date: string;
-  reason: string;
-}
-
-interface RequestBody {
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
-  context: {
-    weekDates: string[];
-    sectorName: string;
-    employees: ContextEmployee[];
-    staffing: ContextStaffing[];
-    existingShifts: ContextShift[];
-    absences: ContextAbsence[];
-  };
-}
-
-const TOOL_PROPOR_ESCALA = {
-  type: "function",
-  function: {
-    name: "propor_escala",
-    description:
-      "Devolve a proposta de escala completa para a semana, respeitando POP de Escalas e CLT.",
-    parameters: {
-      type: "object",
-      properties: {
-        resumo: {
-          type: "string",
-          description:
-            "1-3 frases explicando a lógica da escala proposta e onde, se houver, sobrou furo de cobertura.",
-        },
-        turnos: {
-          type: "array",
-          description: "Lista de turnos. Inclua TODOS os funcionários e TODOS os 7 dias da semana (off para folgas).",
-          items: {
-            type: "object",
-            properties: {
-              employee_id: { type: "string" },
-              employee_name: { type: "string" },
-              date: { type: "string", description: "YYYY-MM-DD" },
-              schedule_type: {
-                type: "string",
-                enum: ["working", "off", "vacation", "sick_leave"],
-              },
-              shift_type: {
-                type: "string",
-                enum: ["T1", "T2", "T3", "meia"],
-                description: "Obrigatório quando schedule_type=working.",
-              },
-              start_time: { type: "string", description: "HH:mm — vazio se off/férias/atestado." },
-              end_time: { type: "string", description: "HH:mm — vazio se off/férias/atestado." },
-              break_min: { type: "number", description: "Pausa em minutos (0 se sem pausa)." },
-            },
-            required: ["employee_id", "employee_name", "date", "schedule_type", "shift_type", "start_time", "end_time", "break_min"],
-            additionalProperties: false,
-          },
-        },
-        avisos: {
-          type: "array",
-          items: { type: "string" },
-          description: "Avisos importantes (furos de cobertura, sugestões de freelancer, etc).",
-        },
-      },
-      required: ["resumo", "turnos", "avisos"],
-      additionalProperties: false,
-    },
+═══════════════════════════════
+FORMATO DE SAÍDA — JSON PURO
+═══════════════════════════════
+Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
+{
+  "setor": "string",
+  "semana_inicio": "YYYY-MM-DD",
+  "modelo_folga": "6x1",
+  "dias_folga_sugeridos": ["SEG"],
+  "justificativa_folga": "string",
+  "dias": {
+    "SEG": {
+      "tipo_dia": "A",
+      "fechamento": "00:30",
+      "pop_almoco": 7, "pop_jantar": 5,
+      "pop_almoco_coberto": 7, "pop_jantar_coberto": 5,
+      "pops_atendidos": true,
+      "slots": [
+        {
+          "tipo": "ABRIDOR-DOBRA",
+          "quantidade": 2,
+          "responsavel": false,
+          "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },
+          "break_min": 180,
+          "t2": { "entrada": "17:00", "saida": "21:00", "cruza_meia_noite": false, "efetivo_min": 240 },
+          "jornada_dia_min": 540,
+          "cobre_almoco": true, "cobre_jantar": true,
+          "obs": "string"
+        }
+      ],
+      "extras": []
+    }
   },
-};
+  "resumo_semanal": {
+    "modelo": "6x1",
+    "distribuicao_tipica": { "dias_tipo_a_ou_b": 3, "dias_tipo_c": 2, "dias_folga": 1, "total_horas_estimado": "44h00" },
+    "dias_com_extras": [],
+    "interjornada_alertas": []
+  },
+  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_operacionais": [] }
+}
 
-function buildSystemPrompt(ctx: RequestBody["context"]): string {
-  const lines: string[] = [POP_RULES, "", "## CONTEXTO OPERACIONAL DESTA REQUISIÇÃO", ""];
-  lines.push(`Setor: ${ctx.sectorName}`);
-  lines.push(`Semana (segunda a domingo): ${ctx.weekDates.join(", ")}`);
-  lines.push("");
-  lines.push("### Funcionários disponíveis (use APENAS estes ids)");
-  for (const e of ctx.employees) {
-    lines.push(
-      `- id=${e.id} | ${e.name} | ${e.job_title ?? "—"} | ${e.worker_type} | meta ${e.weekly_hours_target}h/sem`,
-    );
-  }
-  lines.push("");
-  lines.push("### Tabela Mínima POP (cobertura obrigatória + dobras planejadas)");
-  const dowName = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  for (const r of ctx.staffing) {
-    const extras = (r.extras_count ?? 0) > 0
-      ? ` (+ até ${r.extras_count} dobra(s) se cobertura ficar comprometida)`
-      : "";
-    lines.push(`- ${dowName[r.day_of_week]} ${r.shift_type}: ${r.required_count} pessoa(s)${extras}`);
-  }
-  if (ctx.absences.length > 0) {
-    lines.push("");
-    lines.push("### Ausências confirmadas na semana (NÃO escalar)");
-    for (const a of ctx.absences) {
-      lines.push(`- ${a.employee_name} (${a.employee_id}) — ${a.date} — ${a.reason}`);
-    }
-  }
-  if (ctx.existingShifts.length > 0) {
-    lines.push("");
-    lines.push("### Turnos já existentes (semana anterior/posterior — considere para interjornada 11h)");
-    for (const s of ctx.existingShifts.slice(0, 60)) {
-      lines.push(
-        `- ${s.employee_name} ${s.date} ${s.start_time ?? "?"}-${s.end_time ?? "?"}${s.break_min ? ` pausa ${s.break_min}m` : ""}`,
-      );
-    }
-  }
-  return lines.join("\n");
+CHECKLIST: □ Tipo C: nenhum fechador tem T1  □ Tipo C: abridores saem 21h
+□ T1+T2 ≤ 10h ef  □ POP almoço e jantar cobertos em todos dias
+□ Dias com +X têm slots EXTRA  □ Break sempre 180min  □ JSON válido sem texto extra
+`;
+
+function buildUserPrompt(p: {
+  setor: string; semana: string; modeloFolga: string;
+  config: { qtd_abridores: number; qtd_fechadores: number; qtd_intermediarios: number; observacoes?: string | null; };
+  tabelaMinima: Array<{ dia: string; almoco_efetivos: number; almoco_extras: number; jantar_efetivos: number; jantar_extras: number; }>;
+}): string {
+  const tabela = p.tabelaMinima.map(d => {
+    const al = d.almoco_extras > 0 ? `${d.almoco_efetivos}+${d.almoco_extras}ext` : `${d.almoco_efetivos}`;
+    const ja = d.jantar_extras > 0 ? `${d.jantar_efetivos}+${d.jantar_extras}ext` : `${d.jantar_efetivos}`;
+    return `  ${d.dia.padEnd(4)}: Almoço ${al.padEnd(12)} | Jantar ${ja}`;
+  }).join('\n');
+
+  return `Gere a escala de horários para o setor abaixo.
+
+SETOR: ${p.setor}
+SEMANA: ${p.semana}
+MODELO DE FOLGA: ${p.modeloFolga}
+
+ESTRUTURA DE TURNOS (COO Felipe Carneiro):
+  Abridores:       ${p.config.qtd_abridores}
+  Fechadores:      ${p.config.qtd_fechadores}
+  Intermediários:  ${p.config.qtd_intermediarios}
+  Total headcount: ${p.config.qtd_abridores + p.config.qtd_fechadores + p.config.qtd_intermediarios}
+  ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ''}
+
+TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):
+${tabela}
+
+Aplique os templates corretos por tipo de dia (A/B/C). Verifique ambos os POPs. Retorne o JSON completo conforme formato.`;
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const body = await req.json();
+    const { setor, semana, modeloFolga, config, tabelaMinima } = body ?? {};
+
+    if (!setor || !semana || !modeloFolga || !config || !Array.isArray(tabelaMinima)) {
+      return new Response(JSON.stringify({ error: "Parâmetros obrigatórios: setor, semana, modeloFolga, config, tabelaMinima" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const body = (await req.json()) as RequestBody;
-    if (!Array.isArray(body.messages) || body.messages.length === 0 || !body.context) {
-      return new Response(JSON.stringify({ error: "messages/context obrigatórios" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY não configurada");
 
-    const systemPrompt = buildSystemPrompt(body.context);
+    const userPrompt = buildUserPrompt({ setor, semana, modeloFolga, config, tabelaMinima });
 
-    const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "openai/gpt-5",
         messages: [
-          { role: "system", content: systemPrompt },
-          ...body.messages,
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userPrompt },
         ],
-        tools: [TOOL_PROPOR_ESCALA],
+        response_format: { type: "json_object" },
       }),
     });
 
-    if (!upstream.ok) {
-      if (upstream.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Muitas requisições agora. Tente em alguns segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+    if (!aiResp.ok) {
+      if (aiResp.status === 429) {
+        return new Response(JSON.stringify({ error: "Limite de requisições atingido. Tente novamente em alguns instantes." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      if (upstream.status === 402) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Créditos do Lovable AI esgotados. Adicione créditos em Settings > Workspace > Usage.",
-          }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
+      if (aiResp.status === 402) {
+        return new Response(JSON.stringify({ error: "Créditos da Lovable AI esgotados. Adicione créditos em Settings → Workspace → Usage." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      const txt = await upstream.text();
-      console.error("AI gateway error", upstream.status, txt);
-      return new Response(JSON.stringify({ error: "Falha no gateway de IA." }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const t = await aiResp.text();
+      console.error("AI gateway error:", aiResp.status, t);
+      return new Response(JSON.stringify({ error: "Erro no AI Gateway", detail: t }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await upstream.json();
-    const choice = data?.choices?.[0]?.message ?? {};
-    const text: string = choice?.content ?? "";
-    let proposta: any = null;
-    const toolCalls = choice?.tool_calls ?? [];
-    if (Array.isArray(toolCalls)) {
-      for (const tc of toolCalls) {
-        if (tc?.function?.name === "propor_escala") {
-          try {
-            proposta = JSON.parse(tc.function.arguments ?? "{}");
-          } catch (e) {
-            console.error("Falha ao parsear proposta:", e);
-          }
-        }
-      }
+    const data = await aiResp.json();
+    const content = data.choices?.[0]?.message?.content ?? "{}";
+
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(content); } catch (_e) {
+      return new Response(JSON.stringify({ error: "Resposta da IA não é JSON válido", raw: content }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    return new Response(JSON.stringify({ text, proposta }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return new Response(JSON.stringify({ escala: parsed, prompt_user: userPrompt }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    console.error("gerar-escala-ia error:", err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  } catch (e) {
+    console.error("gerar-escala-ia error:", e);
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

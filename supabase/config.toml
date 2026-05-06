@@ -73,3 +73,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.plano-acao-ia]
 verify_jwt = false
+
+[functions.escala-aprovacao-info]
+verify_jwt = false
+
+[functions.escala-aprovacao-decidir]
+verify_jwt = false

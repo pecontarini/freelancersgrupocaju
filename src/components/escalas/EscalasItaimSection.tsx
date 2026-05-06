@@ -29,6 +29,7 @@ import {
 import { toast } from "sonner";
 import { EscalaApprovalPanel } from "./EscalaApprovalPanel";
 import { EscalaVinculacaoBuilder } from "./EscalaVinculacaoBuilder";
+import { CooApprovalLinkBox } from "./CooApprovalLinkBox";
 
 const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 
@@ -427,16 +428,24 @@ export function EscalasItaimSection() {
       <div className="space-y-4">
         {/* Painel de aprovação do COO */}
         {template?.status === "pendente_aprovacao" && template?.id && template?.payload && (
-          <EscalaApprovalPanel
-            templateId={template.id}
-            setor={setorAtivo}
-            semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
-            payload={template.payload}
-            onChanged={() => {
-              setEscalaGerada(null);
-              refetch();
-            }}
-          />
+          <>
+            <EscalaApprovalPanel
+              templateId={template.id}
+              setor={setorAtivo}
+              semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
+              payload={template.payload}
+              onChanged={() => {
+                setEscalaGerada(null);
+                refetch();
+              }}
+            />
+            <CooApprovalLinkBox
+              templateId={template.id}
+              setor={setorAtivo}
+              semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
+              unidadeNome="Caju Limão Itaim"
+            />
+          </>
         )}
 
         {/* Status do template no topo */}

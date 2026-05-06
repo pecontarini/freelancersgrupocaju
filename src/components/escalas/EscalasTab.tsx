@@ -34,6 +34,11 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
   const [tab, setTab] = useState(defaultTab || "scheduler");
   const showPopDashboard = isAdmin || isOperator;
 
+  // Se sair de Itaim enquanto na aba MVP, volta para o editor padrão
+  useEffect(() => {
+    if (!isItaim && tab === "ia-mvp") setTab("scheduler");
+  }, [isItaim, tab]);
+
   return (
     <Tabs value={tab} onValueChange={setTab} className="space-y-4">
       <TabsList className="flex-wrap h-auto gap-1">
@@ -42,6 +47,13 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Editor de Escalas</span>
           <span className="sm:hidden">Escalas</span>
         </TabsTrigger>
+        {isItaim && (
+          <TabsTrigger value="ia-mvp" className="gap-1.5 border-primary/40 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Wand2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Gerador IA (MVP)</span>
+            <span className="sm:hidden">IA MVP</span>
+          </TabsTrigger>
+        )}
         <TabsTrigger value="d1" className="gap-1.5 relative">
           <ClipboardList className="h-4 w-4" />
           <span className="hidden sm:inline">Gestão D-1</span>

@@ -1400,6 +1400,31 @@ export function ManualScheduleGrid() {
                     </Popover>
                   </div>
 
+                  {draftSlots.length > 0 && (
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 backdrop-blur px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <SparklesIcon className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-medium">
+                          {draftSlots.length} vaga{draftSlots.length > 1 ? "s" : ""} gerada{draftSlots.length > 1 ? "s" : ""} pela IA aguardando vínculo.
+                        </span>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          Use <strong>Vincular</strong> em cada linha ou descarte tudo abaixo.
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm(`Descartar ${draftSlots.length} vaga(s) IA pendente(s)?`)) {
+                            clearDraftSlotsFor(selectedUnit, activeSectorId!, weekStart);
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" /> Descartar tudo
+                      </Button>
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>

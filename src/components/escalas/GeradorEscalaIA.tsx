@@ -243,31 +243,7 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      // ===== Estratégia "Vaga por pessoa do PICO" =====
-      // 1) Coletar TODOS os slots por dia (slots fixos + extras), expandidos por quantidade.
-      // 2) Para cada dia, calcular ocupação por hora (00..23) e identificar o PICO do dia.
-      // 3) Pegar o maior pico da semana e a composição por cargo nesse momento.
-      // 4) Gerar 1 linha-vaga por pessoa do pico, preenchendo todos os 7 dias com o
-      //    horário-padrão (moda) daquele cargo. Folgas só nos dias sugeridos pela IA.
-
-      const diffMin = (a: string, b: string): number => {
-        const [ah, am] = a.split(":").map(Number);
-        const [bh, bm] = b.split(":").map(Number);
-        let d = (bh * 60 + bm) - (ah * 60 + am);
-        if (d < 0) d += 24 * 60;
-        return d;
-      };
-
-      const addMinutes = (hhmm: string, mins: number): string => {
-        const [h, m] = hhmm.split(":").map(Number);
-        let total = h * 60 + m + mins;
-        total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
-        const nh = Math.floor(total / 60);
-        const nm = total % 60;
-        return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
-      };
-
-      const slotToDay = (horario: { t1?: any; t2?: any }): DraftDay | null => {
+      // ===== Estratégia: 1 linha-vaga por vaga em plano_folgas, com folgas distribuídas =====
         if (horario.t1 && horario.t2) {
           return {
             kind: "work",

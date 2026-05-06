@@ -47,6 +47,7 @@ export default function AprovarEscala() {
   const [linkInfo, setLinkInfo] = useState<any>(null);
   const [comentario, setComentario] = useState("");
   const [aprovador, setAprovador] = useState("");
+  const [pin, setPin] = useState("");
   const [acao, setAcao] = useState<"aprovar" | "rejeitar" | null>(null);
 
   useEffect(() => {

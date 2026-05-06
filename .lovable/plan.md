@@ -1,70 +1,74 @@
 
-## Contexto
+## Diagnóstico
 
-Hoje, quando o Gerador de IA produz um turno com T1 + T2 (jornada partida), o sistema envia para o Editor de Escalas um único horário "achatado" (`T1.entrada → T2.saida`) usando o `break_min` que vem do JSON da IA. Resultado: o intervalo nem sempre reflete o tempo real entre o fim do T1 e o começo do T2, e o operador não consegue interpretar a jornada da mesma forma que vê no Gerador.
+### Problema 1 — Felipe não vê as vagas
+O store `useAIDraftSlots` é **memória local do navegador** (`useSyncExternalStore` com array em módulo). Quando você clicou "Enviar para o Editor", as vagas só existem **na sua aba**. Felipe (mesmo sendo admin global) abre o Editor e o array está vazio — não há nada para ler do banco. O modelo "só persiste ao vincular" só funciona se a mesma pessoa que gera é a mesma que vincula, em uma única sessão. Para colaboração precisa virar dado persistido.
 
-Além disso, o fluxo "ver e usar a escala" hoje só funciona se o operador souber que precisa abrir manualmente a aba **Editor de Escalas** depois de gerar — não há um caminho guiado nem indicação visual de que há vagas pendentes.
+### Problema 2 — 21 vagas para 13 pessoas necessárias
+A contagem atual em `GeradorEscalaIA.tsx` (~linha 234) faz:
+1. Agrupa slots por `(tipo, responsavel)` — ex: "Cozinheiro", "Cozinheiro responsável", "Aux. Cozinha", etc.
+2. Para **cada grupo**, pega `maxQty` (a maior quantidade vista em qualquer dia da semana) e gera `maxQty` linhas-vaga.
+3. Resultado: soma-se cargos diferentes. Se a matriz pede 5 cozinheiros + 8 auxiliares + 5 chefes em algum momento da semana, viram 18 linhas — mesmo que no PICO real só estejam 13 pessoas escaladas juntas.
 
-## Parte 1 — Horários T1/T2 com intervalo real
+Você escolheu **"1 vaga por pessoa do PICO"**: a contagem precisa ser feita no nível do pico semanal (qual dia/turno tem maior soma total de pessoas em campo), não somando máximos por cargo.
 
-### Comportamento atual
-`slotToDay()` em `GeradorEscalaIA.tsx` (linhas 253-272) usa:
+### Problema 3 — varredura geral (achados durante a leitura)
+- `linkDraftToEmployee` chama `upsertSchedule` em paralelo via `Promise.allSettled`. Cada upsert roda um `SELECT` de checagem de duplicidade — em 7 dias, são 7 selects + 7 upserts simultâneos. Sob RLS de admin global isso quase nunca falha, mas para operadores com acesso restrito por unidade pode estourar erro silencioso. Trocar para `Promise.all` propaga o erro real.
+- `useUpsertSchedule` (hook) define `break_duration ?? 60` quando `params.break_duration` é `undefined`. Para folgas mandamos `0`, ok. Para drafts mandamos `day.break_min ?? 0`. Sem problema, mas se algum dia do draft vier com `break_min: undefined`, vira 60 e quebra a interpretação. Precisa garantir `Number(...)` explícito.
+- Não há feedback claro quando o setor de destino tem matriz vazia ou job titles inexistentes — geração pode produzir 0 vagas e o operador não entende o que fazer.
+
+## Proposta — em 3 frentes
+
+### A. Persistir as vagas IA no banco (resolve Felipe)
+
+Criar tabela `ai_draft_slots` com RLS por unit:
 ```
-start_time = T1.entrada
-end_time   = T2.saida
-break_min  = slot.break_min ?? 0   ← vem cru da IA
+id uuid PK
+unit_id uuid NOT NULL
+sector_id uuid NOT NULL
+week_start date NOT NULL
+label text
+tipo text
+responsavel boolean
+days jsonb            -- { "2026-05-04": {kind:"work", start_time, end_time, break_min, shift_type}, ... }
+created_by uuid
+created_at timestamptz
 ```
+RLS: SELECT/INSERT/DELETE por `user_has_access_to_loja(auth.uid(), unit_id)` OR `has_role(auth.uid(), 'admin')`.
 
-### Comportamento desejado
-- Quando o slot tem **T1 + T2**: o intervalo deve ser **calculado** como `T2.entrada − T1.saida` (em minutos), não confiar no `break_min` solto.
-- Quando o slot tem **apenas T1** ou **apenas T2**: continuar como hoje (sem intervalo, ou só o `break_min` se vier).
-- A célula no grid já mostra `HH:MM - HH:MM` + ícone de café se houver intervalo. Vamos reforçar: ao passar o mouse na célula de uma vaga IA com jornada partida, o tooltip mostra `T1 07:00–11:00 • Intervalo 2h00 • T2 13:00–17:00`.
+Substituir o store em memória por hook React Query (`useAIDraftSlots(unit, sector, week)`) que lê/insere/deleta da tabela. Mantém a mesma API (`setDraftSlots`, `removeDraftSlot`, `clearDraftSlotsFor`, `updateDraftSlotDay`) mas agora persistida. Realtime opcional (subscribe na tabela) para que quando a Maria gerar, o Felipe veja aparecer sem refresh.
 
-### Onde mexe
-- `src/components/escalas/GeradorEscalaIA.tsx` — função `slotToDay`: calcular `break_min` a partir dos horários reais de T1/T2.
-- `src/components/escalas/ManualScheduleGrid.tsx` — `ScheduleCell` (linhas 2291-2367) e a renderização da linha de draft (linhas 1733-1775): adicionar `title` no `<TableCell>` formatando T1/intervalo/T2 quando o slot for de jornada partida (`shift_type === "T3"` e `break_duration > 0`).
+Ao **vincular** uma vaga a um funcionário: continua o fluxo atual (cria 7 schedules) e depois **deleta a linha de `ai_draft_slots`** (em vez de remover do array em memória).
 
-Nada muda na persistência: ao vincular a um funcionário, já gravamos `start_time`, `end_time` e `break_duration` corretos.
+### B. Recontagem das vagas pela "pessoa do pico" (resolve as 21 vagas)
 
-## Parte 2 — Fluxo de "ver e usar" a escala IA
+Reescrever a derivação de quantidade no `enviarParaEditor`:
 
-### Princípios
-- O operador termina a geração e **não precisa procurar nada** — o sistema o leva para o Editor de Escalas com as vagas já visíveis.
-- A vaga aberta tem affordance clara: como vincular, como marcar folga, como descartar.
-- Não há persistência fantasma: se o operador sair sem vincular, as vagas somem (já é o comportamento atual via `useAIDraftSlots` em memória) — mas avisamos antes.
+1. Para cada dia da semana, calcular **total de pessoas em campo simultaneamente** olhando a janela de pico (almoço 12:00–14:00 OU jantar 20:00–22:00 — pegar o maior). Soma de todos os slots cobrindo aquela hora.
+2. **Pico semanal** = maior valor entre os 7 dias.
+3. Distribuir o pico entre cargos: para cada cargo distinto, contar quantos slots desse cargo estão no momento do pico. Total deve bater com o pico.
+4. Gerar **uma linha-vaga por pessoa esperada no pico**, não por máximo por cargo.
 
-### Mudanças propostas
+Exemplo: se no jantar de sexta o pico for 13 pessoas (5 cozinheiros + 6 aux + 2 chefes) → 13 linhas, com horários que cada uma cobre o dia todo da semana usando o turno-padrão (moda) do cargo correspondente. Folgas continuam como hoje.
 
-**A. Banner de aterrissagem no Editor.** Quando há `draftSlots` na semana/setor atual, mostrar no topo do `ManualScheduleGrid` um banner discreto (estilo liquid glass, accent coral):
-> "N vagas geradas pela IA aguardando vínculo. Clique em **Vincular** em cada linha para atribuir a um funcionário, ou **Descartar tudo**."
-- Botão **Descartar tudo** chama `clearDraftSlotsFor(unit, sector, week)`.
-- O banner some sozinho quando não restam drafts.
+Adicionar no banner do Editor: *"13 vagas — pico identificado em SEX 20:00 (5 Cozinheiro + 6 Aux + 2 Chefe)"* para o operador entender de onde veio o número.
 
-**B. Auto-scroll e highlight.** Ao receber o evento `ai-drafts-ready`, além de trocar de aba/setor (já feito), rolar a tabela até a primeira linha de draft e dar um pulse visual de 1.5s nas linhas novas (anel coral fade-out). Sem isso, em listas longas o operador não percebe que algo apareceu.
+### C. Robustez do fluxo (varredura)
 
-**C. CTA explícito no Gerador.** O botão "Enviar para o Editor de Escalas" continua, mas:
-- Após sucesso, mostrar um toast com ação **"Abrir Editor agora"** que dispara o mesmo evento `ai-drafts-ready` (caso o operador tenha clicado em outra aba enquanto carregava).
-- Adicionar texto curto abaixo do botão: *"As vagas vão aparecer como linhas 'Vaga Aberta' no Editor. Vincule cada uma a uma pessoa ativa para gravar a escala."*
+- `linkDraftToEmployee`: trocar `Promise.allSettled` por `Promise.all` envolto em `try/catch` que mostra qual dia falhou. Mostrar contagem de sucesso vs falha no toast.
+- `slotToDay`: garantir `Number(diffMin(...))` e clamp em 0..600 minutos para `break_min`.
+- Se o setor não tem `staffing_matrix` ou job titles vinculados, mostrar aviso visível no Gerador antes mesmo de chamar a IA: *"Setor X sem matriz POP configurada — configure em Cargos e Setores antes de gerar"*.
+- Adicionar log estruturado (tabela `ai_generation_audit` opcional, ou só `console.info` por enquanto) com: usuário, setor, semana, qtd vagas geradas, pico identificado, modelo de folga. Facilita auditar quando alguém pergunta "de onde vieram essas vagas".
+- Banner do Editor passa a mostrar **quem** criou as vagas e **quando**: *"13 vagas geradas por Pedro às 17:38 aguardando vínculo"*.
 
-**D. Aviso ao trocar de semana/setor com drafts pendentes.** Se houver drafts na semana atual e o operador tentar mudar `week` ou `sector`, mostrar um `AlertDialog`: "Existem N vagas IA não vinculadas. Manter na memória, descartar, ou continuar editando?". Hoje elas continuam na memória mas ficam invisíveis — confunde.
+## Ordem de execução proposta
 
-**E. Vincular em lote (opcional, simples).** No banner do item A, adicionar um botão **"Auto-vincular sugestões"** que abre um modal listando cada vaga lado-a-lado com a primeira pessoa ativa do mesmo `job_title` que ainda não tem escala completa na semana. Operador confere, marca o que aceita, confirma. Mantém o modelo "só persiste ao vincular".
+1. Criar tabela `ai_draft_slots` + RLS (migration).
+2. Refazer `useAIDraftSlots` como hook React Query lendo/escrevendo da tabela; manter assinatura igual para o resto do código quase não mudar.
+3. Atualizar `GeradorEscalaIA.enviarParaEditor` para inserir na tabela em vez do store local.
+4. Reescrever a contagem de vagas (lógica do pico).
+5. Endurecer `linkDraftToEmployee` (Promise.all + relatório).
+6. Banner com "criado por X em Y", contador correto, justificativa do pico.
+7. (Opcional) realtime subscribe para outros usuários verem na hora.
 
-### Onde mexe
-- `src/components/escalas/ManualScheduleGrid.tsx` — adicionar banner, ref+scroll para a primeira linha draft, classe de highlight com `useEffect` baseado em `draftSlots.length`, AlertDialog em `setSelectedSectorId`/`setCurrentWeekBase` (apenas quando há drafts).
-- `src/components/escalas/GeradorEscalaIA.tsx` — toast com ação "Abrir Editor agora" e legenda explicativa.
-- (Item E, se aprovado) — novo componente `AIDraftBulkLinkModal.tsx`.
-
-## Resumo do que será entregue
-
-1. Intervalo correto T1/T2 nas vagas geradas pela IA (cálculo a partir dos horários reais).
-2. Tooltip detalhado nas células de jornada partida.
-3. Banner de "N vagas pendentes" + botão descartar tudo.
-4. Auto-scroll + pulse na chegada das vagas.
-5. Toast de sucesso com ação "Abrir Editor agora" + legenda.
-6. Aviso ao mudar semana/setor com drafts pendentes.
-7. (Opcional) Modal de auto-vínculo em lote.
-
-## Pergunta antes de implementar
-
-Quer incluir o item **E (auto-vincular em lote)** já agora, ou começamos só com A–D + a parte do intervalo, e o E fica para depois?
+Sem perguntas adicionais — implementarei direto se você aprovar.

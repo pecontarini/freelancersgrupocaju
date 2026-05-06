@@ -88,9 +88,11 @@ PAPEL DE CADA VAGA (derivado do tipo):
   - INTERMEDIARIO → tipo começa com "INTERMEDIARIO"
   (garçons e demais seguem regra de demanda_dia, sem mínimo por papel.)
 
-MÍNIMOS DIÁRIOS POR PAPEL (recebidos no prompt como qtd_abridores, qtd_fechadores, qtd_intermediarios):
-  Em TODO dia d: papel_em_campo[d] >= qtd_papel.
-  Isso é o POP de abertura/fechamento — INEGOCIÁVEL. Se furar, a escala é inválida.
+MÍNIMOS DIÁRIOS POR PAPEL (POP de abertura/fechamento — INEGOCIÁVEL):
+  Em TODO dia d: abridor_em_campo[d] >= qtd_abridores
+                 fechador_em_campo[d] >= qtd_fechadores
+  qtd_intermediarios = HEADCOUNT TOTAL contratado (NÃO é mínimo diário).
+  Intermediários cobrem demanda variável e podem folgar livremente.
 
 ALGORITMO OBRIGATÓRIO:
 1. demanda_dia[d] = nº máximo de pessoas em campo simultaneamente naquele dia

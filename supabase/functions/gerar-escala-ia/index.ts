@@ -115,6 +115,37 @@ Deno.serve(async (req) => {
       return json({ error: "Violações CLT detectadas.", alertas: cltAlerts, escala }, 422);
     }
 
+    // Validação extra: plano_folgas deve respeitar 6x1/5x2 e cobrir demanda diária
+    const plano = escala?.plano_folgas;
+    const modeloUsado = (modelo_folga === "5x2" || modelo_folga === "6x1")
+      ? modelo_folga
+      : (config.modelo_folga ?? "6x1");
+    const folgasPorVaga = modeloUsado === "5x2" ? 2 : 1;
+    const alertasFolga: string[] = [];
+    if (!plano || !Array.isArray(plano.vagas) || plano.vagas.length === 0) {
+      alertasFolga.push("plano_folgas.vagas ausente ou vazio.");
+    } else {
+      for (const v of plano.vagas) {
+        const f = Array.isArray(v.folgas) ? v.folgas.length : 0;
+        if (f !== folgasPorVaga) {
+          alertasFolga.push(`Vaga ${v.id_vaga ?? v.tipo}: ${f} folga(s), esperado ${folgasPorVaga} (${modeloUsado}).`);
+        }
+      }
+      const demanda = plano.demanda_por_dia ?? {};
+      for (const dia of DIAS) {
+        const emFolga = plano.vagas.filter((v: any) => Array.isArray(v.folgas) && v.folgas.includes(dia)).length;
+        const emCampo = plano.vagas.length - emFolga;
+        const need = Number(demanda[dia] ?? 0);
+        if (need > 0 && emCampo < need) {
+          alertasFolga.push(`${dia}: ${emCampo} em campo < demanda ${need}.`);
+        }
+      }
+    }
+    if (alertasFolga.length > 0) {
+      escala.validacao = escala.validacao ?? {};
+      escala.validacao.alertas_folga = alertasFolga;
+    }
+
     const { data: template, error: saveError } = await supabase
       .from("escala_template")
       .upsert(

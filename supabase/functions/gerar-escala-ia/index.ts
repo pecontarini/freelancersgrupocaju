@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const userPrompt = buildUserPrompt({
       setor,
       semana: semana_inicio,
-      modeloFolga: config.modelo_folga ?? "6x1",
+      modeloFolga: (modelo_folga === "5x2" || modelo_folga === "6x1") ? modelo_folga : (config.modelo_folga ?? "6x1"),
       config: {
         qtd_abridores: config.qtd_abridores,
         qtd_fechadores: config.qtd_fechadores,

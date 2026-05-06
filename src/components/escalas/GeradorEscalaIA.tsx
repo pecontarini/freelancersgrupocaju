@@ -123,6 +123,16 @@ export function GeradorEscalaIA() {
     [turnoConfigs, setor],
   );
 
+  // Quando o setor muda, sincronizar o modelo de folga com o padrão do setor
+  // (mas o usuário pode sobrescrever depois).
+  const lastSyncedSetor = React.useRef<string>("");
+  if (setor && config && lastSyncedSetor.current !== setor) {
+    lastSyncedSetor.current = setor;
+    if (config.modelo_folga === "5x2" || config.modelo_folga === "6x1") {
+      queueMicrotask(() => setModeloFolga(config.modelo_folga as "5x2" | "6x1"));
+    }
+  }
+
   const tabelaMinima = useMemo(() => {
     if (!escalaMinimas) return [];
     return DIAS.map((dia) => {

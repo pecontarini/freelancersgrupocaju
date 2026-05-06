@@ -438,7 +438,9 @@ export function ManualScheduleGrid() {
 
   // Quando novas vagas chegam, scroll + pulse de destaque
   useEffect(() => {
-    if (draftSlots.length > prevDraftCountRef.current && draftSlots.length > 0) {
+    const prev = prevDraftCountRef.current;
+    prevDraftCountRef.current = draftSlots.length;
+    if (draftSlots.length > prev && draftSlots.length > 0) {
       setPulseDrafts(true);
       setTimeout(() => {
         firstDraftRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -446,7 +448,6 @@ export function ManualScheduleGrid() {
       const t = setTimeout(() => setPulseDrafts(false), 2000);
       return () => clearTimeout(t);
     }
-    prevDraftCountRef.current = draftSlots.length;
   }, [draftSlots.length]);
 
   // Quando vagas chegam, garante que o setor delas esteja ativo

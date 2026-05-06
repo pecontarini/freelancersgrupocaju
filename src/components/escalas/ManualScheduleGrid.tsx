@@ -93,6 +93,7 @@ import {
   useDraftSlotsFor,
   removeDraftSlot,
   updateDraftSlotDay,
+  clearDraftSlotsFor,
   type DraftSlot,
 } from "@/hooks/useAIDraftSlots";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";

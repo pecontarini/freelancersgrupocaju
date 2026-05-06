@@ -85,6 +85,10 @@ interface EscalaResponse {
     demanda_pessoa_dia_semana?: number;
     dias_uteis_por_pessoa?: number;
     demanda_por_dia?: Record<string, number>;
+    minimos_por_papel?: { abridor?: number; fechador?: number; intermediario?: number };
+    minimos_por_papel_calc?: { abridor: number; fechador: number; intermediario: number };
+    cobertura_por_dia?: Record<string, { abridor_em_campo?: number; fechador_em_campo?: number; intermediario_em_campo?: number; headcount_total?: number }>;
+    cobertura_por_dia_calc?: Record<string, { abridor: number; fechador: number; intermediario: number; outro: number; headcount_total: number }>;
     vagas: VagaPlanejada[];
   };
   resumo_semanal?: any;

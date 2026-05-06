@@ -245,6 +245,14 @@ export default function AprovarEscala() {
                 value={aprovador}
                 onChange={(e) => setAprovador(e.target.value)}
               />
+              <Input
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="PIN do COO"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+              />
               <Textarea
                 placeholder="Comentário (obrigatório se rejeitar)"
                 value={comentario}

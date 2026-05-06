@@ -274,6 +274,7 @@ export function GeradorEscalaIA() {
               </CardTitle>
               <CardDescription>
                 Semana {resultado.semana_inicio} • {resultado.modelo_folga}
+                {templateId ? ` • salvo (pendente aprovação)` : ""}
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>

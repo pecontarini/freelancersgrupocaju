@@ -53,6 +53,7 @@ interface SlotResponse {
 interface VagaPlanejada {
   id_vaga?: string;
   tipo: string;
+  papel?: "abridor" | "fechador" | "intermediario" | "outro";
   responsavel?: boolean;
   folgas: string[]; // ["SEG", ...]
   horario_padrao: {
@@ -84,6 +85,10 @@ interface EscalaResponse {
     demanda_pessoa_dia_semana?: number;
     dias_uteis_por_pessoa?: number;
     demanda_por_dia?: Record<string, number>;
+    minimos_por_papel?: { abridor?: number; fechador?: number; intermediario?: number };
+    minimos_por_papel_calc?: { abridor: number; fechador: number; intermediario: number };
+    cobertura_por_dia?: Record<string, { abridor_em_campo?: number; fechador_em_campo?: number; intermediario_em_campo?: number; headcount_total?: number }>;
+    cobertura_por_dia_calc?: Record<string, { abridor: number; fechador: number; intermediario: number; outro: number; headcount_total: number }>;
     vagas: VagaPlanejada[];
   };
   resumo_semanal?: any;
@@ -519,6 +524,49 @@ export function GeradorEscalaIA() {
                     </TableBody>
                   </Table>
                 </div>
+
+                {(() => {
+                  const cob = resultado.plano_folgas!.cobertura_por_dia_calc;
+                  const min = resultado.plano_folgas!.minimos_por_papel_calc
+                    ?? resultado.plano_folgas!.minimos_por_papel
+                    ?? { abridor: 0, fechador: 0, intermediario: 0 };
+                  if (!cob) return null;
+                  const papeis: Array<{ key: "abridor" | "fechador" | "intermediario"; label: string }> = [
+                    { key: "abridor", label: "Abridor" },
+                    { key: "fechador", label: "Fechador" },
+                    { key: "intermediario", label: "Intermediário" },
+                  ];
+                  return (
+                    <div className="overflow-x-auto">
+                      <div className="text-xs font-semibold mb-1 text-muted-foreground uppercase">Cobertura por papel (em campo / mínimo)</div>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Papel</TableHead>
+                            {DIAS.map(d => <TableHead key={d} className="text-xs text-center">{d}</TableHead>)}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {papeis.map(p => (
+                            <TableRow key={p.key}>
+                              <TableCell className="text-xs font-medium">{p.label} (mín. {min[p.key] ?? 0})</TableCell>
+                              {DIAS.map(d => {
+                                const emCampo = cob[d]?.[p.key] ?? 0;
+                                const minimo = min[p.key] ?? 0;
+                                const furou = minimo > 0 && emCampo < minimo;
+                                return (
+                                  <TableCell key={d} className={`text-xs text-center font-mono ${furou ? "text-destructive font-bold" : ""}`}>
+                                    {emCampo}/{minimo}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

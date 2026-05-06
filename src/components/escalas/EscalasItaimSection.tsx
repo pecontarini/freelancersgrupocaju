@@ -77,7 +77,7 @@ type TurnoConfigRow = {
 
 export function EscalasItaimSection() {
   const [setorAtivo, setSetorAtivo] = useState<string>("COZINHA");
-  const [semanaInicio, setSemanaInicio] = useState<Date>(() => nextMonday());
+  const [semanaInicio, setSemanaInicio] = useState<Date>(() => currentMonday());
   const [gerando, setGerando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [escalaGerada, setEscalaGerada] = useState<any>(null);

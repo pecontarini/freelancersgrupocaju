@@ -354,8 +354,104 @@ export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload,
     refetchVinc();
   };
 
-  const exportarPdf = () => {
-    toast.info("Exportação de PDF em breve");
+  const fmtDate = (d: Date) =>
+    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const semanaLabel = `${fmtDate(semanaInicio)} a ${fmtDate(semanaFim)}`;
+  const aprovadoPor = tplInfo?.aprovado_por ?? "—";
+  const aprovadoEm = tplInfo?.aprovado_em
+    ? new Date(tplInfo.aprovado_em).toLocaleString("pt-BR")
+    : "—";
+
+  const buildResumo = (turno: "ALMOCO" | "JANTAR") => {
+    const cobreKey = turno === "ALMOCO" ? "cobre_almoco" : "cobre_jantar";
+    return DIAS.map((d) => {
+      const popRow = minima.find(
+        (m: any) =>
+          m.dia_semana === d &&
+          (m.turno === turno || (turno === "ALMOCO" && m.turno === "TARDE")),
+      );
+      const popMin = (popRow?.qtd_efetivos ?? 0) + (popRow?.qtd_extras ?? 0);
+      const slots = payload?.dias?.[d]?.slots ?? [];
+      const tiposCobrem = new Set(
+        slots.filter((s: any) => s[cobreKey]).map((s: any) => s.tipo),
+      );
+      const nomes = vinculacoes
+        .filter((v) => v.dia_semana === d && tiposCobrem.has(v.tipo_turno))
+        .map((v) => empMap[v.funcionario_id]?.name ?? "?");
+      return { dia: d, popMin, escalados: nomes.length, saldo: nomes.length - popMin, nomes };
+    });
+  };
+
+  const gerarPDF = (turno: "ALMOCO" | "JANTAR") => {
+    const doc = new jsPDF();
+    const titulo = turno === "ALMOCO" ? "ALMOÇO" : "JANTAR";
+    doc.setFontSize(14);
+    doc.text(`QUADRO OPERACIONAL — ${setor} — ${titulo}`, 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Caju Limão Itaim · Semana ${semanaLabel}`, 14, 23);
+
+    const rows = buildResumo(turno).map((r) => [
+      r.dia,
+      String(r.popMin),
+      String(r.escalados),
+      (r.saldo >= 0 ? "+" : "") + r.saldo,
+      r.nomes.join(", ") || "—",
+    ]);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [["DIA", "POP MÍN", "ESCALADOS", "SALDO", "NOMES"]],
+      body: rows,
+      styles: { fontSize: 9, cellPadding: 2 },
+      headStyles: { fillColor: [208, 89, 55] },
+      columnStyles: { 4: { cellWidth: 90 } },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 3) {
+          const v = parseInt(data.cell.raw as string, 10);
+          if (!isNaN(v)) {
+            data.cell.styles.textColor = v < 0 ? [200, 30, 30] : [20, 130, 60];
+            data.cell.styles.fontStyle = "bold";
+          }
+        }
+      },
+    });
+
+    const finalY = (doc as any).lastAutoTable?.finalY ?? 40;
+    doc.setFontSize(9);
+    doc.text(`Aprovado por: ${aprovadoPor} em ${aprovadoEm}`, 14, finalY + 10);
+    doc.text(
+      `Portal da Liderança CajuPAR — ${new Date().toLocaleString("pt-BR")}`,
+      14,
+      finalY + 16,
+    );
+
+    const slug = setor.toLowerCase().replace(/\s+/g, "-");
+    const semSlug = semanaInicio.toISOString().slice(0, 10);
+    doc.save(`quadro_${turno.toLowerCase()}_${slug}_${semSlug}.pdf`);
+  };
+
+  const textoWhatsApp = useMemo(() => {
+    const linha = (r: { dia: string; popMin: number; escalados: number; saldo: number }) =>
+      `${r.dia}: POP ${r.popMin} | Escalados ${r.escalados} | ${r.saldo >= 0 ? "+" : ""}${r.saldo}`;
+    const almoco = buildResumo("ALMOCO").map(linha).join("\n");
+    const jantar = buildResumo("JANTAR").map(linha).join("\n");
+    return (
+      `📋 *QUADRO OPERACIONAL — ${setor}*\n` +
+      `*Caju Limão Itaim · Semana ${semanaLabel}*\n\n` +
+      `*🌅 ALMOÇO*\n${almoco}\n\n` +
+      `*🌙 JANTAR*\n${jantar}\n\n` +
+      `✅ _Aprovado por ${aprovadoPor} em ${aprovadoEm}_`
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vinculacoes, minima, payload, setor, semanaLabel, aprovadoPor, aprovadoEm, empMap]);
+
+  const copiarWhatsApp = async () => {
+    try {
+      await navigator.clipboard.writeText(textoWhatsApp);
+      toast.success("Texto copiado");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
   };
 
   const preenchidos = vinculacoes.length;

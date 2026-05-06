@@ -77,6 +77,25 @@ REGRAS POP 02 — INEGOCIÁVEIS
 5. Cozinha e Bar: 1 slot responsavel=true na abertura E no fechamento.
 
 ═══════════════════════════════
+PLANEJAMENTO DE FOLGAS — DISTRIBUÍDO POR VAGA
+═══════════════════════════════
+6x1 → cada vaga tem EXATAMENTE 1 folga/semana.
+5x2 → cada vaga tem EXATAMENTE 2 folgas/semana (preferencialmente consecutivas).
+
+ALGORITMO OBRIGATÓRIO:
+1. demanda_dia[d] = nº máximo de pessoas em campo simultaneamente naquele dia
+   (considere o pico de cada dia entre almoço e jantar; dobras contam 1 pessoa).
+2. demanda_pessoa_dia_semana = SOMA(demanda_dia[d]) para d em SEG..DOM.
+3. dias_uteis_por_pessoa = 6 (se 6x1) ou 5 (se 5x2).
+4. headcount_total = ceil(demanda_pessoa_dia_semana / dias_uteis_por_pessoa).
+5. Para cada vaga (1..headcount_total) atribua folgas escalonadas, garantindo:
+   - Em todo dia d: (headcount_total - vagas_em_folga[d]) >= demanda_dia[d].
+   - Priorize folgar nos dias de MENOR demanda (geralmente SEG/TER/QUA).
+   - 5x2: prefira pares consecutivos (SEG+TER, TER+QUA, DOM+SEG); evite SEX+SAB.
+   - Distribua as folgas de forma balanceada — não concentre todas no mesmo dia.
+6. Cada vaga deve ter horário-padrão (o template predominante do seu cargo).
+
+═══════════════════════════════
 FORMATO DE SAÍDA — JSON PURO
 ═══════════════════════════════
 Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
@@ -109,14 +128,39 @@ Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
       "extras": []
     }
   },
+  "plano_folgas": {
+    "headcount_total": 8,
+    "demanda_pessoa_dia_semana": 48,
+    "dias_uteis_por_pessoa": 6,
+    "demanda_por_dia": { "SEG": 5, "TER": 6, "QUA": 7, "QUI": 8, "SEX": 8, "SAB": 8, "DOM": 6 },
+    "vagas": [
+      {
+        "id_vaga": "v1",
+        "tipo": "ABRIDOR-DOBRA",
+        "responsavel": false,
+        "folgas": ["SEG"],
+        "horario_padrao": {
+          "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },
+          "break_min": 180,
+          "t2": { "entrada": "17:00", "saida": "21:00", "cruza_meia_noite": false, "efetivo_min": 240 }
+        }
+      }
+    ]
+  },
   "resumo_semanal": {
     "modelo": "6x1",
     "distribuicao_tipica": { "dias_tipo_a_ou_b": 3, "dias_tipo_c": 2, "dias_folga": 1, "total_horas_estimado": "44h00" },
     "dias_com_extras": [],
     "interjornada_alertas": []
   },
-  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_operacionais": [] }
+  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_folga": [], "alertas_operacionais": [] }
 }
+
+REGRAS DE VALIDAÇÃO DE FOLGAS:
+- Se 6x1 e alguma vaga tiver folgas.length != 1 → adicione em alertas_folga.
+- Se 5x2 e alguma vaga tiver folgas.length != 2 → adicione em alertas_folga.
+- Se em algum dia (headcount_total - vagas_em_folga) < demanda_dia → adicione em alertas_folga.
+- A soma de horario_padrao expandido por todas as vagas (excluindo folgas) deve cobrir o POP de cada dia.
 
 CHECKLIST: □ Tipo C: nenhum fechador tem T1  □ Tipo C: abridores saem 21h
 □ T1+T2 ≤ 10h ef  □ POP almoço e jantar cobertos em todos dias

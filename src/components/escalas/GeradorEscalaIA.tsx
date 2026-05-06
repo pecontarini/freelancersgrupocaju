@@ -50,6 +50,18 @@ interface SlotResponse {
   obs?: string;
 }
 
+interface VagaPlanejada {
+  id_vaga?: string;
+  tipo: string;
+  responsavel?: boolean;
+  folgas: string[]; // ["SEG", ...]
+  horario_padrao: {
+    t1?: { entrada: string; saida: string; efetivo_min?: number };
+    break_min?: number;
+    t2?: { entrada: string; saida: string; cruza_meia_noite?: boolean; efetivo_min?: number };
+  };
+}
+
 interface EscalaResponse {
   setor: string;
   semana_inicio: string;
@@ -67,8 +79,15 @@ interface EscalaResponse {
     slots: SlotResponse[];
     extras?: SlotResponse[];
   }>;
+  plano_folgas?: {
+    headcount_total: number;
+    demanda_pessoa_dia_semana?: number;
+    dias_uteis_por_pessoa?: number;
+    demanda_por_dia?: Record<string, number>;
+    vagas: VagaPlanejada[];
+  };
   resumo_semanal?: any;
-  validacao?: { aprovado: boolean; alertas_clt?: string[]; alertas_pop?: string[]; alertas_operacionais?: string[] };
+  validacao?: { aprovado: boolean; alertas_clt?: string[]; alertas_pop?: string[]; alertas_folga?: string[]; alertas_operacionais?: string[] };
 }
 
 function formatSlot(s: SlotResponse): string {
@@ -224,174 +243,65 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      // ===== Estratégia "Vaga por pessoa do PICO" =====
-      // 1) Coletar TODOS os slots por dia (slots fixos + extras), expandidos por quantidade.
-      // 2) Para cada dia, calcular ocupação por hora (00..23) e identificar o PICO do dia.
-      // 3) Pegar o maior pico da semana e a composição por cargo nesse momento.
-      // 4) Gerar 1 linha-vaga por pessoa do pico, preenchendo todos os 7 dias com o
-      //    horário-padrão (moda) daquele cargo. Folgas só nos dias sugeridos pela IA.
-
-      const diffMin = (a: string, b: string): number => {
-        const [ah, am] = a.split(":").map(Number);
-        const [bh, bm] = b.split(":").map(Number);
-        let d = (bh * 60 + bm) - (ah * 60 + am);
-        if (d < 0) d += 24 * 60;
-        return d;
-      };
-
-      const addMinutes = (hhmm: string, mins: number): string => {
-        const [h, m] = hhmm.split(":").map(Number);
-        let total = h * 60 + m + mins;
-        total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
-        const nh = Math.floor(total / 60);
-        const nm = total % 60;
-        return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
-      };
-
-      const slotToDay = (slot: SlotResponse): DraftDay | null => {
-        if (slot.t1 && slot.t2) {
-          // Dobra: entrada T1 → saída T2, com break padrão de 180min
+      const slotToDay = (horario: { t1?: any; t2?: any }): DraftDay | null => {
+        if (horario.t1 && horario.t2) {
           return {
             kind: "work",
-            start_time: slot.t1.entrada,
-            end_time: slot.t2.saida,
+            start_time: horario.t1.entrada,
+            end_time: horario.t2.saida,
             break_min: 180,
             shift_type: "T3",
           };
         }
-        const t = slot.t1 ?? slot.t2;
+        const t = horario.t1 ?? horario.t2;
         if (!t) return null;
-        // Turno único: usa entrada e saída sugeridas pela IA, com 3h de intervalo padrão
         return {
           kind: "work",
           start_time: t.entrada,
           end_time: t.saida,
           break_min: 180,
-          shift_type: slot.t1 ? "T1" : "T2",
+          shift_type: horario.t1 ? "T1" : "T2",
         };
       };
 
-      // Verifica se um slot está cobrindo a hora H (em minutos do dia)
-      const slotCobreHora = (slot: SlotResponse, hMin: number): boolean => {
-        const intervalos: Array<[string, string]> = [];
-        if (slot.t1) intervalos.push([slot.t1.entrada, slot.t1.saida]);
-        if (slot.t2) intervalos.push([slot.t2.entrada, slot.t2.saida]);
-        for (const [s, e] of intervalos) {
-          const [sh, sm] = s.split(":").map(Number);
-          let [eh, em] = e.split(":").map(Number);
-          let sMin = sh * 60 + sm;
-          let eMin = eh * 60 + em;
-          if (eMin <= sMin) eMin += 24 * 60; // cruza meia-noite
-          if (hMin >= sMin && hMin < eMin) return true;
-          if (hMin + 24 * 60 >= sMin && hMin + 24 * 60 < eMin) return true;
-        }
-        return false;
-      };
-
-      const allDaySlots: Record<string, SlotResponse[]> = {};
-      for (const d of DIAS) {
-        const dia = resultado.dias?.[d];
-        allDaySlots[d] = dia ? [...(dia.slots ?? []), ...(dia.extras ?? [])] : [];
-      }
-
-      // Para cada dia, achar o pico (hora com mais pessoas em campo)
-      type DayPeak = { dia: string; horaMin: number; total: number; porCargo: Map<string, { tipo: string; responsavel: boolean; qty: number }> };
-      let weekPeak: DayPeak | null = null;
-      for (const d of DIAS) {
-        const slotsDia = allDaySlots[d];
-        if (slotsDia.length === 0) continue;
-        for (let h = 0; h < 24; h++) {
-          const hMin = h * 60;
-          const porCargo = new Map<string, { tipo: string; responsavel: boolean; qty: number }>();
-          let total = 0;
-          for (const s of slotsDia) {
-            if (!slotCobreHora(s, hMin)) continue;
-            const qty = s.quantidade ?? 1;
-            total += qty;
-            const k = `${s.tipo}|${s.responsavel ? "1" : "0"}`;
-            const prev = porCargo.get(k);
-            if (prev) prev.qty += qty;
-            else porCargo.set(k, { tipo: s.tipo, responsavel: !!s.responsavel, qty });
-          }
-          if (!weekPeak || total > weekPeak.total) {
-            weekPeak = { dia: d, horaMin: hMin, total, porCargo };
-          }
-        }
-      }
-
-      if (!weekPeak || weekPeak.total === 0) {
-        toast.warning("Nenhum pico identificado — nada para enviar.");
+      // ===== Nova estratégia: usar plano_folgas.vagas (folgas distribuídas por vaga) =====
+      const vagas = resultado.plano_folgas?.vagas ?? [];
+      if (vagas.length === 0) {
+        toast.error("IA não retornou plano_folgas.vagas. Re-gere a escala.");
         return;
       }
 
-      // Para cada cargo, derivar horário-padrão (moda) usando todos os slots da semana
-      const defaultByGrupo = new Map<string, DraftDay>();
-      for (const [grupoKey, info] of weekPeak.porCargo) {
-        const freq = new Map<string, { count: number; day: DraftDay }>();
-        for (const d of DIAS) {
-          for (const s of allDaySlots[d]) {
-            if (s.tipo !== info.tipo || !!s.responsavel !== info.responsavel) continue;
-            const day = slotToDay(s);
-            if (!day || day.kind !== "work") continue;
-            const k = `${day.start_time}|${day.end_time}|${day.break_min}|${day.shift_type}`;
-            const prev = freq.get(k);
-            if (prev) prev.count += s.quantidade ?? 1;
-            else freq.set(k, { count: s.quantidade ?? 1, day });
-          }
-        }
-        let best: DraftDay | null = null;
-        let bestCount = 0;
-        for (const { count, day } of freq.values()) {
-          if (count > bestCount) {
-            bestCount = count;
-            best = day;
-          }
-        }
-        if (best) defaultByGrupo.set(grupoKey, best);
-      }
-
-      const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
       const drafts: Omit<DraftSlot, "id" | "created_at" | "created_by">[] = [];
-
-      // 1 linha-vaga por pessoa do pico, agrupadas por cargo
-      for (const [grupoKey, info] of weekPeak.porCargo) {
-        const defaultDay = defaultByGrupo.get(grupoKey);
-        if (!defaultDay) continue;
-        for (let i = 0; i < info.qty; i++) {
-          const days: Record<string, DraftDay> = {};
-          for (const d of DIAS) {
-            const dateStr = dayDates[d];
-            days[dateStr] = folgasSugeridas.has(d) ? { kind: "off" } : defaultDay;
-          }
-          drafts.push({
-            unit_id: effectiveUnidadeId,
-            sector_id: sector.id,
-            sector_name: sector.name,
-            week_start: semana,
-            label: `Vaga ${info.tipo}${info.responsavel ? " ★" : ""}`,
-            tipo: info.tipo,
-            responsavel: info.responsavel,
-            days,
-          });
+      for (let i = 0; i < vagas.length; i++) {
+        const v = vagas[i];
+        const day = slotToDay(v.horario_padrao);
+        if (!day) continue;
+        const folgasSet = new Set(v.folgas ?? []);
+        const days: Record<string, DraftDay> = {};
+        for (const d of DIAS) {
+          days[dayDates[d]] = folgasSet.has(d) ? { kind: "off" } : day;
         }
+        drafts.push({
+          unit_id: effectiveUnidadeId,
+          sector_id: sector.id,
+          sector_name: sector.name,
+          week_start: semana,
+          label: `Vaga ${v.tipo}${v.responsavel ? " ★" : ""}`,
+          tipo: v.tipo,
+          responsavel: !!v.responsavel,
+          days,
+        });
       }
 
       if (drafts.length === 0) {
-        toast.warning("Nenhuma vaga para enviar.");
+        toast.warning("Nenhuma vaga válida para enviar.");
         return;
       }
 
-      const peakHourStr = `${String(Math.floor(weekPeak.horaMin / 60)).padStart(2, "0")}:00`;
-      const composicao = Array.from(weekPeak.porCargo.values())
-        .map((c) => `${c.qty} ${c.tipo}${c.responsavel ? "★" : ""}`)
-        .join(" + ");
-
-      console.info("[AI Draft] Pico semanal:", {
-        dia: weekPeak.dia,
-        hora: peakHourStr,
-        total: weekPeak.total,
-        composicao,
-        drafts_gerados: drafts.length,
+      console.info("[AI Draft] plano_folgas:", {
+        headcount: resultado.plano_folgas?.headcount_total,
+        vagas: vagas.length,
+        modelo: resultado.modelo_folga,
       });
 
       const { inserted } = await insertDraftSlots(drafts);
@@ -404,7 +314,7 @@ export function GeradorEscalaIA() {
         );
 
       toast.success(
-        `${inserted} vaga(s) — pico ${weekPeak.dia} ${peakHourStr} (${composicao})`,
+        `${inserted} vaga(s) enviadas — folgas distribuídas (${resultado.modelo_folga})`,
         {
           action: { label: "Abrir Editor agora", onClick: fireDrafts },
           duration: 8000,
@@ -558,6 +468,57 @@ export function GeradorEscalaIA() {
                 {resultado.validacao.alertas_operacionais?.map((a, i) => (
                   <div key={`op-${i}`} className="rounded border bg-muted px-3 py-2 text-sm">{a}</div>
                 ))}
+              </div>
+            )}
+            {resultado.validacao?.alertas_folga && resultado.validacao.alertas_folga.length > 0 && (
+              <div className="space-y-2">
+                {resultado.validacao.alertas_folga.map((a, i) => (
+                  <div key={`folga-${i}`} className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">FOLGA: {a}</div>
+                ))}
+              </div>
+            )}
+
+            {resultado.plano_folgas && resultado.plano_folgas.vagas?.length > 0 && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="font-semibold text-sm">Plano de folgas — {resultado.plano_folgas.headcount_total} vagas ({resultado.modelo_folga})</div>
+                  {resultado.plano_folgas.demanda_por_dia && (
+                    <div className="text-xs text-muted-foreground">
+                      Demanda: {DIAS.map(d => `${d} ${resultado.plano_folgas!.demanda_por_dia![d] ?? 0}`).join(" · ")}
+                    </div>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Vaga</TableHead>
+                        {DIAS.map(d => <TableHead key={d} className="text-xs text-center">{d}</TableHead>)}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resultado.plano_folgas.vagas.map((v, idx) => {
+                        const folgasSet = new Set(v.folgas ?? []);
+                        return (
+                          <TableRow key={idx}>
+                            <TableCell className="text-xs font-medium">
+                              {v.tipo}{v.responsavel ? " ★" : ""}
+                            </TableCell>
+                            {DIAS.map(d => (
+                              <TableCell key={d} className="text-xs text-center">
+                                {folgasSet.has(d) ? (
+                                  <Badge variant="secondary" className="text-[10px]">FOLGA</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">✓</span>
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
 

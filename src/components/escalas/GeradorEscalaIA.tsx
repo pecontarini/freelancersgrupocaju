@@ -244,41 +244,84 @@ export function GeradorEscalaIA() {
       }
 
       // 4) Para cada grupo, gerar maxQty linhas-vaga
+      // Estratégia: cada linha começa preenchida em TODOS os dias com um horário
+      // padrão derivado do quadro (moda). Folgas só nos dias sugeridos pela IA.
       const drafts: DraftSlot[] = [];
       let counter = 0;
-      const folgas = new Set(resultado.dias_folga_sugeridos ?? []);
+      const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
+
+      const slotToDay = (slot: SlotResponse): DraftDay | null => {
+        if (slot.t1 && slot.t2) {
+          return {
+            kind: "work",
+            start_time: slot.t1.entrada,
+            end_time: slot.t2.saida,
+            break_min: slot.break_min ?? 0,
+            shift_type: "T3",
+          };
+        }
+        const t = slot.t1 ?? slot.t2;
+        if (!t) return null;
+        return {
+          kind: "work",
+          start_time: t.entrada,
+          end_time: t.saida,
+          break_min: slot.break_min ?? 0,
+          shift_type: slot.t1 ? "T1" : "T2",
+        };
+      };
+
       for (const [, g] of groupMap) {
+        // Coletar todos os slots desse grupo na semana para derivar horário padrão
+        const allSlotsOfGroup: SlotResponse[] = [];
+        for (const d of DIAS) {
+          for (const s of allDaySlots[d] || []) {
+            if (s.tipo === g.tipo && !!s.responsavel === g.responsavel) {
+              for (let k = 0; k < (s.quantidade ?? 1); k++) allSlotsOfGroup.push(s);
+            }
+          }
+        }
+        // Moda do horário (entrada|saida|break)
+        const freq = new Map<string, { count: number; day: DraftDay }>();
+        for (const s of allSlotsOfGroup) {
+          const day = slotToDay(s);
+          if (!day || day.kind !== "work") continue;
+          const key = `${day.start_time}|${day.end_time}|${day.break_min}|${day.shift_type}`;
+          const prev = freq.get(key);
+          if (prev) prev.count++;
+          else freq.set(key, { count: 1, day });
+        }
+        let defaultDay: DraftDay | null = null;
+        let bestCount = 0;
+        for (const { count, day } of freq.values()) {
+          if (count > bestCount) {
+            bestCount = count;
+            defaultDay = day;
+          }
+        }
+        if (!defaultDay) continue; // grupo sem horário válido — pular
+
         for (let i = 0; i < g.maxQty; i++) {
           const days: Record<string, DraftDay> = {};
           for (const d of DIAS) {
             const dateStr = dayDates[d];
-            const dia = resultado.dias?.[d];
-            const slotsOfType = (allDaySlots[d] || []).filter(
+            // Tenta usar slot específico do dia/instância para preservar variação real
+            const slotsOfDay = (allDaySlots[d] || []).filter(
               (s) => s.tipo === g.tipo && !!s.responsavel === g.responsavel,
             );
-            // Expande quantidade para "instâncias"
             const expanded: SlotResponse[] = [];
-            for (const s of slotsOfType) {
+            for (const s of slotsOfDay) {
               for (let k = 0; k < (s.quantidade ?? 1); k++) expanded.push(s);
             }
             const slot = expanded[i];
-            if (!dia || !slot || folgas.has(d)) {
-              days[dateStr] = { kind: "off" };
-              continue;
+            const specificDay = slot ? slotToDay(slot) : null;
+            days[dateStr] = specificDay ?? defaultDay;
+          }
+          // Aplicar folgas sugeridas pela IA por cima
+          for (const d of DIAS) {
+            if (folgasSugeridas.has(d)) {
+              days[dayDates[d]] = { kind: "off" };
             }
-            // Prefere T1; se só houver T2, usa T2.
-            const t = slot.t1 ?? slot.t2;
-            if (!t) {
-              days[dateStr] = { kind: "off" };
-              continue;
-            }
-            days[dateStr] = {
-              kind: "work",
-              start_time: t.entrada,
-              end_time: t.saida,
-              break_min: slot.break_min ?? 0,
-              shift_type: slot.t1 && slot.t2 ? "T3" : slot.t2 ? "T2" : "T1",
-            };
           }
           drafts.push({
             id: `ai-${Date.now()}-${counter++}`,

@@ -451,6 +451,8 @@ export function EscalasItaimSection() {
                 unidadeId={UNIDADE_ID_ITAIM}
                 setor={setorAtivo}
                 payload={template.payload}
+                semanaInicio={semanaInicio}
+                semanaFim={semanaFim}
               />
             )}
           </div>

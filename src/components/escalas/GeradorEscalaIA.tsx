@@ -53,6 +53,7 @@ interface SlotResponse {
 interface VagaPlanejada {
   id_vaga?: string;
   tipo: string;
+  papel?: "abridor" | "fechador" | "intermediario" | "outro";
   responsavel?: boolean;
   folgas: string[]; // ["SEG", ...]
   horario_padrao: {

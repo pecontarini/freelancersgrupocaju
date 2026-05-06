@@ -512,14 +512,12 @@ export function EscalasItaimSection() {
   };
 
   return (
-    <section className="space-y-4 pt-2">
-      <Separator />
-
+    <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge className="bg-primary/15 text-primary border border-primary/30 hover:bg-primary/20">
           MVP · Caju Limão Itaim
         </Badge>
-        <h2 className="text-xl font-semibold tracking-tight">Gerador de Escalas</h2>
+        <h2 className="text-xl font-semibold tracking-tight">Gerador de Escalas com IA</h2>
       </div>
 
       <div className="overflow-x-auto -mx-1 px-1">

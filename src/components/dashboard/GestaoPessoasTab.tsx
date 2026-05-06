@@ -2,7 +2,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarClock, ScanFace } from "lucide-react";
 import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { CheckinManagerDashboard } from "@/components/checkin";
-import { EscalasItaimSection } from "@/components/escalas/EscalasItaimSection";
 
 interface GestaoPessoasTabProps {
   selectedUnidadeId: string;
@@ -30,7 +29,6 @@ export function GestaoPessoasTab({ selectedUnidadeId }: GestaoPessoasTabProps) {
         <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />
       </TabsContent>
     </Tabs>
-    <EscalasItaimSection />
     </div>
   );
 }

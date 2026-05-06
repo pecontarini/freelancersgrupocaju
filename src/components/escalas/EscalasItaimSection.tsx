@@ -27,6 +27,7 @@ import {
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { EscalaApprovalPanel } from "./EscalaApprovalPanel";
 
 const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 
@@ -418,6 +419,20 @@ export function EscalasItaimSection() {
 
     return (
       <div className="space-y-4">
+        {/* Painel de aprovação do COO */}
+        {template?.status === "pendente_aprovacao" && template?.id && template?.payload && (
+          <EscalaApprovalPanel
+            templateId={template.id}
+            setor={setorAtivo}
+            semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
+            payload={template.payload}
+            onChanged={() => {
+              setEscalaGerada(null);
+              refetch();
+            }}
+          />
+        )}
+
         {/* Status do template no topo */}
         {template?.status === "pendente_aprovacao" && !escalaGerada && (
           <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">

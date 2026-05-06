@@ -31,7 +31,7 @@ export function CooApprovalLinkBox({ templateId, setor, semanaLabel, unidadeNome
         .from("escala_aprovacao_links")
         .insert({ template_id: templateId, token });
       if (error) throw error;
-      const url = `${window.location.origin}/aprovar-escala/${token}`;
+      const url = `https://freelancersgrupocaju.lovable.app/aprovar-escala/${token}`;
       setLink(url);
       toast.success("Link de aprovação gerado");
     } catch (e: any) {

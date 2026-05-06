@@ -1710,6 +1710,144 @@ export type Database = {
           },
         ]
       }
+      escala_minima: {
+        Row: {
+          created_at: string
+          dia_semana: string
+          id: string
+          qtd_efetivos: number
+          qtd_extras: number
+          setor: string
+          turno: string
+          unidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dia_semana: string
+          id?: string
+          qtd_efetivos?: number
+          qtd_extras?: number
+          setor: string
+          turno: string
+          unidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dia_semana?: string
+          id?: string
+          qtd_efetivos?: number
+          qtd_extras?: number
+          setor?: string
+          turno?: string
+          unidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escala_minima_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      escala_template: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          comentario_rejeicao: string | null
+          created_at: string
+          gerado_em: string
+          id: string
+          payload: Json
+          semana_inicio: string
+          setor: string
+          status: string
+          unidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          comentario_rejeicao?: string | null
+          created_at?: string
+          gerado_em?: string
+          id?: string
+          payload: Json
+          semana_inicio: string
+          setor: string
+          status?: string
+          unidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          comentario_rejeicao?: string | null
+          created_at?: string
+          gerado_em?: string
+          id?: string
+          payload?: Json
+          semana_inicio?: string
+          setor?: string
+          status?: string
+          unidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escala_template_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      escala_vinculacao: {
+        Row: {
+          created_at: string
+          dia_semana: string
+          funcionario_id: string
+          id: string
+          observacao: string | null
+          template_id: string
+          tipo_dia: string
+          tipo_turno: string
+        }
+        Insert: {
+          created_at?: string
+          dia_semana: string
+          funcionario_id: string
+          id?: string
+          observacao?: string | null
+          template_id: string
+          tipo_dia: string
+          tipo_turno: string
+        }
+        Update: {
+          created_at?: string
+          dia_semana?: string
+          funcionario_id?: string
+          id?: string
+          observacao?: string | null
+          template_id?: string
+          tipo_dia?: string
+          tipo_turno?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escala_vinculacao_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "escala_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       freelancer_checkins: {
         Row: {
           approved_at: string | null
@@ -4595,6 +4733,68 @@ export type Database = {
           {
             foreignKeyName: "supervision_failures_loja_id_fkey"
             columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turno_config: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          cruza_meia_noite_1: boolean
+          cruza_meia_noite_2: boolean
+          dia_tipo: string
+          entrada_1: string
+          entrada_2: string | null
+          gap_min: number
+          id: string
+          saida_1: string
+          saida_2: string | null
+          setor: string
+          tipo_turno: string
+          unidade_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          cruza_meia_noite_1?: boolean
+          cruza_meia_noite_2?: boolean
+          dia_tipo: string
+          entrada_1: string
+          entrada_2?: string | null
+          gap_min?: number
+          id?: string
+          saida_1: string
+          saida_2?: string | null
+          setor: string
+          tipo_turno: string
+          unidade_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          cruza_meia_noite_1?: boolean
+          cruza_meia_noite_2?: boolean
+          dia_tipo?: string
+          entrada_1?: string
+          entrada_2?: string | null
+          gap_min?: number
+          id?: string
+          saida_1?: string
+          saida_2?: string | null
+          setor?: string
+          tipo_turno?: string
+          unidade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turno_config_unidade_id_fkey"
+            columns: ["unidade_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]

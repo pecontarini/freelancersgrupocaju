@@ -243,7 +243,7 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      // ===== Estratégia: 1 linha-vaga por vaga em plano_folgas, com folgas distribuídas =====
+      const slotToDay = (horario: { t1?: any; t2?: any }): DraftDay | null => {
         if (horario.t1 && horario.t2) {
           return {
             kind: "work",

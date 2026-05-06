@@ -43,11 +43,11 @@ const DIA_LABEL: Record<string, string> = {
   SEX: "Sexta", SAB: "Sábado", DOM: "Domingo",
 };
 
-function nextMonday(from = new Date()): Date {
+function currentMonday(from = new Date()): Date {
   const d = new Date(from);
   d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = day === 1 ? 7 : ((8 - day) % 7) || 7;
+  const day = d.getDay(); // 0=Dom, 1=Seg
+  const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
   return d;
 }

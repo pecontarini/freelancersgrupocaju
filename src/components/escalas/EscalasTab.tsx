@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2 } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
+import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";

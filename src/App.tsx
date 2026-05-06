@@ -24,6 +24,7 @@ import EstacaoCheckin from "./pages/EstacaoCheckin";
 import MetasPage from "./pages/painel/Metas";
 import AprovarEscala from "./pages/AprovarEscala";
 import { PageTransition } from "@/components/motion";
+import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ function App() {
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
+                <VersionUpdateBanner />
               <PageTransition>
               <Routes>
                 <Route path="/auth" element={<Auth />} />

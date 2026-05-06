@@ -1,74 +1,37 @@
-
 ## Diagnóstico
 
-### Problema 1 — Felipe não vê as vagas
-O store `useAIDraftSlots` é **memória local do navegador** (`useSyncExternalStore` com array em módulo). Quando você clicou "Enviar para o Editor", as vagas só existem **na sua aba**. Felipe (mesmo sendo admin global) abre o Editor e o array está vazio — não há nada para ler do banco. O modelo "só persiste ao vincular" só funciona se a mesma pessoa que gera é a mesma que vincula, em uma única sessão. Para colaboração precisa virar dado persistido.
+Confirmei via curl que o bundle publicado em `freelancersgrupocaju.lovable.app` **já contém o código novo** (string `ai_draft_slots` aparece no JS de produção, hash `index-B76Uu_a-.js`). O site está público e o build está atualizado.
 
-### Problema 2 — 21 vagas para 13 pessoas necessárias
-A contagem atual em `GeradorEscalaIA.tsx` (~linha 234) faz:
-1. Agrupa slots por `(tipo, responsavel)` — ex: "Cozinheiro", "Cozinheiro responsável", "Aux. Cozinha", etc.
-2. Para **cada grupo**, pega `maxQty` (a maior quantidade vista em qualquer dia da semana) e gera `maxQty` linhas-vaga.
-3. Resultado: soma-se cargos diferentes. Se a matriz pede 5 cozinheiros + 8 auxiliares + 5 chefes em algum momento da semana, viram 18 linhas — mesmo que no PICO real só estejam 13 pessoas escaladas juntas.
+O problema é **cache do navegador** — Chrome/Safari estão servindo o `index.html` antigo, que aponta para um bundle antigo. Como a estratégia "só publicar" já foi tentada sem sucesso, a única forma confiável de resolver é o **próprio app detectar a nova versão e forçar reload**.
 
-Você escolheu **"1 vaga por pessoa do PICO"**: a contagem precisa ser feita no nível do pico semanal (qual dia/turno tem maior soma total de pessoas em campo), não somando máximos por cargo.
+## Plano: detector de versão com auto-reload
 
-### Problema 3 — varredura geral (achados durante a leitura)
-- `linkDraftToEmployee` chama `upsertSchedule` em paralelo via `Promise.allSettled`. Cada upsert roda um `SELECT` de checagem de duplicidade — em 7 dias, são 7 selects + 7 upserts simultâneos. Sob RLS de admin global isso quase nunca falha, mas para operadores com acesso restrito por unidade pode estourar erro silencioso. Trocar para `Promise.all` propaga o erro real.
-- `useUpsertSchedule` (hook) define `break_duration ?? 60` quando `params.break_duration` é `undefined`. Para folgas mandamos `0`, ok. Para drafts mandamos `day.break_min ?? 0`. Sem problema, mas se algum dia do draft vier com `break_min: undefined`, vira 60 e quebra a interpretação. Precisa garantir `Number(...)` explícito.
-- Não há feedback claro quando o setor de destino tem matriz vazia ou job titles inexistentes — geração pode produzir 0 vagas e o operador não entende o que fazer.
+### 1. Gerar arquivo de versão no build
+- Adicionar plugin Vite simples que escreve `public/version.json` com `{ "buildId": "<timestamp+hash>" }` a cada build.
+- Injetar o mesmo `buildId` como `import.meta.env.VITE_BUILD_ID` no bundle.
 
-## Proposta — em 3 frentes
+### 2. Hook `useVersionCheck`
+- A cada 60s (e no `visibilitychange` para quando a aba volta ao foco), faz `fetch('/version.json', { cache: 'no-store' })`.
+- Se o `buildId` retornado ≠ `VITE_BUILD_ID` do bundle em execução → dispara o passo 3.
 
-### A. Persistir as vagas IA no banco (resolve Felipe)
+### 3. Banner + reload
+- Mostra um toast persistente no topo: *"Nova versão disponível"* com botão **Atualizar agora**.
+- Ao clicar: `window.location.reload()` com cache-busting (`?v=<buildId>`).
+- Se o usuário ignorar por mais de 5min, recarrega automaticamente quando a aba estiver inativa (sem perder trabalho em andamento).
 
-Criar tabela `ai_draft_slots` com RLS por unit:
-```
-id uuid PK
-unit_id uuid NOT NULL
-sector_id uuid NOT NULL
-week_start date NOT NULL
-label text
-tipo text
-responsavel boolean
-days jsonb            -- { "2026-05-04": {kind:"work", start_time, end_time, break_min, shift_type}, ... }
-created_by uuid
-created_at timestamptz
-```
-RLS: SELECT/INSERT/DELETE por `user_has_access_to_loja(auth.uid(), unit_id)` OR `has_role(auth.uid(), 'admin')`.
+### 4. Badge de versão no rodapé (discreto)
+- Pequeno texto cinza no canto: `v <buildId-curto>` — permite confirmar visualmente em qual versão o usuário está, sem precisar abrir DevTools.
 
-Substituir o store em memória por hook React Query (`useAIDraftSlots(unit, sector, week)`) que lê/insere/deleta da tabela. Mantém a mesma API (`setDraftSlots`, `removeDraftSlot`, `clearDraftSlotsFor`, `updateDraftSlotDay`) mas agora persistida. Realtime opcional (subscribe na tabela) para que quando a Maria gerar, o Felipe veja aparecer sem refresh.
+### 5. Quebra de cache imediata (one-shot)
+- Para resolver **agora** sem esperar o ciclo: incluir no `index.html` meta tags `Cache-Control: no-cache, must-revalidate` para o próprio HTML (o bundle JS já tem hash, então ele se auto-versiona; o problema é só o HTML que aponta para ele).
 
-Ao **vincular** uma vaga a um funcionário: continua o fluxo atual (cria 7 schedules) e depois **deleta a linha de `ai_draft_slots`** (em vez de remover do array em memória).
+### Arquivos afetados
+- `vite.config.ts` — plugin de geração de `version.json` + define `VITE_BUILD_ID`.
+- `src/hooks/useVersionCheck.ts` — novo.
+- `src/App.tsx` — montar o hook e o banner globalmente.
+- `src/components/ui/VersionBadge.tsx` — novo, discreto no rodapé.
+- `index.html` — meta cache-control no HTML.
 
-### B. Recontagem das vagas pela "pessoa do pico" (resolve as 21 vagas)
-
-Reescrever a derivação de quantidade no `enviarParaEditor`:
-
-1. Para cada dia da semana, calcular **total de pessoas em campo simultaneamente** olhando a janela de pico (almoço 12:00–14:00 OU jantar 20:00–22:00 — pegar o maior). Soma de todos os slots cobrindo aquela hora.
-2. **Pico semanal** = maior valor entre os 7 dias.
-3. Distribuir o pico entre cargos: para cada cargo distinto, contar quantos slots desse cargo estão no momento do pico. Total deve bater com o pico.
-4. Gerar **uma linha-vaga por pessoa esperada no pico**, não por máximo por cargo.
-
-Exemplo: se no jantar de sexta o pico for 13 pessoas (5 cozinheiros + 6 aux + 2 chefes) → 13 linhas, com horários que cada uma cobre o dia todo da semana usando o turno-padrão (moda) do cargo correspondente. Folgas continuam como hoje.
-
-Adicionar no banner do Editor: *"13 vagas — pico identificado em SEX 20:00 (5 Cozinheiro + 6 Aux + 2 Chefe)"* para o operador entender de onde veio o número.
-
-### C. Robustez do fluxo (varredura)
-
-- `linkDraftToEmployee`: trocar `Promise.allSettled` por `Promise.all` envolto em `try/catch` que mostra qual dia falhou. Mostrar contagem de sucesso vs falha no toast.
-- `slotToDay`: garantir `Number(diffMin(...))` e clamp em 0..600 minutos para `break_min`.
-- Se o setor não tem `staffing_matrix` ou job titles vinculados, mostrar aviso visível no Gerador antes mesmo de chamar a IA: *"Setor X sem matriz POP configurada — configure em Cargos e Setores antes de gerar"*.
-- Adicionar log estruturado (tabela `ai_generation_audit` opcional, ou só `console.info` por enquanto) com: usuário, setor, semana, qtd vagas geradas, pico identificado, modelo de folga. Facilita auditar quando alguém pergunta "de onde vieram essas vagas".
-- Banner do Editor passa a mostrar **quem** criou as vagas e **quando**: *"13 vagas geradas por Pedro às 17:38 aguardando vínculo"*.
-
-## Ordem de execução proposta
-
-1. Criar tabela `ai_draft_slots` + RLS (migration).
-2. Refazer `useAIDraftSlots` como hook React Query lendo/escrevendo da tabela; manter assinatura igual para o resto do código quase não mudar.
-3. Atualizar `GeradorEscalaIA.enviarParaEditor` para inserir na tabela em vez do store local.
-4. Reescrever a contagem de vagas (lógica do pico).
-5. Endurecer `linkDraftToEmployee` (Promise.all + relatório).
-6. Banner com "criado por X em Y", contador correto, justificativa do pico.
-7. (Opcional) realtime subscribe para outros usuários verem na hora.
-
-Sem perguntas adicionais — implementarei direto se você aprovar.
+### Resultado esperado
+- Hoje à noite: Felipe e qualquer usuário com aba aberta verão um toast "Atualizar agora" em até 60s após a próxima publicação. Um clique resolve.
+- Daqui para frente: nunca mais "preciso fazer hard refresh" — o app cuida disso sozinho.

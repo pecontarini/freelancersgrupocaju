@@ -250,13 +250,24 @@ export function GeradorEscalaIA() {
       let counter = 0;
       const folgasSugeridas = new Set(resultado.dias_folga_sugeridos ?? []);
 
+      // Diferença entre HH:MM em minutos (suporta cruzamento de meia-noite)
+      const diffMin = (a: string, b: string): number => {
+        const [ah, am] = a.split(":").map(Number);
+        const [bh, bm] = b.split(":").map(Number);
+        let d = (bh * 60 + bm) - (ah * 60 + am);
+        if (d < 0) d += 24 * 60;
+        return d;
+      };
+
       const slotToDay = (slot: SlotResponse): DraftDay | null => {
         if (slot.t1 && slot.t2) {
+          // Intervalo REAL = T2.entrada - T1.saida
+          const realBreak = diffMin(slot.t1.saida, slot.t2.entrada);
           return {
             kind: "work",
             start_time: slot.t1.entrada,
             end_time: slot.t2.saida,
-            break_min: slot.break_min ?? 0,
+            break_min: realBreak,
             shift_type: "T3",
           };
         }
@@ -343,14 +354,21 @@ export function GeradorEscalaIA() {
       }
 
       setDraftSlots(drafts);
-      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`);
+
+      const fireDrafts = () =>
+        window.dispatchEvent(
+          new CustomEvent("ai-drafts-ready", {
+            detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
+          }),
+        );
+
+      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`, {
+        action: { label: "Abrir Editor agora", onClick: fireDrafts },
+        duration: 6000,
+      });
 
       // 5) Navegar para o Editor (Gestão de Pessoas → Escalas → Editor)
-      window.dispatchEvent(
-        new CustomEvent("ai-drafts-ready", {
-          detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
-        }),
-      );
+      fireDrafts();
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Falha ao enviar para o Editor");
@@ -469,14 +487,19 @@ export function GeradorEscalaIA() {
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
-                {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-                Enviar para o Editor de Escalas
-              </Button>
-              <Button variant="outline" size="sm" onClick={copyJSON}>
-                <Copy className="mr-2 h-4 w-4" /> Copiar JSON
-              </Button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
+                  {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                  Enviar para o Editor de Escalas
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyJSON}>
+                  <Copy className="mr-2 h-4 w-4" /> Copiar JSON
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground max-w-xs text-right">
+                As vagas aparecem como linhas <strong>"Vaga Aberta"</strong> no Editor. Vincule cada uma a uma pessoa ativa para gravar a escala.
+              </p>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">

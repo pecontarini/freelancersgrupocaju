@@ -93,6 +93,7 @@ import {
   useDraftSlotsFor,
   removeDraftSlot,
   updateDraftSlotDay,
+  clearDraftSlotsFor,
   type DraftSlot,
 } from "@/hooks/useAIDraftSlots";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -431,6 +432,23 @@ export function ManualScheduleGrid() {
   const draftSlots = useDraftSlotsFor(selectedUnit, activeSectorId, weekStart);
   const [linkPickerOpen, setLinkPickerOpen] = useState<string | null>(null);
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const firstDraftRowRef = useRef<HTMLTableRowElement>(null);
+  const [pulseDrafts, setPulseDrafts] = useState(false);
+  const prevDraftCountRef = useRef(0);
+
+  // Quando novas vagas chegam, scroll + pulse de destaque
+  useEffect(() => {
+    const prev = prevDraftCountRef.current;
+    prevDraftCountRef.current = draftSlots.length;
+    if (draftSlots.length > prev && draftSlots.length > 0) {
+      setPulseDrafts(true);
+      setTimeout(() => {
+        firstDraftRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      const t = setTimeout(() => setPulseDrafts(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [draftSlots.length]);
 
   // Quando vagas chegam, garante que o setor delas esteja ativo
   useEffect(() => {
@@ -1382,6 +1400,31 @@ export function ManualScheduleGrid() {
                     </Popover>
                   </div>
 
+                  {draftSlots.length > 0 && (
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 backdrop-blur px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <SparklesIcon className="h-4 w-4 text-primary shrink-0" />
+                        <span className="font-medium">
+                          {draftSlots.length} vaga{draftSlots.length > 1 ? "s" : ""} gerada{draftSlots.length > 1 ? "s" : ""} pela IA aguardando vínculo.
+                        </span>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          Use <strong>Vincular</strong> em cada linha ou descarte tudo abaixo.
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm(`Descartar ${draftSlots.length} vaga(s) IA pendente(s)?`)) {
+                            clearDraftSlotsFor(selectedUnit, activeSectorId!, weekStart);
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" /> Descartar tudo
+                      </Button>
+                    </div>
+                  )}
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1671,7 +1714,7 @@ export function ManualScheduleGrid() {
                         </React.Fragment>
                       ))}
                       {/* AI DRAFT SLOTS — vagas vindas do Gerador IA */}
-                      {draftSlots.map((slot) => {
+                      {draftSlots.map((slot, draftIdx) => {
                         const linkableEmps = scheduledEmployees.length > 0 || sectorBaseEmployees.length > 0
                           ? [...employees]
                           : employees;
@@ -1682,7 +1725,11 @@ export function ManualScheduleGrid() {
                           })
                           .sort((a, b) => a.name.localeCompare(b.name));
                         return (
-                          <TableRow key={`draft-${slot.id}`} className="bg-primary/5">
+                          <TableRow
+                            key={`draft-${slot.id}`}
+                            ref={draftIdx === 0 ? firstDraftRowRef : undefined}
+                            className={`bg-primary/5 transition-shadow ${pulseDrafts ? "ring-2 ring-primary/60 ring-inset animate-pulse" : ""}`}
+                          >
                             <TableCell className="font-medium sticky left-0 z-10 border-r bg-primary/10 backdrop-blur">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <SparklesIcon className="h-3 w-3 text-primary shrink-0" />
@@ -2344,8 +2391,29 @@ function ScheduleCell({
   const endStr = schedule.end_time?.slice(0, 5) || "";
   const hasBreak = schedule.break_duration > 0;
 
+  // Tooltip detalhado quando há intervalo: mostra T1, intervalo (h/min) e T2
+  let tooltip = "";
+  if (startStr && endStr && hasBreak && schedule.break_duration > 0) {
+    const brkH = Math.floor(schedule.break_duration / 60);
+    const brkM = schedule.break_duration % 60;
+    const brkStr = brkH > 0 ? `${brkH}h${brkM > 0 ? String(brkM).padStart(2, "0") : ""}` : `${brkM}min`;
+    // Calcular fim do T1 e início do T2 a partir de start/end/break (jornada partida)
+    const [sh, sm] = startStr.split(":").map(Number);
+    const [eh, em] = endStr.split(":").map(Number);
+    let totalMin = (eh * 60 + em) - (sh * 60 + sm);
+    if (totalMin < 0) totalMin += 24 * 60;
+    const workMin = totalMin - schedule.break_duration;
+    const t1Min = Math.round(workMin / 2);
+    const t1EndAbs = sh * 60 + sm + t1Min;
+    const t2StartAbs = t1EndAbs + schedule.break_duration;
+    const fmt = (m: number) => `${String(Math.floor((m % (24 * 60)) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    tooltip = `T1 ${startStr}–${fmt(t1EndAbs)}  •  Intervalo ${brkStr}  •  T2 ${fmt(t2StartAbs)}–${endStr}`;
+  } else if (startStr && endStr) {
+    tooltip = `${startStr} – ${endStr}`;
+  }
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5" title={tooltip}>
       <div
         className={`h-10 w-full flex items-center justify-center rounded-md text-[11px] font-medium px-1 ${
           isFreelancer

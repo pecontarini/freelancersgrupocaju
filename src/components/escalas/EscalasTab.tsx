@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles, Wand2 } from "lucide-react";
+import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
 import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
@@ -11,33 +11,31 @@ import { StaffingMatrixConfig } from "./StaffingMatrixConfig";
 import { PopComplianceDashboard } from "./PopComplianceDashboard";
 import { PracasConfig } from "./PracasConfig";
 import { HoldingOperationalConfigTab } from "./HoldingOperationalConfigTab";
-import { EscalasItaimSection } from "./EscalasItaimSection";
 
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { useUnidade } from "@/contexts/UnidadeContext";
-
-const UNIDADE_ID_ITAIM = "87228077-03ab-445b-a409-237972ee6719";
 
 interface EscalasTabProps {
   defaultTab?: string;
 }
 
 export function EscalasTab({ defaultTab }: EscalasTabProps) {
-  
+
   const { data: confirmations } = usePendingConfirmations();
   const { isAdmin, isOperator } = useUserProfile();
-  const { effectiveUnidadeId } = useUnidade();
-  const isItaim = effectiveUnidadeId === UNIDADE_ID_ITAIM;
 
   const hasRisk = (confirmations?.pending ?? 0) > 0 || (confirmations?.denied ?? 0) > 0;
   const [tab, setTab] = useState(defaultTab || "scheduler");
   const showPopDashboard = isAdmin || isOperator;
 
-  // Se sair de Itaim enquanto na aba MVP, volta para o editor padrão
+  // Quando o Gerador IA envia vagas, salta para o Editor automaticamente
   useEffect(() => {
-    if (!isItaim && tab === "ia-mvp") setTab("scheduler");
-  }, [isItaim, tab]);
+    function onDrafts() {
+      setTab("scheduler");
+    }
+    window.addEventListener("ai-drafts-ready", onDrafts as any);
+    return () => window.removeEventListener("ai-drafts-ready", onDrafts as any);
+  }, []);
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="space-y-4">
@@ -47,13 +45,6 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
           <span className="hidden sm:inline">Editor de Escalas</span>
           <span className="sm:hidden">Escalas</span>
         </TabsTrigger>
-        {isItaim && (
-          <TabsTrigger value="ia-mvp" className="gap-1.5 border-primary/40 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            <Wand2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Gerador IA (MVP)</span>
-            <span className="sm:hidden">IA MVP</span>
-          </TabsTrigger>
-        )}
         <TabsTrigger value="d1" className="gap-1.5 relative">
           <ClipboardList className="h-4 w-4" />
           <span className="hidden sm:inline">Gestão D-1</span>
@@ -107,11 +98,6 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       <TabsContent value="scheduler">
         <ManualScheduleGrid />
       </TabsContent>
-      {isItaim && (
-        <TabsContent value="ia-mvp">
-          <EscalasItaimSection />
-        </TabsContent>
-      )}
       <TabsContent value="d1">
         <D1ManagementPanel />
       </TabsContent>

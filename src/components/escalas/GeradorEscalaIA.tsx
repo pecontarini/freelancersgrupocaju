@@ -13,8 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import { setDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
 
@@ -189,6 +190,132 @@ export function GeradorEscalaIA() {
     toast.success("JSON copiado");
   };
 
+  const [enviando, setEnviando] = useState(false);
+
+  const enviarParaEditor = async () => {
+    if (!resultado || !effectiveUnidadeId) return;
+    setEnviando(true);
+    try {
+      // 1) Resolver sector_id pelo nome do setor (turno_config.setor → sectors.name)
+      const { data: sectorRows, error: sectorErr } = await supabase
+        .from("sectors")
+        .select("id, name")
+        .eq("unit_id", effectiveUnidadeId);
+      if (sectorErr) throw sectorErr;
+
+      const norm = (s: string) =>
+        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+      const target = norm(setor);
+      const sector = (sectorRows || []).find((s) => norm(s.name) === target);
+      if (!sector) {
+        toast.error(
+          `Setor "${setor}" não encontrado no Editor de Escalas. Crie em Cargos e Setores antes.`,
+          { duration: 8000 },
+        );
+        return;
+      }
+
+      // 2) Construir mapa dia da semana (SEG..DOM) → date string da semana
+      const baseMonday = new Date(`${semana}T12:00:00`);
+      const dayDates: Record<string, string> = {};
+      DIAS.forEach((d, idx) => {
+        const dt = new Date(baseMonday);
+        dt.setDate(baseMonday.getDate() + idx);
+        dayDates[d] = dt.toISOString().slice(0, 10);
+      });
+
+      // 3) Agregar slots por (tipo, responsavel) e maxQuantidade
+      type Key = string;
+      const allDaySlots: Record<string, SlotResponse[]> = {};
+      for (const d of DIAS) {
+        const dia = resultado.dias?.[d];
+        allDaySlots[d] = dia ? [...(dia.slots ?? []), ...(dia.extras ?? [])] : [];
+      }
+      const groupMap = new Map<Key, { tipo: string; responsavel: boolean; maxQty: number }>();
+      for (const d of DIAS) {
+        for (const s of allDaySlots[d]) {
+          const key = `${s.tipo}|${s.responsavel ? "1" : "0"}`;
+          const prev = groupMap.get(key);
+          const qty = s.quantidade ?? 1;
+          if (!prev || qty > prev.maxQty) {
+            groupMap.set(key, { tipo: s.tipo, responsavel: !!s.responsavel, maxQty: qty });
+          }
+        }
+      }
+
+      // 4) Para cada grupo, gerar maxQty linhas-vaga
+      const drafts: DraftSlot[] = [];
+      let counter = 0;
+      const folgas = new Set(resultado.dias_folga_sugeridos ?? []);
+      for (const [, g] of groupMap) {
+        for (let i = 0; i < g.maxQty; i++) {
+          const days: Record<string, DraftDay> = {};
+          for (const d of DIAS) {
+            const dateStr = dayDates[d];
+            const dia = resultado.dias?.[d];
+            const slotsOfType = (allDaySlots[d] || []).filter(
+              (s) => s.tipo === g.tipo && !!s.responsavel === g.responsavel,
+            );
+            // Expande quantidade para "instâncias"
+            const expanded: SlotResponse[] = [];
+            for (const s of slotsOfType) {
+              for (let k = 0; k < (s.quantidade ?? 1); k++) expanded.push(s);
+            }
+            const slot = expanded[i];
+            if (!dia || !slot || folgas.has(d)) {
+              days[dateStr] = { kind: "off" };
+              continue;
+            }
+            // Prefere T1; se só houver T2, usa T2.
+            const t = slot.t1 ?? slot.t2;
+            if (!t) {
+              days[dateStr] = { kind: "off" };
+              continue;
+            }
+            days[dateStr] = {
+              kind: "work",
+              start_time: t.entrada,
+              end_time: t.saida,
+              break_min: slot.break_min ?? 0,
+              shift_type: slot.t1 && slot.t2 ? "T3" : slot.t2 ? "T2" : "T1",
+            };
+          }
+          drafts.push({
+            id: `ai-${Date.now()}-${counter++}`,
+            unit_id: effectiveUnidadeId,
+            sector_id: sector.id,
+            sector_name: sector.name,
+            week_start: semana,
+            label: `Vaga ${g.tipo}${g.responsavel ? " ★" : ""}`,
+            tipo: g.tipo,
+            responsavel: g.responsavel,
+            days,
+          });
+        }
+      }
+
+      if (drafts.length === 0) {
+        toast.warning("Nenhuma vaga para enviar.");
+        return;
+      }
+
+      setDraftSlots(drafts);
+      toast.success(`${drafts.length} vaga(s) enviada(s) ao Editor de Escalas.`);
+
+      // 5) Navegar para o Editor (Gestão de Pessoas → Escalas → Editor)
+      window.dispatchEvent(
+        new CustomEvent("ai-drafts-ready", {
+          detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
+        }),
+      );
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Falha ao enviar para o Editor");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -299,9 +426,15 @@ export function GeradorEscalaIA() {
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={copyJSON}>
-              <Copy className="mr-2 h-4 w-4" /> Copiar JSON
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
+                {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                Enviar para o Editor de Escalas
+              </Button>
+              <Button variant="outline" size="sm" onClick={copyJSON}>
+                <Copy className="mr-2 h-4 w-4" /> Copiar JSON
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {resultado.validacao && (

@@ -128,14 +128,39 @@ Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
       "extras": []
     }
   },
+  "plano_folgas": {
+    "headcount_total": 8,
+    "demanda_pessoa_dia_semana": 48,
+    "dias_uteis_por_pessoa": 6,
+    "demanda_por_dia": { "SEG": 5, "TER": 6, "QUA": 7, "QUI": 8, "SEX": 8, "SAB": 8, "DOM": 6 },
+    "vagas": [
+      {
+        "id_vaga": "v1",
+        "tipo": "ABRIDOR-DOBRA",
+        "responsavel": false,
+        "folgas": ["SEG"],
+        "horario_padrao": {
+          "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },
+          "break_min": 180,
+          "t2": { "entrada": "17:00", "saida": "21:00", "cruza_meia_noite": false, "efetivo_min": 240 }
+        }
+      }
+    ]
+  },
   "resumo_semanal": {
     "modelo": "6x1",
     "distribuicao_tipica": { "dias_tipo_a_ou_b": 3, "dias_tipo_c": 2, "dias_folga": 1, "total_horas_estimado": "44h00" },
     "dias_com_extras": [],
     "interjornada_alertas": []
   },
-  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_operacionais": [] }
+  "validacao": { "aprovado": true, "alertas_clt": [], "alertas_pop": [], "alertas_folga": [], "alertas_operacionais": [] }
 }
+
+REGRAS DE VALIDAÇÃO DE FOLGAS:
+- Se 6x1 e alguma vaga tiver folgas.length != 1 → adicione em alertas_folga.
+- Se 5x2 e alguma vaga tiver folgas.length != 2 → adicione em alertas_folga.
+- Se em algum dia (headcount_total - vagas_em_folga) < demanda_dia → adicione em alertas_folga.
+- A soma de horario_padrao expandido por todas as vagas (excluindo folgas) deve cobrir o POP de cada dia.
 
 CHECKLIST: □ Tipo C: nenhum fechador tem T1  □ Tipo C: abridores saem 21h
 □ T1+T2 ≤ 10h ef  □ POP almoço e jantar cobertos em todos dias

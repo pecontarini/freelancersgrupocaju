@@ -426,9 +426,15 @@ export function GeradorEscalaIA() {
                 {resultado.dias_folga_sugeridos?.length ? ` • Folga sugerida: ${resultado.dias_folga_sugeridos.join(", ")}` : ""}
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={copyJSON}>
-              <Copy className="mr-2 h-4 w-4" /> Copiar JSON
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={enviarParaEditor} disabled={enviando}>
+                {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+                Enviar para o Editor de Escalas
+              </Button>
+              <Button variant="outline" size="sm" onClick={copyJSON}>
+                <Copy className="mr-2 h-4 w-4" /> Copiar JSON
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {resultado.validacao && (

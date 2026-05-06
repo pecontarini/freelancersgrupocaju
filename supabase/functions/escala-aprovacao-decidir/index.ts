@@ -64,6 +64,112 @@ Deno.serve(async (req) => {
         })
         .eq("id", tpl.id);
       if (uErr) return json({ error: uErr.message }, 500);
+
+      // ===== Materializar slots como linhas em `schedules` =====
+      try {
+        const tplFull = await supabase
+          .from("escala_template")
+          .select("id, unidade_id, setor, semana_inicio, payload")
+          .eq("id", tpl.id)
+          .maybeSingle();
+        const t = tplFull.data;
+        if (t) {
+          const dias = (novoPayload as any)?.dias ?? {};
+          const diasMap: Record<string, number> = { SEG: 0, TER: 1, QUA: 2, QUI: 3, SEX: 4, SAB: 5, DOM: 6 };
+
+          // sector: find or create
+          let sectorId: string | null = null;
+          const { data: secExist } = await supabase
+            .from("sectors")
+            .select("id, name")
+            .eq("unit_id", t.unidade_id);
+          const found = (secExist ?? []).find(
+            (s: any) => String(s.name).trim().toLowerCase() === String(t.setor).trim().toLowerCase(),
+          );
+          if (found) sectorId = found.id;
+          else {
+            const { data: newSec } = await supabase
+              .from("sectors")
+              .insert({ unit_id: t.unidade_id, name: t.setor })
+              .select("id")
+              .single();
+            sectorId = newSec?.id ?? null;
+          }
+
+          // pick a system user_id (first admin) to satisfy NOT NULL
+          const { data: adminRow } = await supabase
+            .from("user_roles")
+            .select("user_id")
+            .eq("role", "admin")
+            .limit(1)
+            .maybeSingle();
+          const systemUserId = adminRow?.user_id ?? null;
+
+          // shifts cache
+          const { data: allShifts } = await supabase.from("shifts").select("id, start_time, end_time, type, name");
+          const shiftCache = new Map<string, string>();
+          for (const sh of allShifts ?? []) {
+            shiftCache.set(`${sh.start_time}-${sh.end_time}`, sh.id);
+          }
+          const ensureShift = async (entrada: string, saida: string) => {
+            const e = entrada.length === 5 ? `${entrada}:00` : entrada;
+            const s = saida.length === 5 ? `${saida}:00` : saida;
+            const key = `${e}-${s}`;
+            if (shiftCache.has(key)) return shiftCache.get(key)!;
+            const type = parseInt(e.slice(0, 2), 10) < 16 ? "almoco" : "jantar";
+            const { data: ns } = await supabase
+              .from("shifts")
+              .insert({ name: `${entrada}-${saida}`, start_time: e, end_time: s, type })
+              .select("id")
+              .single();
+            if (ns?.id) shiftCache.set(key, ns.id);
+            return ns?.id;
+          };
+
+          const baseDate = new Date(`${t.semana_inicio}T00:00:00`);
+          const rows: any[] = [];
+
+          for (const [diaCode, diaData] of Object.entries(dias as Record<string, any>)) {
+            const offset = diasMap[diaCode];
+            if (offset === undefined) continue;
+            const d = new Date(baseDate);
+            d.setDate(d.getDate() + offset);
+            const dateStr = d.toISOString().slice(0, 10);
+            const slots = (diaData as any)?.slots ?? [];
+            for (const slot of slots) {
+              const qty = Math.max(1, Number(slot?.quantidade ?? 1));
+              const turnos = ["t1", "t2"]
+                .map((k) => slot?.[k])
+                .filter((tt: any) => tt && tt.entrada && tt.saida);
+              for (const turno of turnos) {
+                const shiftId = await ensureShift(turno.entrada, turno.saida);
+                if (!shiftId || !sectorId || !systemUserId) continue;
+                for (let i = 0; i < qty; i++) {
+                  rows.push({
+                    user_id: systemUserId,
+                    sector_id: sectorId,
+                    shift_id: shiftId,
+                    schedule_date: dateStr,
+                    start_time: turno.entrada.length === 5 ? `${turno.entrada}:00` : turno.entrada,
+                    end_time: turno.saida.length === 5 ? `${turno.saida}:00` : turno.saida,
+                    schedule_type: "working",
+                    status: "scheduled",
+                    agreed_rate: 0,
+                    employee_id: null,
+                  });
+                }
+              }
+            }
+          }
+
+          if (rows.length > 0) {
+            const { error: insErr } = await supabase.from("schedules").insert(rows);
+            if (insErr) console.error("Erro ao materializar schedules:", insErr.message);
+          }
+        }
+      } catch (matErr) {
+        console.error("Materialization error:", matErr);
+      }
     } else {
       const { error: uErr } = await supabase
         .from("escala_template")

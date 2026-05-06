@@ -427,16 +427,24 @@ export function EscalasItaimSection() {
       <div className="space-y-4">
         {/* Painel de aprovação do COO */}
         {template?.status === "pendente_aprovacao" && template?.id && template?.payload && (
-          <EscalaApprovalPanel
-            templateId={template.id}
-            setor={setorAtivo}
-            semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
-            payload={template.payload}
-            onChanged={() => {
-              setEscalaGerada(null);
-              refetch();
-            }}
-          />
+          <>
+            <EscalaApprovalPanel
+              templateId={template.id}
+              setor={setorAtivo}
+              semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
+              payload={template.payload}
+              onChanged={() => {
+                setEscalaGerada(null);
+                refetch();
+              }}
+            />
+            <CooApprovalLinkBox
+              templateId={template.id}
+              setor={setorAtivo}
+              semanaLabel={`${formatDate(semanaInicio)} a ${formatDate(semanaFim)}`}
+              unidadeNome="Caju Limão Itaim"
+            />
+          </>
         )}
 
         {/* Status do template no topo */}

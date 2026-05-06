@@ -154,6 +154,7 @@ export function GeradorEscalaIA() {
           setor,
           semana_inicio: semana,
           unidade_id: effectiveUnidadeId,
+          modelo_folga: modeloFolga,
         },
       });
       if (error) throw error;

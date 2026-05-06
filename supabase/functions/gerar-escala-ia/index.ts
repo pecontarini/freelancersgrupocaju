@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { setor, semana_inicio, unidade_id } = await req.json();
+    const { setor, semana_inicio, unidade_id, modelo_folga } = await req.json();
 
     if (!setor || !semana_inicio || !unidade_id) {
       return json({ error: "Parâmetros obrigatórios: setor, semana_inicio, unidade_id" }, 400);

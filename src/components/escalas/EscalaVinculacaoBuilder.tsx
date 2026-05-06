@@ -473,9 +473,14 @@ export function EscalaVinculacaoBuilder({ templateId, unidadeId, setor, payload,
               </div>
             </div>
             {completo && (
-              <Button onClick={exportarPdf} size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={() => gerarPDF("ALMOCO")} size="sm" variant="outline">
+                  <Sun className="mr-1.5 h-4 w-4" /> PDF Almoço
+                </Button>
+                <Button onClick={() => gerarPDF("JANTAR")} size="sm" variant="outline">
+                  <Moon className="mr-1.5 h-4 w-4" /> PDF Jantar
+                </Button>
+              </div>
             )}
           </div>
         </div>

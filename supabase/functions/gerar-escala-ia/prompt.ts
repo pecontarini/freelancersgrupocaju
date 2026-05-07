@@ -204,6 +204,7 @@ export function buildUserPrompt(p: {
   setor: string;
   semana: string;
   modeloFolga: string;
+  headcount_max: number;
   config: { qtd_abridores: number; qtd_fechadores: number; qtd_intermediarios: number; observacoes?: string | null };
   tabelaMinima: Array<{ dia: string; almoco_efetivos: number; almoco_extras: number; jantar_efetivos: number; jantar_extras: number }>;
 }): string {
@@ -224,6 +225,21 @@ ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   Fechadores (mín. diário POP): ${p.config.qtd_fechadores}   ← em campo TODOS os 7 dias
   Intermediários (headcount contratado): ${p.config.qtd_intermediarios}   ← podem folgar
   ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ""}
+
+═══════════════════════════════
+TETO DE HEADCOUNT — INEGOCIÁVEL
+═══════════════════════════════
+Headcount real cadastrado no setor: ${p.headcount_max} pessoas ATIVAS.
+A soma de vagas regulares (plano_folgas.vagas, EXCLUINDO EXTRA-*) NÃO pode
+ultrapassar ${p.headcount_max}. Cada vaga será vinculada a 1 pessoa real.
+
+Se a configuração POP exigir mais vagas do que esse teto, na ORDEM:
+  1. Mantenha 100% dos abridores e fechadores em campo nos 7 dias (POP intocável).
+  2. Force modelo 6x1 (1 folga/vaga) mesmo se foi solicitado 5x2.
+  3. Reduza intermediários até caber no teto.
+  4. Sinalize em validacao.alertas_operacionais a falta de capacidade
+     ("Setor tem ${p.headcount_max} pessoas mas POP exige X vagas").
+EXTRA-ALMOCO/EXTRA-JANTAR são reforços pontuais e NÃO contam no teto.
 
 ATENÇÃO: nenhuma folga pode reduzir abridores/fechadores em campo
 abaixo do mínimo em NENHUM dia. Para abridor/fechador dimensione

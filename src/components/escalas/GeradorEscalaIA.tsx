@@ -100,6 +100,10 @@ interface EscalaResponse {
     minimos_por_papel_calc?: { abridor: number; fechador: number; intermediario: number };
     cobertura_por_dia?: Record<string, { abridor_em_campo?: number; fechador_em_campo?: number; intermediario_em_campo?: number; headcount_total?: number }>;
     cobertura_por_dia_calc?: Record<string, { abridor: number; fechador: number; intermediario: number; outro: number; headcount_total: number }>;
+    headcount_max?: number;
+    headcount_usado?: number;
+    modelo_folga_aplicado?: string;
+    alertas_capacidade?: string[];
     vagas: VagaPlanejada[];
   };
   resumo_semanal?: any;
@@ -525,10 +529,26 @@ export function GeradorEscalaIA() {
               </div>
             )}
 
+            {resultado.plano_folgas?.alertas_capacidade && resultado.plano_folgas.alertas_capacidade.length > 0 && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-1">
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  Capacidade do setor
+                </div>
+                {resultado.plano_folgas.alertas_capacidade.map((a, i) => (
+                  <div key={i} className="text-xs text-amber-900 dark:text-amber-200">{a}</div>
+                ))}
+              </div>
+            )}
+
             {resultado.plano_folgas && resultado.plano_folgas.vagas?.length > 0 && (
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="font-semibold text-sm">Plano de folgas — {resultado.plano_folgas.headcount_total} vagas ({resultado.modelo_folga})</div>
+                  <div className="font-semibold text-sm">
+                    Plano de folgas — {resultado.plano_folgas.headcount_usado ?? resultado.plano_folgas.headcount_total} vagas
+                    {resultado.plano_folgas.headcount_max ? ` / ${resultado.plano_folgas.headcount_max} disponíveis` : ""}
+                    {" "}({resultado.plano_folgas.modelo_folga_aplicado ?? resultado.modelo_folga})
+                  </div>
                   {resultado.plano_folgas.demanda_por_dia && (
                     <div className="text-xs text-muted-foreground">
                       Demanda: {DIAS.map(d => `${d} ${resultado.plano_folgas!.demanda_por_dia![d] ?? 0}`).join(" · ")}

@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       tabelaMinima,
     });
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const callGateway = async () => fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -94,13 +94,28 @@ Deno.serve(async (req) => {
       }),
     });
 
-    if (!aiResp.ok) {
-      if (aiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
-      if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
-      const t = await aiResp.text();
-      console.error("AI gateway error:", aiResp.status, t);
-      return json({ error: "Erro no AI Gateway", detail: t }, 500);
+    let aiResp: Response | null = null;
+    let lastErr = "";
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        aiResp = await callGateway();
+        if (aiResp.ok) break;
+        if (aiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+        if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
+        lastErr = await aiResp.text();
+        console.error(`AI gateway error (tentativa ${attempt}):`, aiResp.status, lastErr);
+        // Retry apenas em 5xx
+        if (aiResp.status < 500) break;
+      } catch (e) {
+        lastErr = e instanceof Error ? e.message : String(e);
+        console.error(`AI gateway fetch falhou (tentativa ${attempt}):`, lastErr);
+      }
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
+    if (!aiResp || !aiResp.ok) {
+      return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após 3 tentativas." }, 502);
+    }
+
 
     const aiData = await aiResp.json();
     const rawText = aiData.choices?.[0]?.message?.content ?? "";

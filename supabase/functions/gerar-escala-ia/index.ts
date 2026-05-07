@@ -69,27 +69,82 @@ Deno.serve(async (req) => {
       [...sectorRows.filter((s) => lemma(s.name).startsWith(setorLemma))].sort((a, b) => a.name.length - b.name.length)[0];
 
     let headcountMax = 0;
+    let headcountVinculado = 0;
+    let headcountEquivalente = 0;
+    const alertasHeadcount: string[] = [];
+
+    // Carrega todos os cargos da unidade para fazer match por nome (resolve o caso
+    // de "Garcom" vs "Garçom" não vinculados ao mesmo setor).
+    const { data: allJobs } = await supabase
+      .from("job_titles")
+      .select("id, name")
+      .eq("unit_id", unidade_id);
+    const jobsList = (allJobs ?? []) as Array<{ id: string; name: string }>;
+
+    // Vínculo direto (sector_job_titles)
+    let sjtJobIds: string[] = [];
     if (matchedSector) {
       const { data: sjt } = await supabase
         .from("sector_job_titles")
         .select("job_title_id")
         .eq("sector_id", matchedSector.id);
-      const jobIds = (sjt ?? []).map((r: any) => r.job_title_id).filter(Boolean);
-      if (jobIds.length > 0) {
+      sjtJobIds = (sjt ?? []).map((r: any) => r.job_title_id).filter(Boolean);
+      if (sjtJobIds.length > 0) {
         const { count } = await supabase
           .from("employees")
           .select("id", { count: "exact", head: true })
           .eq("unit_id", unidade_id)
           .eq("active", true)
-          .in("job_title_id", jobIds);
-        headcountMax = count ?? 0;
+          .in("job_title_id", sjtJobIds);
+        headcountVinculado = count ?? 0;
       }
     }
-    // Fallback: se não conseguiu calcular, usa soma da config
+
+    // Match por nome do cargo (independente de vínculo SJT) para o mesmo setor lógico.
+    // Ex.: setor=GARCOM ⇒ cargos cujo nome normalizado é equivalente a "garcom".
+    const setorNormForJob = setorLemma; // já normalizado e singularizado
+    const jobMatchesSetor = (jobName: string) => {
+      const n = lemma(jobName);
+      if (n === setorNormForJob) return true;
+      // sinônimos comuns por setor
+      if (setorNormForJob === "garcon" || setorNormForJob === "garco") {
+        return n === "garcon" || n === "garco" || n.startsWith("garc");
+      }
+      if (setorNormForJob === "atendimento" || setorNormForJob === "salao") {
+        return n.startsWith("atend") || n === "salao" || n.startsWith("garc");
+      }
+      return false;
+    };
+    const equivalentJobIds = jobsList.filter((j) => jobMatchesSetor(j.name)).map((j) => j.id);
+    if (equivalentJobIds.length > 0) {
+      const { count } = await supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("unit_id", unidade_id)
+        .eq("active", true)
+        .in("job_title_id", equivalentJobIds);
+      headcountEquivalente = count ?? 0;
+    }
+
+    headcountMax = Math.max(headcountVinculado, headcountEquivalente);
+
+    // Alerta se houver cargo equivalente fora do vínculo do setor
+    if (headcountEquivalente > headcountVinculado) {
+      const semVinculo = jobsList
+        .filter((j) => jobMatchesSetor(j.name) && !sjtJobIds.includes(j.id))
+        .map((j) => j.name);
+      if (semVinculo.length > 0) {
+        alertasHeadcount.push(
+          `Cargo(s) ${semVinculo.join(", ")} não está(ão) vinculado(s) ao setor ${setor} — vincule em Cargos e Setores para precisão.`,
+        );
+      }
+    }
+
+    // Fallback final
     if (headcountMax <= 0) {
       headcountMax = Number(config.qtd_abridores ?? 0) + Number(config.qtd_fechadores ?? 0) + Number(config.qtd_intermediarios ?? 0);
     }
-    console.log(`[gerar-escala-ia] setor=${setor} headcount_max=${headcountMax}`);
+    console.log(`[gerar-escala-ia] setor=${setor} headcount_vinculado=${headcountVinculado} headcount_equivalente=${headcountEquivalente} headcount_max=${headcountMax}`);
 
     const tabelaMinima = DIAS.map((dia) => {
       const al = pop.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));
@@ -374,9 +429,9 @@ Deno.serve(async (req) => {
         );
       }
 
-      // === GARANTIR COBERTURA DO POP DE ALMOÇO ===
-      // Se em algum dia faltarem vagas começando até 11:00 (POP almoço 11h30),
-      // injetar vagas TIPO-ALMOCO (10:30→16:00) para cobrir o déficit.
+      // === DIMENSIONAMENTO MATEMÁTICO + TETO RÍGIDO ===
+      // Regra: respeitar headcountMax sempre que ele for >= mínimo matemático.
+      // Se for menor, gerar com o mínimo matemático e emitir alerta de déficit.
       const popPorDia: Record<string, { almoco: number; jantar: number }> = {};
       for (const t of tabelaMinima) {
         popPorDia[t.dia] = {
@@ -390,66 +445,173 @@ Deno.serve(async (req) => {
         const [h, m] = String(t1.entrada).split(":").map(Number);
         return (h * 60 + (m || 0)) <= 11 * 60;
       };
+      const cobreJantar = (v: any): boolean => {
+        const t2 = v.horario_padrao?.t2;
+        if (t2?.entrada) {
+          const [h, m] = String(t2.entrada).split(":").map(Number);
+          return (h * 60 + (m || 0)) <= 18 * 60;
+        }
+        // dobra parcial: T1 longo cobrindo até pelo menos 17h
+        const t1 = v.horario_padrao?.t1;
+        if (!t1?.entrada || !t1?.saida) return false;
+        const [hs, ms] = String(t1.saida).split(":").map(Number);
+        return (hs * 60 + (ms || 0)) >= 17 * 60;
+      };
 
-      const injetarVagaAlmoco = (idx: number) => {
-        const nova: any = {
-          id_vaga: `almoco_auto_${idx}`,
-          tipo: "TIPO-ALMOCO",
-          papel: "abridor",
-          responsavel: false,
-          folgas: [],
-          horario_padrao: {
-            t1: { entrada: "10:30", saida: "16:00", efetivo_min: 330 },
-            break_min: 0,
-            t2: null,
-          },
-        };
+      // demanda_pessoa_dia[d] = max(pop_almoco, pop_jantar) — assume reaproveitamento via dobra
+      // (uma pessoa em dobra cobre 1 almoço + 1 jantar). Soma dá pessoas-dia/semana.
+      const demandaPessoaDia: Record<string, number> = {};
+      let somaPessoaDia = 0;
+      for (const dia of DIAS) {
+        const need = Math.max(popPorDia[dia]?.almoco ?? 0, popPorDia[dia]?.jantar ?? 0);
+        demandaPessoaDia[dia] = need;
+        somaPessoaDia += need;
+      }
+      const diasUteisPorPessoa = Math.max(1, DIAS.length - folgasPorVagaAtivo);
+      // mínimo matemático: 1) atender pico diário, 2) atender total semanal
+      const minimoMatematico = Math.max(
+        ...Object.values(demandaPessoaDia),
+        Math.ceil(somaPessoaDia / diasUteisPorPessoa),
+      );
+
+      // Teto efetivo de vagas regulares
+      const tetoEfetivo = headcountMax >= minimoMatematico
+        ? headcountMax
+        : minimoMatematico;
+
+      if (headcountMax < minimoMatematico) {
+        alertasCapacidade.push(
+          `Setor tem ${headcountMax} pessoa(s) ativa(s) mas o POP exige no mínimo ${minimoMatematico} ` +
+          `(modelo ${modeloFolgaAplicado}). Escala gerada com ${minimoMatematico} vagas — déficit de ` +
+          `${minimoMatematico - headcountMax} pessoa(s). Contrate ou reduza o POP em Cargos e Setores.`,
+        );
+      }
+
+      // === PODA: se IA estourou o teto, remove vagas extras priorizando manutenção da cobertura ===
+      const podaParaTeto = () => {
+        // Primeiro remove EXTRAs duplicados, depois vagas que sobram sem necessidade.
+        while (vagasRegulares.length > tetoEfetivo) {
+          // Encontra a vaga "menos essencial": aquela cuja remoção não derruba cobertura abaixo do POP
+          let alvoIdx = -1;
+          for (let i = vagasRegulares.length - 1; i >= 0; i--) {
+            const v = vagasRegulares[i];
+            // Simula remoção
+            let podeRemover = true;
+            for (const dia of DIAS) {
+              if (Array.isArray(v.folgas) && v.folgas.includes(dia)) continue;
+              const restantesNoDia = vagasRegulares.filter(
+                (x: any, j: number) => j !== i && !(Array.isArray(x.folgas) && x.folgas.includes(dia)),
+              );
+              const cobAlm = restantesNoDia.filter(cobreAlmoco).length;
+              const cobJan = restantesNoDia.filter(cobreJantar).length;
+              if (cobAlm < (popPorDia[dia]?.almoco ?? 0) || cobJan < (popPorDia[dia]?.jantar ?? 0)) {
+                podeRemover = false;
+                break;
+              }
+            }
+            if (podeRemover) { alvoIdx = i; break; }
+          }
+          if (alvoIdx === -1) break; // não dá para podar mais sem violar POP
+          const removida = vagasRegulares[alvoIdx];
+          vagasRegulares.splice(alvoIdx, 1);
+          const idxPlano = plano.vagas.indexOf(removida);
+          if (idxPlano >= 0) plano.vagas.splice(idxPlano, 1);
+        }
+      };
+
+      // === INJEÇÃO MÍNIMA: só se faltar cobertura E ainda houver espaço no teto ===
+      const injetarVaga = (perfil: "almoco" | "jantar", idx: number) => {
+        const nova: any = perfil === "almoco"
+          ? {
+              id_vaga: `almoco_auto_${idx}`,
+              tipo: "TIPO-ALMOCO",
+              papel: "abridor",
+              responsavel: false,
+              folgas: [],
+              horario_padrao: {
+                t1: { entrada: "10:30", saida: "16:00", efetivo_min: 330 },
+                break_min: 0,
+                t2: null,
+              },
+            }
+          : {
+              id_vaga: `jantar_auto_${idx}`,
+              tipo: "TIPO-FECHAMENTO",
+              papel: "fechador",
+              responsavel: false,
+              folgas: [],
+              horario_padrao: {
+                t1: null,
+                break_min: 0,
+                t2: { entrada: "17:00", saida: "23:30", efetivo_min: 390 },
+              },
+            };
         plano.vagas.push(nova);
         vagasRegulares.push(nova);
         return nova;
       };
 
-      const calcDeficitAlmoco = () => {
-        let maiorDeficit = 0;
+      const calcDeficit = () => {
+        let defAlm = 0, defJan = 0;
         for (const dia of DIAS) {
           const emCampo = vagasRegulares.filter(
-            (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)) && cobreAlmoco(v),
-          ).length;
-          const need = popPorDia[dia]?.almoco ?? 0;
-          const def = Math.max(0, need - emCampo);
-          if (def > maiorDeficit) maiorDeficit = def;
+            (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)),
+          );
+          defAlm = Math.max(defAlm, (popPorDia[dia]?.almoco ?? 0) - emCampo.filter(cobreAlmoco).length);
+          defJan = Math.max(defJan, (popPorDia[dia]?.jantar ?? 0) - emCampo.filter(cobreJantar).length);
         }
-        return maiorDeficit;
+        return { defAlm: Math.max(0, defAlm), defJan: Math.max(0, defJan) };
       };
 
-      let iter = 0;
-      let maiorDeficit = calcDeficitAlmoco();
+      // 1) Poda inicial se IA estourou
+      if (vagasRegulares.length > tetoEfetivo) {
+        podaParaTeto();
+      }
+
+      // 2) Injeta o necessário (até o teto) para cobrir POP
       const vagasInjetadas: string[] = [];
-      while (maiorDeficit > 0 && iter < 30) {
-        for (let k = 0; k < maiorDeficit; k++) {
-          const v = injetarVagaAlmoco(vagasRegulares.length + 1);
-          vagasInjetadas.push(v.id_vaga);
-        }
+      let iter = 0;
+      while (iter < 30) {
+        const { defAlm, defJan } = calcDeficit();
+        if (defAlm <= 0 && defJan <= 0) break;
+        if (vagasRegulares.length >= tetoEfetivo) break;
+        // injeta priorizando o maior déficit
+        const perfil = defAlm >= defJan ? "almoco" : "jantar";
+        const v = injetarVaga(perfil, vagasRegulares.length + 1);
+        vagasInjetadas.push(v.id_vaga);
         distribuirFolgas(folgasPorVagaAtivo);
-        maiorDeficit = calcDeficitAlmoco();
         iter++;
       }
-      if (vagasInjetadas.length > 0) {
+
+      // 3) Se ainda assim ultrapassou teto (raro após poda), avisa
+      if (vagasRegulares.length > tetoEfetivo) {
         alertasCapacidade.push(
-          `${vagasInjetadas.length} vaga(s) TIPO-ALMOCO (10:30→16:00) injetada(s) automaticamente para cobrir o POP de almoço (IA não cobriu).`,
+          `Vagas finais (${vagasRegulares.length}) excedem teto efetivo (${tetoEfetivo}) — POP impossível com este headcount.`,
         );
       }
 
-      // Cobertura de almoço por dia (informativa)
+      if (vagasInjetadas.length > 0) {
+        alertasCapacidade.push(
+          `${vagasInjetadas.length} vaga(s) auto-injetada(s) para cobrir POP (IA não cobriu).`,
+        );
+      }
+
+      // Cobertura final por dia
       const coberturaAlmocoPorDia: Record<string, { necessario: number; em_campo: number; ok: boolean }> = {};
+      const coberturaJantarPorDia: Record<string, { necessario: number; em_campo: number; ok: boolean }> = {};
       for (const dia of DIAS) {
         const emCampo = vagasRegulares.filter(
-          (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)) && cobreAlmoco(v),
-        ).length;
-        const need = popPorDia[dia]?.almoco ?? 0;
-        coberturaAlmocoPorDia[dia] = { necessario: need, em_campo: emCampo, ok: emCampo >= need };
+          (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)),
+        );
+        const cAlm = emCampo.filter(cobreAlmoco).length;
+        const cJan = emCampo.filter(cobreJantar).length;
+        const nAlm = popPorDia[dia]?.almoco ?? 0;
+        const nJan = popPorDia[dia]?.jantar ?? 0;
+        coberturaAlmocoPorDia[dia] = { necessario: nAlm, em_campo: cAlm, ok: cAlm >= nAlm };
+        coberturaJantarPorDia[dia] = { necessario: nJan, em_campo: cJan, ok: cJan >= nJan };
       }
       plano.cobertura_almoco_por_dia = coberturaAlmocoPorDia;
+      plano.cobertura_jantar_por_dia = coberturaJantarPorDia;
 
       // Cobertura final
       const { cobertura, violacoes } = calcularCobertura();
@@ -457,9 +619,13 @@ Deno.serve(async (req) => {
 
       plano.headcount_total = vagasRegulares.length;
       plano.headcount_max = headcountMax;
+      plano.headcount_vinculado = headcountVinculado;
+      plano.headcount_equivalente = headcountEquivalente;
       plano.headcount_usado = vagasRegulares.length;
+      plano.minimo_matematico = minimoMatematico;
+      plano.teto_efetivo = tetoEfetivo;
       plano.modelo_folga_aplicado = modeloFolgaAplicado;
-      plano.alertas_capacidade = alertasCapacidade;
+      plano.alertas_capacidade = [...alertasHeadcount, ...alertasCapacidade];
       plano.distribuicao_folgas_por_dia = folgasPorDiaGlobal;
       plano.cobertura_por_dia_calc = cobertura;
       plano.minimos_por_papel_calc = minimos;

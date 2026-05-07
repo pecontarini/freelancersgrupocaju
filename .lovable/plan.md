@@ -1,45 +1,59 @@
-## Problema
+## Diagnóstico da causa raiz
 
-Para o setor GARCOM o gerador está produzindo só vagas de fechamento. Causa raiz dupla:
+A falha não é só da IA: é da regra de pós-processamento e do prompt.
 
-1. **Teto de headcount estrangulando o POP**: o log mostra `headcount_max=2` (só 2 garçons cadastrados). A lógica atual em `index.ts` (linhas 369-396) poda intermediários LIFO até caber em 2 vagas e nunca cria slots de almoço. Como `qtd_abridores`/`qtd_fechadores` para garçom geralmente estão zerados em `turno_config` (a estrutura abridor/fechador é típica de cozinha), tudo vira "intermediário" e é podado, sobrando só o que a IA jogou para o jantar.
-2. **Prompt sem garantia explícita do POP de almoço para garçons**: o bloco "GARÇOM" da biblioteca de templates só descreve TIPO-ALMOCO e TIPO-FECHAMENTO, mas a regra de prioridade ("POP é piso absoluto, gerar mesmo sem gente") não está reforçada. Combinada com o teto, a IA aprende a sacrificar o almoço.
+O gerador hoje está tratando o POP de almoço e jantar como se fossem pessoas/slots independentes demais, e depois ainda força a criação de vagas extras de almoço. No caso real:
 
-O usuário foi explícito: **a IA deve resolver o POP independente de ter pessoas contratadas**. Headcount vira aviso, não restrição.
+- POP cadastrado de GARCOM chega a 23 no almoço e 22 no jantar.
+- Matematicamente, com escala 6x1, a necessidade mínima semanal usando dobras quando possível fica perto de 22 a 26 pessoas, não 47.
+- O template salvo mostra 38 vagas `TIPO-ALMOCO` + 9 `TIPO-FECHAMENTO`, ou seja: almoço foi duplicado em vez de reaproveitar dobras/turnos que cobrem almoço e jantar.
+- Além disso, o sistema está lendo `headcount_max=2` porque o setor `GARÇOM` está vinculado ao cargo `Garcom` com 2 ativos, enquanto existe outro cargo `Garçom` com 20 ativos não vinculado ao setor. Isso explica o alerta errado de 2 pessoas, mas não justifica as 47 vagas — são dois bugs separados.
 
-## Plano
+## Correção definitiva proposta
 
-### 1. `supabase/functions/gerar-escala-ia/index.ts` — POP acima do headcount
+### 1. Corrigir a fonte do teto de garçons
+- Ajustar a resolução de headcount para considerar cargos equivalentes por normalização robusta (`GARCOM`, `GARÇOM`, variações com/sem acento e plural).
+- Se o setor for GARCOM/GARÇOM, somar cargos compatíveis vinculados e equivalentes da unidade, evitando contar só o cargo errado.
+- Manter alerta se o vínculo de cargo estiver incompleto: “Setor GARÇOM tem cargo Garcom vinculado, mas há Garçom ativo fora do vínculo”.
 
-- **Remover a poda de intermediários** (linhas 369-387). Substituir por: se `vagasRegulares.length > headcountMax`, NÃO podar — apenas adicionar `alertas_capacidade` informando o déficit ("Setor tem X pessoas mas POP exige Y vagas — contrate Z ou reduza POP").
-- **Manter o downgrade 5x2 → 6x1** (linhas 358-366) só como otimização, mas sem bloquear se ainda exceder.
-- **Garantir vagas de almoço para garçom**: após receber a resposta da IA, varrer `vagasRegulares` e, se nenhuma vaga cobre almoço (slot.t1.entrada ≤ 11:30 OU tipo contém "ALMOCO"/"ABRIDOR"), injetar vagas TIPO-ALMOCO usando `pop.almoco_efetivos` de cada dia como referência, com horário-padrão `10:30→16:00`. Marcar com `papel: "abridor"` para entrarem no mínimo diário.
-- **Recalcular cobertura** (`calcularCobertura`) considerando explicitamente cobertura de almoço: novo campo `almoco_coberto_por_dia[d]` = nº de vagas em campo cujo `horario_padrao.t1.entrada <= 11:30`. Se < `pop.almoco_efetivos[d]`, incluir em `alertas_folga`.
-- **Não bloquear nada**: alertas continuam viajando no payload com HTTP 200 (já é o comportamento, manter).
+### 2. Trocar a lógica de “injetar almoço” por “dimensionar por cobertura mínima”
+- Remover a lógica atual que adiciona vagas de almoço em loop até cobrir, pois ela cria duplicação.
+- Implementar um cálculo determinístico antes/depois da IA:
+  - Para cada dia, calcular `pop_almoco`, `pop_jantar` e `demanda_minima_dia = max(pop_almoco, pop_jantar)` quando a jornada puder cobrir ambos.
+  - Para dias Tipo C (fechamento 02h30), separar `fechadores_puros` apenas na quantidade necessária para fechamento, mas não duplicar todo o POP de almoço.
+  - Usar 6x1/5x2 para calcular o número semanal mínimo: `ceil(soma_demanda_pessoa_dia / dias_uteis_por_pessoa)`.
+  - Limitar `plano_folgas.vagas` ao `headcountMax` quando `headcountMax` for suficiente para a demanda mínima.
 
-### 2. `supabase/functions/gerar-escala-ia/prompt.ts` — POP inegociável e templates de garçom
+### 3. Fazer a IA gerar horários, não inventar headcount ilimitado
+- Atualizar o prompt para deixar claro:
+  - A função da IA é desenhar horários dentro do teto real de pessoas sempre que matematicamente possível.
+  - POP é obrigatório, mas deve ser cumprido com dobras e reaproveitamento de pessoas, não criando uma vaga nova para cada turno.
+  - `TIPO-ALMOCO` puro só entra quando faltou cobertura de almoço depois de usar dobras viáveis.
+  - Se `headcountMax` for menor que o mínimo matemático, reduzir folgas/modelo e gerar alerta, não explodir vagas.
 
-- **Reescrever o bloco "TETO DE HEADCOUNT"** em `buildUserPrompt`: o teto vira **referência informativa**, não restrição. Texto: "Headcount cadastrado é X — gere todas as vagas necessárias para cobrir POP almoço E POP jantar de cada dia, mesmo que ultrapasse X. O sistema sinalizará déficit de pessoal."
-- **Adicionar regra dura para garçom no SYSTEM_PROMPT** (bloco GARÇOM da biblioteca):
-  - Para todo dia em que `pop.almoco_efetivos > 0`, criar pelo menos `pop.almoco_efetivos` vagas com T1 começando às 10:30 (não depois das 11:00) → garante presença às 11:30.
-  - Para todo dia em que `pop.jantar_efetivos > 0`, criar pelo menos `pop.jantar_efetivos` vagas TIPO-FECHAMENTO.
-  - Vagas de almoço e jantar são **independentes** para garçom (sem dobras obrigatórias) — preferir DOBRA quando possível para economizar pessoas, mas nunca sacrificar o POP de almoço por falta de gente.
-- **Reforçar prioridade**: "POP é PISO ABSOLUTO. Headcount real é apenas referência. Se faltar gente, gere as vagas mesmo assim."
+### 4. Criar um validador de capacidade final
+- Depois da resposta da IA, recalcular:
+  - quantidade total de vagas;
+  - cobertura almoço por dia;
+  - cobertura jantar por dia;
+  - folgas por dia;
+  - déficit real contra o teto.
+- Se `vagas > headcountMax` e `headcountMax >= minimo_matematico`, podar/compactar vagas redundantes antes de salvar.
+- Se `vagas > headcountMax` e `headcountMax < minimo_matematico`, manter somente o mínimo matemático e emitir alerta operacional.
 
-### 3. `src/components/escalas/GeradorEscalaIA.tsx` — UI
+### 5. Exibir diagnóstico claro no front
+- Mostrar no painel do gerador:
+  - `Garçons ativos considerados: 26`;
+  - `Mínimo matemático para POP: X`;
+  - `Vagas geradas: Y`;
+  - alertas de cargo desvinculado ou POP impossível.
 
-- O banner amber de `alertas_capacidade` já existe; ajustar texto para refletir o novo comportamento ("Faltam contratar N pessoas — escala foi gerada com déficit, sinalize ao RH").
-- Adicionar linha no resumo: "Cobertura almoço: ✓/⚠ (X/Y dias OK)" e "Cobertura jantar: ✓/⚠".
+## Resultado esperado
 
-### Verificação
+Para o cenário citado:
 
-Setor GARCOM Caju Limão Itaim com `headcount_max=2` e POP almoço=4/jantar=5:
-- Antes: gera só 2 vagas de fechamento.
-- Depois: gera 4 vagas TIPO-ALMOCO (10:30–16:00) + 5 vagas TIPO-FECHAMENTO + banner amber "Setor tem 2 pessoas, POP exige 9 vagas — contratar 7".
-- `cobertura_por_dia_calc` mostra abridor_em_campo ≥ 4 todos os dias.
-
-### Arquivos afetados
-
-- `supabase/functions/gerar-escala-ia/index.ts` (remoção da poda + injeção de vagas de almoço + cobertura)
-- `supabase/functions/gerar-escala-ia/prompt.ts` (POP > headcount + regra explícita garçom almoço)
-- `src/components/escalas/GeradorEscalaIA.tsx` (mensagem dos banners + linha de cobertura)
+- O sistema deve reconhecer 26 garçons, não 2.
+- A IA não deve sugerir 47 vagas.
+- A escala deve ficar limitada ao teto real quando o teto cobre o POP.
+- Todos os dias continuam garantindo abertura, fechamento e POP de almoço às 11h30.
+- Se algum dia realmente exigir mais que 26, o sistema gera alerta objetivo, sem inventar 47 espaços.

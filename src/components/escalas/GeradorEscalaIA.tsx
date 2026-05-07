@@ -227,14 +227,42 @@ export function GeradorEscalaIA() {
         .eq("unit_id", effectiveUnidadeId);
       if (sectorErr) throw sectorErr;
 
-      const norm = (s: string) =>
-        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
-      const target = norm(setor);
-      const sector = (sectorRows || []).find((s) => norm(s.name) === target);
+      const normalize = (s: string) =>
+        s
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase().trim()
+          .replace(/[\s\-_]+/g, " ");
+      // Lemma: colapsa singular/plural e variações m↔n no final (cumins/cumim → cumin)
+      const lemma = (s: string) =>
+        normalize(s).replace(/m$/, "n").replace(/s$/, "");
+      const target = normalize(setor);
+      const targetLemma = lemma(setor);
+      const rows = sectorRows || [];
+
+      // 1) Match exato normalizado
+      let sector = rows.find((s) => normalize(s.name) === target);
+      // 2) Match por lemma (singular/plural, m↔n)
       if (!sector) {
+        const lemmaMatches = rows.filter((s) => lemma(s.name) === targetLemma);
+        if (lemmaMatches.length === 1) sector = lemmaMatches[0];
+        else if (lemmaMatches.length > 1) {
+          toast.error(
+            `Setor "${setor}" ambíguo nesta unidade. Candidatos: ${lemmaMatches.map((s) => s.name).join(", ")}. Renomeie em Cargos e Setores.`,
+            { duration: 10000 },
+          );
+          return;
+        }
+      }
+      // 3) Fallback: startsWith único pelo lemma
+      if (!sector) {
+        const startsMatches = rows.filter((s) => lemma(s.name).startsWith(targetLemma));
+        if (startsMatches.length === 1) sector = startsMatches[0];
+      }
+      if (!sector) {
+        const candidatos = rows.map((s) => s.name).join(", ") || "nenhum";
         toast.error(
-          `Setor "${setor}" não encontrado no Editor de Escalas. Crie em Cargos e Setores antes.`,
-          { duration: 8000 },
+          `Setor "${setor}" não encontrado no Editor de Escalas. Setores da unidade: ${candidatos}.`,
+          { duration: 10000 },
         );
         return;
       }

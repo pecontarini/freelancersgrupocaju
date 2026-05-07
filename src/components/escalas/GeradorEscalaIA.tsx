@@ -403,7 +403,7 @@ export function GeradorEscalaIA() {
             </div>
             <div className="space-y-2">
               <Label>Semana (segunda-feira)</Label>
-              <Input type="date" value={semana} onChange={(e) => setSemana(e.target.value)} />
+              <Input type="date" value={semana} onChange={(e) => setSemana(e.target.value ? toMondayISO(e.target.value) : e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label>Modelo de folga</Label>

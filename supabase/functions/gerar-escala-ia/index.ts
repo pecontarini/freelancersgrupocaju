@@ -157,11 +157,14 @@ Deno.serve(async (req) => {
     const folgasPorVaga = modeloUsado === "5x2" ? 2 : 1;
     const alertasFolga: string[] = [];
 
-    const papelDe = (tipo: string): "abridor" | "fechador" | "intermediario" | "outro" => {
-      const t = String(tipo ?? "").toUpperCase();
-      if (t.startsWith("ABRIDOR")) return "abridor";
-      if (t.startsWith("FECHADOR")) return "fechador";
-      if (t.startsWith("INTERMEDIARIO") || t.startsWith("INTERMEDIÁRIO")) return "intermediario";
+    type Papel = "abridor" | "fechador" | "intermediario" | "outro";
+    const papelDe = (tipo: unknown, papel?: unknown): Papel => {
+      const candidatos = [tipo, papel].map((v) => String(v ?? "").toUpperCase());
+      for (const t of candidatos) {
+        if (t.startsWith("ABRIDOR") || t === "ABERTURA") return "abridor";
+        if (t.startsWith("FECHADOR") || t === "FECHAMENTO") return "fechador";
+        if (t.startsWith("INTERMEDIARIO") || t.startsWith("INTERMEDIÁRIO")) return "intermediario";
+      }
       return "outro";
     };
 
@@ -177,6 +180,68 @@ Deno.serve(async (req) => {
       // Extras (reforços situacionais) não entram no ciclo semanal de folgas
       const isExtra = (v: any) => String(v.tipo ?? "").toUpperCase().startsWith("EXTRA");
       const vagasRegulares = plano.vagas.filter((v: any) => !isExtra(v));
+
+      const demandaPorDia = plano.demanda_por_dia ?? {};
+      const prioridadeFolgas = [...DIAS].sort((a, b) =>
+        Number(demandaPorDia[a] ?? 999) - Number(demandaPorDia[b] ?? 999)
+          || DIAS.indexOf(a) - DIAS.indexOf(b)
+      );
+      const clone = (obj: any) => JSON.parse(JSON.stringify(obj));
+      const templateParaPapel = (papel: Exclude<Papel, "intermediario" | "outro">) => {
+        const existente = vagasRegulares.find((v: any) => papelDe(v.tipo, v.papel) === papel);
+        if (existente) return clone(existente);
+        for (const dia of DIAS) {
+          const slot = escala?.dias?.[dia]?.slots?.find((s: any) => papelDe(s.tipo) === papel);
+          if (slot) {
+            return {
+              tipo: slot.tipo,
+              papel,
+              responsavel: !!slot.responsavel,
+              folgas: [],
+              horario_padrao: { t1: slot.t1, break_min: slot.break_min ?? 180, t2: slot.t2 },
+            };
+          }
+        }
+        return null;
+      };
+
+      // Reparo determinístico: abridor/fechador são mínimos diários; se a IA gerar
+      // menos vagas semanais que o necessário para 5x2/6x1, criamos vagas regulares
+      // de cobertura e redistribuímos folgas para nunca zerar abertura/fechamento.
+      for (const papel of ["abridor", "fechador"] as const) {
+        if (minimos[papel] <= 0) continue;
+        const diasUteisPorVaga = Math.max(1, DIAS.length - folgasPorVaga);
+        const vagasNecessarias = Math.ceil((minimos[papel] * DIAS.length) / diasUteisPorVaga);
+        while (vagasRegulares.filter((v: any) => papelDe(v.tipo, v.papel) === papel).length < vagasNecessarias) {
+          const base = templateParaPapel(papel);
+          if (!base) break;
+          base.id_vaga = `${papel}_auto_${vagasRegulares.length + 1}`;
+          base.papel = papel;
+          base.folgas = [];
+          plano.vagas.push(base);
+          vagasRegulares.push(base);
+        }
+
+        const vagasDoPapel = vagasRegulares.filter((v: any) => papelDe(v.tipo, v.papel) === papel);
+        const capacidadeFolgaPorDia = Object.fromEntries(
+          DIAS.map((dia) => [dia, Math.max(0, vagasDoPapel.length - minimos[papel])])
+        ) as Record<string, number>;
+        const folgasUsadas = Object.fromEntries(DIAS.map((dia) => [dia, 0])) as Record<string, number>;
+        vagasDoPapel.forEach((v: any, idx: number) => {
+          const folgas: string[] = [];
+          const offset = (idx * folgasPorVaga) % DIAS.length;
+          const diasRotacionados = [...prioridadeFolgas.slice(offset), ...prioridadeFolgas.slice(0, offset)];
+          for (const dia of diasRotacionados) {
+            if (folgas.length >= folgasPorVaga) break;
+            if (folgasUsadas[dia] < capacidadeFolgaPorDia[dia]) {
+              folgas.push(dia);
+              folgasUsadas[dia]++;
+            }
+          }
+          v.folgas = folgas;
+        });
+      }
+      plano.headcount_total = vagasRegulares.length;
 
       // Aviso (não-fatal) sobre divergência de folgas/vaga vs modelo.
       // Regra dura é o mínimo POP por papel/dia, validado abaixo.
@@ -194,7 +259,7 @@ Deno.serve(async (req) => {
         const emCampo = vagasNoDia.length;
         const porPapel = { abridor: 0, fechador: 0, intermediario: 0, outro: 0 };
         for (const v of vagasNoDia) {
-          porPapel[papelDe(v.papel ?? v.tipo)]++;
+          porPapel[papelDe(v.tipo, v.papel)]++;
         }
         cobertura[dia] = { ...porPapel, headcount_total: emCampo };
         // Apenas abridor/fechador são mínimos POP duros (abertura/fechamento).

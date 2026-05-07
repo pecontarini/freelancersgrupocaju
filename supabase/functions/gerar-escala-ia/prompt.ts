@@ -54,6 +54,16 @@ GARÇOM:
   TIPO-FECHAMENTO Tipo A/B → 17h→00h30 ou 17h→23h30
   TIPO-FECHAMENTO Tipo C   → 17h→02h30
 
+═══════════════════════════════
+REGRA ESPECÍFICA — SETOR PARRILLA
+═══════════════════════════════
+Quando o setor for PARRILLA (parrilleiro/churrasqueiro), TODA abertura começa
+às 08:00 (não 09:00). Templates da Parrilla:
+  ABRIDOR-DOBRA (Tipo A/B)        → T1: 08h→13h | break 3h | T2: 17h→fechamento
+  ABRIDOR-DOBRA-PARCIAL (Tipo C)  → T1: 08h→13h | break 3h | T2: 17h→21h
+A entrada 08:00 é INEGOCIÁVEL para qualquer vaga/slot de papel "abridor" da
+Parrilla, em todos os 7 dias da semana.
+
 REGRAS DOS TEMPLATES:
 - T1 + T2 = MESMA pessoa, MESMO dia
 - Break = exatamente 180min (3h), inegociável
@@ -214,11 +224,17 @@ export function buildUserPrompt(p: {
     return `  ${d.dia.padEnd(4)}: Almoço ${al.padEnd(12)} | Jantar ${ja}`;
   }).join("\n");
 
+  const setorNorm = p.setor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const isParrilla = setorNorm.includes("parrilla") || setorNorm.includes("parrillero") || setorNorm.includes("churrasq");
+  const blocoParrilla = isParrilla
+    ? `\n⚠️ ABERTURA DESTE SETOR: 08:00 (INEGOCIÁVEL)\n   Todo abridor da Parrilla entra T1 às 08:00 (08h→13h), break 3h, e segue T2 normal.\n`
+    : "";
+
   return `Gere a escala de horários para o setor abaixo.
 
 SETOR: ${p.setor}
 SEMANA: ${p.semana}
-MODELO DE FOLGA: ${p.modeloFolga}
+MODELO DE FOLGA: ${p.modeloFolga}${blocoParrilla}
 
 ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   Abridores (mín. diário POP):  ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias

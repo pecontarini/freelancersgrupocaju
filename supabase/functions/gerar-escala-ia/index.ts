@@ -69,27 +69,82 @@ Deno.serve(async (req) => {
       [...sectorRows.filter((s) => lemma(s.name).startsWith(setorLemma))].sort((a, b) => a.name.length - b.name.length)[0];
 
     let headcountMax = 0;
+    let headcountVinculado = 0;
+    let headcountEquivalente = 0;
+    const alertasHeadcount: string[] = [];
+
+    // Carrega todos os cargos da unidade para fazer match por nome (resolve o caso
+    // de "Garcom" vs "Garçom" não vinculados ao mesmo setor).
+    const { data: allJobs } = await supabase
+      .from("job_titles")
+      .select("id, name")
+      .eq("unit_id", unidade_id);
+    const jobsList = (allJobs ?? []) as Array<{ id: string; name: string }>;
+
+    // Vínculo direto (sector_job_titles)
+    let sjtJobIds: string[] = [];
     if (matchedSector) {
       const { data: sjt } = await supabase
         .from("sector_job_titles")
         .select("job_title_id")
         .eq("sector_id", matchedSector.id);
-      const jobIds = (sjt ?? []).map((r: any) => r.job_title_id).filter(Boolean);
-      if (jobIds.length > 0) {
+      sjtJobIds = (sjt ?? []).map((r: any) => r.job_title_id).filter(Boolean);
+      if (sjtJobIds.length > 0) {
         const { count } = await supabase
           .from("employees")
           .select("id", { count: "exact", head: true })
           .eq("unit_id", unidade_id)
           .eq("active", true)
-          .in("job_title_id", jobIds);
-        headcountMax = count ?? 0;
+          .in("job_title_id", sjtJobIds);
+        headcountVinculado = count ?? 0;
       }
     }
-    // Fallback: se não conseguiu calcular, usa soma da config
+
+    // Match por nome do cargo (independente de vínculo SJT) para o mesmo setor lógico.
+    // Ex.: setor=GARCOM ⇒ cargos cujo nome normalizado é equivalente a "garcom".
+    const setorNormForJob = setorLemma; // já normalizado e singularizado
+    const jobMatchesSetor = (jobName: string) => {
+      const n = lemma(jobName);
+      if (n === setorNormForJob) return true;
+      // sinônimos comuns por setor
+      if (setorNormForJob === "garcon" || setorNormForJob === "garco") {
+        return n === "garcon" || n === "garco" || n.startsWith("garc");
+      }
+      if (setorNormForJob === "atendimento" || setorNormForJob === "salao") {
+        return n.startsWith("atend") || n === "salao" || n.startsWith("garc");
+      }
+      return false;
+    };
+    const equivalentJobIds = jobsList.filter((j) => jobMatchesSetor(j.name)).map((j) => j.id);
+    if (equivalentJobIds.length > 0) {
+      const { count } = await supabase
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("unit_id", unidade_id)
+        .eq("active", true)
+        .in("job_title_id", equivalentJobIds);
+      headcountEquivalente = count ?? 0;
+    }
+
+    headcountMax = Math.max(headcountVinculado, headcountEquivalente);
+
+    // Alerta se houver cargo equivalente fora do vínculo do setor
+    if (headcountEquivalente > headcountVinculado) {
+      const semVinculo = jobsList
+        .filter((j) => jobMatchesSetor(j.name) && !sjtJobIds.includes(j.id))
+        .map((j) => j.name);
+      if (semVinculo.length > 0) {
+        alertasHeadcount.push(
+          `Cargo(s) ${semVinculo.join(", ")} não está(ão) vinculado(s) ao setor ${setor} — vincule em Cargos e Setores para precisão.`,
+        );
+      }
+    }
+
+    // Fallback final
     if (headcountMax <= 0) {
       headcountMax = Number(config.qtd_abridores ?? 0) + Number(config.qtd_fechadores ?? 0) + Number(config.qtd_intermediarios ?? 0);
     }
-    console.log(`[gerar-escala-ia] setor=${setor} headcount_max=${headcountMax}`);
+    console.log(`[gerar-escala-ia] setor=${setor} headcount_vinculado=${headcountVinculado} headcount_equivalente=${headcountEquivalente} headcount_max=${headcountMax}`);
 
     const tabelaMinima = DIAS.map((dia) => {
       const al = pop.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));

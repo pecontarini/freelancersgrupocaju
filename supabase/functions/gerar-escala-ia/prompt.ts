@@ -224,11 +224,17 @@ export function buildUserPrompt(p: {
     return `  ${d.dia.padEnd(4)}: Almoço ${al.padEnd(12)} | Jantar ${ja}`;
   }).join("\n");
 
+  const setorNorm = p.setor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const isParrilla = setorNorm.includes("parrilla") || setorNorm.includes("parrillero") || setorNorm.includes("churrasq");
+  const blocoParrilla = isParrilla
+    ? `\n⚠️ ABERTURA DESTE SETOR: 08:00 (INEGOCIÁVEL)\n   Todo abridor da Parrilla entra T1 às 08:00 (08h→13h), break 3h, e segue T2 normal.\n`
+    : "";
+
   return `Gere a escala de horários para o setor abaixo.
 
 SETOR: ${p.setor}
 SEMANA: ${p.semana}
-MODELO DE FOLGA: ${p.modeloFolga}
+MODELO DE FOLGA: ${p.modeloFolga}${blocoParrilla}
 
 ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   Abridores (mín. diário POP):  ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias

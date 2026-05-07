@@ -262,7 +262,7 @@ Deno.serve(async (req) => {
       const pares5x2 = ["SEG-TER", "TER-QUA", "QUA-QUI", "DOM-SEG", "SEG-TER", "TER-QUA"];
       const dias6x1 = ["SEG", "TER", "QUA", "DOM", "QUI", "SEG", "TER", "QUA"];
       const papeis: Papel[] = ["abridor", "fechador", "intermediario", "outro"];
-      const demandaPorDia = plano.demanda_por_dia ?? {};
+      // demandaPorDia já declarado acima
       let folgasPorDiaGlobal: Record<string, number> = {};
 
       // Distribui folgas dado um folgasPorVagaAtual (1 ou 2). Mutates vagas in place.

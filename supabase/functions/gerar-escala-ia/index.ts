@@ -365,35 +365,91 @@ Deno.serve(async (req) => {
         distribuirFolgas(folgasPorVagaAtivo);
       }
 
-      // Se ainda excede, podar intermediários (LIFO) — nunca abridor/fechador
+      // POP é PISO ABSOLUTO. Headcount real é apenas referência — NÃO podar vagas.
       if (vagasRegulares.length > headcountMax) {
-        const excesso = vagasRegulares.length - headcountMax;
-        let podados = 0;
-        for (let i = vagasRegulares.length - 1; i >= 0 && podados < excesso; i--) {
-          const v = vagasRegulares[i];
-          if (papelDe(v.tipo, v.papel) === "intermediario") {
-            const idxPlano = plano.vagas.indexOf(v);
-            if (idxPlano >= 0) plano.vagas.splice(idxPlano, 1);
-            vagasRegulares.splice(i, 1);
-            podados++;
-          }
-        }
-        if (podados > 0) {
-          alertasCapacidade.push(
-            `${podados} vaga(s) de intermediário podada(s) para respeitar teto de ${headcountMax} pessoa(s).`,
-          );
-          distribuirFolgas(folgasPorVagaAtivo);
-        }
-      }
-
-      // Se MESMO assim excede (excesso é abridor/fechador): alertar mas não podar
-      if (vagasRegulares.length > headcountMax) {
+        const deficit = vagasRegulares.length - headcountMax;
         alertasCapacidade.push(
-          `ATENÇÃO: setor tem apenas ${headcountMax} pessoa(s) ativa(s), mas o POP de abertura/fechamento ` +
-          `exige ${vagasRegulares.length} vagas. Contrate ${vagasRegulares.length - headcountMax} pessoa(s) ` +
-          `ou reduza o POP em Cargos e Setores.`,
+          `Setor tem ${headcountMax} pessoa(s) ativa(s) mas o POP exige ${vagasRegulares.length} vagas. ` +
+          `Escala foi gerada com déficit de ${deficit} pessoa(s) — contrate ou reduza o POP em Cargos e Setores.`,
         );
       }
+
+      // === GARANTIR COBERTURA DO POP DE ALMOÇO ===
+      // Se em algum dia faltarem vagas começando até 11:00 (POP almoço 11h30),
+      // injetar vagas TIPO-ALMOCO (10:30→16:00) para cobrir o déficit.
+      const popPorDia: Record<string, { almoco: number; jantar: number }> = {};
+      for (const t of tabelaMinima) {
+        popPorDia[t.dia] = {
+          almoco: Number(t.almoco_efetivos ?? 0),
+          jantar: Number(t.jantar_efetivos ?? 0),
+        };
+      }
+      const cobreAlmoco = (v: any): boolean => {
+        const t1 = v.horario_padrao?.t1;
+        if (!t1?.entrada) return false;
+        const [h, m] = String(t1.entrada).split(":").map(Number);
+        return (h * 60 + (m || 0)) <= 11 * 60;
+      };
+
+      const injetarVagaAlmoco = (idx: number) => {
+        const nova: any = {
+          id_vaga: `almoco_auto_${idx}`,
+          tipo: "TIPO-ALMOCO",
+          papel: "abridor",
+          responsavel: false,
+          folgas: [],
+          horario_padrao: {
+            t1: { entrada: "10:30", saida: "16:00", efetivo_min: 330 },
+            break_min: 0,
+            t2: null,
+          },
+        };
+        plano.vagas.push(nova);
+        vagasRegulares.push(nova);
+        return nova;
+      };
+
+      const calcDeficitAlmoco = () => {
+        let maiorDeficit = 0;
+        for (const dia of DIAS) {
+          const emCampo = vagasRegulares.filter(
+            (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)) && cobreAlmoco(v),
+          ).length;
+          const need = popPorDia[dia]?.almoco ?? 0;
+          const def = Math.max(0, need - emCampo);
+          if (def > maiorDeficit) maiorDeficit = def;
+        }
+        return maiorDeficit;
+      };
+
+      let iter = 0;
+      let maiorDeficit = calcDeficitAlmoco();
+      const vagasInjetadas: string[] = [];
+      while (maiorDeficit > 0 && iter < 30) {
+        for (let k = 0; k < maiorDeficit; k++) {
+          const v = injetarVagaAlmoco(vagasRegulares.length + 1);
+          vagasInjetadas.push(v.id_vaga);
+        }
+        distribuirFolgas(folgasPorVagaAtivo);
+        maiorDeficit = calcDeficitAlmoco();
+        iter++;
+      }
+      if (vagasInjetadas.length > 0) {
+        alertasCapacidade.push(
+          `${vagasInjetadas.length} vaga(s) TIPO-ALMOCO (10:30→16:00) injetada(s) automaticamente para cobrir o POP de almoço (IA não cobriu).`,
+        );
+      }
+
+      // Cobertura de almoço por dia (informativa)
+      const coberturaAlmocoPorDia: Record<string, { necessario: number; em_campo: number; ok: boolean }> = {};
+      for (const dia of DIAS) {
+        const emCampo = vagasRegulares.filter(
+          (v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)) && cobreAlmoco(v),
+        ).length;
+        const need = popPorDia[dia]?.almoco ?? 0;
+        coberturaAlmocoPorDia[dia] = { necessario: need, em_campo: emCampo, ok: emCampo >= need };
+      }
+      plano.cobertura_almoco_por_dia = coberturaAlmocoPorDia;
 
       // Cobertura final
       const { cobertura, violacoes } = calcularCobertura();

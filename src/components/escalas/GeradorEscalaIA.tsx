@@ -542,6 +542,23 @@ export function GeradorEscalaIA() {
               </div>
             )}
 
+            {resultado.plano_folgas?.cobertura_almoco_por_dia && (
+              <div className="rounded-lg border p-3 text-xs space-y-1">
+                <div className="font-semibold text-sm">Cobertura POP Almoço (chega até 11:00)</div>
+                <div className="flex flex-wrap gap-2">
+                  {DIAS.map((d) => {
+                    const c = resultado.plano_folgas!.cobertura_almoco_por_dia![d];
+                    if (!c) return null;
+                    return (
+                      <Badge key={d} variant={c.ok ? "secondary" : "destructive"} className="text-[10px]">
+                        {d}: {c.em_campo}/{c.necessario}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {resultado.plano_folgas && resultado.plano_folgas.vagas?.length > 0 && (
               <div className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">

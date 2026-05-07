@@ -1,48 +1,43 @@
 ## Diagnóstico
 
-A queixa procede. No setor CUMIN (e em qualquer setor), quase todas as vagas estão folgando segunda e terça por **dois motivos combinados** em `supabase/functions/gerar-escala-ia/index.ts`:
+O fluxo "Gerar IA → Editor de Escalas" usa `enviarParaEditor` em `src/components/escalas/GeradorEscalaIA.tsx` (linhas 219–337). Ele:
 
-### 1. O reparo determinístico de abridor/fechador concentra folgas no início da fila de prioridade
+1. Lê o `setor` do Gerador (vem de `turno_config.setor`).
+2. Procura em `sectors` da unidade um registro cujo `name` normalizado seja **exatamente igual** ao nome do setor (somente strip de acentos + lowercase + trim — linhas 230–233).
+3. Se não achar, dispara `toast.error('Setor "X" não encontrado…')` e **não** dispara o evento `ai-drafts-ready`, então o Editor nunca abre.
 
-Linhas 230–242: para cada vaga, calcula-se um `offset = (idx * folgasPorVaga) % 7` e aplica-se sobre `prioridadeFolgas` (que está ordenada pela menor demanda). No 5x2 com 2 folgas/vaga e poucas vagas (típico de CUMIN: 2–3 abridores/fechadores), o índice 0 sempre cai em SEG+TER, o índice 1 em QUA+QUI, etc. Como geralmente há só 2–3 vagas por papel, a maioria fica de fato em SEG+TER.
+No banco temos `turno_config.setor = 'CUMIN'`, mas vários `sectors.name` da rede estão como **`CUMINS`** (plural) ou **`CUMIM`** (typo). Para essas unidades a comparação `cumin === cumins` falha → o envio para o Editor não acontece. As "demais" funções funcionam porque o nome do setor bate 1:1 (ex.: `Cozinha`, `Salão`).
 
-Além disso, `capacidadeFolgaPorDia = vagasDoPapel.length - minimos[papel]` é constante para todos os dias da semana — não reflete a demanda real. Se há 3 vagas e mínimo 1, o algoritmo permite até 2 folgas em QUALQUER dia, inclusive SAB/DOM, mas a rotação por offset puxa tudo pro começo da prioridade.
+## Plano
 
-### 2. Intermediários e demais papéis não têm reparo nenhum
+Editar apenas `src/components/escalas/GeradorEscalaIA.tsx` (função `enviarParaEditor`):
 
-O loop de reparo (linha 211) só roda para `["abridor", "fechador"]`. Os intermediários ficam com o que a IA gerou — e o prompt instrui explicitamente "Priorize folgar em dias de MENOR demanda (SEG/TER/QUA)" (prompt.ts linha 109). A IA obedece e empilha tudo em SEG+TER.
+1. **Lookup tolerante**: além do match exato normalizado, aceitar variantes:
+   - normalizar removendo `s` final (`cumins → cumin`, `cumin → cumin`);
+   - normalizar trocando `m` final por `n` (`cumim → cumin`);
+   - colapsar espaços/hífens.
+   Implementar como `normalize(s)` e usar `find()` com igualdade entre as duas strings normalizadas.
+2. **Fallback `includes`**: se ainda assim não houver match único, procurar `sector.name` que **comece com** o nome do setor normalizado (ex.: `cumin` casaria com `cumins nazo` só se houver um único candidato — caso contrário, preserva o erro atual para evitar ambiguidade).
+3. **Mensagem de erro melhor**: quando houver múltiplos candidatos ambíguos, listar os nomes encontrados na unidade no `toast.error` para o usuário escolher renomear.
+4. **Sem mudanças** no edge function, no Editor, nem no schema.
 
-Resultado: 100% das vagas folgam SEG/TER, deixando QUI–DOM (alta demanda) com headcount alto, mas SEG/TER fica em mínimo absoluto e qualquer falta vira crise.
+### Detalhes técnicos
 
-## Plano de Correção
+```ts
+const normalize = (s: string) => s
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase().trim()
+  .replace(/[\s\-_]+/g, " ")
+  .replace(/m$/, "n")     // CUMIM → cumin
+  .replace(/s$/, "");     // CUMINS → cumin
+```
 
-Editar `supabase/functions/gerar-escala-ia/index.ts`:
+Ordem de busca:
+1. exato normalizado;
+2. se nada, `startsWith` único;
+3. se nada/ambíguo, mostrar erro com lista de candidatos.
 
-### A. Distribuir folgas de forma balanceada (não só "menor demanda primeiro")
+### Validação
 
-Substituir `prioridadeFolgas` por uma fila que considere capacidade por dia baseada em **demanda real**, não só ranking:
-
-- Calcular `capacidadeFolgaPorDia[dia] = vagasDoPapel.length - max(minimos[papel], demanda_papel_estimada[dia])`.
-- Para 5x2, ao escolher 2 folgas por vaga, preferir pares consecutivos (SEG+TER, TER+QUA, DOM+SEG) e **distribuir as vagas em pares diferentes** ciclicamente, não pelo offset linear da lista priorizada.
-- Adicionar trava: nenhum dia pode receber mais de `ceil(vagasDoPapel.length * folgasPorVaga / 7) + 1` folgas do mesmo papel (espalhamento forçado).
-
-### B. Aplicar o mesmo reparo a intermediários e demais vagas regulares
-
-Estender o loop para incluir `intermediario` e qualquer vaga regular sem papel mapeado. Critério de mínimo diário para intermediários: usar `demanda_por_dia[dia] - (abridores_em_campo + fechadores_em_campo)` como piso, garantindo que a folga não derrube `headcount_total - folgas[dia] < demanda_por_dia[dia]`.
-
-### C. Pós-validação anti-concentração (regra dura)
-
-Após o reparo, calcular `folgasPorDia[dia]` somando todas as vagas regulares. Se algum dia concentra > 50% das folgas semanais totais, redistribuir movendo folgas excedentes para o próximo dia com capacidade livre. Adicionar alerta em `plano.avisos_distribuicao_folgas`.
-
-### D. Ajuste no prompt (prompt.ts)
-
-Suavizar a instrução "Priorize folgar em dias de MENOR demanda" para "Distribua folgas de forma BALANCEADA ao longo da semana, evitando concentrar mais de 40% das folgas no mesmo dia. Dias de menor demanda recebem folgas marginalmente mais; nunca todas".
-
-### E. Teste
-
-Após o deploy, chamar a função para CUMIN / 2026-05-05 / 5x2 e verificar que `cobertura_por_dia_calc` mostra headcount > mínimo+1 em SEG/TER (não só mínimo cravado), e que nenhum dia concentra mais que ~30% das folgas.
-
-## Arquivos afetados
-
-- `supabase/functions/gerar-escala-ia/index.ts` (lógica de reparo e validação)
-- `supabase/functions/gerar-escala-ia/prompt.ts` (instrução de balanceamento)
+- Gerar a escala de CUMIN em uma unidade cujo `sectors.name` é `CUMINS`/`CUMIM` e confirmar que o Editor é aberto automaticamente (evento `ai-drafts-ready` disparado).
+- Repetir para um setor que já casava (ex.: `Cozinha`) para garantir que não regredimos.

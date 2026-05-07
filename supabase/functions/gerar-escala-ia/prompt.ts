@@ -204,6 +204,7 @@ export function buildUserPrompt(p: {
   setor: string;
   semana: string;
   modeloFolga: string;
+  headcount_max: number;
   config: { qtd_abridores: number; qtd_fechadores: number; qtd_intermediarios: number; observacoes?: string | null };
   tabelaMinima: Array<{ dia: string; almoco_efetivos: number; almoco_extras: number; jantar_efetivos: number; jantar_extras: number }>;
 }): string {

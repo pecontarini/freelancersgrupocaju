@@ -1,59 +1,40 @@
-## Diagnóstico da causa raiz
+## Objetivo
+Garantir que toda escala gerada para o setor **Parrilla** abra automaticamente às **08:00**, em qualquer unidade e qualquer dia da semana, sem depender da decisão da IA.
 
-A falha não é só da IA: é da regra de pós-processamento e do prompt.
+## Diagnóstico
+Hoje os templates do prompt (`supabase/functions/gerar-escala-ia/prompt.ts`) usam **09:00** como entrada padrão dos abridores (`ABRIDOR-DOBRA` e `ABRIDOR-DOBRA-PARCIAL` T1: 09h→14h). Como a IA copia esses templates, a Parrilla acaba abrindo às 09h. Não há override por setor.
 
-O gerador hoje está tratando o POP de almoço e jantar como se fossem pessoas/slots independentes demais, e depois ainda força a criação de vagas extras de almoço. No caso real:
+A correção é em duas camadas, para ser determinística:
 
-- POP cadastrado de GARCOM chega a 23 no almoço e 22 no jantar.
-- Matematicamente, com escala 6x1, a necessidade mínima semanal usando dobras quando possível fica perto de 22 a 26 pessoas, não 47.
-- O template salvo mostra 38 vagas `TIPO-ALMOCO` + 9 `TIPO-FECHAMENTO`, ou seja: almoço foi duplicado em vez de reaproveitar dobras/turnos que cobrem almoço e jantar.
-- Além disso, o sistema está lendo `headcount_max=2` porque o setor `GARÇOM` está vinculado ao cargo `Garcom` com 2 ativos, enquanto existe outro cargo `Garçom` com 20 ativos não vinculado ao setor. Isso explica o alerta errado de 2 pessoas, mas não justifica as 47 vagas — são dois bugs separados.
+1. **Camada de prompt**: instruir a IA, quando o setor for Parrilla, a usar 08:00 como entrada do abridor (T1: 08h→13h, mantendo 5h efetivas e break de 3h).
+2. **Camada de pós-processamento (garantia)**: no `index.ts`, depois de receber o JSON da IA, varrer todos os slots/vagas de papel `abridor` quando `setor === parrilla` e forçar `t1.entrada = "08:00"` (ajustando `saida` para manter as 5h e recalculando `efetivo_min`). Isso evita regressão se a IA "esquecer".
 
-## Correção definitiva proposta
+## Mudanças
 
-### 1. Corrigir a fonte do teto de garçons
-- Ajustar a resolução de headcount para considerar cargos equivalentes por normalização robusta (`GARCOM`, `GARÇOM`, variações com/sem acento e plural).
-- Se o setor for GARCOM/GARÇOM, somar cargos compatíveis vinculados e equivalentes da unidade, evitando contar só o cargo errado.
-- Manter alerta se o vínculo de cargo estiver incompleto: “Setor GARÇOM tem cargo Garcom vinculado, mas há Garçom ativo fora do vínculo”.
+### 1) `supabase/functions/gerar-escala-ia/prompt.ts`
+- Adicionar bloco "REGRA ESPECÍFICA — PARRILLA" no SYSTEM_PROMPT:
+  - Toda abertura da Parrilla começa às **08:00** (T1: 08h→13h | break 3h | T2 inalterado).
+  - Vale para Tipo A, B e C (incluindo `ABRIDOR-DOBRA-PARCIAL`).
+- Reforçar no `buildUserPrompt` quando `setor` normalizado for `parrilla`: linha explícita "ABERTURA DESTE SETOR: 08:00 (inegociável)".
 
-### 2. Trocar a lógica de “injetar almoço” por “dimensionar por cobertura mínima”
-- Remover a lógica atual que adiciona vagas de almoço em loop até cobrir, pois ela cria duplicação.
-- Implementar um cálculo determinístico antes/depois da IA:
-  - Para cada dia, calcular `pop_almoco`, `pop_jantar` e `demanda_minima_dia = max(pop_almoco, pop_jantar)` quando a jornada puder cobrir ambos.
-  - Para dias Tipo C (fechamento 02h30), separar `fechadores_puros` apenas na quantidade necessária para fechamento, mas não duplicar todo o POP de almoço.
-  - Usar 6x1/5x2 para calcular o número semanal mínimo: `ceil(soma_demanda_pessoa_dia / dias_uteis_por_pessoa)`.
-  - Limitar `plano_folgas.vagas` ao `headcountMax` quando `headcountMax` for suficiente para a demanda mínima.
+### 2) `supabase/functions/gerar-escala-ia/index.ts`
+- Após o parse do JSON da IA e antes da validação CLT, aplicar normalização:
+  ```ts
+  if (lemma(setor) === "parrilla") {
+    forcarAberturaParrilla(escala); // ajusta slots[].t1 e plano_folgas.vagas[].horario_padrao.t1
+  }
+  ```
+- A função ajusta apenas vagas/slots cujo `papel === "abridor"` ou `tipo` começa com `ABRIDOR`:
+  - `t1.entrada = "08:00"`, `t1.saida = "13:00"`, `t1.efetivo_min = 300`
+  - mantém break (180) e T2 como veio
+  - recalcula `jornada_dia_min`
 
-### 3. Fazer a IA gerar horários, não inventar headcount ilimitado
-- Atualizar o prompt para deixar claro:
-  - A função da IA é desenhar horários dentro do teto real de pessoas sempre que matematicamente possível.
-  - POP é obrigatório, mas deve ser cumprido com dobras e reaproveitamento de pessoas, não criando uma vaga nova para cada turno.
-  - `TIPO-ALMOCO` puro só entra quando faltou cobertura de almoço depois de usar dobras viáveis.
-  - Se `headcountMax` for menor que o mínimo matemático, reduzir folgas/modelo e gerar alerta, não explodir vagas.
+### 3) Sem mudanças de UI
+A geração é via `gerar-escala-ia`; o `ScheduleAIGenerator` (chat) não precisa mudar. A garantia fica na edge function, então qualquer ponto de entrada respeita a regra.
 
-### 4. Criar um validador de capacidade final
-- Depois da resposta da IA, recalcular:
-  - quantidade total de vagas;
-  - cobertura almoço por dia;
-  - cobertura jantar por dia;
-  - folgas por dia;
-  - déficit real contra o teto.
-- Se `vagas > headcountMax` e `headcountMax >= minimo_matematico`, podar/compactar vagas redundantes antes de salvar.
-- Se `vagas > headcountMax` e `headcountMax < minimo_matematico`, manter somente o mínimo matemático e emitir alerta operacional.
+## Verificação
+- Disparar geração para um setor Parrilla de qualquer unidade e conferir que todos os abridores aparecem com T1 começando 08:00 nos 7 dias.
+- Conferir que setores não-Parrilla (Cozinha, Bar, Garçom, etc.) seguem com 09:00.
 
-### 5. Exibir diagnóstico claro no front
-- Mostrar no painel do gerador:
-  - `Garçons ativos considerados: 26`;
-  - `Mínimo matemático para POP: X`;
-  - `Vagas geradas: Y`;
-  - alertas de cargo desvinculado ou POP impossível.
-
-## Resultado esperado
-
-Para o cenário citado:
-
-- O sistema deve reconhecer 26 garçons, não 2.
-- A IA não deve sugerir 47 vagas.
-- A escala deve ficar limitada ao teto real quando o teto cobre o POP.
-- Todos os dias continuam garantindo abertura, fechamento e POP de almoço às 11h30.
-- Se algum dia realmente exigir mais que 26, o sistema gera alerta objetivo, sem inventar 47 espaços.
+## Pergunta rápida
+Confirma que **todos os papéis de abertura** da Parrilla (abridor puro e abridor-dobra-parcial) devem entrar 08:00, ou só um papel específico (ex.: "parrilleiro abridor")? O plano acima assume **todos os abridores** da Parrilla.

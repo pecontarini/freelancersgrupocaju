@@ -106,9 +106,15 @@ ALGORITMO OBRIGATÓRIO:
 5. Atribua folgas RODANDO DENTRO DE CADA PAPEL, validando após cada folga:
    - papel_em_campo[d] >= qtd_papel para TODO d (regra dura).
    - headcount_total - vagas_em_folga[d] >= demanda_dia[d].
-   - Priorize folgar em dias de MENOR demanda (SEG/TER/QUA).
-   - 5x2: prefira pares consecutivos (SEG+TER, TER+QUA, DOM+SEG); evite SEX+SAB.
-   - Distribua de forma BALANCEADA — nunca concentre folgas do mesmo papel num único dia.
+   - Distribua folgas de forma BALANCEADA ao longo da semana. NUNCA concentre
+     mais de ~30% das folgas semanais do setor num mesmo dia.
+   - Dias de menor demanda (SEG/TER/QUA) podem receber folgas marginalmente
+     mais — porém JAMAIS todas as vagas folgando no mesmo dia.
+   - 5x2: prefira pares consecutivos (SEG+TER, TER+QUA, QUA+QUI, DOM+SEG);
+     evite SEX+SAB. Cicle os pares entre vagas (vaga1=SEG+TER, vaga2=TER+QUA,
+     vaga3=QUA+QUI, vaga4=DOM+SEG, etc.) para espalhar as folgas.
+   - Cada DIA da semana deve ter pelo menos 1 vaga folgando (se houver folgas
+     suficientes), exceto SEX/SAB se possível.
 6. Cada vaga tem horário-padrão (template predominante do seu papel/dia).
 7. EXTRAS (EXTRA-ALMOCO, EXTRA-JANTAR) NÃO entram em plano_folgas.vagas — são
    reforços situacionais por dia, vão apenas em dias[d].extras.

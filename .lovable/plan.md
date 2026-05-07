@@ -1,69 +1,48 @@
-## Problema
+## Diagnóstico
 
-O `plano_folgas` atual distribui folgas olhando só a **demanda diária total** (pico almoço/jantar). Resultado: dias acabam com headcount suficiente no pico, mas **sem o mínimo obrigatório de abridores e fechadores** definido em `turno_config` (`qtd_abridores`, `qtd_fechadores`, `qtd_intermediarios`).
+A queixa procede. No setor CUMIN (e em qualquer setor), quase todas as vagas estão folgando segunda e terça por **dois motivos combinados** em `supabase/functions/gerar-escala-ia/index.ts`:
 
-Ex.: numa Quinta (Tipo C), todas as folgas dos fechadores caíram no mesmo dia → ninguém para fechar até 02h30, mesmo o headcount total batendo.
+### 1. O reparo determinístico de abridor/fechador concentra folgas no início da fila de prioridade
 
-## Solução: cobertura por papel + por dia
+Linhas 230–242: para cada vaga, calcula-se um `offset = (idx * folgasPorVaga) % 7` e aplica-se sobre `prioridadeFolgas` (que está ordenada pela menor demanda). No 5x2 com 2 folgas/vaga e poucas vagas (típico de CUMIN: 2–3 abridores/fechadores), o índice 0 sempre cai em SEG+TER, o índice 1 em QUA+QUI, etc. Como geralmente há só 2–3 vagas por papel, a maioria fica de fato em SEG+TER.
 
-Trocar a regra "headcount total ≥ demanda" por **três restrições simultâneas por dia**:
+Além disso, `capacidadeFolgaPorDia = vagasDoPapel.length - minimos[papel]` é constante para todos os dias da semana — não reflete a demanda real. Se há 3 vagas e mínimo 1, o algoritmo permite até 2 folgas em QUALQUER dia, inclusive SAB/DOM, mas a rotação por offset puxa tudo pro começo da prioridade.
 
-1. `abridores_em_campo[d] ≥ qtd_abridores` (mínimo POP de abertura)
-2. `fechadores_em_campo[d] ≥ qtd_fechadores` (mínimo POP de fechamento)
-3. `intermediarios_em_campo[d] ≥ qtd_intermediarios`
-4. (mantém) headcount total ≥ demanda do pico
+### 2. Intermediários e demais papéis não têm reparo nenhum
 
-Cada vaga já nasce tipada (`ABRIDOR-DOBRA`, `FECHADOR-PURO`, `INTERMEDIARIO-DOBRA`, etc.). A folga só é aceita se, **removendo aquela vaga naquele dia, o mínimo do papel dela continua atendido**.
+O loop de reparo (linha 211) só roda para `["abridor", "fechador"]`. Os intermediários ficam com o que a IA gerou — e o prompt instrui explicitamente "Priorize folgar em dias de MENOR demanda (SEG/TER/QUA)" (prompt.ts linha 109). A IA obedece e empilha tudo em SEG+TER.
 
-## Mudanças
+Resultado: 100% das vagas folgam SEG/TER, deixando QUI–DOM (alta demanda) com headcount alto, mas SEG/TER fica em mínimo absoluto e qualquer falta vira crise.
 
-### 1. `supabase/functions/gerar-escala-ia/prompt.ts`
+## Plano de Correção
 
-Reescrever o bloco "PLANEJAMENTO DE FOLGAS — DISTRIBUÍDO POR VAGA":
+Editar `supabase/functions/gerar-escala-ia/index.ts`:
 
-- Definir `papel(vaga)` ∈ {ABRIDOR, FECHADOR, INTERMEDIARIO} a partir do `tipo`.
-- Headcount mínimo por papel = valores recebidos no prompt (`qtd_abridores`, `qtd_fechadores`, `qtd_intermediarios`).
-- Headcount total por papel na semana:
-  ```
-  vagas_papel = ceil( (qtd_papel * dias_semana) / dias_uteis_por_pessoa )
-  ```
-  (6x1 → /6, 5x2 → /5). Garante folga sem furar o mínimo diário.
-- Distribuir folgas **dentro de cada papel** rotacionando entre os 7 dias, validando após cada atribuição:
-  - `papel_em_campo[d] ≥ qtd_papel` para todo d.
-  - 5x2: pares consecutivos quando possível.
-- Adicionar ao JSON de saída:
-  ```
-  plano_folgas.minimos_por_papel: { abridor, fechador, intermediario }
-  plano_folgas.cobertura_por_dia: {
-    SEG: { abridor_em_campo, fechador_em_campo, intermediario_em_campo, headcount_total },
-    ...
-  }
-  ```
-- Novo item de validação: "se cobertura_por_dia[d].papel < minimos_por_papel.papel → adicione em alertas_folga".
-- Atualizar CHECKLIST para incluir "□ Mín. abridores/fechadores/intermediários atendido em todos os 7 dias".
+### A. Distribuir folgas de forma balanceada (não só "menor demanda primeiro")
 
-### 2. `supabase/functions/gerar-escala-ia/index.ts`
+Substituir `prioridadeFolgas` por uma fila que considere capacidade por dia baseada em **demanda real**, não só ranking:
 
-Estender a validação do `plano_folgas` (logo após o loop atual):
+- Calcular `capacidadeFolgaPorDia[dia] = vagasDoPapel.length - max(minimos[papel], demanda_papel_estimada[dia])`.
+- Para 5x2, ao escolher 2 folgas por vaga, preferir pares consecutivos (SEG+TER, TER+QUA, DOM+SEG) e **distribuir as vagas em pares diferentes** ciclicamente, não pelo offset linear da lista priorizada.
+- Adicionar trava: nenhum dia pode receber mais de `ceil(vagasDoPapel.length * folgasPorVaga / 7) + 1` folgas do mesmo papel (espalhamento forçado).
 
-- Para cada dia ∈ DIAS, contar vagas por papel **não em folga** naquele dia.
-- Comparar com `config.qtd_abridores / qtd_fechadores / qtd_intermediarios`.
-- Se faltar, push em `alertasFolga` (`SEG: 1 abridor em campo < mínimo 2`).
-- Bloquear retorno (422) se `alertasFolga.length > 0` — hoje só anexa avisos. Como o usuário disse que isso é **obrigatório**, virar erro duro.
+### B. Aplicar o mesmo reparo a intermediários e demais vagas regulares
 
-### 3. `src/components/escalas/GeradorEscalaIA.tsx`
+Estender o loop para incluir `intermediario` e qualquer vaga regular sem papel mapeado. Critério de mínimo diário para intermediários: usar `demanda_por_dia[dia] - (abridores_em_campo + fechadores_em_campo)` como piso, garantindo que a folga não derrube `headcount_total - folgas[dia] < demanda_por_dia[dia]`.
 
-No painel "Plano de folgas", adicionar uma segunda mini-tabela:
-- Linhas: Abridor / Fechador / Intermediário / Total
-- Colunas: SEG..DOM
-- Célula: `em_campo / mínimo` — vermelho se em_campo < mínimo.
+### C. Pós-validação anti-concentração (regra dura)
 
-Lê de `resultado.plano_folgas.cobertura_por_dia` e `minimos_por_papel`.
+Após o reparo, calcular `folgasPorDia[dia]` somando todas as vagas regulares. Se algum dia concentra > 50% das folgas semanais totais, redistribuir movendo folgas excedentes para o próximo dia com capacidade livre. Adicionar alerta em `plano.avisos_distribuicao_folgas`.
 
-## Arquivos
-- `supabase/functions/gerar-escala-ia/prompt.ts`
-- `supabase/functions/gerar-escala-ia/index.ts`
-- `src/components/escalas/GeradorEscalaIA.tsx`
+### D. Ajuste no prompt (prompt.ts)
 
-## Como testar
-Rodar o gerador para a mesma semana de teste. O JSON deve agora trazer `cobertura_por_dia`; se o modelo tentar colocar duas folgas de fechador no mesmo Tipo C, o edge retorna 422 com `alertas_folga` apontando o dia/papel furado, forçando nova geração.
+Suavizar a instrução "Priorize folgar em dias de MENOR demanda" para "Distribua folgas de forma BALANCEADA ao longo da semana, evitando concentrar mais de 40% das folgas no mesmo dia. Dias de menor demanda recebem folgas marginalmente mais; nunca todas".
+
+### E. Teste
+
+Após o deploy, chamar a função para CUMIN / 2026-05-05 / 5x2 e verificar que `cobertura_por_dia_calc` mostra headcount > mínimo+1 em SEG/TER (não só mínimo cravado), e que nenhum dia concentra mais que ~30% das folgas.
+
+## Arquivos afetados
+
+- `supabase/functions/gerar-escala-ia/index.ts` (lógica de reparo e validação)
+- `supabase/functions/gerar-escala-ia/prompt.ts` (instrução de balanceamento)

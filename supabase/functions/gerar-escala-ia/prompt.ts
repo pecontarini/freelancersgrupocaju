@@ -52,6 +52,7 @@ TIPO C:
 GARÇOM:
   TIPO-ALMOCO    → 10h30→16h
   TIPO-FECHAMENTO Tipo A/B → 17h→00h30 ou 17h→23h30
+  TIPO-FECHAMENTO Tipo C   → 17h→02h30
 
 ═══════════════════════════════
 REGRA ESPECÍFICA — SETOR PARRILLA

@@ -150,15 +150,10 @@ Deno.serve(async (req) => {
           alertasFolga.push(`Vaga ${v.id_vaga ?? v.tipo}: ${f} folga(s), esperado ${folgasPorVaga} (${modeloUsado}).`);
         }
       }
-      const demanda = plano.demanda_por_dia ?? {};
       const cobertura: Record<string, any> = {};
       for (const dia of DIAS) {
         const vagasNoDia = vagasRegulares.filter((v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)));
         const emCampo = vagasNoDia.length;
-        const need = Number(demanda[dia] ?? 0);
-        if (need > 0 && emCampo < need) {
-          alertasFolga.push(`${dia}: ${emCampo} em campo < demanda ${need}.`);
-        }
         const porPapel = { abridor: 0, fechador: 0, intermediario: 0, outro: 0 };
         for (const v of vagasNoDia) {
           porPapel[papelDe(v.papel ?? v.tipo)]++;

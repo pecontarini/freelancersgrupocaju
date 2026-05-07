@@ -239,6 +239,41 @@ Deno.serve(async (req) => {
       }
     }
 
+    // === REGRA ESPECÍFICA — PARRILLA: abertura sempre 08:00 ===
+    // Garantia determinística: independente do que a IA gerar, todo abridor da
+    // Parrilla começa T1 às 08:00 (08:00→13:00 = 5h efetivas), mantendo break 180
+    // e T2 inalterado.
+    if (setorLemma === "parrilla" || setorLemma.startsWith("parrilla")) {
+      const ehAbridor = (tipo: unknown, papel?: unknown) => {
+        const c = [tipo, papel].map((v) => String(v ?? "").toUpperCase());
+        return c.some((t) => t.startsWith("ABRIDOR") || t === "ABERTURA");
+      };
+      const forcarT1 = (slotOuVaga: any, t1Holder: any) => {
+        if (!t1Holder) return;
+        t1Holder.entrada = "08:00";
+        t1Holder.saida = "13:00";
+        t1Holder.efetivo_min = 300;
+        if (typeof slotOuVaga.jornada_dia_min === "number") {
+          const t2ef = slotOuVaga?.t2?.efetivo_min ?? slotOuVaga?.horario_padrao?.t2?.efetivo_min ?? 0;
+          slotOuVaga.jornada_dia_min = 300 + (slotOuVaga.break_min ?? 180) + t2ef;
+        }
+      };
+      // Slots em dias[*].slots
+      for (const dia of Object.keys(escala?.dias ?? {})) {
+        const slots = escala.dias[dia]?.slots ?? [];
+        for (const s of slots) {
+          if (ehAbridor(s.tipo, s.papel) && s.t1) forcarT1(s, s.t1);
+        }
+      }
+      // Vagas em plano_folgas.vagas[*].horario_padrao.t1
+      for (const v of escala?.plano_folgas?.vagas ?? []) {
+        if (ehAbridor(v.tipo, v.papel) && v.horario_padrao?.t1) {
+          forcarT1(v, v.horario_padrao.t1);
+        }
+      }
+      console.log("[gerar-escala-ia] Parrilla: abertura forçada para 08:00 em todos abridores.");
+    }
+
     const cltAlerts = escala?.validacao?.alertas_clt ?? [];
     // Só bloqueia se houver alertas CLT explícitos.
     // Ausência de bloco "validacao" ou "aprovado=false" sem alertas é tratada como aviso, não erro.

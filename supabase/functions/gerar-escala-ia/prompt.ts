@@ -227,39 +227,40 @@ ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ""}
 
 ═══════════════════════════════
-HEADCOUNT — APENAS REFERÊNCIA INFORMATIVA
+HEADCOUNT — TETO REAL DE PESSOAS
 ═══════════════════════════════
-Headcount cadastrado no setor: ${p.headcount_max} pessoas ATIVAS (apenas referência).
+Headcount cadastrado no setor: ${p.headcount_max} pessoas ATIVAS.
 
-POP É PISO ABSOLUTO E INEGOCIÁVEL — gere TODAS as vagas necessárias para
-cobrir o POP de almoço E o POP de jantar de CADA dia, MESMO QUE ULTRAPASSE
-${p.headcount_max} pessoas. Não sacrifique cobertura por falta de gente.
-O sistema sinalizará automaticamente o déficit de pessoal ao RH.
+Sua função PRINCIPAL é desenhar HORÁRIOS para essas pessoas reais cobrindo o POP.
+NÃO crie uma vaga nova para cada turno. UMA pessoa pode (e deve) cobrir almoço E
+jantar no mesmo dia em DOBRA quando viável (Tipo A/B). Reaproveite ao máximo.
 
-Se ultrapassar ${p.headcount_max}: registre em validacao.alertas_operacionais
-("Setor exige X vagas, tem ${p.headcount_max} ativos — déficit de Y pessoas")
-mas GERE A ESCALA COMPLETA mesmo assim.
+REGRAS DE DIMENSIONAMENTO:
+1. Calcule demanda_pessoa_dia[d] = max(pop_almoco[d], pop_jantar[d]).
+   Uma pessoa em DOBRA conta como 1 pessoa-dia e cobre os dois POPs.
+2. Mínimo matemático semanal = max( pico_diário, ceil(soma/dias_uteis_por_pessoa) ).
+3. Total de vagas DEVE ser <= ${p.headcount_max} sempre que ${p.headcount_max}
+   for >= mínimo matemático. Se for menor, use o mínimo matemático e registre
+   alerta operacional. NÃO infle vagas além do necessário.
+4. TIPO-ALMOCO puro só quando, depois de usar dobras viáveis, ainda faltar
+   cobertura de almoço.
+5. Tipo C (Qui/Sex/Sáb): fechadores são puros (jantar). Abridores ficam até 21h
+   (cobrem almoço + parte do jantar).
 
 ═══════════════════════════════
-REGRAS PARA GARÇOM / ATENDIMENTO — POP ALMOÇO INEGOCIÁVEL
+REGRAS PARA GARÇOM / ATENDIMENTO
 ═══════════════════════════════
 Se o setor for de atendimento (GARCOM, GARCOMS, GARÇOM, ATENDIMENTO, SALAO):
-  - Para CADA dia com pop_almoco > 0: criar pelo menos esse número de vagas
-    com T1 começando ATÉ 10:30 (nunca depois das 11:00). Garante presença
-    antes da abertura ao cliente às 11:30.
-  - Para CADA dia com pop_jantar > 0: criar pelo menos esse número de vagas
-    TIPO-FECHAMENTO.
-  - Vagas de almoço e jantar para garçom são INDEPENDENTES — preferir DOBRA
-    quando viável para economizar pessoas, mas NUNCA omitir vagas TIPO-ALMOCO
-    "porque já tem gente no jantar". O cliente almoça e janta — ambos POPs
-    são obrigatórios, separadamente.
-  - Template padrão TIPO-ALMOCO: T1 10:30→16:00 (sem dobra).
-  - Folgas de garçom devem nunca derrubar o POP de almoço NEM o POP de jantar
-    abaixo do mínimo em nenhum dia.
+  - Para CADA dia, garantir presença suficiente para cobrir POP almoço (T1
+    iniciando até 10:30) E POP jantar (T2 iniciando até 18:00) — usando DOBRAS
+    como mecanismo principal.
+  - Vagas de almoço/jantar NÃO são listas separadas: uma pessoa em dobra cobre
+    ambos. Só crie vaga TIPO-ALMOCO pura quando faltar cobertura de almoço
+    após esgotar dobras.
+  - Folgas nunca derrubam POP (almoço ou jantar) abaixo do mínimo.
 
-ATENÇÃO GLOBAL: nenhuma folga pode reduzir abridores/fechadores/garçons-almoço
-em campo abaixo do mínimo POP em NENHUM dia. Dimensione:
-vagas_papel = ceil((qtd_papel * 7) / dias_uteis_por_pessoa).
+ATENÇÃO: respeitar o teto ${p.headcount_max} sempre que matematicamente possível.
+O sistema fará poda automática se você passar do teto. Dimensione corretamente.
 
 TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):
 ${tabela}

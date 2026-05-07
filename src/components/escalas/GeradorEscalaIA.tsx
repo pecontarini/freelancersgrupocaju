@@ -104,6 +104,7 @@ interface EscalaResponse {
     headcount_usado?: number;
     modelo_folga_aplicado?: string;
     alertas_capacidade?: string[];
+    cobertura_almoco_por_dia?: Record<string, { necessario: number; em_campo: number; ok: boolean }>;
     vagas: VagaPlanejada[];
   };
   resumo_semanal?: any;

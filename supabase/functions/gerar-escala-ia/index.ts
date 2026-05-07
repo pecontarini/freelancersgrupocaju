@@ -84,11 +84,12 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
+        max_tokens: 16000,
         response_format: { type: "json_object" },
       }),
     });
@@ -103,11 +104,30 @@ Deno.serve(async (req) => {
 
     const aiData = await aiResp.json();
     const rawText = aiData.choices?.[0]?.message?.content ?? "";
+    const finishReason = aiData.choices?.[0]?.finish_reason;
+
+    if (finishReason === "length") {
+      return json({
+        error: "Resposta da IA truncada (limite de tokens). Tente novamente — o setor pode ter muitos slots.",
+        finish_reason: finishReason,
+      }, 422);
+    }
 
     let escala: any;
     try { escala = JSON.parse(rawText); }
     catch {
-      return json({ error: "IA retornou JSON inválido.", raw: rawText }, 422);
+      // Tenta extrair JSON mesmo com texto extra ao redor
+      try {
+        const start = rawText.indexOf("{");
+        const end = rawText.lastIndexOf("}");
+        if (start !== -1 && end > start) {
+          escala = JSON.parse(rawText.slice(start, end + 1));
+        } else {
+          throw new Error("no json");
+        }
+      } catch {
+        return json({ error: "IA retornou JSON inválido.", raw: rawText, finish_reason: finishReason }, 422);
+      }
     }
 
     const cltAlerts = escala?.validacao?.alertas_clt ?? [];

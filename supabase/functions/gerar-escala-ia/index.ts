@@ -144,12 +144,16 @@ Deno.serve(async (req) => {
       const isExtra = (v: any) => String(v.tipo ?? "").toUpperCase().startsWith("EXTRA");
       const vagasRegulares = plano.vagas.filter((v: any) => !isExtra(v));
 
+      // Aviso (não-fatal) sobre divergência de folgas/vaga vs modelo.
+      // Regra dura é o mínimo POP por papel/dia, validado abaixo.
+      const avisosFolgaVaga: string[] = [];
       for (const v of vagasRegulares) {
         const f = Array.isArray(v.folgas) ? v.folgas.length : 0;
         if (f !== folgasPorVaga) {
-          alertasFolga.push(`Vaga ${v.id_vaga ?? v.tipo}: ${f} folga(s), esperado ${folgasPorVaga} (${modeloUsado}).`);
+          avisosFolgaVaga.push(`Vaga ${v.id_vaga ?? v.tipo}: ${f} folga(s), esperado ${folgasPorVaga} (${modeloUsado}).`);
         }
       }
+      plano.avisos_folga_vaga = avisosFolgaVaga;
       const cobertura: Record<string, any> = {};
       for (const dia of DIAS) {
         const vagasNoDia = vagasRegulares.filter((v: any) => !(Array.isArray(v.folgas) && v.folgas.includes(dia)));

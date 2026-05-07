@@ -231,6 +231,9 @@ export function GeradorEscalaIA() {
     if (!resultado || !effectiveUnidadeId) return;
     setEnviando(true);
     try {
+      // Semana sempre normalizada para a segunda-feira (Editor faz startOfWeek).
+      const weekStartMonday = toMondayISO(semana);
+
       // 1) Resolver sector_id pelo nome do setor (turno_config.setor → sectors.name)
       const { data: sectorRows, error: sectorErr } = await supabase
         .from("sectors")
@@ -250,24 +253,22 @@ export function GeradorEscalaIA() {
       const targetLemma = lemma(setor);
       const rows = sectorRows || [];
 
-      // 1) Match exato normalizado
+      // 1) Match exato normalizado (vence sempre, mesmo se houver variantes)
       let sector = rows.find((s) => normalize(s.name) === target);
-      // 2) Match por lemma (singular/plural, m↔n)
+      // 2) Match por lemma — quando há múltiplos, escolhe o de nome mais curto
+      //    (tende a ser a forma canônica: "Cumin" vence "CUMINS NAZO")
       if (!sector) {
         const lemmaMatches = rows.filter((s) => lemma(s.name) === targetLemma);
-        if (lemmaMatches.length === 1) sector = lemmaMatches[0];
-        else if (lemmaMatches.length > 1) {
-          toast.error(
-            `Setor "${setor}" ambíguo nesta unidade. Candidatos: ${lemmaMatches.map((s) => s.name).join(", ")}. Renomeie em Cargos e Setores.`,
-            { duration: 10000 },
-          );
-          return;
+        if (lemmaMatches.length >= 1) {
+          sector = [...lemmaMatches].sort((a, b) => a.name.length - b.name.length)[0];
         }
       }
-      // 3) Fallback: startsWith único pelo lemma
+      // 3) Fallback: startsWith pelo lemma — mesma regra: menor nome vence
       if (!sector) {
         const startsMatches = rows.filter((s) => lemma(s.name).startsWith(targetLemma));
-        if (startsMatches.length === 1) sector = startsMatches[0];
+        if (startsMatches.length >= 1) {
+          sector = [...startsMatches].sort((a, b) => a.name.length - b.name.length)[0];
+        }
       }
       if (!sector) {
         const candidatos = rows.map((s) => s.name).join(", ") || "nenhum";
@@ -278,8 +279,8 @@ export function GeradorEscalaIA() {
         return;
       }
 
-      // 2) Construir mapa dia da semana (SEG..DOM) → date string da semana
-      const baseMonday = new Date(`${semana}T12:00:00`);
+      // 2) Construir mapa dia da semana (SEG..DOM) → date string da semana (a partir da segunda)
+      const baseMonday = new Date(`${weekStartMonday}T12:00:00`);
       const dayDates: Record<string, string> = {};
       DIAS.forEach((d, idx) => {
         const dt = new Date(baseMonday);
@@ -329,7 +330,7 @@ export function GeradorEscalaIA() {
           unit_id: effectiveUnidadeId,
           sector_id: sector.id,
           sector_name: sector.name,
-          week_start: semana,
+          week_start: weekStartMonday,
           label: `Vaga ${v.tipo}${v.responsavel ? " ★" : ""}`,
           tipo: v.tipo,
           responsavel: !!v.responsavel,
@@ -342,10 +343,12 @@ export function GeradorEscalaIA() {
         return;
       }
 
-      console.info("[AI Draft] plano_folgas:", {
-        headcount: resultado.plano_folgas?.headcount_total,
+      console.info("[AI Draft] enviando para editor:", {
+        unit_id: effectiveUnidadeId,
+        sector: sector.name,
+        sector_id: sector.id,
+        week_start: weekStartMonday,
         vagas: vagas.length,
-        modelo: resultado.modelo_folga,
       });
 
       const { inserted } = await insertDraftSlots(drafts);
@@ -353,12 +356,12 @@ export function GeradorEscalaIA() {
       const fireDrafts = () =>
         window.dispatchEvent(
           new CustomEvent("ai-drafts-ready", {
-            detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: semana },
+            detail: { unitId: effectiveUnidadeId, sectorId: sector.id, weekStart: weekStartMonday },
           }),
         );
 
       toast.success(
-        `${inserted} vaga(s) enviadas — folgas distribuídas (${resultado.modelo_folga})`,
+        `${inserted} vaga(s) enviadas para "${sector.name}" — semana de ${weekStartMonday}`,
         {
           action: { label: "Abrir Editor agora", onClick: fireDrafts },
           duration: 8000,

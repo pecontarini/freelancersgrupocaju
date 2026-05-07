@@ -52,7 +52,16 @@ TIPO C:
 GARÇOM:
   TIPO-ALMOCO    → 10h30→16h
   TIPO-FECHAMENTO Tipo A/B → 17h→00h30 ou 17h→23h30
-  TIPO-FECHAMENTO Tipo C   → 17h→02h30
+
+═══════════════════════════════
+REGRA ESPECÍFICA — SETOR PARRILLA
+═══════════════════════════════
+Quando o setor for PARRILLA (parrilleiro/churrasqueiro), TODA abertura começa
+às 08:00 (não 09:00). Templates da Parrilla:
+  ABRIDOR-DOBRA (Tipo A/B)        → T1: 08h→13h | break 3h | T2: 17h→fechamento
+  ABRIDOR-DOBRA-PARCIAL (Tipo C)  → T1: 08h→13h | break 3h | T2: 17h→21h
+A entrada 08:00 é INEGOCIÁVEL para qualquer vaga/slot de papel "abridor" da
+Parrilla, em todos os 7 dias da semana.
 
 REGRAS DOS TEMPLATES:
 - T1 + T2 = MESMA pessoa, MESMO dia

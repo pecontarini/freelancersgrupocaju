@@ -19,6 +19,17 @@ import { insertDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDr
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
 
+// Normaliza qualquer data YYYY-MM-DD para a segunda-feira (00:00) da mesma semana ISO.
+// Mantém string pura para evitar problemas de timezone.
+function toMondayISO(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  const dow = dt.getUTCDay(); // 0=Dom..6=Sab
+  const diff = dow === 0 ? -6 : 1 - dow;
+  dt.setUTCDate(dt.getUTCDate() + diff);
+  return dt.toISOString().slice(0, 10);
+}
+
 interface TurnoConfigRow {
   id: string;
   setor: string;

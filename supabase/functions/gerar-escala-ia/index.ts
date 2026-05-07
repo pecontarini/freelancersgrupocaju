@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const [{ data: pop }, { data: config }] = await Promise.all([
+    const [{ data: pop }, { data: config }, { data: sectorRow }] = await Promise.all([
       supabase
         .from("escala_minima")
         .select("dia_semana, turno, qtd_efetivos, qtd_extras")
@@ -46,11 +46,50 @@ Deno.serve(async (req) => {
         .eq("unidade_id", unidade_id)
         .eq("setor", setor)
         .maybeSingle(),
+      supabase
+        .from("sectors")
+        .select("id, name")
+        .eq("unit_id", unidade_id),
     ]);
 
     if (!pop?.length || !config) {
       return json({ error: "Configuração não encontrada para este setor." }, 404);
     }
+
+    // Resolver sector_id pelo nome (normalizado) para calcular headcount real do setor
+    const norm = (s: string) =>
+      s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/[\s\-_]+/g, " ");
+    const lemma = (s: string) => norm(s).replace(/m$/, "n").replace(/s$/, "");
+    const setorNorm = norm(setor);
+    const setorLemma = lemma(setor);
+    const sectorRows = (sectorRow ?? []) as Array<{ id: string; name: string }>;
+    let matchedSector =
+      sectorRows.find((s) => norm(s.name) === setorNorm) ??
+      [...sectorRows.filter((s) => lemma(s.name) === setorLemma)].sort((a, b) => a.name.length - b.name.length)[0] ??
+      [...sectorRows.filter((s) => lemma(s.name).startsWith(setorLemma))].sort((a, b) => a.name.length - b.name.length)[0];
+
+    let headcountMax = 0;
+    if (matchedSector) {
+      const { data: sjt } = await supabase
+        .from("sector_job_titles")
+        .select("job_title_id")
+        .eq("sector_id", matchedSector.id);
+      const jobIds = (sjt ?? []).map((r: any) => r.job_title_id).filter(Boolean);
+      if (jobIds.length > 0) {
+        const { count } = await supabase
+          .from("employees")
+          .select("id", { count: "exact", head: true })
+          .eq("unit_id", unidade_id)
+          .eq("active", true)
+          .in("job_title_id", jobIds);
+        headcountMax = count ?? 0;
+      }
+    }
+    // Fallback: se não conseguiu calcular, usa soma da config
+    if (headcountMax <= 0) {
+      headcountMax = Number(config.qtd_abridores ?? 0) + Number(config.qtd_fechadores ?? 0) + Number(config.qtd_intermediarios ?? 0);
+    }
+    console.log(`[gerar-escala-ia] setor=${setor} headcount_max=${headcountMax}`);
 
     const tabelaMinima = DIAS.map((dia) => {
       const al = pop.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));
@@ -71,6 +110,7 @@ Deno.serve(async (req) => {
       setor,
       semana: semana_inicio,
       modeloFolga: (modelo_folga === "5x2" || modelo_folga === "6x1") ? modelo_folga : (config.modelo_folga ?? "6x1"),
+      headcount_max: headcountMax,
       config: {
         qtd_abridores: config.qtd_abridores,
         qtd_fechadores: config.qtd_fechadores,

@@ -84,19 +84,19 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 32000,
+        max_tokens: 16000,
         response_format: { type: "json_object" },
       }),
     });
 
     let aiResp: Response | null = null;
     let lastErr = "";
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         aiResp = await callGateway();
         if (aiResp.ok) break;
@@ -104,13 +104,12 @@ Deno.serve(async (req) => {
         if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
         lastErr = await aiResp.text();
         console.error(`AI gateway error (tentativa ${attempt}):`, aiResp.status, lastErr);
-        // Retry apenas em 5xx
         if (aiResp.status < 500) break;
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e);
         console.error(`AI gateway fetch falhou (tentativa ${attempt}):`, lastErr);
       }
-      if (attempt < 3) await new Promise((r) => setTimeout(r, 1500 * attempt));
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000));
     }
     if (!aiResp || !aiResp.ok) {
       return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após 3 tentativas." }, 502);

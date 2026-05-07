@@ -227,22 +227,38 @@ ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   ${p.config.observacoes ? `Obs do COO: ${p.config.observacoes}` : ""}
 
 ═══════════════════════════════
-TETO DE HEADCOUNT — INEGOCIÁVEL
+HEADCOUNT — APENAS REFERÊNCIA INFORMATIVA
 ═══════════════════════════════
-Headcount real cadastrado no setor: ${p.headcount_max} pessoas ATIVAS.
-A soma de vagas regulares (plano_folgas.vagas, EXCLUINDO EXTRA-*) NÃO pode
-ultrapassar ${p.headcount_max}. Cada vaga será vinculada a 1 pessoa real.
+Headcount cadastrado no setor: ${p.headcount_max} pessoas ATIVAS (apenas referência).
 
-Se a configuração POP exigir mais vagas do que esse teto, na ORDEM:
-  1. Mantenha 100% dos abridores e fechadores em campo nos 7 dias (POP intocável).
-  2. Force modelo 6x1 (1 folga/vaga) mesmo se foi solicitado 5x2.
-  3. Reduza intermediários até caber no teto.
-  4. Sinalize em validacao.alertas_operacionais a falta de capacidade
-     ("Setor tem ${p.headcount_max} pessoas mas POP exige X vagas").
-EXTRA-ALMOCO/EXTRA-JANTAR são reforços pontuais e NÃO contam no teto.
+POP É PISO ABSOLUTO E INEGOCIÁVEL — gere TODAS as vagas necessárias para
+cobrir o POP de almoço E o POP de jantar de CADA dia, MESMO QUE ULTRAPASSE
+${p.headcount_max} pessoas. Não sacrifique cobertura por falta de gente.
+O sistema sinalizará automaticamente o déficit de pessoal ao RH.
 
-ATENÇÃO: nenhuma folga pode reduzir abridores/fechadores em campo
-abaixo do mínimo em NENHUM dia. Para abridor/fechador dimensione
+Se ultrapassar ${p.headcount_max}: registre em validacao.alertas_operacionais
+("Setor exige X vagas, tem ${p.headcount_max} ativos — déficit de Y pessoas")
+mas GERE A ESCALA COMPLETA mesmo assim.
+
+═══════════════════════════════
+REGRAS PARA GARÇOM / ATENDIMENTO — POP ALMOÇO INEGOCIÁVEL
+═══════════════════════════════
+Se o setor for de atendimento (GARCOM, GARCOMS, GARÇOM, ATENDIMENTO, SALAO):
+  - Para CADA dia com pop_almoco > 0: criar pelo menos esse número de vagas
+    com T1 começando ATÉ 10:30 (nunca depois das 11:00). Garante presença
+    antes da abertura ao cliente às 11:30.
+  - Para CADA dia com pop_jantar > 0: criar pelo menos esse número de vagas
+    TIPO-FECHAMENTO.
+  - Vagas de almoço e jantar para garçom são INDEPENDENTES — preferir DOBRA
+    quando viável para economizar pessoas, mas NUNCA omitir vagas TIPO-ALMOCO
+    "porque já tem gente no jantar". O cliente almoça e janta — ambos POPs
+    são obrigatórios, separadamente.
+  - Template padrão TIPO-ALMOCO: T1 10:30→16:00 (sem dobra).
+  - Folgas de garçom devem nunca derrubar o POP de almoço NEM o POP de jantar
+    abaixo do mínimo em nenhum dia.
+
+ATENÇÃO GLOBAL: nenhuma folga pode reduzir abridores/fechadores/garçons-almoço
+em campo abaixo do mínimo POP em NENHUM dia. Dimensione:
 vagas_papel = ceil((qtd_papel * 7) / dias_uteis_por_pessoa).
 
 TABELA MÍNIMA POP (aprovada pelo Conselho — obrigatória):

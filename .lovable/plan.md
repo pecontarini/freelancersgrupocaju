@@ -1,82 +1,45 @@
 ## Problema
 
-O gerador de escalas IA pode criar mais "vagas" do que pessoas realmente cadastradas no setor (ex.: gera 30 vagas de garçom quando só existem 26 funcionários ativos). Como cada vaga precisa ser vinculada a uma pessoa real no Editor, qualquer excedente fica órfão. Além disso, o algoritmo às vezes deixa abertura/fechamento/POP descobertos quando o teto aperta.
+Para o setor GARCOM o gerador está produzindo só vagas de fechamento. Causa raiz dupla:
 
-## Regra de negócio definida
+1. **Teto de headcount estrangulando o POP**: o log mostra `headcount_max=2` (só 2 garçons cadastrados). A lógica atual em `index.ts` (linhas 369-396) poda intermediários LIFO até caber em 2 vagas e nunca cria slots de almoço. Como `qtd_abridores`/`qtd_fechadores` para garçom geralmente estão zerados em `turno_config` (a estrutura abridor/fechador é típica de cozinha), tudo vira "intermediário" e é podado, sobrando só o que a IA jogou para o jantar.
+2. **Prompt sem garantia explícita do POP de almoço para garçons**: o bloco "GARÇOM" da biblioteca de templates só descreve TIPO-ALMOCO e TIPO-FECHAMENTO, mas a regra de prioridade ("POP é piso absoluto, gerar mesmo sem gente") não está reforçada. Combinada com o teto, a IA aprende a sacrificar o almoço.
 
-1. **Teto = headcount real do setor** = nº de `employees` ativos vinculados ao setor via `sector_job_titles`. Esse é o número máximo de vagas regulares (não-EXTRA) que o gerador pode produzir.
-2. **POP de abertura/fechamento é intocável.** Mínimo diário de abridores e fechadores em campo deve ser respeitado nos 7 dias.
-3. **Se teto não couber POP+folgas:** reduzir folgas (manter 6x1 mesmo quando o desejado era 5x2) e devolver alerta visível, **sem bloquear** a geração.
+O usuário foi explícito: **a IA deve resolver o POP independente de ter pessoas contratadas**. Headcount vira aviso, não restrição.
 
-## Mudanças
+## Plano
 
-### Edge function `gerar-escala-ia/index.ts`
+### 1. `supabase/functions/gerar-escala-ia/index.ts` — POP acima do headcount
 
-1. Buscar `headcount_max` antes de chamar a IA:
-   - `sector_job_titles` do setor → `job_title_id[]`
-   - `employees` ativos da unidade com `job_title_id IN (...)` → `count`
-   - Passar esse número para a IA (no prompt) e usar como teto duro na pós-validação.
-2. Pós-validação após resposta da IA:
-   - Filtrar `vagasRegulares` (sem EXTRA).
-   - Garantir `vagas_papel = ceil((qtd_papel * 7)/diasUteis)` para abridor e fechador (já existe).
-   - Se `vagasRegulares.length > headcount_max`:
-     - Tentar primeiro mudar modelo para 6x1 (recalcular `diasUteisPorVaga`) e refazer a distribuição de folgas.
-     - Se ainda exceder, podar **intermediários** (último a entrar) até bater o teto.
-     - Nunca podar abridor/fechador abaixo do mínimo diário POP.
-     - Se mesmo após podar intermediários ao mínimo necessário ainda exceder, retornar alerta `headcount_insuficiente` com a mensagem: "Setor X tem N pessoas mas a configuração POP exige M vagas. Reduzir POP ou contratar (M-N)."
-   - Recalcular `cobertura_por_dia_calc` e revalidar mínimos POP por papel após qualquer poda/redistribuição.
-3. Adicionar ao payload retornado:
-   - `headcount_max`
-   - `headcount_usado`
-   - `alertas_capacidade` (array com mensagens explicativas)
-   - `modelo_folga_aplicado` (pode diferir do solicitado se houve fallback)
-4. Caso o conflito não tenha sido contornável (resta excedente), retornar HTTP 200 mas com `alertas_capacidade.length > 0` para o front mostrar banner amarelo (não 422 — usuário ainda pode revisar).
+- **Remover a poda de intermediários** (linhas 369-387). Substituir por: se `vagasRegulares.length > headcountMax`, NÃO podar — apenas adicionar `alertas_capacidade` informando o déficit ("Setor tem X pessoas mas POP exige Y vagas — contrate Z ou reduza POP").
+- **Manter o downgrade 5x2 → 6x1** (linhas 358-366) só como otimização, mas sem bloquear se ainda exceder.
+- **Garantir vagas de almoço para garçom**: após receber a resposta da IA, varrer `vagasRegulares` e, se nenhuma vaga cobre almoço (slot.t1.entrada ≤ 11:30 OU tipo contém "ALMOCO"/"ABRIDOR"), injetar vagas TIPO-ALMOCO usando `pop.almoco_efetivos` de cada dia como referência, com horário-padrão `10:30→16:00`. Marcar com `papel: "abridor"` para entrarem no mínimo diário.
+- **Recalcular cobertura** (`calcularCobertura`) considerando explicitamente cobertura de almoço: novo campo `almoco_coberto_por_dia[d]` = nº de vagas em campo cujo `horario_padrao.t1.entrada <= 11:30`. Se < `pop.almoco_efetivos[d]`, incluir em `alertas_folga`.
+- **Não bloquear nada**: alertas continuam viajando no payload com HTTP 200 (já é o comportamento, manter).
 
-### Prompt `gerar-escala-ia/prompt.ts`
+### 2. `supabase/functions/gerar-escala-ia/prompt.ts` — POP inegociável e templates de garçom
 
-Adicionar bloco logo após "ESTRUTURA DE TURNOS":
+- **Reescrever o bloco "TETO DE HEADCOUNT"** em `buildUserPrompt`: o teto vira **referência informativa**, não restrição. Texto: "Headcount cadastrado é X — gere todas as vagas necessárias para cobrir POP almoço E POP jantar de cada dia, mesmo que ultrapasse X. O sistema sinalizará déficit de pessoal."
+- **Adicionar regra dura para garçom no SYSTEM_PROMPT** (bloco GARÇOM da biblioteca):
+  - Para todo dia em que `pop.almoco_efetivos > 0`, criar pelo menos `pop.almoco_efetivos` vagas com T1 começando às 10:30 (não depois das 11:00) → garante presença às 11:30.
+  - Para todo dia em que `pop.jantar_efetivos > 0`, criar pelo menos `pop.jantar_efetivos` vagas TIPO-FECHAMENTO.
+  - Vagas de almoço e jantar são **independentes** para garçom (sem dobras obrigatórias) — preferir DOBRA quando possível para economizar pessoas, mas nunca sacrificar o POP de almoço por falta de gente.
+- **Reforçar prioridade**: "POP é PISO ABSOLUTO. Headcount real é apenas referência. Se faltar gente, gere as vagas mesmo assim."
 
-```
-TETO DE HEADCOUNT — INEGOCIÁVEL
-Headcount real cadastrado no setor: ${p.headcount_max}
-A soma de vagas regulares (excluindo EXTRA-*) NÃO pode ultrapassar esse número.
-Se a configuração POP exigir mais vagas do que esse teto:
-  1. Mantenha 100% dos abridores e fechadores nos 7 dias (POP intocável).
-  2. Reduza intermediários até caber.
-  3. Se mesmo assim não couber, use modelo 6x1 (1 folga/vaga) em vez de 5x2.
-  4. Sinalize em validacao.alertas_operacionais a falta de capacidade.
-EXTRA-ALMOCO/EXTRA-JANTAR não contam no teto (são reforços pontuais).
-```
+### 3. `src/components/escalas/GeradorEscalaIA.tsx` — UI
 
-### Front — `GeradorEscalaIA.tsx`
+- O banner amber de `alertas_capacidade` já existe; ajustar texto para refletir o novo comportamento ("Faltam contratar N pessoas — escala foi gerada com déficit, sinalize ao RH").
+- Adicionar linha no resumo: "Cobertura almoço: ✓/⚠ (X/Y dias OK)" e "Cobertura jantar: ✓/⚠".
 
-1. Após receber resposta, se `alertas_capacidade?.length > 0`, mostrar banner amarelo com a lista (não impedir envio ao Editor).
-2. Mostrar no resumo: `Vagas: X / Y disponíveis no setor`.
-3. Se `modelo_folga_aplicado !== modelo_folga` solicitado, exibir aviso: "Modelo ajustado para 6x1 por falta de headcount".
+### Verificação
 
-## Detalhes técnicos
+Setor GARCOM Caju Limão Itaim com `headcount_max=2` e POP almoço=4/jantar=5:
+- Antes: gera só 2 vagas de fechamento.
+- Depois: gera 4 vagas TIPO-ALMOCO (10:30–16:00) + 5 vagas TIPO-FECHAMENTO + banner amber "Setor tem 2 pessoas, POP exige 9 vagas — contratar 7".
+- `cobertura_por_dia_calc` mostra abridor_em_campo ≥ 4 todos os dias.
 
-- Headcount real consultado via:
-  ```sql
-  SELECT COUNT(*) FROM employees e
-  WHERE e.unit_id = $1 AND e.active = true
-    AND e.job_title_id IN (
-      SELECT job_title_id FROM sector_job_titles WHERE sector_id = $2
-    )
-  ```
-  Como o gerador atual recebe `setor` (text) e não `sector_id`, resolver `sector_id` por `name = setor AND unit_id = unidade_id`.
-- Função auxiliar `podarIntermediarios(vagasRegulares, headcountMax, minimos)`: remove vagas com `papelDe = 'intermediario'` (LIFO) até `length <= headcountMax`, sem tocar em abridor/fechador.
-- Função auxiliar `forcar6x1(vagasRegulares)`: zera `folgas` e reaplica `escolherDiasParaVaga` com `folgasPorVaga = 1`.
-- Ordem das ações de fallback: (1) trocar p/ 6x1 → (2) podar intermediários → (3) emitir alerta.
+### Arquivos afetados
 
-## Arquivos afetados
-
-- `supabase/functions/gerar-escala-ia/index.ts`
-- `supabase/functions/gerar-escala-ia/prompt.ts`
-- `src/components/escalas/GeradorEscalaIA.tsx` (banners de capacidade/modelo)
-
-## Verificação
-
-1. Rodar gerador para Garçom do Caju Limão Itaim com config que pediria 30 vagas → deve sair com ≤ 26 vagas, abertura/fechamento cobertos e banner amarelo "modelo ajustado".
-2. Confirmar via `ai_draft_slots` que nº de funcionários distintos ≤ 26.
-3. Validar nos `cobertura_por_dia_calc` que `abridor`/`fechador` ≥ mínimo em todos os 7 dias.
+- `supabase/functions/gerar-escala-ia/index.ts` (remoção da poda + injeção de vagas de almoço + cobertura)
+- `supabase/functions/gerar-escala-ia/prompt.ts` (POP > headcount + regra explícita garçom almoço)
+- `src/components/escalas/GeradorEscalaIA.tsx` (mensagem dos banners + linha de cobertura)

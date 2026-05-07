@@ -104,6 +104,7 @@ interface EscalaResponse {
     headcount_usado?: number;
     modelo_folga_aplicado?: string;
     alertas_capacidade?: string[];
+    cobertura_almoco_por_dia?: Record<string, { necessario: number; em_campo: number; ok: boolean }>;
     vagas: VagaPlanejada[];
   };
   resumo_semanal?: any;
@@ -538,6 +539,23 @@ export function GeradorEscalaIA() {
                 {resultado.plano_folgas.alertas_capacidade.map((a, i) => (
                   <div key={i} className="text-xs text-amber-900 dark:text-amber-200">{a}</div>
                 ))}
+              </div>
+            )}
+
+            {resultado.plano_folgas?.cobertura_almoco_por_dia && (
+              <div className="rounded-lg border p-3 text-xs space-y-1">
+                <div className="font-semibold text-sm">Cobertura POP Almoço (chega até 11:00)</div>
+                <div className="flex flex-wrap gap-2">
+                  {DIAS.map((d) => {
+                    const c = resultado.plano_folgas!.cobertura_almoco_por_dia![d];
+                    if (!c) return null;
+                    return (
+                      <Badge key={d} variant={c.ok ? "secondary" : "destructive"} className="text-[10px]">
+                        {d}: {c.em_campo}/{c.necessario}
+                      </Badge>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

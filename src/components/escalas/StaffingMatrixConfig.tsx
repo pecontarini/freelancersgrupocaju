@@ -375,7 +375,7 @@ export function StaffingMatrixConfig() {
                                   key={`eff-${sector.id}-${d.value}-${shiftType}-${count}`}
                                   type="number"
                                   min={0}
-                                  className="h-7 w-12 text-center mx-auto text-xs"
+                                  className="h-7 w-14 text-center mx-auto text-sm tabular-nums px-1"
                                   defaultValue={count}
                                   onBlur={(e) => {
                                     const v = parseInt(e.target.value) || 0;

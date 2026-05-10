@@ -1,40 +1,58 @@
 ## Objetivo
-Garantir que toda escala gerada para o setor **Parrilla** abra automaticamente às **08:00**, em qualquer unidade e qualquer dia da semana, sem depender da decisão da IA.
 
-## Diagnóstico
-Hoje os templates do prompt (`supabase/functions/gerar-escala-ia/prompt.ts`) usam **09:00** como entrada padrão dos abridores (`ABRIDOR-DOBRA` e `ABRIDOR-DOBRA-PARCIAL` T1: 09h→14h). Como a IA copia esses templates, a Parrilla acaba abrindo às 09h. Não há override por setor.
+Resolver duas melhorias na aba **Escalas** (Gestão de Pessoas):
 
-A correção é em duas camadas, para ser determinística:
+1. Permitir cadastrar um funcionário direto do **Editor de Escalas** (`ManualScheduleGrid`), já vinculando-o ao **setor ativo** e a um **cargo** (com vínculo `sector_job_titles`).
+2. Ajustar o input de **POP** (efetivos e extras) na configuração de matriz para que números de **2+ dígitos** apareçam por inteiro sem cortar.
 
-1. **Camada de prompt**: instruir a IA, quando o setor for Parrilla, a usar 08:00 como entrada do abridor (T1: 08h→13h, mantendo 5h efetivas e break de 3h).
-2. **Camada de pós-processamento (garantia)**: no `index.ts`, depois de receber o JSON da IA, varrer todos os slots/vagas de papel `abridor` quando `setor === parrilla` e forçar `t1.entrada = "08:00"` (ajustando `saida` para manter as 5h e recalculando `efetivo_min`). Isso evita regressão se a IA "esquecer".
+---
 
-## Mudanças
+## 1. Cadastro rápido de funcionário no Editor de Escalas
 
-### 1) `supabase/functions/gerar-escala-ia/prompt.ts`
-- Adicionar bloco "REGRA ESPECÍFICA — PARRILLA" no SYSTEM_PROMPT:
-  - Toda abertura da Parrilla começa às **08:00** (T1: 08h→13h | break 3h | T2 inalterado).
-  - Vale para Tipo A, B e C (incluindo `ABRIDOR-DOBRA-PARCIAL`).
-- Reforçar no `buildUserPrompt` quando `setor` normalizado for `parrilla`: linha explícita "ABERTURA DESTE SETOR: 08:00 (inegociável)".
+### Onde
+- `src/components/escalas/ManualScheduleGrid.tsx` — adicionar botão **"Novo funcionário"** no cabeçalho da grade (próximo aos filtros de cargo/setor já existentes), visível quando há `activeSectorId` selecionado.
+- Criar novo componente `src/components/escalas/QuickCreateEmployeeModal.tsx`, reaproveitando a lógica de `TeamManagement.tsx`.
 
-### 2) `supabase/functions/gerar-escala-ia/index.ts`
-- Após o parse do JSON da IA e antes da validação CLT, aplicar normalização:
-  ```ts
-  if (lemma(setor) === "parrilla") {
-    forcarAberturaParrilla(escala); // ajusta slots[].t1 e plano_folgas.vagas[].horario_padrao.t1
-  }
-  ```
-- A função ajusta apenas vagas/slots cujo `papel === "abridor"` ou `tipo` começa com `ABRIDOR`:
-  - `t1.entrada = "08:00"`, `t1.saida = "13:00"`, `t1.efetivo_min = 300`
-  - mantém break (180) e T2 como veio
-  - recalcula `jornada_dia_min`
+### O que o modal faz
+Campos no modal (todos no mesmo passo):
+- **Unidade** — pré-preenchida com `selectedUnit` do editor (admin pode trocar).
+- **Setor** — pré-preenchido com o setor ativo da grade (`activeSectorId`); somente leitura ou seleção entre setores da unidade.
+- **Cargo** — `Select` com cargos já existentes da unidade (`useJobTitles`) **+ opção "Novo cargo"**, igual ao `TeamManagement`. Quando o cargo escolhido **ainda não está vinculado ao setor**, vincula automaticamente.
+- **Nome** (obrigatório).
+- **Gênero** (M/F).
+- **Telefone** (opcional, máscara igual ao `TeamManagement`).
 
-### 3) Sem mudanças de UI
-A geração é via `gerar-escala-ia`; o `ScheduleAIGenerator` (chat) não precisa mudar. A garantia fica na edge function, então qualquer ponto de entrada respeita a regra.
+### Fluxo de salvamento (em ordem)
+1. `useUpsertJobTitle` → garante o `job_title_id` na unidade.
+2. `useAddSectorJobTitle` → vincula `(sector_id, job_title_id)` se ainda não vinculado (idempotente).
+3. `useAddEmployee` → cria o funcionário com `unit_id`, `name`, `gender`, `phone`, `job_title`, `job_title_id`.
+4. Invalida queries de `employees` e `sector_job_titles` → o novo funcionário aparece imediatamente em `sectorBaseEmployees` da grade ativa.
+5. Toast de sucesso e modal fecha.
+
+### Reuso de regras
+- Mesma validação de duplicidade do `TeamManagement` (mensagem amigável `friendlyEmployeeError`).
+- Respeita `useUserProfile` + `useAccessibleStores` para admins (ainda podem trocar a unidade).
+
+---
+
+## 2. Visualização do POP — input de dezenas legível
+
+### Onde
+- `src/components/escalas/StaffingMatrixConfig.tsx` (linhas ~374 e ~388 — inputs `efetivos` e `extras` da matriz).
+
+### Mudança
+- Atualmente os dois `Input` usam `w-12` (48px) com `text-xs`, o que corta o valor quando passa de 1 dígito (ex: `12`, `23`).
+- Aumentar a largura para acomodar até 3 dígitos confortavelmente:
+  - `w-12 text-xs` → `w-14 text-sm tabular-nums px-1`.
+  - Manter `text-center` e o `key` baseado no valor (preserva o comportamento de re-render).
+- Aplicar a mesma melhoria nos dois campos (efetivos e extras) para manter alinhamento visual.
+
+Sem alterações em lógica de cálculo, apenas estilo.
+
+---
 
 ## Verificação
-- Disparar geração para um setor Parrilla de qualquer unidade e conferir que todos os abridores aparecem com T1 começando 08:00 nos 7 dias.
-- Conferir que setores não-Parrilla (Cozinha, Bar, Garçom, etc.) seguem com 09:00.
 
-## Pergunta rápida
-Confirma que **todos os papéis de abertura** da Parrilla (abridor puro e abridor-dobra-parcial) devem entrar 08:00, ou só um papel específico (ex.: "parrilleiro abridor")? O plano acima assume **todos os abridores** da Parrilla.
+1. Editor de Escalas → selecionar setor "Garçom" → clicar em **Novo funcionário** → criar "Teste Garçom" / cargo "Garçom" → confirmar que aparece imediatamente como funcionário da base do setor (sem reload).
+2. Configurações → Matriz POP → digitar `12` em um efetivo → todo o número visível dentro do input em todos os dias da semana.
+3. Mobile (922px e abaixo): inputs continuam dentro da célula sem quebrar layout.

@@ -74,6 +74,7 @@ import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
 import { EditEmployeeQuickModal } from "./EditEmployeeQuickModal";
+import { QuickCreateEmployeeModal } from "./QuickCreateEmployeeModal";
 import { useEmployeeSundaysOff, monthRefFromDate } from "@/hooks/useSundayOff";
 import { formatCurrency } from "@/lib/formatters";
 import { useUnidade } from "@/contexts/UnidadeContext";
@@ -132,6 +133,7 @@ export function ManualScheduleGrid() {
   const { data: pracasOfUnit = [] } = usePracasByUnit(selectedUnit);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [showAllEmployees, setShowAllEmployees] = useState(false);
+  const [showQuickCreateEmp, setShowQuickCreateEmp] = useState(false);
 
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
 
@@ -1080,6 +1082,18 @@ export function ManualScheduleGrid() {
           </p>
         </div>
         <div className="flex gap-1.5 flex-wrap shrink-0">
+          {canManage && selectedUnit && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => setShowQuickCreateEmp(true)}
+              title="Cadastrar funcionário e vincular ao setor"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo funcionário</span>
+            </Button>
+          )}
           {canManage && selectedUnit && sectors.length > 0 && (
             <ClearSchedulesModal
               unitId={selectedUnit}
@@ -2029,6 +2043,14 @@ export function ManualScheduleGrid() {
         open={!!editEmployeeModal}
         onClose={() => setEditEmployeeModal(null)}
         employee={editEmployeeModal}
+      />
+
+      {/* Quick Create Employee (cadastro rápido) */}
+      <QuickCreateEmployeeModal
+        open={showQuickCreateEmp}
+        onOpenChange={setShowQuickCreateEmp}
+        unitId={selectedUnit}
+        sectorId={activeSectorId}
       />
 
       {/* Delete employee from week confirmation */}

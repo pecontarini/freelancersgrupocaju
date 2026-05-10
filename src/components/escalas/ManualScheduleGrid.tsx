@@ -133,6 +133,7 @@ export function ManualScheduleGrid() {
   const { data: pracasOfUnit = [] } = usePracasByUnit(selectedUnit);
   const [selectedSectorId, setSelectedSectorId] = useState<string | null>(null);
   const [showAllEmployees, setShowAllEmployees] = useState(false);
+  const [showQuickCreateEmp, setShowQuickCreateEmp] = useState(false);
 
   const activeSectorId = selectedSectorId || (sectors.length > 0 ? sectors[0].id : null);
 

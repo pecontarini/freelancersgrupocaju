@@ -1082,6 +1082,18 @@ export function ManualScheduleGrid() {
           </p>
         </div>
         <div className="flex gap-1.5 flex-wrap shrink-0">
+          {canManage && selectedUnit && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => setShowQuickCreateEmp(true)}
+              title="Cadastrar funcionário e vincular ao setor"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span className="hidden sm:inline">Novo funcionário</span>
+            </Button>
+          )}
           {canManage && selectedUnit && sectors.length > 0 && (
             <ClearSchedulesModal
               unitId={selectedUnit}

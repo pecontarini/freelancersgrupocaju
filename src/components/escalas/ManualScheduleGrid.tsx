@@ -74,6 +74,7 @@ import { jsDayToPopDay } from "@/lib/popConventions";
 import { ScheduleEditModal } from "./ScheduleEditModal";
 import { FreelancerAddModal } from "./FreelancerAddModal";
 import { EditEmployeeQuickModal } from "./EditEmployeeQuickModal";
+import { QuickCreateEmployeeModal } from "./QuickCreateEmployeeModal";
 import { useEmployeeSundaysOff, monthRefFromDate } from "@/hooks/useSundayOff";
 import { formatCurrency } from "@/lib/formatters";
 import { useUnidade } from "@/contexts/UnidadeContext";

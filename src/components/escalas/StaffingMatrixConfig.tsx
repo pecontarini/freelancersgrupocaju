@@ -390,7 +390,7 @@ export function StaffingMatrixConfig() {
                                     type="text"
                                     inputMode="numeric"
                                     pattern="[0-9]*"
-                                    className="h-7 w-12 text-center mx-auto text-xs border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-7 w-14 text-center mx-auto text-sm tabular-nums px-1 border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     defaultValue={extras}
                                     onBlur={(e) => {
                                       const v = parseInt(e.target.value) || 0;

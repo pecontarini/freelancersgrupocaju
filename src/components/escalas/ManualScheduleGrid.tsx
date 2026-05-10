@@ -2045,6 +2045,14 @@ export function ManualScheduleGrid() {
         employee={editEmployeeModal}
       />
 
+      {/* Quick Create Employee (cadastro rápido) */}
+      <QuickCreateEmployeeModal
+        open={showQuickCreateEmp}
+        onOpenChange={setShowQuickCreateEmp}
+        unitId={selectedUnit}
+        sectorId={activeSectorId}
+      />
+
       {/* Delete employee from week confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o && !isDeletingWeek) setDeleteConfirm(null); }}>
         <AlertDialogContent>

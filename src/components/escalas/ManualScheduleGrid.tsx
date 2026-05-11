@@ -2027,7 +2027,18 @@ export function ManualScheduleGrid() {
                                   <TableCell
                                     key={i}
                                     className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                    onClick={() => handleCellClick(emp, dateStr)}
+                                    title="1 clique: folga · 2 cliques: editar"
+                                    onClick={() => {
+                                      cancelPendingClick();
+                                      clickTimerRef.current = setTimeout(() => {
+                                        handleSingleClickToggleOff(emp, dateStr);
+                                        clickTimerRef.current = null;
+                                      }, 220);
+                                    }}
+                                    onDoubleClick={() => {
+                                      cancelPendingClick();
+                                      handleCellClick(emp, dateStr);
+                                    }}
                                   >
                                     <div className="h-10 flex items-center justify-center">
                                       <span className="text-muted-foreground/40 text-xs">—</span>

@@ -23,6 +23,8 @@ import {
   Clock4,
   Sun,
   CheckCircle2,
+  Link as LinkIcon,
+  Unlink,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { PracaSelector } from "./PracaSelector";

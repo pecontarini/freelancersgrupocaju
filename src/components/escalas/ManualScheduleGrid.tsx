@@ -1547,14 +1547,25 @@ export function ManualScheduleGrid() {
                                       Gasto: {formatCurrency(metrics.freelancerCost)}
                                     </div>
                                   )}
+                                  {(() => {
+                                    const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
+                                    const filled = freelancerCountPerDay.get(dateStr) ?? 0;
+                                    const over = filled - quota;
+                                    if (over <= 0) return null;
+                                    return (
+                                      <div className="inline-flex items-center gap-0.5 rounded px-1 py-[1px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-medium">
+                                        Acima da cota POP (+{over})
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Actions */}
                                 <div className="flex items-center justify-center gap-0.5 mt-1">
                                   <button
                                     onClick={() => setFreelancerModal({ open: true, date: dateStr })}
-                                    className="p-0.5 rounded hover:bg-muted text-orange-500"
-                                    title="+ Freelancer"
+                                    className="p-0.5 rounded hover:bg-primary/10 text-primary"
+                                    title="Adicionar freelancer (inclui acima da cota POP)"
                                   >
                                     <UserPlus className="h-3 w-3" />
                                   </button>

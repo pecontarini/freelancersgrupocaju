@@ -962,7 +962,9 @@ export function ManualScheduleGrid() {
       const dateStr = format(day, "yyyy-MM-dd");
       const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
       const filled = freelancerCountPerDay.get(dateStr) ?? 0;
-      map.set(dateStr, Math.max(quota, filled, 1));
+      // Always keep one empty extra slot available beyond what's already filled,
+      // so the operator can always lançar mais freelancers além da cota POP.
+      map.set(dateStr, Math.max(quota, filled + 1));
     }
     return map;
   }, [weekDays, extrasQuotaPerDay, freelancerCountPerDay]);
@@ -1545,14 +1547,25 @@ export function ManualScheduleGrid() {
                                       Gasto: {formatCurrency(metrics.freelancerCost)}
                                     </div>
                                   )}
+                                  {(() => {
+                                    const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
+                                    const filled = freelancerCountPerDay.get(dateStr) ?? 0;
+                                    const over = filled - quota;
+                                    if (over <= 0) return null;
+                                    return (
+                                      <div className="inline-flex items-center gap-0.5 rounded px-1 py-[1px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-medium">
+                                        Acima da cota POP (+{over})
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Actions */}
                                 <div className="flex items-center justify-center gap-0.5 mt-1">
                                   <button
                                     onClick={() => setFreelancerModal({ open: true, date: dateStr })}
-                                    className="p-0.5 rounded hover:bg-muted text-orange-500"
-                                    title="+ Freelancer"
+                                    className="p-0.5 rounded hover:bg-primary/10 text-primary"
+                                    title="Adicionar freelancer (inclui acima da cota POP)"
                                   >
                                     <UserPlus className="h-3 w-3" />
                                   </button>
@@ -1859,6 +1872,12 @@ export function ManualScheduleGrid() {
                           const dateStr = format(day, "yyyy-MM-dd");
                           return slotIdx < (extrasQuotaPerDay.get(dateStr) ?? 0);
                         });
+                        // Maximum quota across the week (used to number avulso rows)
+                        const maxQuotaWeek = weekDays.reduce((m, day) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          return Math.max(m, extrasQuotaPerDay.get(dateStr) ?? 0);
+                        }, 0);
+                        const avulsoIndex = slotIdx - maxQuotaWeek + 1; // 1-based, only meaningful when !isQuotaRowAnyDay
                         return (
                         <TableRow key={`extra-slot-${slotIdx}`} className={isQuotaRowAnyDay ? "bg-amber-50/50 dark:bg-amber-950/10" : "bg-muted/20"}>
                           <TableCell className={`font-medium sticky left-0 z-10 border-r ${isQuotaRowAnyDay ? "bg-amber-50 dark:bg-amber-950/20" : "bg-muted/30"}`}>
@@ -1867,7 +1886,9 @@ export function ManualScheduleGrid() {
                               <span className={`text-xs font-semibold ${isQuotaRowAnyDay ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
                                 {isQuotaRowAnyDay
                                   ? `VAGA EXTRA ${String(slotIdx + 1).padStart(2, "0")}`
-                                  : "EXTRA AVULSO"}
+                                  : avulsoIndex > 1
+                                    ? `EXTRA AVULSO ${String(avulsoIndex).padStart(2, "0")}`
+                                    : "EXTRA AVULSO"}
                               </span>
                             </div>
                           </TableCell>

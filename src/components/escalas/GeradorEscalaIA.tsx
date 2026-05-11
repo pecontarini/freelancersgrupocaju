@@ -293,8 +293,13 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      const slotToDay = (horario: { t1?: any; t2?: any }): DraftDay | null => {
-        if (horario.t1 && horario.t2) {
+      const isHHMM = (s: any): s is string =>
+        typeof s === "string" && /^\d{1,2}:\d{2}$/.test(s.trim());
+
+      const slotToDay = (horario: any): DraftDay | null => {
+        if (!horario || typeof horario !== "object") return null;
+        // Formato canônico: { t1: { entrada, saida }, t2: { entrada, saida } }
+        if (horario.t1 && horario.t2 && isHHMM(horario.t1.entrada) && isHHMM(horario.t2.saida)) {
           return {
             kind: "work",
             start_time: horario.t1.entrada,
@@ -304,14 +309,38 @@ export function GeradorEscalaIA() {
           };
         }
         const t = horario.t1 ?? horario.t2;
-        if (!t) return null;
-        return {
-          kind: "work",
-          start_time: t.entrada,
-          end_time: t.saida,
-          break_min: 180,
-          shift_type: horario.t1 ? "T1" : "T2",
-        };
+        if (t && isHHMM(t.entrada) && isHHMM(t.saida)) {
+          return {
+            kind: "work",
+            start_time: t.entrada,
+            end_time: t.saida,
+            break_min: 180,
+            shift_type: horario.t1 ? "T1" : "T2",
+          };
+        }
+        // Fallback: { entrada, saida } no próprio objeto
+        if (isHHMM(horario.entrada) && isHHMM(horario.saida)) {
+          return {
+            kind: "work",
+            start_time: horario.entrada,
+            end_time: horario.saida,
+            break_min: 180,
+            shift_type: "T1",
+          };
+        }
+        // Fallback: { start_time, end_time } / { inicio, fim }
+        const start = horario.start_time ?? horario.inicio;
+        const end = horario.end_time ?? horario.fim;
+        if (isHHMM(start) && isHHMM(end)) {
+          return {
+            kind: "work",
+            start_time: start,
+            end_time: end,
+            break_min: 180,
+            shift_type: "T1",
+          };
+        }
+        return null;
       };
 
       // ===== Nova estratégia: usar plano_folgas.vagas (folgas distribuídas por vaga) =====
@@ -322,10 +351,23 @@ export function GeradorEscalaIA() {
       }
 
       const drafts: Omit<DraftSlot, "id" | "created_at" | "created_by">[] = [];
+      let vagasIgnoradas = 0;
+      let warnedSample = false;
       for (let i = 0; i < vagas.length; i++) {
         const v = vagas[i];
-        const day = slotToDay(v.horario_padrao);
-        if (!day) continue;
+        const horario = (v as any)?.horario_padrao ?? (v as any)?.horario ?? v;
+        const day = slotToDay(horario);
+        if (!day) {
+          vagasIgnoradas++;
+          if (!warnedSample) {
+            warnedSample = true;
+            console.warn("[GeradorEscalaIA] vaga sem horário válido:", {
+              keys: v && typeof v === "object" ? Object.keys(v) : null,
+              horario_padrao: v?.horario_padrao,
+            });
+          }
+          continue;
+        }
         const folgasSet = new Set(v.folgas ?? []);
         const days: Record<string, DraftDay> = {};
         for (const d of DIAS) {
@@ -336,16 +378,23 @@ export function GeradorEscalaIA() {
           sector_id: sector.id,
           sector_name: sector.name,
           week_start: weekStartMonday,
-          label: `Vaga ${v.tipo}${v.responsavel ? " ★" : ""}`,
-          tipo: v.tipo,
+          label: `Vaga ${v.tipo ?? "?"}${v.responsavel ? " ★" : ""}`,
+          tipo: v.tipo ?? "indefinido",
           responsavel: !!v.responsavel,
           days,
         });
       }
 
       if (drafts.length === 0) {
-        toast.warning("Nenhuma vaga válida para enviar.");
+        toast.error(
+          vagasIgnoradas > 0
+            ? `IA não retornou horários válidos em ${vagasIgnoradas} vaga(s). Tente regenerar a escala.`
+            : "Nenhuma vaga válida para enviar.",
+        );
         return;
+      }
+      if (vagasIgnoradas > 0) {
+        toast.warning(`${vagasIgnoradas} vaga(s) ignorada(s) por horário inválido.`);
       }
 
       console.info("[AI Draft] enviando para editor:", {

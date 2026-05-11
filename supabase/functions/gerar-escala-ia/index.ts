@@ -330,13 +330,38 @@ Deno.serve(async (req) => {
     console.log(`[gerar-escala-ia] modelo_usado=${modeloUsadoIA}`);
 
 
-    const aiData = await aiResp.json();
-    const rawText = aiData.choices?.[0]?.message?.content ?? "";
-    const finishReason = aiData.choices?.[0]?.finish_reason;
+    let aiData = await aiResp.json();
+    let rawText = aiData.choices?.[0]?.message?.content ?? "";
+    let finishReason = aiData.choices?.[0]?.finish_reason;
+
+    // Pro com reasoning às vezes consome todos os tokens "pensando" e devolve content vazio
+    // com finish_reason=stop. Nesse caso, tenta novamente no Flash (sem reasoning).
+    if ((!rawText || !rawText.trim()) && modeloUsadoIA === "pro") {
+      console.warn("[gerar-escala-ia] Pro retornou content vazio (finish=" + finishReason + "), fallback para Flash.");
+      try {
+        const flashResp = await callGateway("flash");
+        if (flashResp.ok) {
+          aiData = await flashResp.json();
+          rawText = aiData.choices?.[0]?.message?.content ?? "";
+          finishReason = aiData.choices?.[0]?.finish_reason;
+          modeloUsadoIA = "flash";
+          console.log("[gerar-escala-ia] modelo_usado=flash (após Pro vazio)");
+        }
+      } catch (e) {
+        console.error("[gerar-escala-ia] fallback Flash falhou:", e);
+      }
+    }
 
     if (finishReason === "length") {
       return json({
         error: "Resposta da IA truncada (limite de tokens). Tente novamente — o setor pode ter muitos slots.",
+        finish_reason: finishReason,
+      }, 422);
+    }
+
+    if (!rawText || !rawText.trim()) {
+      return json({
+        error: "IA retornou resposta vazia. Tente novamente em instantes.",
         finish_reason: finishReason,
       }, 422);
     }

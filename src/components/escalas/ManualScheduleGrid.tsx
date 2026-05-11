@@ -1861,6 +1861,12 @@ export function ManualScheduleGrid() {
                           const dateStr = format(day, "yyyy-MM-dd");
                           return slotIdx < (extrasQuotaPerDay.get(dateStr) ?? 0);
                         });
+                        // Maximum quota across the week (used to number avulso rows)
+                        const maxQuotaWeek = weekDays.reduce((m, day) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          return Math.max(m, extrasQuotaPerDay.get(dateStr) ?? 0);
+                        }, 0);
+                        const avulsoIndex = slotIdx - maxQuotaWeek + 1; // 1-based, only meaningful when !isQuotaRowAnyDay
                         return (
                         <TableRow key={`extra-slot-${slotIdx}`} className={isQuotaRowAnyDay ? "bg-amber-50/50 dark:bg-amber-950/10" : "bg-muted/20"}>
                           <TableCell className={`font-medium sticky left-0 z-10 border-r ${isQuotaRowAnyDay ? "bg-amber-50 dark:bg-amber-950/20" : "bg-muted/30"}`}>
@@ -1869,7 +1875,9 @@ export function ManualScheduleGrid() {
                               <span className={`text-xs font-semibold ${isQuotaRowAnyDay ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
                                 {isQuotaRowAnyDay
                                   ? `VAGA EXTRA ${String(slotIdx + 1).padStart(2, "0")}`
-                                  : "EXTRA AVULSO"}
+                                  : avulsoIndex > 1
+                                    ? `EXTRA AVULSO ${String(avulsoIndex).padStart(2, "0")}`
+                                    : "EXTRA AVULSO"}
                               </span>
                             </div>
                           </TableCell>

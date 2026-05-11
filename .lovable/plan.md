@@ -1,31 +1,77 @@
 ## Objetivo
-Replicar as escalas do CAJU - ITAIM da semana **04/05 → 10/05/2026** para a semana seguinte **11/05 → 17/05/2026**, mantendo mesmos colaboradores, turnos, setores e configurações (start_time, end_time, break_duration, schedule_type, agreed_rate, praca_id).
 
-## Escopo
-- Unidade: CAJU - ITAIM (`87228077-03ab-445b-a409-237972ee6719`)
-- Setores afetados (com escalas na semana origem): PARRILLA (7), BAR (28), PRODUÇÃO (49), COZINHA (55) → **139 registros**
-- Semana destino está vazia (0 escalas) → sem risco de duplicar.
+Garantir que a semana **11–17/05/2026 do Caju Itaim** tenha um **template completo de escala em todos os 10 setores**, com horários de abertura/fechamento e vagas dimensionadas pelo POP, prontos para a liderança vincular pessoas no Editor de Escalas.
 
-## Execução
-Migração SQL única:
+## Situação atual
 
-```sql
-INSERT INTO schedules (
-  user_id, employee_id, schedule_date, shift_id, sector_id, status,
-  start_time, end_time, break_duration, schedule_type, agreed_rate, praca_id
-)
-SELECT
-  s.user_id, s.employee_id, s.schedule_date + INTERVAL '7 days',
-  s.shift_id, s.sector_id, 'scheduled',
-  s.start_time, s.end_time, s.break_duration, s.schedule_type, s.agreed_rate, s.praca_id
-FROM schedules s
-JOIN sectors sec ON sec.id = s.sector_id
-WHERE sec.unit_id = '87228077-03ab-445b-a409-237972ee6719'
-  AND s.schedule_date BETWEEN '2026-05-04' AND '2026-05-10'
-  AND s.status <> 'cancelled';
-```
+| Setor | Template 11/05? | Vagas | Schedules já replicados (11–17) |
+|---|---|---|---|
+| BAR | sim | 12 | 28 |
+| COZINHA | sim | 16 | 55 |
+| CUMIN | sim | 23 | 0 |
+| GARÇOM | sim | 23 | 0 |
+| HOSTESS | sim | 4 | 0 |
+| PARRILLA | sim | 6 | 7 |
+| PRODUÇÃO | sim | 12 | 49 |
+| **CHEFE E SUBCHEFE** | **não** | — | 0 |
+| **DELIVERY** | **não** | — | 0 |
+| **SERVIÇOS GERAIS SALÃO/BAR** | **não** | — | 0 |
 
-## Observações
-- Triggers existentes (`sync_schedule_to_freelancer_entry`, `create_pending_schedule_checkin`) vão disparar automaticamente para freelancers — comportamento esperado.
-- Validação CLT (`validate_schedule_clt`) **não roda** em INSERT direto via migração; como é uma cópia idêntica de uma semana já aprovada, é seguro pular. Se aparecer alerta de interjornada entre dom 10/05 e seg 11/05, será visível no editor.
-- Confirmações (`confirmation_status`) começam em null/default — colaboradores precisarão confirmar a nova semana normalmente.
+Decisão aprovada: **regerar TODOS os 10 setores via IA, modelo 5x2**, sobrescrevendo os 7 templates existentes e criando os 3 faltantes. As 139 escalas replicadas em `schedules` permanecem intactas (são vínculos pessoa↔dia, separados do template de horários).
+
+## O que vou construir
+
+### 1. Botão "Gerar para TODOS os setores" no `GeradorEscalaIA.tsx`
+
+Adicionar ao topo do gerador, ao lado do seletor de setor atual, um botão **"Gerar todos os setores desta unidade (5x2)"** que:
+
+1. Lê todos os setores ativos da unidade (`sectors` + `turno_config` + `staffing_matrix`).
+2. Itera SEQUENCIALMENTE (não paralelo, p/ não estourar rate-limit do Lovable AI) chamando `supabase.functions.invoke("gerar-escala-ia", { setor, semana_inicio, unidade_id, modelo_folga: "5x2" })` para cada setor.
+3. Mostra progresso em tempo real: `Gerando 4/10 — COZINHA…` com barra de progresso.
+4. Coleta resultado por setor: ✓ sucesso (vagas geradas) | ⚠ aviso (gerou com alertas POP/CLT) | ✗ falha (motivo).
+5. No final, exibe resumo em tabela com link "Abrir no editor" por setor que sucedeu.
+6. A edge function `gerar-escala-ia` já faz UPSERT em `escala_template` (unique key `unidade_id, setor, semana_inicio`), então sobrescrever é automático — não precisa deletar antes.
+
+### 2. Pré-checagem de pré-requisitos por setor
+
+Antes de chamar a IA, validar para cada setor:
+- Tem registro em `turno_config` (qtd_abridores/fechadores/intermediarios)?
+- Tem matriz de staffing em `staffing_matrix` para os 7 dias?
+- Tem `escala_minima` populada?
+
+Setores sem pré-requisitos são listados num bloco "Pulei estes setores" com motivo claro (ex.: "DELIVERY: falta `turno_config`. Configure em `Mínimos & Configurações` antes."), em vez de gerar template vazio ou erro 500.
+
+### 3. Validação pós-geração
+
+Após o loop, exibir alerta se algum setor ficou:
+- Sem template no fim (falhou) → CTA para retry só desse setor.
+- Com `validacao.aprovado=false` → mostrar alertas POP/CLT/folga retornados pela IA.
+
+### 4. Sem alteração de schema nem de edge function
+
+A edge function `gerar-escala-ia` já existe, já normaliza setor, já salva em `escala_template` com upsert e já roda validador POP. Tudo o que precisa é a orquestração no front.
+
+## Fluxo do usuário (resultado final)
+
+1. Liderança abre **Escalas → Gerador IA**, seleciona unidade **CAJU - ITAIM**, semana **11/05/2026**.
+2. Clica **"Gerar todos os setores (5x2)"**.
+3. Acompanha a barra de progresso (~30–60s por setor, ~5–10min no total).
+4. Vê o resumo: 10 setores processados, X sucessos, Y avisos, Z pulados por falta de config.
+5. Para cada setor com sucesso, clica **"Enviar para o editor"** (fluxo já existente, um a um) ou usa o botão extra **"Enviar TODOS para o editor"** que itera o `enviarParaEditor` existente para cada `template_id` com vagas alocadas.
+6. No Editor de Escalas, a liderança apenas atribui pessoas reais a cada vaga já dimensionada.
+
+## Detalhes técnicos
+
+- Componente: `src/components/escalas/GeradorEscalaIA.tsx` (modificar; manter fluxo single-sector intacto).
+- Hook auxiliar: usar query existente de `sectors` por unidade; combinar com `turno_config` e `staffing_matrix` (pode reaproveitar `useStaffingMatrix`).
+- Sequencial com `for…of` + `await` para evitar 429 do gateway.
+- Estado de progresso: `useState<{ idx: number; total: number; current: string; results: Array<{setor; status; vagas; alertas}> }>`.
+- Toast no final + `queryClient.invalidateQueries(["escala-template", unidadeId, semana])`.
+- Sem migração SQL.
+
+## Riscos e mitigação
+
+- **Rate limit Lovable AI** → execução sequencial + delay de 1s entre chamadas.
+- **Setor sem `turno_config`** → pular com mensagem (não tenta gerar) — evita ruído de erro.
+- **Template já existente** → upsert sobrescreve (comportamento desejado e confirmado pelo usuário).
+- **Schedules existentes (139 já replicados)** → não tocados; convivem com o novo template porque template define vagas/horários e schedules já são vínculos pessoa-data.

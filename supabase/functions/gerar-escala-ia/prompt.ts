@@ -179,6 +179,8 @@ Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
         "tipo": "ABRIDOR-DOBRA",
         "papel": "abridor",
         "responsavel": false,
+        "employee_id": "uuid-ou-null",
+        "employee_nome": "Nome (opcional, ajuda revisão)",
         "folgas": ["SEG"],
         "horario_padrao": {
           "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },

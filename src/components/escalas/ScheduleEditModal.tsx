@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,8 @@ import {
   Clock4,
   Sun,
   CheckCircle2,
+  Link as LinkIcon,
+  Unlink,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { PracaSelector } from "./PracaSelector";
@@ -92,6 +94,8 @@ export function ScheduleEditModal({
   const [agreedRate, setAgreedRate] = useState("");
   const [pracaId, setPracaId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("turno");
+  const [linkDuration, setLinkDuration] = useState(true);
+  const durationMinRef = useRef<number>(500); // 08:00 → 16:20 default = 500min
 
   // Vacation sub-form state
   const [showVacationForm, setShowVacationForm] = useState(false);
@@ -102,9 +106,13 @@ export function ScheduleEditModal({
 
   // Initialize from existing
   useEffect(() => {
+    let initStart = "08:00";
+    let initEnd = "16:20";
     if (existing) {
-      setStartTime(existing.start_time?.slice(0, 5) || "08:00");
-      setEndTime(existing.end_time?.slice(0, 5) || "16:20");
+      initStart = existing.start_time?.slice(0, 5) || "08:00";
+      initEnd = existing.end_time?.slice(0, 5) || "16:20";
+      setStartTime(initStart);
+      setEndTime(initEnd);
       setBreakDuration(existing.break_duration ?? 60);
       setAgreedRate(existing.agreed_rate ? String(existing.agreed_rate) : (isFreelancer ? "120" : ""));
       setPracaId(existing.praca_id ?? null);
@@ -114,17 +122,49 @@ export function ScheduleEditModal({
         setActiveTab("turno");
       }
     } else {
-      setStartTime("08:00");
-      setEndTime("16:20");
+      setStartTime(initStart);
+      setEndTime(initEnd);
       setBreakDuration(60);
       setAgreedRate(isFreelancer ? "120" : "");
       setPracaId(null);
       setActiveTab("turno");
     }
+    durationMinRef.current = diffMinutes(initStart, initEnd);
+    setLinkDuration(true);
     setShowVacationForm(false);
     setVacStartDate(date);
     setVacEndDate("");
   }, [existing, open, date]);
+
+  function diffMinutes(a: string, b: string): number {
+    if (!a || !b) return 0;
+    const [ah, am] = a.split(":").map(Number);
+    const [bh, bm] = b.split(":").map(Number);
+    let d = (bh * 60 + bm) - (ah * 60 + am);
+    if (d < 0) d += 24 * 60;
+    return d;
+  }
+  function addMinutes(t: string, mins: number): string {
+    const [h, m] = t.split(":").map(Number);
+    let total = h * 60 + m + mins;
+    total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+    const nh = Math.floor(total / 60);
+    const nm = total % 60;
+    return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+  }
+
+  function handleStartChange(v: string) {
+    setStartTime(v);
+    if (linkDuration && v) {
+      setEndTime(addMinutes(v, durationMinRef.current));
+    }
+  }
+  function handleEndChange(v: string) {
+    setEndTime(v);
+    if (linkDuration && v) {
+      setStartTime(addMinutes(v, -durationMinRef.current));
+    }
+  }
 
   const totalHours = useMemo(
     () => calculateHours(startTime, endTime, breakDuration),
@@ -246,13 +286,28 @@ export function ScheduleEditModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Início</Label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Input type="time" value={startTime} onChange={(e) => handleStartChange(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Fim</Label>
-                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <Input type="time" value={endTime} onChange={(e) => handleEndChange(e.target.value)} />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setLinkDuration((v) => !v)}
+              className={`w-full flex items-center justify-center gap-1.5 text-xs rounded-md py-1.5 border transition-colors ${
+                linkDuration
+                  ? "border-primary/40 bg-primary/5 text-primary"
+                  : "border-muted text-muted-foreground hover:bg-muted/50"
+              }`}
+              title="Ao mover início ou fim, o outro acompanha mantendo a duração total"
+            >
+              {linkDuration ? <LinkIcon className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />}
+              {linkDuration
+                ? `Manter duração (${Math.floor(durationMinRef.current / 60)}h${durationMinRef.current % 60 ? ` ${durationMinRef.current % 60}min` : ""})`
+                : "Editar início e fim independentes"}
+            </button>
             <div className="space-y-1.5">
               <Label>Intervalo (minutos)</Label>
               <Input type="number" min={0} max={180} value={breakDuration} onChange={(e) => setBreakDuration(Number(e.target.value))} />

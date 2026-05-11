@@ -1031,6 +1031,37 @@ export function ManualScheduleGrid() {
     });
   }
 
+  // Click-vs-doubleClick disambiguation for fast toggle-off behavior
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelPendingClick() {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+  }
+  function handleSingleClickToggleOff(emp: any, dateStr: string) {
+    const existing = getScheduleForCell(emp.id, dateStr);
+    if (!existing) {
+      // Empty cell → mark as folga
+      const sectorId = resolveSectorForEmployee(emp.id);
+      if (!sectorId) return;
+      upsertSchedule.mutate({
+        employee_id: emp.id,
+        schedule_date: dateStr,
+        sector_id: sectorId,
+        schedule_type: "off",
+        start_time: null,
+        end_time: null,
+        break_duration: 0,
+        agreed_rate: 0,
+      });
+    } else if (existing.schedule_type === "off") {
+      // Folga → cancel back to empty
+      cancelSchedule.mutate(existing.id);
+    }
+    // Working shift → no-op (just selection); user must double-click to edit
+  }
+
   function handleSaveBudget(dateStr: string) {
     if (!selectedUnit) return;
     upsertBudget.mutate({
@@ -1735,16 +1766,26 @@ export function ManualScheduleGrid() {
                                         e.stopPropagation();
                                         if (e.shiftKey && grid.state.active) {
                                           grid.extendSelection({ row: rowIdx, col: i });
-                                        } else {
-                                          grid.setActive({ row: rowIdx, col: i });
+                                          return;
                                         }
+                                        grid.setActive({ row: rowIdx, col: i });
                                         focusGrid();
+                                        // Toggle folga only on empty / off cells; working shifts require dbl-click
+                                        const eligible = !schedule || schedule.schedule_type === "off";
+                                        if (!eligible) return;
+                                        cancelPendingClick();
+                                        clickTimerRef.current = setTimeout(() => {
+                                          handleSingleClickToggleOff(emp, dateStr);
+                                          clickTimerRef.current = null;
+                                        }, 220);
                                       }}
                                       onDoubleClick={(e) => {
                                         if (copyMode) return;
                                         e.stopPropagation();
+                                        cancelPendingClick();
                                         handleCellClick(emp, dateStr);
                                       }}
+                                      title={!schedule ? "1 clique: folga · 2 cliques: editar" : undefined}
                                     >
                                       <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
                                     </TableCell>
@@ -1986,7 +2027,18 @@ export function ManualScheduleGrid() {
                                   <TableCell
                                     key={i}
                                     className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                    onClick={() => handleCellClick(emp, dateStr)}
+                                    title="1 clique: folga · 2 cliques: editar"
+                                    onClick={() => {
+                                      cancelPendingClick();
+                                      clickTimerRef.current = setTimeout(() => {
+                                        handleSingleClickToggleOff(emp, dateStr);
+                                        clickTimerRef.current = null;
+                                      }, 220);
+                                    }}
+                                    onDoubleClick={() => {
+                                      cancelPendingClick();
+                                      handleCellClick(emp, dateStr);
+                                    }}
                                   >
                                     <div className="h-10 flex items-center justify-center">
                                       <span className="text-muted-foreground/40 text-xs">—</span>

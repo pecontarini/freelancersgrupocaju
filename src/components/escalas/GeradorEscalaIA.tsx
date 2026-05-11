@@ -131,6 +131,19 @@ export function GeradorEscalaIA() {
   const [resultado, setResultado] = useState<EscalaResponse | null>(null);
   const [modeloFolga, setModeloFolga] = useState<"5x2" | "6x1">("6x1");
 
+  // ===== Geração em LOTE (todos os setores da unidade) =====
+  type BatchResult = {
+    setor: string;
+    status: "ok" | "warn" | "fail" | "skipped";
+    vagas?: number;
+    alertas?: string[];
+    motivo?: string;
+  };
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ idx: number; total: number; current: string }>({ idx: 0, total: 0, current: "" });
+  const [batchResults, setBatchResults] = useState<BatchResult[]>([]);
+  const [batchModelo, setBatchModelo] = useState<"5x2" | "6x1">("5x2");
+
   const { data: turnoConfigs } = useQuery({
     queryKey: ["turno_config", effectiveUnidadeId],
     enabled: !!effectiveUnidadeId,

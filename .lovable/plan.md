@@ -1,28 +1,31 @@
-# Fix: "Cannot read properties of undefined (reading 't1')"
+## Objetivo
+Replicar as escalas do CAJU - ITAIM da semana **04/05 → 10/05/2026** para a semana seguinte **11/05 → 17/05/2026**, mantendo mesmos colaboradores, turnos, setores e configurações (start_time, end_time, break_duration, schedule_type, agreed_rate, praca_id).
 
-## Causa
-Após o upgrade para `gemini-2.5-pro`, a IA às vezes retorna `vagas[]` sem `horario_padrao: { t1, t2 }` — ou retorna `null`/`undefined`, ou usa `entrada`/`saida` no nível da vaga. O `slotToDay(v.horario_padrao)` em `GeradorEscalaIA.tsx:327` quebra ao tentar ler `.t1` de `undefined`.
+## Escopo
+- Unidade: CAJU - ITAIM (`87228077-03ab-445b-a409-237972ee6719`)
+- Setores afetados (com escalas na semana origem): PARRILLA (7), BAR (28), PRODUÇÃO (49), COZINHA (55) → **139 registros**
+- Semana destino está vazia (0 escalas) → sem risco de duplicar.
 
-## Mudanças (apenas em `src/components/escalas/GeradorEscalaIA.tsx`)
+## Execução
+Migração SQL única:
 
-### 1. `slotToDay` defensivo (~linha 296)
-- Aceitar `horario: any | undefined`.
-- Se `null`/`undefined` → `return null`.
-- Se faltar `t1`/`t2`, tentar fallbacks: `horario.entrada`/`horario.saida`, ou objeto raiz com `entrada`/`saida`.
-- Validar formato `HH:MM` antes de retornar.
+```sql
+INSERT INTO schedules (
+  user_id, employee_id, schedule_date, shift_id, sector_id, status,
+  start_time, end_time, break_duration, schedule_type, agreed_rate, praca_id
+)
+SELECT
+  s.user_id, s.employee_id, s.schedule_date + INTERVAL '7 days',
+  s.shift_id, s.sector_id, 'scheduled',
+  s.start_time, s.end_time, s.break_duration, s.schedule_type, s.agreed_rate, s.praca_id
+FROM schedules s
+JOIN sectors sec ON sec.id = s.sector_id
+WHERE sec.unit_id = '87228077-03ab-445b-a409-237972ee6719'
+  AND s.schedule_date BETWEEN '2026-05-04' AND '2026-05-10'
+  AND s.status <> 'cancelled';
+```
 
-### 2. Loop de vagas (~linhas 325-344)
-- Ler horário em cascata: `v.horario_padrao ?? v.horario ?? v`.
-- Se `slotToDay` retornar `null`, contar como vaga inválida e **continuar** (não derrubar o lote inteiro).
-- Acumular contadores: `vagasIgnoradas`, `vagasOk`.
-
-### 3. Feedback ao usuário
-- Após o loop: se `drafts.length === 0` e `vagas.length > 0` → toast de erro "IA não retornou horários válidos. Tente regenerar."
-- Se `vagasIgnoradas > 0` mas houve algumas válidas → toast de warning "{n} vagas ignoradas por horário inválido."
-
-### 4. Log diagnóstico
-- `console.warn("[GeradorEscalaIA] vaga sem horário válido:", { keys: Object.keys(v), sample: v.horario_padrao })` — apenas a primeira ocorrência por geração, sem PII.
-
-## Fora de escopo
-- Sem mudanças no edge function nem no prompt.
-- Padronização do output da IA fica para Eixo 8 futuro.
+## Observações
+- Triggers existentes (`sync_schedule_to_freelancer_entry`, `create_pending_schedule_checkin`) vão disparar automaticamente para freelancers — comportamento esperado.
+- Validação CLT (`validate_schedule_clt`) **não roda** em INSERT direto via migração; como é uma cópia idêntica de uma semana já aprovada, é seguro pular. Se aparecer alerta de interjornada entre dom 10/05 e seg 11/05, será visível no editor.
+- Confirmações (`confirmation_status`) começam em null/default — colaboradores precisarão confirmar a nova semana normalmente.

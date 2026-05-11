@@ -293,8 +293,13 @@ export function GeradorEscalaIA() {
         dayDates[d] = dt.toISOString().slice(0, 10);
       });
 
-      const slotToDay = (horario: { t1?: any; t2?: any }): DraftDay | null => {
-        if (horario.t1 && horario.t2) {
+      const isHHMM = (s: any): s is string =>
+        typeof s === "string" && /^\d{1,2}:\d{2}$/.test(s.trim());
+
+      const slotToDay = (horario: any): DraftDay | null => {
+        if (!horario || typeof horario !== "object") return null;
+        // Formato canônico: { t1: { entrada, saida }, t2: { entrada, saida } }
+        if (horario.t1 && horario.t2 && isHHMM(horario.t1.entrada) && isHHMM(horario.t2.saida)) {
           return {
             kind: "work",
             start_time: horario.t1.entrada,
@@ -304,14 +309,38 @@ export function GeradorEscalaIA() {
           };
         }
         const t = horario.t1 ?? horario.t2;
-        if (!t) return null;
-        return {
-          kind: "work",
-          start_time: t.entrada,
-          end_time: t.saida,
-          break_min: 180,
-          shift_type: horario.t1 ? "T1" : "T2",
-        };
+        if (t && isHHMM(t.entrada) && isHHMM(t.saida)) {
+          return {
+            kind: "work",
+            start_time: t.entrada,
+            end_time: t.saida,
+            break_min: 180,
+            shift_type: horario.t1 ? "T1" : "T2",
+          };
+        }
+        // Fallback: { entrada, saida } no próprio objeto
+        if (isHHMM(horario.entrada) && isHHMM(horario.saida)) {
+          return {
+            kind: "work",
+            start_time: horario.entrada,
+            end_time: horario.saida,
+            break_min: 180,
+            shift_type: "T1",
+          };
+        }
+        // Fallback: { start_time, end_time } / { inicio, fim }
+        const start = horario.start_time ?? horario.inicio;
+        const end = horario.end_time ?? horario.fim;
+        if (isHHMM(start) && isHHMM(end)) {
+          return {
+            kind: "work",
+            start_time: start,
+            end_time: end,
+            break_min: 180,
+            shift_type: "T1",
+          };
+        }
+        return null;
       };
 
       // ===== Nova estratégia: usar plano_folgas.vagas (folgas distribuídas por vaga) =====

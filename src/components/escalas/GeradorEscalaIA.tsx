@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight, ListChecks, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { insertDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
 

@@ -394,10 +394,16 @@ Deno.serve(async (req) => {
     }
 
     const cltAlerts = escala?.validacao?.alertas_clt ?? [];
-    // Só bloqueia se houver alertas CLT explícitos.
-    // Ausência de bloco "validacao" ou "aprovado=false" sem alertas é tratada como aviso, não erro.
+    // Alertas CLT (ex: interjornada de 10h vs 11h) são tratados como AVISO,
+    // não como bloqueio — muitos desses casos são resolvidos por acordo coletivo
+    // ou ajuste manual no grid. O usuário decide se aplica.
     if (cltAlerts.length > 0) {
-      return json({ error: "Violações CLT detectadas.", alertas: cltAlerts, escala }, 422);
+      escala.validacao = {
+        ...(escala.validacao ?? {}),
+        aprovado: false,
+        alertas_clt: cltAlerts,
+        observacoes: "Alertas CLT presentes — revisar antes de salvar.",
+      };
     }
     if (!escala?.validacao) {
       escala.validacao = { aprovado: true, alertas_clt: [], observacoes: "Bloco validacao ausente — assumido aprovado." };

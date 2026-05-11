@@ -298,24 +298,36 @@ Deno.serve(async (req) => {
 
     let aiResp: Response | null = null;
     let lastErr = "";
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    let modeloUsadoIA: "pro" | "flash" = "pro";
+    // Tentativa 1: Pro com reasoning. Tentativa 2: Pro novamente. Tentativa 3: fallback Flash.
+    const sequence: ("pro" | "flash")[] = ["pro", "pro", "flash"];
+    for (let attempt = 0; attempt < sequence.length; attempt++) {
+      const target = sequence[attempt];
       try {
-        aiResp = await callGateway();
-        if (aiResp.ok) break;
-        if (aiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+        aiResp = await callGateway(target);
+        if (aiResp.ok) { modeloUsadoIA = target; break; }
+        if (aiResp.status === 429) {
+          // Rate-limit no Pro: cai para Flash imediatamente em vez de erroar.
+          if (target === "pro") {
+            console.warn("[gerar-escala-ia] Pro rate-limited, fallback para Flash.");
+            continue;
+          }
+          return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+        }
         if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
         lastErr = await aiResp.text();
-        console.error(`AI gateway error (tentativa ${attempt}):`, aiResp.status, lastErr);
-        if (aiResp.status < 500) break;
+        console.error(`AI gateway error (tentativa ${attempt + 1}, modelo ${target}):`, aiResp.status, lastErr);
+        if (aiResp.status < 500 && target === "flash") break;
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e);
-        console.error(`AI gateway fetch falhou (tentativa ${attempt}):`, lastErr);
+        console.error(`AI gateway fetch falhou (tentativa ${attempt + 1}, modelo ${target}):`, lastErr);
       }
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000));
+      if (attempt < sequence.length - 1) await new Promise((r) => setTimeout(r, 800));
     }
     if (!aiResp || !aiResp.ok) {
-      return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após 3 tentativas." }, 502);
+      return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após retries." }, 502);
     }
+    console.log(`[gerar-escala-ia] modelo_usado=${modeloUsadoIA}`);
 
 
     const aiData = await aiResp.json();

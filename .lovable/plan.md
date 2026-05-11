@@ -1,41 +1,57 @@
-## Objetivo
+# Plano — Edição de escalas mais ágil
 
-No editor manual de escalas (`ManualScheduleGrid`), permitir que o operador lance freelancers além da cota POP do dia, de forma organizada e sempre visível, sem depender de cliques "escondidos".
+Dois ajustes no editor de escalas (`ManualScheduleGrid` + `ScheduleEditModal`).
 
-## Situação atual
+## 1) Horários encadeados no modal de turno
 
-- Existem linhas "VAGA EXTRA" (dentro da cota POP) e "EXTRA AVULSO" (fora da cota).
-- O número de linhas extras renderizadas usa `Math.max(quota, filled, 1)`. Quando `filled === quota` (cota cheia), **nenhuma célula vazia aparece** para adicionar um freelancer adicional; o usuário só consegue via botão pequeno "+ Freelancer" no cabeçalho do dia.
-- Já existe `FreelancerAddModal` reaproveitável e o botão de cabeçalho.
+Quando o usuário abrir uma célula já preenchida e mexer em **Início** ou **Fim**, o outro campo desliza junto, preservando a **duração total** do turno original.
 
-## Mudanças propostas
+Comportamento:
+- Ao abrir o modal, calcula-se `duracaoOriginal = fim − início` (do schedule existente, ou do default 08:00→16:20).
+- Mexeu em **Início** → **Fim** = novo início + duracaoOriginal.
+- Mexeu em **Fim** → **Início** = novo fim − duracaoOriginal.
+- Intervalo (almoço) **não** muda automaticamente.
+- Um cadeado/toggle pequeno "🔗 Manter duração" (ligado por padrão) permite desativar o encadeamento caso o líder queira mudar só uma ponta.
+- Funciona com virada de meia-noite (lógica de minutos já existe em `calculateHours`).
 
-1. **Sempre exibir uma vaga avulsa livre por dia**
-   - Arquivo: `src/components/escalas/ManualScheduleGrid.tsx`
-   - Função `slotsPerDay` (linha ~959): trocar `Math.max(quota, filled, 1)` por `Math.max(quota, filled + 1)`.
-   - Resultado: para cada dia, sempre haverá uma célula tracejada "Adicionar freelancer avulso" abaixo das já preenchidas, mesmo após exceder a cota POP. Múltiplos lançamentos extras viram múltiplas linhas, mantendo a grade organizada.
+Arquivo: `src/components/escalas/ScheduleEditModal.tsx`.
 
-2. **Rótulo dinâmico da linha avulsa**
-   - Já existe rótulo `EXTRA AVULSO`. Acrescentar contagem quando passar da cota: `EXTRA AVULSO (N)` onde `N = slotIdx - quotaMax + 1` para deixar claro o nº de extras adicionados além do previsto. Apenas cosmético.
+## 2) Novo padrão de clique nas células da grade
 
-3. **Botão de atalho no cabeçalho do dia**
-   - O botão `+ Freelancer` (linha ~1553) já existe e abre o `FreelancerAddModal`. Ajustar `title` para "Adicionar freelancer (inclui acima da cota POP)" e dar destaque visual leve (cor coral/`text-primary`) para reforçar que pode ser usado livremente.
+Hoje: 1 clique = seleciona célula (ativa), 2 cliques = abre modal.
 
-4. **Indicador visual de excedente**
-   - No header de métricas do dia, quando `freelancerCountPerDay > extrasQuotaPerDay`, exibir badge discreto "Acima da cota POP (+N)" em âmbar. Ajuda o líder a perceber que está estourando o planejado, sem bloquear.
+Novo:
+- **1 clique** numa célula **vazia** → marca **FOLGA** direto (sem abrir modal).
+- **1 clique** numa célula que **já é FOLGA** → remove a folga (volta a vazia).
+- **1 clique** numa célula com **turno trabalhado** → mantém comportamento de seleção apenas (não sobrescreve, para não destruir turno por engano).
+- **2 cliques** em qualquer célula → abre o **modal de edição** (atual `handleCellClick`).
+- Shift+clique e seleção retangular continuam iguais.
 
-## Fora do escopo
+Implementação:
+- Em `ManualScheduleGrid.tsx` (linhas ~1727–1750) ajustar `onClick` da `TableCell` da linha de funcionário ativo:
+  - Se `copyMode` ou `e.shiftKey` → fluxo atual.
+  - Caso contrário, checar `schedule`:
+    - `!schedule` → chama `useUpsertSchedule` com `schedule_type: "off"` (mesma chamada usada hoje pelo botão "Marcar Folga" do modal).
+    - `schedule.schedule_type === "off"` → `useCancelSchedule(schedule.id)`.
+    - `schedule.schedule_type === "working"` → apenas `grid.setActive` (comportamento atual).
+- `onDoubleClick` continua chamando `handleCellClick` → abre modal.
+- Adicionar tooltip discreto "1 clique: folga · 2 cliques: editar" no hover da célula vazia.
 
-- Não altera permissões, RLS, regras de orçamento, nem a lógica do `FreelancerAddModal` em si.
-- Não muda a cota POP no `staffing_matrix`.
+Edge cases tratados:
+- Linha do "Quadro base do setor" (linha 1986) também ganha o mesmo padrão de 1‑clique → folga.
+- Slots de freelancer/IA não são afetados (mantêm fluxos próprios).
+- Para não disparar folga acidental durante drag de seleção, checa-se que não houve `mousedown→mousemove` antes do click (se o `grid` já expõe isso, reutiliza; caso contrário, comparar coordenadas no `mousedown`/`click`).
 
 ## Verificação
 
-- Abrir editor de escalas em uma semana, escolher setor com cota POP de extras = 1.
-- Adicionar 1 freelancer no dia → linha "EXTRA AVULSO" segue exibindo nova célula vazia abaixo.
-- Adicionar mais 2 freelancers → grid mostra 3 linhas preenchidas + 1 linha vazia "EXTRA AVULSO (3)".
-- Badge "Acima da cota POP (+2)" aparece no cabeçalho do dia.
+- Abrir modal, mexer no Início → Fim acompanha; mexer no Fim → Início acompanha; desligar cadeado → campos independentes.
+- Clicar em célula vazia → vira "FOLGA" sem modal.
+- Clicar de novo na FOLGA → volta a vazia.
+- Clicar em célula com turno → só fica selecionada (azul), não muda nada.
+- Duplo-clique em qualquer célula → modal abre normalmente.
+- Seleção retangular com Shift continua funcionando.
 
-## Arquivos afetados
+## Pontos para confirmar
 
-- `src/components/escalas/ManualScheduleGrid.tsx` (apenas UI/estado derivado).
+- OK manter "1 clique em turno trabalhado = só seleciona" (mais seguro)? Ou prefere que sobrescreva por folga também?
+- Cadeado de "manter duração" deve vir **ligado** por padrão, certo?

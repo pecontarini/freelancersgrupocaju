@@ -106,9 +106,13 @@ export function ScheduleEditModal({
 
   // Initialize from existing
   useEffect(() => {
+    let initStart = "08:00";
+    let initEnd = "16:20";
     if (existing) {
-      setStartTime(existing.start_time?.slice(0, 5) || "08:00");
-      setEndTime(existing.end_time?.slice(0, 5) || "16:20");
+      initStart = existing.start_time?.slice(0, 5) || "08:00";
+      initEnd = existing.end_time?.slice(0, 5) || "16:20";
+      setStartTime(initStart);
+      setEndTime(initEnd);
       setBreakDuration(existing.break_duration ?? 60);
       setAgreedRate(existing.agreed_rate ? String(existing.agreed_rate) : (isFreelancer ? "120" : ""));
       setPracaId(existing.praca_id ?? null);
@@ -118,17 +122,49 @@ export function ScheduleEditModal({
         setActiveTab("turno");
       }
     } else {
-      setStartTime("08:00");
-      setEndTime("16:20");
+      setStartTime(initStart);
+      setEndTime(initEnd);
       setBreakDuration(60);
       setAgreedRate(isFreelancer ? "120" : "");
       setPracaId(null);
       setActiveTab("turno");
     }
+    durationMinRef.current = diffMinutes(initStart, initEnd);
+    setLinkDuration(true);
     setShowVacationForm(false);
     setVacStartDate(date);
     setVacEndDate("");
   }, [existing, open, date]);
+
+  function diffMinutes(a: string, b: string): number {
+    if (!a || !b) return 0;
+    const [ah, am] = a.split(":").map(Number);
+    const [bh, bm] = b.split(":").map(Number);
+    let d = (bh * 60 + bm) - (ah * 60 + am);
+    if (d < 0) d += 24 * 60;
+    return d;
+  }
+  function addMinutes(t: string, mins: number): string {
+    const [h, m] = t.split(":").map(Number);
+    let total = h * 60 + m + mins;
+    total = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+    const nh = Math.floor(total / 60);
+    const nm = total % 60;
+    return `${String(nh).padStart(2, "0")}:${String(nm).padStart(2, "0")}`;
+  }
+
+  function handleStartChange(v: string) {
+    setStartTime(v);
+    if (linkDuration && v) {
+      setEndTime(addMinutes(v, durationMinRef.current));
+    }
+  }
+  function handleEndChange(v: string) {
+    setEndTime(v);
+    if (linkDuration && v) {
+      setStartTime(addMinutes(v, -durationMinRef.current));
+    }
+  }
 
   const totalHours = useMemo(
     () => calculateHours(startTime, endTime, breakDuration),

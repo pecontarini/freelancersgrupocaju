@@ -237,6 +237,72 @@ export function GeradorEscalaIA() {
     }
   };
 
+  // ===== Handler: gerar para TODOS os setores configurados da unidade =====
+  const handleGerarTodos = async () => {
+    if (!effectiveUnidadeId) {
+      toast.error("Selecione uma unidade.");
+      return;
+    }
+    if (!turnoConfigs || turnoConfigs.length === 0) {
+      toast.error("Esta unidade não tem nenhum setor configurado em turno_config.");
+      return;
+    }
+    const semanaMonday = toMondayISO(semana);
+    const setores = turnoConfigs.map((t) => t.setor);
+    setBatchLoading(true);
+    setBatchResults([]);
+    setBatchProgress({ idx: 0, total: setores.length, current: setores[0] ?? "" });
+
+    const acc: BatchResult[] = [];
+    for (let i = 0; i < setores.length; i++) {
+      const s = setores[i];
+      setBatchProgress({ idx: i + 1, total: setores.length, current: s });
+      try {
+        const { data, error } = await supabase.functions.invoke("gerar-escala-ia", {
+          body: {
+            setor: s,
+            semana_inicio: semanaMonday,
+            unidade_id: effectiveUnidadeId,
+            modelo_folga: batchModelo,
+          },
+        });
+        if (error) {
+          acc.push({ setor: s, status: "fail", motivo: error.message });
+        } else if (data?.error) {
+          acc.push({ setor: s, status: "fail", motivo: data.error });
+        } else {
+          const escala = data?.escala as EscalaResponse | undefined;
+          const vagas = escala?.plano_folgas?.vagas?.length ?? 0;
+          const v = escala?.validacao;
+          const alertas = [
+            ...(v?.alertas_clt ?? []),
+            ...(v?.alertas_pop ?? []),
+            ...(v?.alertas_folga ?? []),
+            ...(v?.alertas_operacionais ?? []),
+          ];
+          acc.push({
+            setor: s,
+            status: v?.aprovado ? "ok" : "warn",
+            vagas,
+            alertas,
+          });
+        }
+      } catch (e: any) {
+        acc.push({ setor: s, status: "fail", motivo: e?.message ?? "Erro desconhecido" });
+      }
+      setBatchResults([...acc]);
+      // Pequeno delay para não estourar rate-limit do AI gateway
+      if (i < setores.length - 1) await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    setBatchLoading(false);
+    const ok = acc.filter((r) => r.status === "ok").length;
+    const warn = acc.filter((r) => r.status === "warn").length;
+    const fail = acc.filter((r) => r.status === "fail").length;
+    toast.success(`Lote concluído: ${ok} ok • ${warn} com alertas • ${fail} falha(s)`, { duration: 8000 });
+  };
+
+
   const copyJSON = () => {
     if (!resultado) return;
     navigator.clipboard.writeText(JSON.stringify(resultado, null, 2));

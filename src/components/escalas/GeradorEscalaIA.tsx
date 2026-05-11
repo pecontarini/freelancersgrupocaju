@@ -332,7 +332,8 @@ export function GeradorEscalaIA() {
     const ok = acc.filter((r) => r.status === "ok").length;
     const warn = acc.filter((r) => r.status === "warn").length;
     const fail = acc.filter((r) => r.status === "fail").length;
-    toast.success(`Lote concluído: ${ok} ok • ${warn} com alertas • ${fail} falha(s)`, { duration: 8000 });
+    const skipped = acc.filter((r) => r.status === "skipped").length;
+    toast.success(`Lote concluído: ${ok} ok • ${warn} com alertas • ${fail} falha(s) • ${skipped} pulado(s)`, { duration: 8000 });
   };
 
 

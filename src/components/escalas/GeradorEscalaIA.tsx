@@ -355,7 +355,7 @@ export function GeradorEscalaIA() {
       let warnedSample = false;
       for (let i = 0; i < vagas.length; i++) {
         const v = vagas[i];
-        const horario = v?.horario_padrao ?? v?.horario ?? v;
+        const horario = (v as any)?.horario_padrao ?? (v as any)?.horario ?? v;
         const day = slotToDay(horario);
         if (!day) {
           vagasIgnoradas++;

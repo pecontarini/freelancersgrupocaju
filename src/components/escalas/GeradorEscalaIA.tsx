@@ -597,9 +597,111 @@ export function GeradorEscalaIA() {
             </div>
           )}
 
-          <Button onClick={handleGerar} disabled={!setor || !config || loading} className="w-full md:w-auto">
-            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando…</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar escala com IA</>}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={handleGerar} disabled={!setor || !config || loading || batchLoading} className="w-full md:w-auto">
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando…</> : <><Sparkles className="mr-2 h-4 w-4" /> Gerar escala com IA</>}
+            </Button>
+          </div>
+
+          {/* ===== Geração em LOTE — todos os setores da unidade ===== */}
+          <div className="rounded-lg border border-dashed bg-muted/20 p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-primary" />
+                  Gerar para TODOS os setores desta unidade
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Roda a IA sequencialmente em cada setor configurado da unidade selecionada,
+                  para a semana acima. Sobrescreve templates já existentes.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={batchModelo} onValueChange={(v) => setBatchModelo(v as "5x2" | "6x1")} disabled={batchLoading}>
+                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5x2">5x2 (lote)</SelectItem>
+                    <SelectItem value="6x1">6x1 (lote)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleGerarTodos}
+                  disabled={batchLoading || loading || !effectiveUnidadeId || !turnoConfigs?.length}
+                  variant="default"
+                >
+                  {batchLoading ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando {batchProgress.idx}/{batchProgress.total}…</>
+                  ) : (
+                    <><ListChecks className="mr-2 h-4 w-4" /> Gerar todos os setores</>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {batchLoading && (
+              <div className="space-y-1">
+                <div className="h-2 w-full overflow-hidden rounded bg-muted">
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{ width: `${batchProgress.total ? (batchProgress.idx / batchProgress.total) * 100 : 0}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Gerando {batchProgress.idx}/{batchProgress.total} — <strong>{batchProgress.current}</strong>
+                </p>
+              </div>
+            )}
+
+            {batchResults.length > 0 && (
+              <div className="overflow-x-auto rounded border bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Setor</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Vagas</TableHead>
+                      <TableHead>Observações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {batchResults.map((r) => (
+                      <TableRow key={r.setor}>
+                        <TableCell className="font-medium">{r.setor}</TableCell>
+                        <TableCell>
+                          {r.status === "ok" && (
+                            <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30">
+                              <CheckCircle2 className="mr-1 h-3 w-3" /> OK
+                            </Badge>
+                          )}
+                          {r.status === "warn" && (
+                            <Badge className="bg-amber-500/15 text-amber-700 border-amber-500/30">
+                              <AlertTriangle className="mr-1 h-3 w-3" /> Alertas
+                            </Badge>
+                          )}
+                          {r.status === "fail" && (
+                            <Badge className="bg-destructive/15 text-destructive border-destructive/30">
+                              <XCircle className="mr-1 h-3 w-3" /> Falhou
+                            </Badge>
+                          )}
+                          {r.status === "skipped" && (
+                            <Badge variant="outline">Pulado</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>{r.vagas ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-md">
+                          {r.motivo ? r.motivo : (r.alertas && r.alertas.length > 0 ? r.alertas.slice(0, 3).join(" • ") : "—")}
+                          {r.alertas && r.alertas.length > 3 ? ` (+${r.alertas.length - 3})` : ""}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <p className="px-3 py-2 text-[11px] text-muted-foreground border-t">
+                  Para cada setor com sucesso, selecione-o no topo, clique em <strong>"Gerar escala com IA"</strong> uma vez para carregar o resultado e depois <strong>"Enviar para o Editor de Escalas"</strong>. Ou abra direto o Editor — os templates já estão salvos como pendentes de aprovação.
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

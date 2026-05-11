@@ -1,58 +1,41 @@
 ## Objetivo
 
-Resolver duas melhorias na aba **Escalas** (Gestão de Pessoas):
+No editor manual de escalas (`ManualScheduleGrid`), permitir que o operador lance freelancers além da cota POP do dia, de forma organizada e sempre visível, sem depender de cliques "escondidos".
 
-1. Permitir cadastrar um funcionário direto do **Editor de Escalas** (`ManualScheduleGrid`), já vinculando-o ao **setor ativo** e a um **cargo** (com vínculo `sector_job_titles`).
-2. Ajustar o input de **POP** (efetivos e extras) na configuração de matriz para que números de **2+ dígitos** apareçam por inteiro sem cortar.
+## Situação atual
 
----
+- Existem linhas "VAGA EXTRA" (dentro da cota POP) e "EXTRA AVULSO" (fora da cota).
+- O número de linhas extras renderizadas usa `Math.max(quota, filled, 1)`. Quando `filled === quota` (cota cheia), **nenhuma célula vazia aparece** para adicionar um freelancer adicional; o usuário só consegue via botão pequeno "+ Freelancer" no cabeçalho do dia.
+- Já existe `FreelancerAddModal` reaproveitável e o botão de cabeçalho.
 
-## 1. Cadastro rápido de funcionário no Editor de Escalas
+## Mudanças propostas
 
-### Onde
-- `src/components/escalas/ManualScheduleGrid.tsx` — adicionar botão **"Novo funcionário"** no cabeçalho da grade (próximo aos filtros de cargo/setor já existentes), visível quando há `activeSectorId` selecionado.
-- Criar novo componente `src/components/escalas/QuickCreateEmployeeModal.tsx`, reaproveitando a lógica de `TeamManagement.tsx`.
+1. **Sempre exibir uma vaga avulsa livre por dia**
+   - Arquivo: `src/components/escalas/ManualScheduleGrid.tsx`
+   - Função `slotsPerDay` (linha ~959): trocar `Math.max(quota, filled, 1)` por `Math.max(quota, filled + 1)`.
+   - Resultado: para cada dia, sempre haverá uma célula tracejada "Adicionar freelancer avulso" abaixo das já preenchidas, mesmo após exceder a cota POP. Múltiplos lançamentos extras viram múltiplas linhas, mantendo a grade organizada.
 
-### O que o modal faz
-Campos no modal (todos no mesmo passo):
-- **Unidade** — pré-preenchida com `selectedUnit` do editor (admin pode trocar).
-- **Setor** — pré-preenchido com o setor ativo da grade (`activeSectorId`); somente leitura ou seleção entre setores da unidade.
-- **Cargo** — `Select` com cargos já existentes da unidade (`useJobTitles`) **+ opção "Novo cargo"**, igual ao `TeamManagement`. Quando o cargo escolhido **ainda não está vinculado ao setor**, vincula automaticamente.
-- **Nome** (obrigatório).
-- **Gênero** (M/F).
-- **Telefone** (opcional, máscara igual ao `TeamManagement`).
+2. **Rótulo dinâmico da linha avulsa**
+   - Já existe rótulo `EXTRA AVULSO`. Acrescentar contagem quando passar da cota: `EXTRA AVULSO (N)` onde `N = slotIdx - quotaMax + 1` para deixar claro o nº de extras adicionados além do previsto. Apenas cosmético.
 
-### Fluxo de salvamento (em ordem)
-1. `useUpsertJobTitle` → garante o `job_title_id` na unidade.
-2. `useAddSectorJobTitle` → vincula `(sector_id, job_title_id)` se ainda não vinculado (idempotente).
-3. `useAddEmployee` → cria o funcionário com `unit_id`, `name`, `gender`, `phone`, `job_title`, `job_title_id`.
-4. Invalida queries de `employees` e `sector_job_titles` → o novo funcionário aparece imediatamente em `sectorBaseEmployees` da grade ativa.
-5. Toast de sucesso e modal fecha.
+3. **Botão de atalho no cabeçalho do dia**
+   - O botão `+ Freelancer` (linha ~1553) já existe e abre o `FreelancerAddModal`. Ajustar `title` para "Adicionar freelancer (inclui acima da cota POP)" e dar destaque visual leve (cor coral/`text-primary`) para reforçar que pode ser usado livremente.
 
-### Reuso de regras
-- Mesma validação de duplicidade do `TeamManagement` (mensagem amigável `friendlyEmployeeError`).
-- Respeita `useUserProfile` + `useAccessibleStores` para admins (ainda podem trocar a unidade).
+4. **Indicador visual de excedente**
+   - No header de métricas do dia, quando `freelancerCountPerDay > extrasQuotaPerDay`, exibir badge discreto "Acima da cota POP (+N)" em âmbar. Ajuda o líder a perceber que está estourando o planejado, sem bloquear.
 
----
+## Fora do escopo
 
-## 2. Visualização do POP — input de dezenas legível
-
-### Onde
-- `src/components/escalas/StaffingMatrixConfig.tsx` (linhas ~374 e ~388 — inputs `efetivos` e `extras` da matriz).
-
-### Mudança
-- Atualmente os dois `Input` usam `w-12` (48px) com `text-xs`, o que corta o valor quando passa de 1 dígito (ex: `12`, `23`).
-- Aumentar a largura para acomodar até 3 dígitos confortavelmente:
-  - `w-12 text-xs` → `w-14 text-sm tabular-nums px-1`.
-  - Manter `text-center` e o `key` baseado no valor (preserva o comportamento de re-render).
-- Aplicar a mesma melhoria nos dois campos (efetivos e extras) para manter alinhamento visual.
-
-Sem alterações em lógica de cálculo, apenas estilo.
-
----
+- Não altera permissões, RLS, regras de orçamento, nem a lógica do `FreelancerAddModal` em si.
+- Não muda a cota POP no `staffing_matrix`.
 
 ## Verificação
 
-1. Editor de Escalas → selecionar setor "Garçom" → clicar em **Novo funcionário** → criar "Teste Garçom" / cargo "Garçom" → confirmar que aparece imediatamente como funcionário da base do setor (sem reload).
-2. Configurações → Matriz POP → digitar `12` em um efetivo → todo o número visível dentro do input em todos os dias da semana.
-3. Mobile (922px e abaixo): inputs continuam dentro da célula sem quebrar layout.
+- Abrir editor de escalas em uma semana, escolher setor com cota POP de extras = 1.
+- Adicionar 1 freelancer no dia → linha "EXTRA AVULSO" segue exibindo nova célula vazia abaixo.
+- Adicionar mais 2 freelancers → grid mostra 3 linhas preenchidas + 1 linha vazia "EXTRA AVULSO (3)".
+- Badge "Acima da cota POP (+2)" aparece no cabeçalho do dia.
+
+## Arquivos afetados
+
+- `src/components/escalas/ManualScheduleGrid.tsx` (apenas UI/estado derivado).

@@ -253,10 +253,29 @@ export function GeradorEscalaIA() {
     setBatchResults([]);
     setBatchProgress({ idx: 0, total: setores.length, current: setores[0] ?? "" });
 
+    // Pré-carrega quais setores têm escala_minima cadastrada (necessário pela edge function)
+    const { data: minRows } = await supabase
+      .from("escala_minima")
+      .select("setor")
+      .eq("unidade_id", effectiveUnidadeId);
+    const setoresComMinima = new Set((minRows ?? []).map((r: any) => r.setor));
+
     const acc: BatchResult[] = [];
     for (let i = 0; i < setores.length; i++) {
       const s = setores[i];
       setBatchProgress({ idx: i + 1, total: setores.length, current: s });
+
+      // Skip cedo: sem escala_minima a edge function devolve 404
+      if (!setoresComMinima.has(s)) {
+        acc.push({
+          setor: s,
+          status: "skipped",
+          motivo: "Sem escala_minima cadastrada para este setor (configure POP antes).",
+        });
+        setBatchResults([...acc]);
+        continue;
+      }
+
       try {
         const { data, error } = await supabase.functions.invoke("gerar-escala-ia", {
           body: {
@@ -266,10 +285,24 @@ export function GeradorEscalaIA() {
             modelo_folga: batchModelo,
           },
         });
-        if (error) {
-          acc.push({ setor: s, status: "fail", motivo: error.message });
-        } else if (data?.error) {
-          acc.push({ setor: s, status: "fail", motivo: data.error });
+        // supabase.functions.invoke devolve erro genérico em status != 2xx; trate 404 (config ausente) como "skipped"
+        const errMsg = (error as any)?.message ?? "";
+        const dataErr = (data as any)?.error ?? "";
+        const isConfigMissing =
+          /Configura(ç|c)ão n(ã|a)o encontrada/i.test(errMsg) ||
+          /Configura(ç|c)ão n(ã|a)o encontrada/i.test(dataErr) ||
+          /404/.test(errMsg);
+
+        if (isConfigMissing) {
+          acc.push({
+            setor: s,
+            status: "skipped",
+            motivo: "Configuração ausente (turno_config ou escala_minima).",
+          });
+        } else if (error) {
+          acc.push({ setor: s, status: "fail", motivo: errMsg || "Erro na edge function" });
+        } else if (dataErr) {
+          acc.push({ setor: s, status: "fail", motivo: dataErr });
         } else {
           const escala = data?.escala as EscalaResponse | undefined;
           const vagas = escala?.plano_folgas?.vagas?.length ?? 0;
@@ -299,7 +332,8 @@ export function GeradorEscalaIA() {
     const ok = acc.filter((r) => r.status === "ok").length;
     const warn = acc.filter((r) => r.status === "warn").length;
     const fail = acc.filter((r) => r.status === "fail").length;
-    toast.success(`Lote concluído: ${ok} ok • ${warn} com alertas • ${fail} falha(s)`, { duration: 8000 });
+    const skipped = acc.filter((r) => r.status === "skipped").length;
+    toast.success(`Lote concluído: ${ok} ok • ${warn} com alertas • ${fail} falha(s) • ${skipped} pulado(s)`, { duration: 8000 });
   };
 
 

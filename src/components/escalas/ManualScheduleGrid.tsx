@@ -1766,16 +1766,26 @@ export function ManualScheduleGrid() {
                                         e.stopPropagation();
                                         if (e.shiftKey && grid.state.active) {
                                           grid.extendSelection({ row: rowIdx, col: i });
-                                        } else {
-                                          grid.setActive({ row: rowIdx, col: i });
+                                          return;
                                         }
+                                        grid.setActive({ row: rowIdx, col: i });
                                         focusGrid();
+                                        // Toggle folga only on empty / off cells; working shifts require dbl-click
+                                        const eligible = !schedule || schedule.schedule_type === "off";
+                                        if (!eligible) return;
+                                        cancelPendingClick();
+                                        clickTimerRef.current = setTimeout(() => {
+                                          handleSingleClickToggleOff(emp, dateStr);
+                                          clickTimerRef.current = null;
+                                        }, 220);
                                       }}
                                       onDoubleClick={(e) => {
                                         if (copyMode) return;
                                         e.stopPropagation();
+                                        cancelPendingClick();
                                         handleCellClick(emp, dateStr);
                                       }}
+                                      title={!schedule ? "1 clique: folga · 2 cliques: editar" : undefined}
                                     >
                                       <ScheduleCell schedule={schedule} isFreelancer={isFreelancer} pracaName={pracaName} />
                                     </TableCell>

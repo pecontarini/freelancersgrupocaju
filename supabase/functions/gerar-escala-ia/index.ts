@@ -158,6 +158,108 @@ Deno.serve(async (req) => {
       };
     });
 
+    // === ESTADO DAS PESSOAS — funcionários ativos + histórico recente ===
+    // Datas reais da semana (segunda → domingo) para amarrar dias da semana a YYYY-MM-DD
+    const semanaDate = new Date(semana_inicio + "T12:00:00");
+    const weekDates: { dia: string; date: string }[] = DIAS.map((dia, i) => {
+      const d = new Date(semanaDate);
+      d.setDate(d.getDate() + i);
+      return { dia, date: d.toISOString().slice(0, 10) };
+    });
+    const monthRef = semana_inicio.slice(0, 7); // YYYY-MM (mês de referência p/ folga dominical)
+
+    // IDs de cargo para o setor (já temos sjtJobIds + equivalentJobIds)
+    const allJobIds = Array.from(new Set([...sjtJobIds, ...equivalentJobIds]));
+
+    type PessoaIA = {
+      employee_id: string;
+      nome: string;
+      cargo: string | null;
+      tipo: string;
+      carga_horaria_alvo: number;
+      ultimo_turno_anterior: { data: string; fim: string } | null;
+      domingos_folga_no_mes: string[];
+      ausencias_na_semana: { data: string; tipo: string }[];
+    };
+    const pessoasList: PessoaIA[] = [];
+
+    if (allJobIds.length > 0) {
+      const { data: empsData } = await supabase
+        .from("employees")
+        .select("id, name, worker_type, weekly_hours_target, job_titles(name), job_title")
+        .eq("unit_id", unidade_id)
+        .eq("active", true)
+        .in("job_title_id", allJobIds);
+      const emps = (empsData ?? []) as Array<any>;
+      const empIds = emps.map((e) => e.id);
+
+      // Domingos folgados no mês corrente + ausências/turno anterior
+      const monthStart = `${monthRef}-01`;
+      const monthEndDate = new Date(semanaDate);
+      monthEndDate.setMonth(monthEndDate.getMonth() + 1);
+      const monthEnd = monthEndDate.toISOString().slice(0, 10);
+      const prevWeekStart = (() => {
+        const d = new Date(semanaDate);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().slice(0, 10);
+      })();
+
+      const sundaysByEmp = new Map<string, string[]>();
+      const lastShiftByEmp = new Map<string, { data: string; fim: string }>();
+      const absencesByEmp = new Map<string, { data: string; tipo: string }[]>();
+
+      if (empIds.length > 0) {
+        const { data: schs } = await supabase
+          .from("schedules")
+          .select("employee_id, schedule_date, schedule_type, end_time")
+          .in("employee_id", empIds)
+          .gte("schedule_date", prevWeekStart)
+          .lte("schedule_date", monthEnd)
+          .neq("status", "cancelled");
+        const weekStartStr = semana_inicio;
+        const weekEndStr = weekDates[6].date;
+        for (const s of (schs ?? []) as Array<any>) {
+          const date = s.schedule_date as string;
+          // Domingos de folga no mês de referência
+          if (date.startsWith(monthRef) && s.schedule_type === "off") {
+            const dt = new Date(date + "T12:00:00");
+            if (dt.getDay() === 0) {
+              const arr = sundaysByEmp.get(s.employee_id) ?? [];
+              if (!arr.includes(date)) arr.push(date);
+              sundaysByEmp.set(s.employee_id, arr);
+            }
+          }
+          // Último turno trabalhado ANTES da semana-alvo (p/ interjornada)
+          if (s.schedule_type === "working" && date < weekStartStr && s.end_time) {
+            const cur = lastShiftByEmp.get(s.employee_id);
+            if (!cur || date > cur.data) {
+              lastShiftByEmp.set(s.employee_id, { data: date, fim: String(s.end_time).slice(0, 5) });
+            }
+          }
+          // Ausências DURANTE a semana-alvo (férias/atestado/folga já marcada)
+          if (s.schedule_type !== "working" && date >= weekStartStr && date <= weekEndStr) {
+            const arr = absencesByEmp.get(s.employee_id) ?? [];
+            arr.push({ data: date, tipo: s.schedule_type });
+            absencesByEmp.set(s.employee_id, arr);
+          }
+        }
+      }
+
+      for (const e of emps) {
+        pessoasList.push({
+          employee_id: e.id,
+          nome: e.name,
+          cargo: e.job_titles?.name ?? e.job_title ?? null,
+          tipo: e.worker_type ?? "clt",
+          carga_horaria_alvo: e.weekly_hours_target ?? 44,
+          ultimo_turno_anterior: lastShiftByEmp.get(e.id) ?? null,
+          domingos_folga_no_mes: sundaysByEmp.get(e.id) ?? [],
+          ausencias_na_semana: absencesByEmp.get(e.id) ?? [],
+        });
+      }
+      console.log(`[gerar-escala-ia] pessoas=${pessoasList.length} mês_ref=${monthRef}`);
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
 
@@ -173,42 +275,59 @@ Deno.serve(async (req) => {
         observacoes: config.observacoes,
       },
       tabelaMinima,
+      weekDates,
+      pessoas: pessoasList,
     });
 
-    const callGateway = async () => fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Modelo principal: gemini-2.5-pro com reasoning médio (melhor combinatória de folgas/dobras/CLT).
+    // Fallback automático: gemini-2.5-flash se Pro falhar (rate-limit/erro 5xx).
+    const callGateway = async (model: "pro" | "flash") => fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: model === "pro" ? "google/gemini-2.5-pro" : "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
         ],
         max_tokens: 16000,
         response_format: { type: "json_object" },
+        ...(model === "pro" ? { reasoning: { effort: "medium" } } : {}),
       }),
     });
 
     let aiResp: Response | null = null;
     let lastErr = "";
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    let modeloUsadoIA: "pro" | "flash" = "pro";
+    // Tentativa 1: Pro com reasoning. Tentativa 2: Pro novamente. Tentativa 3: fallback Flash.
+    const sequence: ("pro" | "flash")[] = ["pro", "pro", "flash"];
+    for (let attempt = 0; attempt < sequence.length; attempt++) {
+      const target = sequence[attempt];
       try {
-        aiResp = await callGateway();
-        if (aiResp.ok) break;
-        if (aiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+        aiResp = await callGateway(target);
+        if (aiResp.ok) { modeloUsadoIA = target; break; }
+        if (aiResp.status === 429) {
+          // Rate-limit no Pro: cai para Flash imediatamente em vez de erroar.
+          if (target === "pro") {
+            console.warn("[gerar-escala-ia] Pro rate-limited, fallback para Flash.");
+            continue;
+          }
+          return json({ error: "Limite de requisições atingido. Tente novamente em instantes." }, 429);
+        }
         if (aiResp.status === 402) return json({ error: "Créditos da Lovable AI esgotados." }, 402);
         lastErr = await aiResp.text();
-        console.error(`AI gateway error (tentativa ${attempt}):`, aiResp.status, lastErr);
-        if (aiResp.status < 500) break;
+        console.error(`AI gateway error (tentativa ${attempt + 1}, modelo ${target}):`, aiResp.status, lastErr);
+        if (aiResp.status < 500 && target === "flash") break;
       } catch (e) {
         lastErr = e instanceof Error ? e.message : String(e);
-        console.error(`AI gateway fetch falhou (tentativa ${attempt}):`, lastErr);
+        console.error(`AI gateway fetch falhou (tentativa ${attempt + 1}, modelo ${target}):`, lastErr);
       }
-      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000));
+      if (attempt < sequence.length - 1) await new Promise((r) => setTimeout(r, 800));
     }
     if (!aiResp || !aiResp.ok) {
-      return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após 3 tentativas." }, 502);
+      return json({ error: "Erro no AI Gateway", detail: lastErr || "Falha após retries." }, 502);
     }
+    console.log(`[gerar-escala-ia] modelo_usado=${modeloUsadoIA}`);
 
 
     const aiData = await aiResp.json();
@@ -661,6 +780,7 @@ Deno.serve(async (req) => {
       plano.teto_efetivo = tetoEfetivo;
       plano.modelo_folga_aplicado = modeloFolgaAplicado;
       plano.alertas_capacidade = [...alertasHeadcount, ...alertasCapacidade];
+      plano.modelo_ia_usado = modeloUsadoIA;
       plano.distribuicao_folgas_por_dia = folgasPorDiaGlobal;
       plano.cobertura_por_dia_calc = cobertura;
       plano.minimos_por_papel_calc = minimos;

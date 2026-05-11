@@ -179,6 +179,8 @@ Responda SOMENTE com JSON válido. Sem texto. Sem backticks. Sem markdown.
         "tipo": "ABRIDOR-DOBRA",
         "papel": "abridor",
         "responsavel": false,
+        "employee_id": "uuid-ou-null",
+        "employee_nome": "Nome (opcional, ajuda revisão)",
         "folgas": ["SEG"],
         "horario_padrao": {
           "t1": { "entrada": "09:00", "saida": "14:00", "efetivo_min": 300 },
@@ -217,6 +219,17 @@ export function buildUserPrompt(p: {
   headcount_max: number;
   config: { qtd_abridores: number; qtd_fechadores: number; qtd_intermediarios: number; observacoes?: string | null };
   tabelaMinima: Array<{ dia: string; almoco_efetivos: number; almoco_extras: number; jantar_efetivos: number; jantar_extras: number }>;
+  weekDates?: Array<{ dia: string; date: string }>;
+  pessoas?: Array<{
+    employee_id: string;
+    nome: string;
+    cargo: string | null;
+    tipo: string;
+    carga_horaria_alvo: number;
+    ultimo_turno_anterior: { data: string; fim: string } | null;
+    domingos_folga_no_mes: string[];
+    ausencias_na_semana: { data: string; tipo: string }[];
+  }>;
 }): string {
   const tabela = p.tabelaMinima.map((d) => {
     const al = d.almoco_extras > 0 ? `${d.almoco_efetivos}+${d.almoco_extras}ext` : `${d.almoco_efetivos}`;
@@ -230,11 +243,55 @@ export function buildUserPrompt(p: {
     ? `\n⚠️ ABERTURA DESTE SETOR: 08:00 (INEGOCIÁVEL)\n   Todo abridor da Parrilla entra T1 às 08:00 (08h→13h), break 3h, e segue T2 normal.\n`
     : "";
 
+  // === Bloco de DATAS REAIS da semana ===
+  const blocoDatas = (p.weekDates && p.weekDates.length === 7)
+    ? `\nDATAS DA SEMANA (use para amarrar dia → data real):\n${p.weekDates.map((w) => `  ${w.dia} = ${w.date}`).join("\n")}\n`
+    : "";
+
+  // === Bloco ESTADO DAS PESSOAS ===
+  let blocoPessoas = "";
+  if (p.pessoas && p.pessoas.length > 0) {
+    const linhas = p.pessoas.map((u) => {
+      const last = u.ultimo_turno_anterior
+        ? `últ.turno ${u.ultimo_turno_anterior.data} fim ${u.ultimo_turno_anterior.fim}`
+        : "sem turno anterior";
+      const sundays = u.domingos_folga_no_mes.length > 0
+        ? `dom.folga.mês [${u.domingos_folga_no_mes.join(",")}]`
+        : "SEM domingo de folga no mês";
+      const aus = u.ausencias_na_semana.length > 0
+        ? `INDISPONÍVEL ${u.ausencias_na_semana.map((a) => `${a.data}=${a.tipo}`).join(",")}`
+        : "";
+      return `  - id=${u.employee_id} | ${u.nome} | ${u.cargo ?? "—"} | ${u.tipo} | ${u.carga_horaria_alvo}h/sem | ${last} | ${sundays}${aus ? " | " + aus : ""}`;
+    }).join("\n");
+    blocoPessoas = `\n═══════════════════════════════
+ESTADO DAS PESSOAS (use para atribuir nomes às vagas)
+═══════════════════════════════
+Funcionários ATIVOS deste setor (${p.pessoas.length}):
+${linhas}
+
+REGRAS DE ATRIBUIÇÃO:
+- Em cada vaga de plano_folgas.vagas, inclua o campo "employee_id" e "employee_nome"
+  com a pessoa que cobrirá aquela vaga durante a semana.
+- NÃO atribua a mesma pessoa a duas vagas diferentes.
+- Pessoas com ausências na semana (férias/atestado/folga já marcada) NÃO devem
+  ser atribuídas em vagas que coincidam com aquelas datas. Considere isso ao
+  posicionar as folgas semanais delas.
+- INTERJORNADA 11h: para cada pessoa com "últ.turno", a primeira entrada da
+  semana DEVE respeitar 11h desde aquele fim. Exemplo: últ.turno 24/11 fim
+  23:30 ⇒ não pode entrar antes de 25/11 10:30.
+- DOMINGO DE FOLGA: se a pessoa marcada "SEM domingo de folga no mês" e ainda
+  houver domingo nesta semana ou nas próximas do mês, PREFIRA dar o domingo
+  desta semana para ela (rotação CLT Art. 67/386).
+- Se houver menos pessoas do que vagas necessárias, deixe as vagas excedentes
+  com employee_id=null e adicione "vaga em aberto" em alertas_operacionais.
+`;
+  }
+
   return `Gere a escala de horários para o setor abaixo.
 
 SETOR: ${p.setor}
 SEMANA: ${p.semana}
-MODELO DE FOLGA: ${p.modeloFolga}${blocoParrilla}
+MODELO DE FOLGA: ${p.modeloFolga}${blocoParrilla}${blocoDatas}
 
 ESTRUTURA DE TURNOS (COO Felipe Carneiro):
   Abridores (mín. diário POP):  ${p.config.qtd_abridores}   ← em campo TODOS os 7 dias
@@ -274,7 +331,7 @@ Se o setor for de atendimento (GARCOM, GARCOMS, GARÇOM, ATENDIMENTO, SALAO):
     ambos. Só crie vaga TIPO-ALMOCO pura quando faltar cobertura de almoço
     após esgotar dobras.
   - Folgas nunca derrubam POP (almoço ou jantar) abaixo do mínimo.
-
+${blocoPessoas}
 ATENÇÃO: respeitar o teto ${p.headcount_max} sempre que matematicamente possível.
 O sistema fará poda automática se você passar do teto. Dimensione corretamente.
 

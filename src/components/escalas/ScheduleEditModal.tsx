@@ -286,13 +286,28 @@ export function ScheduleEditModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Início</Label>
-                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Input type="time" value={startTime} onChange={(e) => handleStartChange(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Fim</Label>
-                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                <Input type="time" value={endTime} onChange={(e) => handleEndChange(e.target.value)} />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setLinkDuration((v) => !v)}
+              className={`w-full flex items-center justify-center gap-1.5 text-xs rounded-md py-1.5 border transition-colors ${
+                linkDuration
+                  ? "border-primary/40 bg-primary/5 text-primary"
+                  : "border-muted text-muted-foreground hover:bg-muted/50"
+              }`}
+              title="Ao mover início ou fim, o outro acompanha mantendo a duração total"
+            >
+              {linkDuration ? <LinkIcon className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />}
+              {linkDuration
+                ? `Manter duração (${Math.floor(durationMinRef.current / 60)}h${durationMinRef.current % 60 ? ` ${durationMinRef.current % 60}min` : ""})`
+                : "Editar início e fim independentes"}
+            </button>
             <div className="space-y-1.5">
               <Label>Intervalo (minutos)</Label>
               <Input type="number" min={0} max={180} value={breakDuration} onChange={(e) => setBreakDuration(Number(e.target.value))} />

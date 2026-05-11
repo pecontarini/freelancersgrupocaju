@@ -351,10 +351,23 @@ export function GeradorEscalaIA() {
       }
 
       const drafts: Omit<DraftSlot, "id" | "created_at" | "created_by">[] = [];
+      let vagasIgnoradas = 0;
+      let warnedSample = false;
       for (let i = 0; i < vagas.length; i++) {
         const v = vagas[i];
-        const day = slotToDay(v.horario_padrao);
-        if (!day) continue;
+        const horario = v?.horario_padrao ?? v?.horario ?? v;
+        const day = slotToDay(horario);
+        if (!day) {
+          vagasIgnoradas++;
+          if (!warnedSample) {
+            warnedSample = true;
+            console.warn("[GeradorEscalaIA] vaga sem horário válido:", {
+              keys: v && typeof v === "object" ? Object.keys(v) : null,
+              horario_padrao: v?.horario_padrao,
+            });
+          }
+          continue;
+        }
         const folgasSet = new Set(v.folgas ?? []);
         const days: Record<string, DraftDay> = {};
         for (const d of DIAS) {
@@ -365,16 +378,23 @@ export function GeradorEscalaIA() {
           sector_id: sector.id,
           sector_name: sector.name,
           week_start: weekStartMonday,
-          label: `Vaga ${v.tipo}${v.responsavel ? " ★" : ""}`,
-          tipo: v.tipo,
+          label: `Vaga ${v.tipo ?? "?"}${v.responsavel ? " ★" : ""}`,
+          tipo: v.tipo ?? "indefinido",
           responsavel: !!v.responsavel,
           days,
         });
       }
 
       if (drafts.length === 0) {
-        toast.warning("Nenhuma vaga válida para enviar.");
+        toast.error(
+          vagasIgnoradas > 0
+            ? `IA não retornou horários válidos em ${vagasIgnoradas} vaga(s). Tente regenerar a escala.`
+            : "Nenhuma vaga válida para enviar.",
+        );
         return;
+      }
+      if (vagasIgnoradas > 0) {
+        toast.warning(`${vagasIgnoradas} vaga(s) ignorada(s) por horário inválido.`);
       }
 
       console.info("[AI Draft] enviando para editor:", {

@@ -962,7 +962,9 @@ export function ManualScheduleGrid() {
       const dateStr = format(day, "yyyy-MM-dd");
       const quota = extrasQuotaPerDay.get(dateStr) ?? 0;
       const filled = freelancerCountPerDay.get(dateStr) ?? 0;
-      map.set(dateStr, Math.max(quota, filled, 1));
+      // Always keep one empty extra slot available beyond what's already filled,
+      // so the operator can always lançar mais freelancers além da cota POP.
+      map.set(dateStr, Math.max(quota, filled + 1));
     }
     return map;
   }, [weekDays, extrasQuotaPerDay, freelancerCountPerDay]);

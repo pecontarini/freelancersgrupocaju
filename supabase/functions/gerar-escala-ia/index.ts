@@ -780,6 +780,7 @@ Deno.serve(async (req) => {
       plano.teto_efetivo = tetoEfetivo;
       plano.modelo_folga_aplicado = modeloFolgaAplicado;
       plano.alertas_capacidade = [...alertasHeadcount, ...alertasCapacidade];
+      plano.modelo_ia_usado = modeloUsadoIA;
       plano.distribuicao_folgas_por_dia = folgasPorDiaGlobal;
       plano.cobertura_por_dia_calc = cobertura;
       plano.minimos_por_papel_calc = minimos;

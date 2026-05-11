@@ -94,6 +94,8 @@ export function ScheduleEditModal({
   const [agreedRate, setAgreedRate] = useState("");
   const [pracaId, setPracaId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("turno");
+  const [linkDuration, setLinkDuration] = useState(true);
+  const durationMinRef = useRef<number>(500); // 08:00 → 16:20 default = 500min
 
   // Vacation sub-form state
   const [showVacationForm, setShowVacationForm] = useState(false);

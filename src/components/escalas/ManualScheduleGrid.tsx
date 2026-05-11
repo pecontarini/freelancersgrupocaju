@@ -1031,6 +1031,37 @@ export function ManualScheduleGrid() {
     });
   }
 
+  // Click-vs-doubleClick disambiguation for fast toggle-off behavior
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cancelPendingClick() {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+    }
+  }
+  function handleSingleClickToggleOff(emp: any, dateStr: string) {
+    const existing = getScheduleForCell(emp.id, dateStr);
+    if (!existing) {
+      // Empty cell → mark as folga
+      const sectorId = resolveSectorForEmployee(emp.id);
+      if (!sectorId) return;
+      upsertSchedule.mutate({
+        employee_id: emp.id,
+        schedule_date: dateStr,
+        sector_id: sectorId,
+        schedule_type: "off",
+        start_time: null,
+        end_time: null,
+        break_duration: 0,
+        agreed_rate: 0,
+      });
+    } else if (existing.schedule_type === "off") {
+      // Folga → cancel back to empty
+      cancelSchedule.mutate(existing.id);
+    }
+    // Working shift → no-op (just selection); user must double-click to edit
+  }
+
   function handleSaveBudget(dateStr: string) {
     if (!selectedUnit) return;
     upsertBudget.mutate({

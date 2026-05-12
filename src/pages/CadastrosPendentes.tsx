@@ -21,7 +21,6 @@ import {
   ShieldAlert,
   Pencil,
   PhoneOff,
-  UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import EditPixModal from "@/components/cadastros-pendentes/EditPixModal";
@@ -261,16 +260,6 @@ export default function CadastrosPendentes() {
     setBatchItems(queue);
   };
 
-  const handleMarkInactive = async (p: PendingProfile) => {
-    if (!confirm(`Marcar ${p.nome_completo} como inativo?`)) return;
-    // Convenção: usar campo telefone='' não é ideal; criamos coluna lógica via update_requested_*?
-    // Sem coluna `inativo` ainda — fazemos update simbólico definindo updated_at via RPC futura.
-    // Para esta entrega, apenas removemos do filtro padrão via disparo "informativo".
-    toast.message(
-      `Marcação de inativo só virá no próximo PR. Por ora, ${p.nome_completo} permanece visível.`
-    );
-  };
-
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -416,13 +405,6 @@ export default function CadastrosPendentes() {
                             disabled={!phoneOk || dispatching}
                           >
                             <Send className="h-3.5 w-3.5 mr-1" /> Link
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleMarkInactive(p)}
-                          >
-                            <UserX className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
                       </TableRow>

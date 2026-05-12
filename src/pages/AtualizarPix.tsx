@@ -15,25 +15,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-interface ProfileData {
-  id: string;
-  nome_completo: string;
-  cpf: string;
-  telefone: string | null;
-  tipo_chave_pix: string | null;
-  chave_pix: string | null;
+type PixType = "cpf" | "email" | "telefone";
+
+interface PeekResponse {
+  ok: boolean;
+  error?: string;
+  primeiro_nome?: string | null;
+  cpf_masked?: string;
+  telefone_masked?: string;
+  tipo_chave_pix?: string | null;
+  chave_pix_masked?: string;
+  expires_at?: string;
+}
+
+interface ProfileMasked {
+  primeiroNome: string | null;
+  cpfMasked: string;
+  telefoneMasked: string;
+  tipoAtual: string | null;
+  chaveMasked: string;
 }
 
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; profile: ProfileData; expiresAt: string }
+  | { kind: "ready"; profile: ProfileMasked; expiresAt: string }
   | { kind: "error"; reason: string }
   | { kind: "success" };
 
 export default function AtualizarPix() {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
-  const [tipo, setTipo] = useState<"cpf" | "email" | "telefone">("cpf");
+  const [tipo, setTipo] = useState<PixType>("cpf");
   const [chave, setChave] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -50,16 +62,30 @@ export default function AtualizarPix() {
         setState({ kind: "error", reason: error.message });
         return;
       }
-      const r = data as unknown as { ok: boolean; error?: string; profile?: ProfileData; expires_at?: string };
-      if (!r.ok || !r.profile) {
-        setState({ kind: "error", reason: r.error ?? "unknown" });
+      const r = data as unknown as PeekResponse;
+      if (!r?.ok) {
+        setState({ kind: "error", reason: r?.error ?? "unknown" });
         return;
       }
-      setState({ kind: "ready", profile: r.profile, expiresAt: r.expires_at ?? "" });
-      if (r.profile.tipo_chave_pix === "cpf" || r.profile.tipo_chave_pix === "email" || r.profile.tipo_chave_pix === "telefone") {
-        setTipo(r.profile.tipo_chave_pix);
+      const profile: ProfileMasked = {
+        primeiroNome: r.primeiro_nome ?? null,
+        cpfMasked: r.cpf_masked ?? "—",
+        telefoneMasked: r.telefone_masked ?? "—",
+        tipoAtual: r.tipo_chave_pix ?? null,
+        chaveMasked: r.chave_pix_masked ?? "—",
+      };
+      setState({
+        kind: "ready",
+        profile,
+        expiresAt: r.expires_at ?? "",
+      });
+      if (
+        r.tipo_chave_pix === "cpf" ||
+        r.tipo_chave_pix === "email" ||
+        r.tipo_chave_pix === "telefone"
+      ) {
+        setTipo(r.tipo_chave_pix);
       }
-      if (r.profile.chave_pix) setChave(r.profile.chave_pix);
     })();
   }, [token]);
 
@@ -107,12 +133,8 @@ export default function AtualizarPix() {
             </div>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Este link de atualização de PIX não é mais válido.
-            </p>
-            <p>
-              Entre em contato com seu gestor para receber um novo link.
-            </p>
+            <p>Este link de atualização de PIX não é mais válido.</p>
+            <p>Entre em contato com seu gestor para receber um novo link.</p>
             <p className="text-xs opacity-70">Motivo técnico: {state.reason}</p>
           </CardContent>
         </Card>
@@ -135,9 +157,7 @@ export default function AtualizarPix() {
               Sua chave PIX foi recebida e os pagamentos seguirão para essa
               chave a partir do próximo lote.
             </p>
-            <p className="mt-3">
-              Pode fechar esta página. O link já expirou.
-            </p>
+            <p className="mt-3">Pode fechar esta página. O link já expirou.</p>
           </CardContent>
         </Card>
       </div>
@@ -145,29 +165,36 @@ export default function AtualizarPix() {
   }
 
   const { profile } = state;
+  const saudacao = profile.primeiroNome
+    ? `Olá, ${profile.primeiroNome} — vamos atualizar seu PIX`
+    : "Atualizar minha chave PIX";
 
   return (
     <div className="min-h-screen p-4 bg-background flex items-start justify-center md:items-center">
       <Card className="max-w-md w-full">
         <CardHeader>
-          <CardTitle className="text-lg">Atualizar minha chave PIX</CardTitle>
+          <CardTitle className="text-lg">{saudacao}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
             <div>
-              <span className="text-muted-foreground">Nome:</span>{" "}
-              <strong>{profile.nome_completo}</strong>
+              <span className="text-muted-foreground">CPF:</span>{" "}
+              <strong>{profile.cpfMasked}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">CPF:</span>{" "}
-              {maskCpf(profile.cpf)}
+              <span className="text-muted-foreground">Telefone:</span>{" "}
+              {profile.telefoneMasked}
             </div>
             <div>
               <span className="text-muted-foreground">Chave atual:</span>{" "}
-              {profile.chave_pix
-                ? `${maskKey(profile.chave_pix)} (${profile.tipo_chave_pix ?? "—"})`
+              {profile.chaveMasked !== "—"
+                ? `${profile.chaveMasked}${profile.tipoAtual ? ` (${profile.tipoAtual})` : ""}`
                 : "—"}
             </div>
+            <p className="text-xs text-muted-foreground pt-1">
+              Mostramos só o início e o fim de cada dado para você confirmar
+              que o link é seu, sem expor informação sensível.
+            </p>
           </div>
 
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
@@ -178,7 +205,7 @@ export default function AtualizarPix() {
 
           <div className="space-y-2">
             <Label>Tipo de chave PIX</Label>
-            <Select value={tipo} onValueChange={(v) => setTipo(v as typeof tipo)}>
+            <Select value={tipo} onValueChange={(v) => setTipo(v as PixType)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -223,16 +250,4 @@ export default function AtualizarPix() {
       </Card>
     </div>
   );
-}
-
-function maskCpf(cpf: string): string {
-  const d = (cpf || "").replace(/\D/g, "");
-  if (d.length !== 11) return cpf;
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11).replace(/.(?=.)/g, "X")}`;
-}
-
-function maskKey(k: string): string {
-  if (!k) return "";
-  if (k.length <= 4) return "*".repeat(k.length);
-  return `${k.slice(0, 2)}${"*".repeat(Math.max(2, k.length - 4))}${k.slice(-2)}`;
 }

@@ -4708,6 +4708,7 @@ export type Database = {
       shifts: {
         Row: {
           created_at: string
+          created_from_draft_id: string | null
           end_time: string
           id: string
           name: string
@@ -4716,6 +4717,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_from_draft_id?: string | null
           end_time: string
           id?: string
           name: string
@@ -4724,13 +4726,22 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_from_draft_id?: string | null
           end_time?: string
           id?: string
           name?: string
           start_time?: string
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shifts_created_from_draft_id_fkey"
+            columns: ["created_from_draft_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sincronizacoes_sheets: {
         Row: {
@@ -5238,6 +5249,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_pins: {
+        Row: {
+          created_at: string
+          failed_attempts: number
+          last_changed_at: string
+          locked_until: string | null
+          must_reset: boolean
+          pin_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_attempts?: number
+          last_changed_at?: string
+          locked_until?: string | null
+          must_reset?: boolean
+          pin_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_attempts?: number
+          last_changed_at?: string
+          locked_until?: string | null
+          must_reset?: boolean
+          pin_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -5690,8 +5734,13 @@ export type Database = {
         Args: { p_approval_id: string }
         Returns: number
       }
+      publish_schedule_draft: {
+        Args: { p_draft_id: string; p_override_pin?: string }
+        Returns: Json
+      }
       reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
+      set_user_pin: { Args: { p_pin: string }; Returns: Json }
       user_can_see_missao: {
         Args: { _missao_id: string; _user_id: string }
         Returns: boolean
@@ -5711,6 +5760,10 @@ export type Database = {
       }
       validate_schedule_publish: {
         Args: { p_draft_id: string; p_override_pin?: string }
+        Returns: Json
+      }
+      verify_user_pin: {
+        Args: { p_pin: string; p_user_id: string }
         Returns: Json
       }
     }

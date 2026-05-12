@@ -157,52 +157,23 @@ export default function EscalaDraft() {
     return res;
   }
 
-  async function publishDraft() {
+  async function publishDraft(overridePin: string | null = null) {
     if (!draft || !draftId) return;
-    const res = validateResult ?? (await runValidate());
-    if (!res || !res.can_publish) {
-      toast.error("Rascunho com bloqueios — corrija antes de publicar.");
-      return;
-    }
     setPublishing(true);
     try {
-      // Pega shifts existentes da unidade para mapear
-      // Materializa schedule rows a partir dos slots
-      const rows = slots
-        .filter((s) => s.employee_id)
-        .map((s) => ({
-          employee_id: s.employee_id!,
-          user_id: s.employee_id!,
-          sector_id: (s.sector_id ?? draft.sector_id) as string,
-          schedule_date: s.schedule_date,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          break_duration: s.break_min,
-          schedule_type: "working" as const,
-          status: "scheduled",
-          agreed_rate: s.agreed_rate,
-        }));
-
-      // Buscar primeiro shift como placeholder (schema legado exige NOT NULL)
-      const { data: anyShift } = await supabase.from("shifts").select("id").limit(1).maybeSingle();
-      if (!anyShift) {
-        toast.error("Nenhum shift cadastrado na base — não é possível publicar.");
-        setPublishing(false);
-        return;
+      const { data, error } = await supabase.rpc("publish_schedule_draft", {
+        p_draft_id: draftId,
+        p_override_pin: overridePin,
+      });
+      if (error) throw error;
+      const res = data as { ok: boolean; inserted?: number; error?: string; detail?: ValidateResult };
+      if (!res.ok) {
+        if (res.detail) setValidateResult(res.detail);
+        toast.error(`Falha ao publicar: ${res.error ?? "desconhecido"}`);
+      } else {
+        toast.success(`Escala publicada: ${res.inserted ?? 0} turno(s).`);
+        navigate("/");
       }
-      const rowsWithShift = rows.map((r) => ({ ...r, shift_id: anyShift.id }));
-
-      const { error: insErr } = await supabase.from("schedules").insert(rowsWithShift);
-      if (insErr) throw insErr;
-
-      const { error: upErr } = await supabase
-        .from("schedule_drafts")
-        .update({ status: "published", published_at: new Date().toISOString() })
-        .eq("id", draftId);
-      if (upErr) throw upErr;
-
-      toast.success(`Escala publicada: ${rows.length} turno(s).`);
-      navigate("/");
     } catch (e: any) {
       toast.error("Falha ao publicar: " + (e?.message ?? String(e)));
     }
@@ -404,12 +375,16 @@ export default function EscalaDraft() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
-                await runValidate(pin);
+                const res = await runValidate(pin);
                 setPinDialogOpen(false);
+                const usedPin = pin;
                 setPin("");
+                if (res?.can_publish) {
+                  await publishDraft(usedPin);
+                }
               }}
             >
-              Confirmar
+              Confirmar e publicar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

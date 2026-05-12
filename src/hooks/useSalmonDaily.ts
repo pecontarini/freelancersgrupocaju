@@ -13,8 +13,6 @@ export interface SalmonDailyRow {
   semaphore: "green" | "yellow" | "red" | "gray";
   revenue_brl: number | null;
   source: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface SalmonMonthlySummary {
@@ -30,66 +28,44 @@ export interface SalmonMonthlySummary {
   consumption_total_kg: number | null;
 }
 
-export function useSalmonDaily(lojaId: string | null) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["salmon-daily", lojaId],
-    enabled: !!lojaId,
+export function useSalmonDaily(loja_id: string | null) {
+  const dailyQuery = useQuery({
+    queryKey: ["salmon-daily", loja_id],
+    enabled: !!loja_id,
     queryFn: async () => {
       const since = new Date();
       since.setDate(since.getDate() - 30);
-      const sinceStr = since.toISOString().slice(0, 10);
+      const { data, error } = await (supabase as any)
+        .from("v_salmon_daily")
+        .select("*")
+        .eq("loja_id", loja_id)
+        .gte("transaction_date", since.toISOString().split("T")[0])
+        .order("transaction_date", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as SalmonDailyRow[];
+    },
+  });
 
-      const [dailyRes, summaryRes] = await Promise.all([
-        supabase
-          .from("v_salmon_daily" as any)
-          .select("*")
-          .eq("loja_id", lojaId)
-          .gte("transaction_date", sinceStr)
-          .order("transaction_date", { ascending: true }),
-        supabase
-          .from("v_salmon_monthly_summary" as any)
-          .select("*")
-          .eq("loja_id", lojaId)
-          .order("month_ref", { ascending: false })
-          .limit(1),
-      ]);
-
-      if (dailyRes.error) throw dailyRes.error;
-      if (summaryRes.error) throw summaryRes.error;
-
-      const daily = ((dailyRes.data ?? []) as any[]).map((r) => ({
-        ...r,
-        initial_stock_kg: Number(r.initial_stock_kg ?? 0),
-        transfer_kg: Number(r.transfer_kg ?? 0),
-        final_stock_kg: Number(r.final_stock_kg ?? 0),
-        consumption_kg: Number(r.consumption_kg ?? 0),
-        ratio_kg_per_1k: Number(r.ratio_kg_per_1k ?? 0),
-        revenue_brl: r.revenue_brl !== null && r.revenue_brl !== undefined ? Number(r.revenue_brl) : null,
-      })) as SalmonDailyRow[];
-
-      const summary = (summaryRes.data?.[0] as any) ?? null;
-      const summaryParsed: SalmonMonthlySummary | null = summary
-        ? {
-            ...summary,
-            dias_registrados: Number(summary.dias_registrados ?? 0),
-            dias_verde: Number(summary.dias_verde ?? 0),
-            dias_amarelo: Number(summary.dias_amarelo ?? 0),
-            dias_vermelho: Number(summary.dias_vermelho ?? 0),
-            ratio_avg: summary.ratio_avg !== null ? Number(summary.ratio_avg) : null,
-            ratio_best: summary.ratio_best !== null ? Number(summary.ratio_best) : null,
-            ratio_worst: summary.ratio_worst !== null ? Number(summary.ratio_worst) : null,
-            consumption_total_kg:
-              summary.consumption_total_kg !== null ? Number(summary.consumption_total_kg) : null,
-          }
-        : null;
-
-      return { daily, summary: summaryParsed };
+  const summaryQuery = useQuery({
+    queryKey: ["salmon-monthly-summary", loja_id],
+    enabled: !!loja_id,
+    queryFn: async () => {
+      const firstOfMonth = new Date();
+      firstOfMonth.setDate(1);
+      const { data, error } = await (supabase as any)
+        .from("v_salmon_monthly_summary")
+        .select("*")
+        .eq("loja_id", loja_id)
+        .eq("month_ref", firstOfMonth.toISOString().split("T")[0])
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as SalmonMonthlySummary | null;
     },
   });
 
   return {
-    data: data?.daily ?? [],
-    summary: data?.summary ?? null,
-    isLoading,
+    data: dailyQuery.data ?? [],
+    summary: summaryQuery.data ?? null,
+    isLoading: dailyQuery.isLoading || summaryQuery.isLoading,
   };
 }

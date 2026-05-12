@@ -44,7 +44,7 @@ interface PendingProfile {
 const BATCH_LIMIT = 100;
 
 export default function CadastrosPendentes() {
-  const { data: profileData } = useUserProfile();
+  const profileData = useUserProfile() as unknown as { isAdmin?: boolean; isOperator?: boolean } | null;
   const isAdmin = !!profileData?.isAdmin;
   const isOperator = !!profileData?.isOperator;
   const canSee = isAdmin || isOperator;

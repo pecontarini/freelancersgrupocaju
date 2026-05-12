@@ -278,6 +278,35 @@ export default function CadastrosPendentes() {
     setBatchItems(queue);
   };
 
+  const handleMarkInactive = async () => {
+    if (!confirmInactive) return;
+    setMarking(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("freelancer_profiles")
+        .update({
+          inativo: true,
+          inativo_marcado_em: new Date().toISOString(),
+          inativo_marcado_por: user?.id ?? null,
+        })
+        .eq("id", confirmInactive.id);
+      if (error) throw error;
+      toast.success(`${confirmInactive.nome_completo} marcado como inativo.`);
+      setConfirmInactive(null);
+      setSelected((s) => {
+        const n = new Set(s);
+        n.delete(confirmInactive.id);
+        return n;
+      });
+      refetch();
+    } catch (e) {
+      toast.error(`Falha: ${(e as Error)?.message ?? e}`);
+    } finally {
+      setMarking(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

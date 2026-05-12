@@ -375,12 +375,16 @@ export default function EscalaDraft() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
-                await runValidate(pin);
+                const res = await runValidate(pin);
                 setPinDialogOpen(false);
+                const usedPin = pin;
                 setPin("");
+                if (res?.can_publish) {
+                  await publishDraft(usedPin);
+                }
               }}
             >
-              Confirmar
+              Confirmar e publicar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

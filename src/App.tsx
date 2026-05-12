@@ -25,6 +25,7 @@ import MetasPage from "./pages/painel/Metas";
 import AprovarEscala from "./pages/AprovarEscala";
 import AtualizarPix from "./pages/AtualizarPix";
 import CadastrosPendentes from "./pages/CadastrosPendentes";
+import EscalaDraft from "./pages/escalas/EscalaDraft";
 import { PageTransition } from "@/components/motion";
 import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 
@@ -67,6 +68,7 @@ function App() {
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
                 <Route path="/painel/metas" element={<ProtectedRoute><MetasPage /></ProtectedRoute>} />
+                <Route path="/escalas/draft/:draftId" element={<ProtectedRoute><EscalaDraft /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

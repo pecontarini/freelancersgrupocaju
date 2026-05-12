@@ -4019,6 +4019,65 @@ export type Database = {
           },
         ]
       }
+      salmon_efficiency_daily: {
+        Row: {
+          consumption_kg: number | null
+          created_at: string
+          final_stock_kg: number
+          id: number
+          initial_stock_kg: number
+          loja_id: string
+          ratio_kg_per_1k: number | null
+          revenue_brl: number
+          semaphore: string | null
+          source: string
+          source_row_hash: string | null
+          transaction_date: string
+          transfer_kg: number
+          updated_at: string
+        }
+        Insert: {
+          consumption_kg?: number | null
+          created_at?: string
+          final_stock_kg: number
+          id?: number
+          initial_stock_kg: number
+          loja_id: string
+          ratio_kg_per_1k?: number | null
+          revenue_brl: number
+          semaphore?: string | null
+          source?: string
+          source_row_hash?: string | null
+          transaction_date: string
+          transfer_kg: number
+          updated_at?: string
+        }
+        Update: {
+          consumption_kg?: number | null
+          created_at?: string
+          final_stock_kg?: number
+          id?: number
+          initial_stock_kg?: number
+          loja_id?: string
+          ratio_kg_per_1k?: number | null
+          revenue_brl?: number
+          semaphore?: string | null
+          source?: string
+          source_row_hash?: string | null
+          transaction_date?: string
+          transfer_kg?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_attendance: {
         Row: {
           attendance_date: string
@@ -5688,7 +5747,85 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_salmon_daily: {
+        Row: {
+          consumption_kg: number | null
+          created_at: string | null
+          final_stock_kg: number | null
+          id: number | null
+          initial_stock_kg: number | null
+          loja_id: string | null
+          ratio_kg_per_1k: number | null
+          revenue_brl: number | null
+          semaphore: string | null
+          source: string | null
+          transaction_date: string | null
+          transfer_kg: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          consumption_kg?: number | null
+          created_at?: string | null
+          final_stock_kg?: number | null
+          id?: number | null
+          initial_stock_kg?: number | null
+          loja_id?: string | null
+          ratio_kg_per_1k?: number | null
+          revenue_brl?: never
+          semaphore?: string | null
+          source?: string | null
+          transaction_date?: string | null
+          transfer_kg?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          consumption_kg?: number | null
+          created_at?: string | null
+          final_stock_kg?: number | null
+          id?: number | null
+          initial_stock_kg?: number | null
+          loja_id?: string | null
+          ratio_kg_per_1k?: number | null
+          revenue_brl?: never
+          semaphore?: string | null
+          source?: string | null
+          transaction_date?: string | null
+          transfer_kg?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_salmon_monthly_summary: {
+        Row: {
+          consumption_total_kg: number | null
+          dias_amarelo: number | null
+          dias_registrados: number | null
+          dias_verde: number | null
+          dias_vermelho: number | null
+          loja_id: string | null
+          month_ref: string | null
+          ratio_avg: number | null
+          ratio_best: number | null
+          ratio_worst: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       build_daily_stock_snapshot: {

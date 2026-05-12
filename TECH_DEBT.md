@@ -2,17 +2,32 @@
 
 Documento de dívida técnica acumulada. **NÃO é escopo da Etapa 3 (PRs 1–4)**. Limpeza programada para PR separado após o fechamento da Etapa 3.
 
-Última atualização: 2026-05-12 — após PR 1 (schema validação PIX + AJ1).
+Última atualização: 2026-05-12 — após Onda 6 Etapa 2 (PIN + publish_schedule_draft + validate_schedule_publish).
 
 ---
 
 ## Status
 
-- **Total de warnings ativos no Supabase Linter:** 61
-- **Introduzidos pelo PR 1:** 0
+- **Total de warnings ativos no Supabase Linter:** 65
+- **Piso aceitável após Etapa 2:** 65
+- **Introduzidos pela Etapa 2 (net):** +2 (−1 ao revogar anon de `set_user_pin`, +3 SECDEF auth-callable arquiteturalmente necessários)
 - **Pré-existentes:** 61
 
-Nenhum warning é bloqueante para operação. Nenhum representa exposição de dados sensíveis confirmada — todos são *hardening* recomendado.
+Nenhum warning é bloqueante para operação. Nenhum representa exposição de dados sensíveis confirmada — todos são *hardening* recomendado ou trade-off arquitetural documentado.
+
+---
+
+## Warnings esperados — NÃO são dívida
+
+Linter rule **0029 (`authenticated SECDEF executable`)** conta cada função `SECURITY DEFINER` chamável por `authenticated`. As funções abaixo são arquiteturalmente SECDEF auth-callable e somam +3 ao count. **Não devem ser corrigidas** — fazem parte do desenho de permissões do módulo de escala:
+
+- `verify_user_pin` — gerencia lock/contador de tentativas cross-user (precisa escrever em linhas de outros usuários para incrementar `failed_attempts` / setar `locked_until`).
+- `publish_schedule_draft` — insere linhas em `shifts` (tabela global) e materializa `schedules` para múltiplos funcionários em uma transação atômica.
+- `validate_schedule_publish` — lê `store_budgets` (RLS admin-only) para validar overrides feitos por operator.
+
+Refatorar para esconder esses warnings exigiria que o operator chamasse 2 RPCs em sequência (race conditions, RLS mais complicada, UX pior). Ganho = só passar o linter. **Não vale.**
+
+Crescimento futuro do count é esperado se features novas exigirem novas funções SECDEF auth-callable. Documentar aqui caso a caso.
 
 ---
 

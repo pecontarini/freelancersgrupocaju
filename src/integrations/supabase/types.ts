@@ -4040,6 +4040,161 @@ export type Database = {
           },
         ]
       }
+      schedule_draft_slots: {
+        Row: {
+          agreed_rate: number
+          break_min: number
+          created_at: string
+          dia_semana: string
+          draft_id: string
+          employee_id: string | null
+          end_time: string
+          id: string
+          job_title_id: string | null
+          notes: string | null
+          papel: string
+          schedule_date: string
+          sector_id: string | null
+          shift_label: string | null
+          shift_type: string
+          start_time: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          agreed_rate?: number
+          break_min?: number
+          created_at?: string
+          dia_semana: string
+          draft_id: string
+          employee_id?: string | null
+          end_time: string
+          id?: string
+          job_title_id?: string | null
+          notes?: string | null
+          papel?: string
+          schedule_date: string
+          sector_id?: string | null
+          shift_label?: string | null
+          shift_type?: string
+          start_time: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          agreed_rate?: number
+          break_min?: number
+          created_at?: string
+          dia_semana?: string
+          draft_id?: string
+          employee_id?: string | null
+          end_time?: string
+          id?: string
+          job_title_id?: string | null
+          notes?: string | null
+          papel?: string
+          schedule_date?: string
+          sector_id?: string | null
+          shift_label?: string | null
+          shift_type?: string
+          start_time?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_draft_slots_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_draft_slots_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_draft_slots_job_title_id_fkey"
+            columns: ["job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_draft_slots_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_drafts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          mode: string
+          modelo_folga: string
+          payload: Json | null
+          published_at: string | null
+          published_by: string | null
+          sector_id: string | null
+          semana_inicio: string
+          status: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode?: string
+          modelo_folga?: string
+          payload?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          sector_id?: string | null
+          semana_inicio: string
+          status?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mode?: string
+          modelo_folga?: string
+          payload?: Json | null
+          published_at?: string | null
+          published_by?: string | null
+          sector_id?: string | null
+          semana_inicio?: string
+          status?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_drafts_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_drafts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           agreed_rate: number | null
@@ -5552,6 +5707,10 @@ export type Database = {
           p_sector_id: string
           p_shift_id: string
         }
+        Returns: Json
+      }
+      validate_schedule_publish: {
+        Args: { p_draft_id: string; p_override_pin?: string }
         Returns: Json
       }
     }

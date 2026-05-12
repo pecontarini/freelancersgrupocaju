@@ -993,8 +993,11 @@ export type Database = {
       }
       checklist_templates: {
         Row: {
+          canonical_template_id: string | null
           created_at: string
           created_by: string | null
+          deprecated_at: string | null
+          deprecated_reason: string | null
           id: string
           is_active: boolean
           loja_id: string
@@ -1002,8 +1005,11 @@ export type Database = {
           source_pdf_url: string | null
         }
         Insert: {
+          canonical_template_id?: string | null
           created_at?: string
           created_by?: string | null
+          deprecated_at?: string | null
+          deprecated_reason?: string | null
           id?: string
           is_active?: boolean
           loja_id: string
@@ -1011,8 +1017,11 @@ export type Database = {
           source_pdf_url?: string | null
         }
         Update: {
+          canonical_template_id?: string | null
           created_at?: string
           created_by?: string | null
+          deprecated_at?: string | null
+          deprecated_reason?: string | null
           id?: string
           is_active?: boolean
           loja_id?: string
@@ -1020,6 +1029,13 @@ export type Database = {
           source_pdf_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "checklist_templates_canonical_template_id_fkey"
+            columns: ["canonical_template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "checklist_templates_loja_id_fkey"
             columns: ["loja_id"]

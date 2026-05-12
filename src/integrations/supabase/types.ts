@@ -5336,13 +5336,18 @@ export type Database = {
       }
       whatsapp_dispatch_queue: {
         Row: {
+          channel: string
+          consumed_at: string | null
           created_at: string
+          dispatch_responded_at: string | null
+          dispatched_at: string | null
           dispatched_by: string | null
           error_message: string | null
           id: string
           magic_link_expires_at: string | null
           magic_link_token: string | null
           message_template: string
+          opened_at: string | null
           profile_id: string
           sent_at: string | null
           status: string
@@ -5350,13 +5355,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          channel?: string
+          consumed_at?: string | null
           created_at?: string
+          dispatch_responded_at?: string | null
+          dispatched_at?: string | null
           dispatched_by?: string | null
           error_message?: string | null
           id?: string
           magic_link_expires_at?: string | null
           magic_link_token?: string | null
           message_template: string
+          opened_at?: string | null
           profile_id: string
           sent_at?: string | null
           status?: string
@@ -5364,13 +5374,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          channel?: string
+          consumed_at?: string | null
           created_at?: string
+          dispatch_responded_at?: string | null
+          dispatched_at?: string | null
           dispatched_by?: string | null
           error_message?: string | null
           id?: string
           magic_link_expires_at?: string | null
           magic_link_token?: string | null
           message_template?: string
+          opened_at?: string | null
           profile_id?: string
           sent_at?: string | null
           status?: string
@@ -5440,6 +5455,14 @@ export type Database = {
           total_waste: number
         }[]
       }
+      consume_pix_magic_link: {
+        Args: {
+          p_new_chave_pix: string
+          p_new_tipo_chave_pix: string
+          p_token: string
+        }
+        Returns: Json
+      }
       get_realtime_stock_positions: {
         Args: { p_unit_id: string }
         Returns: {
@@ -5498,6 +5521,7 @@ export type Database = {
       }
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
+      peek_pix_magic_link: { Args: { p_token: string }; Returns: Json }
       promote_approved_checkins: {
         Args: { p_approval_id: string }
         Returns: number

@@ -407,9 +407,14 @@ export default function CadastrosPendentes() {
                         </TableCell>
                         <TableCell className="font-medium">
                           {p.nome_completo}
-                          {!p.is_active_90d && (
+                          {p.inativo && (
+                            <Badge variant="destructive" className="ml-2">
+                              Inativo
+                            </Badge>
+                          )}
+                          {!p.inativo && !p.is_active_90d && (
                             <Badge variant="outline" className="ml-2">
-                              inativo
+                              Sem escala 90d
                             </Badge>
                           )}
                         </TableCell>
@@ -449,10 +454,20 @@ export default function CadastrosPendentes() {
                               setSelected(new Set([p.id]));
                               setTimeout(() => handleDispatchSelected(), 0);
                             }}
-                            disabled={!phoneOk || dispatching}
+                            disabled={!phoneOk || dispatching || p.inativo}
                           >
                             <Send className="h-3.5 w-3.5 mr-1" /> Link
                           </Button>
+                          {!p.inativo && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmInactive(p)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <UserMinus className="h-3.5 w-3.5 mr-1" /> Inativar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );

@@ -21,7 +21,18 @@ import {
   ShieldAlert,
   Pencil,
   PhoneOff,
+  UserMinus,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import EditPixModal from "@/components/cadastros-pendentes/EditPixModal";
 import BatchDispatchDrawer, {
@@ -35,6 +46,7 @@ interface PendingProfile {
   telefone: string | null;
   chave_pix: string | null;
   tipo_chave_pix: string | null;
+  inativo: boolean;
   ultima_escala: string | null;
   ultima_unidade: string | null;
   is_active_90d: boolean;
@@ -53,17 +65,21 @@ export default function CadastrosPendentes() {
   const [editing, setEditing] = useState<PendingProfile | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [batchItems, setBatchItems] = useState<DispatchQueueItem[] | null>(null);
+  const [confirmInactive, setConfirmInactive] = useState<PendingProfile | null>(null);
+  const [marking, setMarking] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["cadastros-pendentes"],
+    queryKey: ["cadastros-pendentes", showInactive],
     enabled: !!canSee,
     queryFn: async (): Promise<PendingProfile[]> => {
-      // Pull all pending profiles (tipo NULL)
-      const { data: profiles, error } = await supabase
+      // Pull pending profiles (tipo NULL); exclude inativos unless admin opts in
+      let q = supabase
         .from("freelancer_profiles")
-        .select("id, nome_completo, cpf, telefone, chave_pix, tipo_chave_pix")
+        .select("id, nome_completo, cpf, telefone, chave_pix, tipo_chave_pix, inativo")
         .is("tipo_chave_pix", null)
         .order("nome_completo", { ascending: true });
+      if (!showInactive) q = q.eq("inativo", false);
+      const { data: profiles, error } = await q;
       if (error) throw error;
       const profileIds = (profiles ?? []).map((p) => p.id);
       if (profileIds.length === 0) return [];
@@ -145,6 +161,7 @@ export default function CadastrosPendentes() {
           telefone: p.telefone,
           chave_pix: p.chave_pix,
           tipo_chave_pix: p.tipo_chave_pix,
+          inativo: !!(p as { inativo?: boolean }).inativo,
           ultima_escala: last?.date ?? null,
           ultima_unidade: last ? unitNames.get(last.unit_id) ?? null : null,
           is_active_90d: !!last && last.date >= cutoff,
@@ -155,7 +172,8 @@ export default function CadastrosPendentes() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return showInactive ? data : data.filter((p) => p.is_active_90d);
+    // showInactive toggles BOTH the inactive (manually marked) and the >90d-no-schedule profiles
+    return showInactive ? data : data.filter((p) => !p.inativo && p.is_active_90d);
   }, [data, showInactive]);
 
   const counters = useMemo(() => {
@@ -260,6 +278,35 @@ export default function CadastrosPendentes() {
     setBatchItems(queue);
   };
 
+  const handleMarkInactive = async () => {
+    if (!confirmInactive) return;
+    setMarking(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("freelancer_profiles")
+        .update({
+          inativo: true,
+          inativo_marcado_em: new Date().toISOString(),
+          inativo_marcado_por: user?.id ?? null,
+        })
+        .eq("id", confirmInactive.id);
+      if (error) throw error;
+      toast.success(`${confirmInactive.nome_completo} marcado como inativo.`);
+      setConfirmInactive(null);
+      setSelected((s) => {
+        const n = new Set(s);
+        n.delete(confirmInactive.id);
+        return n;
+      });
+      refetch();
+    } catch (e) {
+      toast.error(`Falha: ${(e as Error)?.message ?? e}`);
+    } finally {
+      setMarking(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -360,9 +407,14 @@ export default function CadastrosPendentes() {
                         </TableCell>
                         <TableCell className="font-medium">
                           {p.nome_completo}
-                          {!p.is_active_90d && (
+                          {p.inativo && (
+                            <Badge variant="destructive" className="ml-2">
+                              Inativo
+                            </Badge>
+                          )}
+                          {!p.inativo && !p.is_active_90d && (
                             <Badge variant="outline" className="ml-2">
-                              inativo
+                              Sem escala 90d
                             </Badge>
                           )}
                         </TableCell>
@@ -402,10 +454,20 @@ export default function CadastrosPendentes() {
                               setSelected(new Set([p.id]));
                               setTimeout(() => handleDispatchSelected(), 0);
                             }}
-                            disabled={!phoneOk || dispatching}
+                            disabled={!phoneOk || dispatching || p.inativo}
                           >
                             <Send className="h-3.5 w-3.5 mr-1" /> Link
                           </Button>
+                          {!p.inativo && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmInactive(p)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <UserMinus className="h-3.5 w-3.5 mr-1" /> Inativar
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -445,6 +507,41 @@ export default function CadastrosPendentes() {
           }}
         />
       )}
+
+      <AlertDialog
+        open={!!confirmInactive}
+        onOpenChange={(open) => !open && !marking && setConfirmInactive(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar como inativo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmInactive?.nome_completo} sairá da listagem padrão. O perfil
+              não será excluído — admin pode ver perfis inativos ativando o filtro
+              "Mostrar todos". Disparos em lote ficarão desabilitados para este
+              freelancer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={marking}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleMarkInactive();
+              }}
+              disabled={marking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {marking ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <UserMinus className="h-4 w-4 mr-2" />
+              )}
+              Confirmar inativação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

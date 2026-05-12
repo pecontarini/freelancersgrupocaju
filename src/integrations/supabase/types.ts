@@ -2130,6 +2130,9 @@ export type Database = {
           created_at: string
           foto_url: string | null
           id: string
+          inativo: boolean
+          inativo_marcado_em: string | null
+          inativo_marcado_por: string | null
           nome_completo: string
           telefone: string | null
           tipo_chave_pix: string | null
@@ -2142,6 +2145,9 @@ export type Database = {
           created_at?: string
           foto_url?: string | null
           id?: string
+          inativo?: boolean
+          inativo_marcado_em?: string | null
+          inativo_marcado_por?: string | null
           nome_completo: string
           telefone?: string | null
           tipo_chave_pix?: string | null
@@ -2154,6 +2160,9 @@ export type Database = {
           created_at?: string
           foto_url?: string | null
           id?: string
+          inativo?: boolean
+          inativo_marcado_em?: string | null
+          inativo_marcado_por?: string | null
           nome_completo?: string
           telefone?: string | null
           tipo_chave_pix?: string | null

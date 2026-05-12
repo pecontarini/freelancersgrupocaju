@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      _sprint0_sheets_sources_backup: {
+        Row: {
+          ativo: boolean | null
+          backup_at: string | null
+          created_at: string | null
+          gid: string | null
+          id: string | null
+          meta_key: string | null
+          nome: string | null
+          sync_diario: boolean | null
+          tipo_dado: Database["public"]["Enums"]["import_destino"] | null
+          ultima_execucao_cron: string | null
+          ultima_sincronizacao: string | null
+          ultimo_erro: string | null
+          ultimo_status: string | null
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          backup_at?: string | null
+          created_at?: string | null
+          gid?: string | null
+          id?: string | null
+          meta_key?: string | null
+          nome?: string | null
+          sync_diario?: boolean | null
+          tipo_dado?: Database["public"]["Enums"]["import_destino"] | null
+          ultima_execucao_cron?: string | null
+          ultima_sincronizacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_status?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          backup_at?: string | null
+          created_at?: string | null
+          gid?: string | null
+          id?: string | null
+          meta_key?: string | null
+          nome?: string | null
+          sync_diario?: boolean | null
+          tipo_dado?: Database["public"]["Enums"]["import_destino"] | null
+          ultima_execucao_cron?: string | null
+          ultima_sincronizacao?: string | null
+          ultimo_erro?: string | null
+          ultimo_status?: string | null
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
       action_plan_comments: {
         Row: {
           action_plan_id: string
@@ -4585,6 +4639,8 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          deactivated_at: string | null
+          deactivated_reason: string | null
           gid: string | null
           id: string
           meta_key: string | null
@@ -4601,6 +4657,8 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_reason?: string | null
           gid?: string | null
           id?: string
           meta_key?: string | null
@@ -4617,6 +4675,8 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          deactivated_at?: string | null
+          deactivated_reason?: string | null
           gid?: string | null
           id?: string
           meta_key?: string | null

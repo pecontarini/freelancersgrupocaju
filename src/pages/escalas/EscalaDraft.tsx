@@ -172,16 +172,15 @@ export default function EscalaDraft() {
         .filter((s) => s.employee_id)
         .map((s) => ({
           employee_id: s.employee_id!,
-          user_id: s.employee_id!, // legacy; schedules.user_id NOT NULL
-          sector_id: s.sector_id ?? draft.sector_id,
+          user_id: s.employee_id!,
+          sector_id: (s.sector_id ?? draft.sector_id) as string,
           schedule_date: s.schedule_date,
           start_time: s.start_time,
           end_time: s.end_time,
           break_duration: s.break_min,
-          schedule_type: "working",
+          schedule_type: "working" as const,
           status: "scheduled",
           agreed_rate: s.agreed_rate,
-          // shift_id: precisa de um shift válido — usar o primeiro existente como fallback
         }));
 
       // Buscar primeiro shift como placeholder (schema legado exige NOT NULL)

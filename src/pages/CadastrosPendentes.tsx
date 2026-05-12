@@ -65,17 +65,21 @@ export default function CadastrosPendentes() {
   const [editing, setEditing] = useState<PendingProfile | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [batchItems, setBatchItems] = useState<DispatchQueueItem[] | null>(null);
+  const [confirmInactive, setConfirmInactive] = useState<PendingProfile | null>(null);
+  const [marking, setMarking] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["cadastros-pendentes"],
+    queryKey: ["cadastros-pendentes", showInactive],
     enabled: !!canSee,
     queryFn: async (): Promise<PendingProfile[]> => {
-      // Pull all pending profiles (tipo NULL)
-      const { data: profiles, error } = await supabase
+      // Pull pending profiles (tipo NULL); exclude inativos unless admin opts in
+      let q = supabase
         .from("freelancer_profiles")
-        .select("id, nome_completo, cpf, telefone, chave_pix, tipo_chave_pix")
+        .select("id, nome_completo, cpf, telefone, chave_pix, tipo_chave_pix, inativo")
         .is("tipo_chave_pix", null)
         .order("nome_completo", { ascending: true });
+      if (!showInactive) q = q.eq("inativo", false);
+      const { data: profiles, error } = await q;
       if (error) throw error;
       const profileIds = (profiles ?? []).map((p) => p.id);
       if (profileIds.length === 0) return [];

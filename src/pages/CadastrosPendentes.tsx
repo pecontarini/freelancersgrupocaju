@@ -21,7 +21,18 @@ import {
   ShieldAlert,
   Pencil,
   PhoneOff,
+  UserMinus,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import EditPixModal from "@/components/cadastros-pendentes/EditPixModal";
 import BatchDispatchDrawer, {
@@ -35,6 +46,7 @@ interface PendingProfile {
   telefone: string | null;
   chave_pix: string | null;
   tipo_chave_pix: string | null;
+  inativo: boolean;
   ultima_escala: string | null;
   ultima_unidade: string | null;
   is_active_90d: boolean;

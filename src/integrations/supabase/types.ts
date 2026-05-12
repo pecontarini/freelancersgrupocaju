@@ -574,6 +574,7 @@ export type Database = {
           freelancer_name: string
           id: string
           loja_id: string
+          pix_snapshot: Json | null
           signed_at: string
           signed_by: string
           tipo_chave_pix: string | null
@@ -591,6 +592,7 @@ export type Database = {
           freelancer_name: string
           id?: string
           loja_id: string
+          pix_snapshot?: Json | null
           signed_at?: string
           signed_by: string
           tipo_chave_pix?: string | null
@@ -608,6 +610,7 @@ export type Database = {
           freelancer_name?: string
           id?: string
           loja_id?: string
+          pix_snapshot?: Json | null
           signed_at?: string
           signed_by?: string
           tipo_chave_pix?: string | null
@@ -2130,6 +2133,8 @@ export type Database = {
           nome_completo: string
           telefone: string | null
           tipo_chave_pix: string | null
+          update_requested_at: string | null
+          update_requested_by: string | null
         }
         Insert: {
           chave_pix?: string | null
@@ -2140,6 +2145,8 @@ export type Database = {
           nome_completo: string
           telefone?: string | null
           tipo_chave_pix?: string | null
+          update_requested_at?: string | null
+          update_requested_by?: string | null
         }
         Update: {
           chave_pix?: string | null
@@ -2150,6 +2157,8 @@ export type Database = {
           nome_completo?: string
           telefone?: string | null
           tipo_chave_pix?: string | null
+          update_requested_at?: string | null
+          update_requested_by?: string | null
         }
         Relationships: []
       }
@@ -3598,6 +3607,50 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pix_validation_log: {
+        Row: {
+          attempted_chave_pix: string | null
+          attempted_tipo_chave_pix: string | null
+          created_at: string
+          id: string
+          operation: string
+          profile_id: string | null
+          rejection_reason: string | null
+          triggered_by_user_id: string | null
+          would_reject: boolean
+        }
+        Insert: {
+          attempted_chave_pix?: string | null
+          attempted_tipo_chave_pix?: string | null
+          created_at?: string
+          id?: string
+          operation: string
+          profile_id?: string | null
+          rejection_reason?: string | null
+          triggered_by_user_id?: string | null
+          would_reject?: boolean
+        }
+        Update: {
+          attempted_chave_pix?: string | null
+          attempted_tipo_chave_pix?: string | null
+          created_at?: string
+          id?: string
+          operation?: string
+          profile_id?: string | null
+          rejection_reason?: string | null
+          triggered_by_user_id?: string | null
+          would_reject?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pix_validation_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5277,6 +5330,59 @@ export type Database = {
             columns: ["utensilio_item_id"]
             isOneToOne: false
             referencedRelation: "utensilios_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_dispatch_queue: {
+        Row: {
+          created_at: string
+          dispatched_by: string | null
+          error_message: string | null
+          id: string
+          magic_link_expires_at: string | null
+          magic_link_token: string | null
+          message_template: string
+          profile_id: string
+          sent_at: string | null
+          status: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dispatched_by?: string | null
+          error_message?: string | null
+          id?: string
+          magic_link_expires_at?: string | null
+          magic_link_token?: string | null
+          message_template: string
+          profile_id: string
+          sent_at?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dispatched_by?: string | null
+          error_message?: string | null
+          id?: string
+          magic_link_expires_at?: string | null
+          magic_link_token?: string | null
+          message_template?: string
+          profile_id?: string
+          sent_at?: string | null
+          status?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_dispatch_queue_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_profiles"
             referencedColumns: ["id"]
           },
         ]

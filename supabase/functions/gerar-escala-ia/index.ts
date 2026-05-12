@@ -860,7 +860,111 @@ Deno.serve(async (req) => {
       return json({ error: "Erro ao salvar.", detail: saveError.message }, 500);
     }
 
-    return json({ template_id: template.id, escala });
+    // === ONDA 6 ETAPA 2: persistir draft (opcional) ===
+    let draft_id: string | null = null;
+    if (criarDraft) {
+      try {
+        // Resolver sector_id (necessário para slots)
+        const sectorId = matchedSector?.id ?? null;
+
+        // Cancelar drafts antigos para mesma combinação
+        await supabase
+          .from("schedule_drafts")
+          .update({ status: "discarded" })
+          .eq("unit_id", unidade_id)
+          .eq("semana_inicio", semana_inicio)
+          .eq("status", "draft")
+          .eq(sectorId ? "sector_id" : "unit_id", sectorId ?? unidade_id);
+
+        const { data: draftRow, error: draftErr } = await supabase
+          .from("schedule_drafts")
+          .insert({
+            unit_id: unidade_id,
+            sector_id: sectorId,
+            semana_inicio,
+            mode,
+            modelo_folga: (modelo_folga === "5x2" || modelo_folga === "6x1")
+              ? modelo_folga
+              : (config.modelo_folga ?? "6x1"),
+            status: "draft",
+            payload: escala,
+          })
+          .select("id")
+          .single();
+
+        if (draftErr) {
+          console.error("[gerar-escala-ia] draft insert error:", draftErr);
+        } else if (draftRow) {
+          draft_id = draftRow.id;
+
+          // Construir slots a partir de plano_folgas.vagas + dias da semana,
+          // pulando dias em que a vaga está em folga.
+          const vagas = (escala?.plano_folgas?.vagas ?? []) as Array<any>;
+          const slotsToInsert: Array<Record<string, unknown>> = [];
+
+          // Mapear job_title_id pelo papel (aproximação): primeiro cargo vinculado ao setor
+          const defaultJobId = sjtJobIds[0] ?? equivalentJobIds[0] ?? null;
+
+          for (const v of vagas) {
+            const folgas = Array.isArray(v.folgas) ? v.folgas.map(String) : [];
+            const tipoSlot: "efetivo" | "extra" =
+              String(v.tipo ?? "").toUpperCase().startsWith("EXTRA") ? "extra" : "efetivo";
+            const papelRaw = String(v.papel ?? v.tipo ?? "outro").toLowerCase();
+            const papel: "abridor" | "fechador" | "intermediario" | "outro" =
+              papelRaw.startsWith("abr") ? "abridor"
+              : papelRaw.startsWith("fech") ? "fechador"
+              : papelRaw.startsWith("inter") ? "intermediario"
+              : "outro";
+            const t1 = v.horario_padrao?.t1;
+            const t2 = v.horario_padrao?.t2;
+            const breakMin = Number(v.horario_padrao?.break_min ?? 0);
+            const startTime = t1?.entrada ?? t2?.entrada ?? "08:00";
+            const endTime = (t2?.saida ?? t1?.saida ?? "17:00");
+            const isDouble = !!(t1?.entrada && t2?.entrada);
+            const shiftType: "almoco" | "jantar" | "dobra" | "intermediario" =
+              isDouble ? "dobra"
+              : (papel === "fechador" ? "jantar"
+                : (papel === "intermediario" ? "intermediario" : "almoco"));
+
+            for (const wd of weekDates) {
+              if (folgas.includes(wd.dia)) continue;
+              slotsToInsert.push({
+                draft_id,
+                schedule_date: wd.date,
+                dia_semana: wd.dia,
+                sector_id: sectorId,
+                shift_label: v.id_vaga ?? `${papel}_${shiftType}`,
+                start_time: startTime,
+                end_time: endTime,
+                break_min: breakMin,
+                shift_type: shiftType,
+                papel,
+                tipo: tipoSlot,
+                job_title_id: defaultJobId,
+                employee_id: null, // mode=empty_slots default; vinculação na UI
+                agreed_rate: 0,
+                notes: v.responsavel ? "Responsável" : null,
+              });
+            }
+          }
+
+          if (slotsToInsert.length > 0) {
+            const { error: slotsErr } = await supabase
+              .from("schedule_draft_slots")
+              .insert(slotsToInsert);
+            if (slotsErr) {
+              console.error("[gerar-escala-ia] slots insert error:", slotsErr);
+            } else {
+              console.log(`[gerar-escala-ia] draft=${draft_id} slots=${slotsToInsert.length} mode=${mode}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[gerar-escala-ia] draft persistence failed:", e);
+      }
+    }
+
+    return json({ template_id: template.id, escala, draft_id, mode });
   } catch (err) {
     console.error("gerar-escala-ia error:", err);
     return json({ error: err instanceof Error ? err.message : String(err) }, 500);

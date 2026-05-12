@@ -507,6 +507,41 @@ export default function CadastrosPendentes() {
           }}
         />
       )}
+
+      <AlertDialog
+        open={!!confirmInactive}
+        onOpenChange={(open) => !open && !marking && setConfirmInactive(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Marcar como inativo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmInactive?.nome_completo} sairá da listagem padrão. O perfil
+              não será excluído — admin pode ver perfis inativos ativando o filtro
+              "Mostrar todos". Disparos em lote ficarão desabilitados para este
+              freelancer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={marking}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleMarkInactive();
+              }}
+              disabled={marking}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {marking ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <UserMinus className="h-4 w-4 mr-2" />
+              )}
+              Confirmar inativação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

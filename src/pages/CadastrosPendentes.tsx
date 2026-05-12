@@ -161,6 +161,7 @@ export default function CadastrosPendentes() {
           telefone: p.telefone,
           chave_pix: p.chave_pix,
           tipo_chave_pix: p.tipo_chave_pix,
+          inativo: !!(p as { inativo?: boolean }).inativo,
           ultima_escala: last?.date ?? null,
           ultima_unidade: last ? unitNames.get(last.unit_id) ?? null : null,
           is_active_90d: !!last && last.date >= cutoff,
@@ -171,7 +172,8 @@ export default function CadastrosPendentes() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return showInactive ? data : data.filter((p) => p.is_active_90d);
+    // showInactive toggles BOTH the inactive (manually marked) and the >90d-no-schedule profiles
+    return showInactive ? data : data.filter((p) => !p.inativo && p.is_active_90d);
   }, [data, showInactive]);
 
   const counters = useMemo(() => {

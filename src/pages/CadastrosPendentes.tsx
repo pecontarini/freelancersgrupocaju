@@ -21,7 +21,6 @@ import {
   ShieldAlert,
   Pencil,
   PhoneOff,
-  UserX,
 } from "lucide-react";
 import { toast } from "sonner";
 import EditPixModal from "@/components/cadastros-pendentes/EditPixModal";
@@ -416,13 +415,6 @@ export default function CadastrosPendentes() {
                             disabled={!phoneOk || dispatching}
                           >
                             <Send className="h-3.5 w-3.5 mr-1" /> Link
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleMarkInactive(p)}
-                          >
-                            <UserX className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
                       </TableRow>

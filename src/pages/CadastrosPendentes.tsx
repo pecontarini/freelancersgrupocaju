@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -44,9 +44,9 @@ interface PendingProfile {
 const BATCH_LIMIT = 100;
 
 export default function CadastrosPendentes() {
-  const { user, roles } = useAuth();
-  const isAdmin = roles?.includes("admin");
-  const isOperator = roles?.includes("operator");
+  const { data: profileData } = useUserProfile();
+  const isAdmin = !!profileData?.isAdmin;
+  const isOperator = !!profileData?.isOperator;
   const canSee = isAdmin || isOperator;
 
   const [showInactive, setShowInactive] = useState(false);

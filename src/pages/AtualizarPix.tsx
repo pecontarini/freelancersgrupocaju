@@ -50,7 +50,7 @@ export default function AtualizarPix() {
         setState({ kind: "error", reason: error.message });
         return;
       }
-      const r = data as { ok: boolean; error?: string; profile?: ProfileData; expires_at?: string };
+      const r = data as unknown as { ok: boolean; error?: string; profile?: ProfileData; expires_at?: string };
       if (!r.ok || !r.profile) {
         setState({ kind: "error", reason: r.error ?? "unknown" });
         return;
@@ -80,7 +80,7 @@ export default function AtualizarPix() {
       toast.error(error.message);
       return;
     }
-    const r = data as { ok: boolean; error?: string };
+    const r = data as unknown as { ok: boolean; error?: string };
     if (!r.ok) {
       toast.error(`Não foi possível salvar: ${r.error}`);
       return;

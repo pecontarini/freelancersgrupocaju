@@ -23,6 +23,8 @@ import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
 import MetasPage from "./pages/painel/Metas";
 import AprovarEscala from "./pages/AprovarEscala";
+import AtualizarPix from "./pages/AtualizarPix";
+import CadastrosPendentes from "./pages/CadastrosPendentes";
 import { PageTransition } from "@/components/motion";
 import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 
@@ -59,6 +61,8 @@ function App() {
                 <Route path="/checkin-demo" element={<FreelancerCheckinDemo />} />
                 <Route path="/estacao-checkin" element={<EstacaoCheckin />} />
                 <Route path="/aprovar-escala/:token" element={<AprovarEscala />} />
+                <Route path="/atualizar-pix/:token" element={<AtualizarPix />} />
+                <Route path="/pessoas/cadastros-pendentes" element={<ProtectedRoute><CadastrosPendentes /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />

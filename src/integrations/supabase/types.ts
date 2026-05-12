@@ -2153,6 +2153,50 @@ export type Database = {
         }
         Relationships: []
       }
+      freelancer_profiles_audit: {
+        Row: {
+          after_chave_pix: string | null
+          after_tipo_chave_pix: string | null
+          before_chave_pix: string | null
+          before_tipo_chave_pix: string | null
+          id: string
+          inferred_at: string
+          inferred_by: string
+          notes: string | null
+          profile_id: string
+        }
+        Insert: {
+          after_chave_pix?: string | null
+          after_tipo_chave_pix?: string | null
+          before_chave_pix?: string | null
+          before_tipo_chave_pix?: string | null
+          id?: string
+          inferred_at?: string
+          inferred_by: string
+          notes?: string | null
+          profile_id: string
+        }
+        Update: {
+          after_chave_pix?: string | null
+          after_tipo_chave_pix?: string | null
+          before_chave_pix?: string | null
+          before_tipo_chave_pix?: string | null
+          id?: string
+          inferred_at?: string
+          inferred_by?: string
+          notes?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "freelancer_profiles_audit_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "freelancer_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holding_freelancer_forecast: {
         Row: {
           brand: string

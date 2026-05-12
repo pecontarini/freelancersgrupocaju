@@ -71,3 +71,19 @@ GRANT EXECUTE ON FUNCTION public.fn(...) TO anon, service_role;
 ### Validação obrigatória de colunas antes de UPDATE em SECURITY DEFINER
 
 Antes de escrever um `UPDATE table SET col = ...` dentro de uma função `SECURITY DEFINER`, **confirmar via `information_schema.columns`** que cada coluna referenciada existe. CREATE OR REPLACE FUNCTION não valida o corpo contra o schema na hora do CREATE — o erro `column ... does not exist` só aparece em runtime, dentro de uma transação que pode rolar back trabalho legítimo já feito (ex.: o atomic CAS antes do UPDATE problemático).
+
+### REVOKE explícito antes de qualquer GRANT em função nova
+
+Toda função criada no schema `public` deve, **antes** de qualquer `GRANT`, executar:
+```sql
+REVOKE EXECUTE ON FUNCTION public.fn(...) FROM PUBLIC, anon, authenticated;
+```
+Só depois aplicar os `GRANT` desejados (`service_role`, `anon` quando público, etc.). Não confiar em "a função é nova, ninguém tem acesso ainda" — default privileges do Supabase já concederam acesso a `anon`/`authenticated` no momento do CREATE. Mesma armadilha do incidente do Bloco 0 v2.
+
+### SECDEF auth-callable é trade-off arquitetural, não dívida
+
+Funções `SECURITY DEFINER` chamáveis por `authenticated` aparecem no linter (rule 0029). **Só refatorar se houver razão de segurança real** (escalada de privilégio comprovada, vazamento de dados de outro tenant, etc.). Refatorar apenas para silenciar o linter quase sempre piora a arquitetura — força o cliente a orquestrar múltiplas RPCs, abre janelas de race condition, complica RLS. Documentar a decisão em `TECH_DEBT.md` como "warning esperado" e seguir.
+
+### Validação de PIN é monopólio de `verify_user_pin`
+
+Toda função/edge/RPC que precise validar PIN do usuário **deve** chamar `public.verify_user_pin(user_id, pin)` e checar o boolean retornado. **Proibido**: validar `length(pin) >= 4`, comparar texto puro com coluna, recriar lógica de lock/contador em outro lugar. `verify_user_pin` centraliza: hash bcrypt, contador `failed_attempts`, lock automático de 15 min após 5 falhas, flag `must_reset`. Qualquer caminho alternativo cria bypass do lock e é falha de segurança.

@@ -50,3 +50,24 @@ No PR 1 da Etapa 3, a AJ1 foi **commitada antes** do passo 2 (devolução escrit
 - `schedules` (UPDATE em massa)
 
 Schema-aditivo nessas mesmas tabelas (ADD COLUMN nullable + default seguro) **é permitido** sem dry-run.
+
+---
+
+## Armadilhas conhecidas do Supabase
+
+### ACL de funções no schema `public` — REVOKE FROM PUBLIC é insuficiente
+
+Default privileges no Supabase concedem `EXECUTE` direto a `anon` **e** `authenticated` em funções criadas no schema `public`. `REVOKE EXECUTE ... FROM PUBLIC` é **insuficiente** para zerar acesso desses roles — sempre revogar explicitamente por role (`REVOKE EXECUTE ... FROM anon, authenticated`) antes de assumir o estado limpo.
+
+Aprendizado do incidente do COMMIT do Bloco 0 v2 (12/05/2026): o `DO $verify$` abortou a transação com erro `anon still has EXECUTE on validate_pix_key` porque o `REVOKE FROM PUBLIC` não removeu o `GRANT` direto que o Supabase mantém por default. Fix: revogar explicitamente de cada role e, quando o acesso anon for desejado, re-grantar logo em seguida.
+
+Pattern canônico para hardening de função no schema `public`:
+```sql
+REVOKE EXECUTE ON FUNCTION public.fn(...) FROM PUBLIC, anon, authenticated;
+-- Se houver fluxo público anônimo legítimo:
+GRANT EXECUTE ON FUNCTION public.fn(...) TO anon, service_role;
+```
+
+### Validação obrigatória de colunas antes de UPDATE em SECURITY DEFINER
+
+Antes de escrever um `UPDATE table SET col = ...` dentro de uma função `SECURITY DEFINER`, **confirmar via `information_schema.columns`** que cada coluna referenciada existe. CREATE OR REPLACE FUNCTION não valida o corpo contra o schema na hora do CREATE — o erro `column ... does not exist` só aparece em runtime, dentro de uma transação que pode rolar back trabalho legítimo já feito (ex.: o atomic CAS antes do UPDATE problemático).

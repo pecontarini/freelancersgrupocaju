@@ -23,7 +23,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { setor, semana_inicio, unidade_id, modelo_folga } = await req.json();
+    const body = await req.json();
+    const { setor, semana_inicio, unidade_id, modelo_folga } = body;
+    // ONDA 6 — Etapa 2: novo parâmetro `mode`. Default empty_slots.
+    // - empty_slots: gera slots em branco (sem vinculação de funcionário)
+    // - with_employees: gera com pessoas alocadas (comportamento atual)
+    const mode: "with_employees" | "empty_slots" =
+      body?.mode === "with_employees" ? "with_employees" : "empty_slots";
+    // Quando criar_draft=true, persiste em schedule_drafts/schedule_draft_slots
+    const criarDraft: boolean = body?.criar_draft === true;
 
     if (!setor || !semana_inicio || !unidade_id) {
       return json({ error: "Parâmetros obrigatórios: setor, semana_inicio, unidade_id" }, 400);

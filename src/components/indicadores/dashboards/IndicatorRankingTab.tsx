@@ -102,6 +102,7 @@ export function IndicatorRankingTab({
   userLojaCode,
   accessibleLojaCodes,
   mesRef,
+  renderExtraDrillContent,
 }: IndicatorRankingTabProps) {
   const isMobile = useIsMobile();
   const [hovered, setHovered] = useState<string | null>(null);

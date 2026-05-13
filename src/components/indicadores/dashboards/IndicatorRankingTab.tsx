@@ -22,6 +22,7 @@ import {
   type RulesItem,
   type ConsolidatedItem,
 } from "@/hooks/usePayoutSnapshot";
+import { LockedValue } from "../payout/LockedValue";
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/19FL9uaJbmVxPiKHYMM6DRX51M9W8pFvrJt9qOljmUzQ";
 

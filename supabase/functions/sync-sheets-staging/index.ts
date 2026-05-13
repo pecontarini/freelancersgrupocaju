@@ -1564,7 +1564,7 @@ serve(async (req) => {
 
     // Grid principal: CSV preserva linhas de cabeçalho em abas com células mescladas;
     // gviz é mantido para abas por nome (ex.: BASE dados) onde export CSV ignora sheet=.
-    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes'].includes(metaKey);
+    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes', 'payout_rules', 'payout_target_by_role', 'payout_consolidated', 'payout_registry', 'salmao_diario'].includes(metaKey);
     let grid = preferCsv
       ? await fetchCsvGrid(buildCsvExportUrl(sheetId, gid ?? sheetName))
       : await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));

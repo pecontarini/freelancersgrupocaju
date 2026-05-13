@@ -6788,7 +6788,7 @@ export type Database = {
         Returns: number
       }
       parse_kds_brand_avg: {
-        Args: { p_loja_id: string; p_mes_ref: string; p_meta_key?: string }
+        Args: { p_loja_id: string; p_mes_ref: string; p_meta_key: string }
         Returns: number
       }
       parse_nps_revenue: {

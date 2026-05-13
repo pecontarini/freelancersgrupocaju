@@ -1,67 +1,60 @@
-# Estado do Projeto — Painel da Lideranca · Modulo de Pessoas
+# Painel de Metas Variáveis · Estado do Projeto
 
-Ultima atualizacao: 2026-05-12
+**Última atualização:** 2026-05-13
 
-Status geral: pausado aguardando retomada de Pedro Contarini.
+## Status atual
 
-## Onde paramos
+✅ **Fase 1 · Painel Visual MVP** (em andamento)
+- Dashboard `/painel/metas-variaveis` ativo
+- Lê direto de `sheets_blocks_snapshot` (4 fontes)
+- Planilha continua sendo SSOT (Single Source of Truth)
+- Sync manual via Edge Function `sync-sheets-staging`
 
-- Etapa 3 PR 1: COMMITADO em producao, estavel.
-- Etapa 2 (Gerador IA): em branch `onda6-etapa2-gerador-ia`, sem deploy.
-- Trigger validate_pix_key: em modo PERMISSIVO, gravando em pix_validation_log mas sem bloquear nada.
-- AJ1 dos 826 perfis: commitado (migration 20260512111425).
-- Documentacao: TECH_DEBT.md, OPERATIONAL_PROTOCOL.md, RELEASE_NOTES_ETAPA2.md, este arquivo.
+⏸️ **Fase 2 · Automação da Planilha** (pausada)
+- `compute_payouts` real (substitui Duda no cálculo)
+- 5 parsers SQL individuais (`parse_cmv_salmao_avg`, `parse_cmv_carnes_diff`, `parse_nps_revenue`, `parse_kds_brand_avg`, `parse_conformidade`)
+- Workflow n8n diário
+- Trabalho avançado em B5/B6 (esqueleto pronto, 67.77% match em maio/2026)
 
-## O que esta bloqueado aguardando Pedro
+⏸️ **Fase 3 · Migração SSOT** (futuro)
+- Banco vira fonte de verdade
+- Planilha vira espelho readonly
 
-1. Bloco 2 — 27 testes manuais nos 3 perfis + fluxo publico. Checklist disponivel no arquivo BLOCO2_CHECKLIST.md.
-2. Dump do pix_validation_log das ultimas 24-72h em modo permissivo. Esperado: zero rejeicoes em rejection_reason='other'.
-3. Criterio (f) da limpeza (Onda 3): screenshot ou descricao do registro problematico.
+## O que está pronto no banco
 
-## O que vem em sequencia quando Pedro retornar
+- 11 lojas operacionais ativas em `config_lojas` com `code+brand+cnpj`
+- 4 CNPJs administrativos em `cnpj_administrativo`
+- Tabelas: `payout_rules`, `payout_indicator_sources`, `payout_results_monthly`, `payout_orphan_records`
+- Funções: `classify_payout`, `normalize_loja_code`, `resolve_loja_id`, `get_latest_payload`
+- 5 parsers TypeScript em `sync-sheets-staging` (parsePayoutRules, parsePayoutTargetByRole, parsePayoutConsolidated, parsePayoutRegistry, parseSalmaoDiario)
+- 7+ fontes sincronizando OK em `sheets_sources`
 
-- Apos Bloco 2 verde + dump do log analisado: virar trigger pra modo ENFORCE.
-- Apos enforce: Onda 2 (condicionar trigger sync_schedule + adaptar 10 telas + no-show cron D+1 fuso BR).
-- Onda 4 (backfill archived) em paralelo a Onda 2.
-- Quando criterio (f) chegar: Onda 3 (limpeza com preview + backup CSV + audit log).
-- Apos Etapa 3 estabilizada: merge da Etapa 2 (Gerador IA).
+## Fontes ativas (sheets_sources · meta_keys de payout)
 
-## Prazo maximo do modo permissivo
+| meta_key | nome | status |
+|---|---|---|
+| payout_rules | Painel de Metas · Regras | ok |
+| payout_target_by_role | Painel de Metas · Target por Cargo | ok |
+| payout_consolidated | Painel de Metas · Consolidado | ok |
+| payout_registry | Painel de Metas · Registro | ok |
 
-Trigger nao deve ficar em permissivo por mais que 14 dias apos o COMMIT de 2026-05-12 (Bloco 0 v2.1 + hotfix consume + AJ1). Acima disso, o ganho de observacao ja foi extraido e virar enforce passa a ser prioritario. Se Pedro nao retornar em 14 dias, mandar lembrete proativo.
+Outras fontes operacionais: `nps`, `cmv-salmao`, `cmv-carnes`, `conformidade`, `atendimento-medias`, `reclamacoes`, `salmao_diario`, `ranking-supervisores`.
 
-## Estado do TECH_DEBT.md
+## Edge Functions
 
-Piso de linter atual: 65 warnings. Composicao em TECH_DEBT.md. Nao refatorar pra abaixar.
+- `get-payout-snapshot` (read-only, auth-protected) — retorna `{consolidated, registry, rules, target_by_role, last_sync, mes_ref, sources}`.
+- `sync-sheets-staging` — sincronização individual por `sourceId`.
 
-## Protocolo de execucao
+## Decisões importantes
 
-Modo velocidade autorizado: Lovable encadeia PRs seguindo protocolo C1 + DO $verify$ autoabortando, sem precisar de autorizacao individual de Pedro a cada PR. Pedro so intervém nos 4 pontos criticos listados em OPERATIONAL_PROTOCOL.md.
+- **Caju Itaim = CJ SP** (CNPJ próprio 62.723.936/0001-06)
+- `gerente_unidade` vê todos os cargos da própria loja (TECH_DEBT.md)
+- **Modelo C híbrido**: regras na planilha, painel lê do banco
+- Frontend filtra `consolidated` e `registry` por `loja_code` quando `operator`/`gerente_unidade`
 
----
+## Rota e RBAC
 
-## Notas de contexto para retomada rapida
-
-### Estrutura de branches
-- `main` / producao: Etapa 3 PR 1 (ajuste trigger + updated_at + AJ1).
-- `onda6-etapa2-gerador-ia`: schedule_drafts + schedule_draft_slots + user_pins + publish_schedule_draft + Seguranca.tsx.
-- Edge function `gerar-escala-ia`: em branch, sem deploy.
-
-### Tabelas novas (nao em producao ainda)
-- `schedule_drafts` — rascunho de escala gerada por IA.
-- `schedule_draft_slots` — slots dentro do rascunho.
-- `user_pins` — PINs bcrypt com lock de 15min apos 5 falhas.
-
-### Funcoes novas (nao em producao ainda)
-- `publish_schedule_draft(p_draft_id, p_override_pin)` — materializa schedules + match-or-create shifts.
-- `validate_schedule_publish(p_draft_id)` — valida CLT + budget + extras.
-- `verify_user_pin(p_user_id, p_pin)` — valida PIN com lock.
-- `set_user_pin(p_pin)` — define PIN com validacao 4-8 digitos.
-
-### Tela nova (nao em producao ainda)
-- `/escalas/draft/:draftId` — vinculacao de funcionarios a slots + edicao de diaria + publicacao com PIN.
-- `/perfil/seguranca` — cadastro de PIN obrigatorio para operators.
-
-### Seed de PIN
-- Todos os admins/operators existentes foram seedados com PIN '0000' e flag must_reset=true.
-- Mensagem obrigatoria no RELEASE_NOTES_ETAPA2.md para cadastro antes da primeira publicacao.
+- `/painel/metas-variaveis` (ProtectedRoute)
+- `admin`: vê todas as 11 lojas
+- `operator`: filtra pelas lojas vinculadas (`unidades`)
+- `gerente_unidade`: filtra pela própria loja

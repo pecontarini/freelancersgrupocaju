@@ -450,7 +450,7 @@ export function PayoutDashboard() {
                         </span>
                       </span>
                       <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                        {BRL(r.payout_brl)}
+                        {canSeePayout ? BRL(r.payout_brl) : <LockedValue value={r.payout_brl} canSee={false} />}
                       </span>
                     </div>
                   </div>
@@ -461,7 +461,9 @@ export function PayoutDashboard() {
           <div className="border-t border-border/40 p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">
               <span className="text-muted-foreground">Total:</span>{" "}
-              <span className="font-bold text-lg">{BRL(drillTotal)}</span>
+              <span className="font-bold text-lg">
+                {canSeePayout ? BRL(drillTotal) : <LockedValue value={drillTotal} canSee={false} />}
+              </span>
             </div>
             <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">

@@ -280,6 +280,10 @@ export function PayoutDashboard() {
                 <i.icon className="h-3.5 w-3.5" /> {i.label}
               </TabsTrigger>
             ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            <TabsTrigger value="supervisores" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" /> Ranking Supervisores
+            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>

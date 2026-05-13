@@ -49,13 +49,27 @@ export function SalmaoDiarioDrillContent({ lojaCode }: { lojaCode: string }) {
 
   const lojaItems = useMemo(() => {
     const items: DiaItem[] = [];
+    const todayStr = new Date().toISOString().slice(0, 10);
     for (const b of blocks) {
-      const arr = (b.payload?.items ?? []) as DiaItem[];
+      const arr = (b.payload?.items ?? []) as Array<Record<string, unknown>>;
       for (const it of arr) {
-        // payload uses underscore (NZ_AC); ranking sometimes uses space (NZ AC)
-        const code = (it.loja_code ?? "").replace(/\s+/g, "_").toUpperCase();
+        const code = String(it.loja_code ?? "").replace(/\s+/g, "_").toUpperCase();
         const want = lojaCode.replace(/\s+/g, "_").toUpperCase();
-        if (code === want) items.push({ ...it, loja_code: code });
+        if (code !== want) continue;
+        const data = String(it.data ?? "");
+        if (!data) continue;
+        // descarta dias futuros
+        if (data > todayStr) continue;
+        const ratio = toNumberOrNull(it.salmao_ratio);
+        // descarta dias sem dado preenchido (#DIV/0!, vazio, etc.)
+        if (ratio == null) continue;
+        // descarta zero "vazio" — só vale se houver outro sinal de movimento
+        if (ratio === 0) {
+          const consumo = toNumberOrNull((it as any).consumo);
+          const fat = toNumberOrNull((it as any).faturamento);
+          if ((consumo == null || consumo === 0) && (fat == null || fat === 0)) continue;
+        }
+        items.push({ data, loja_code: code, salmao_ratio: ratio });
       }
     }
     return items.sort((a, b) => a.data.localeCompare(b.data));

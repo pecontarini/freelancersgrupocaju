@@ -337,14 +337,18 @@ export function IndicatorRankingTab({
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold tabular-nums">{fmtNum(userRow.resultado)}</div>
-                <div className="text-xs text-emerald-600 font-semibold">{BRL(userRow.payout)}</div>
+                <div className="text-xs text-emerald-600 font-semibold">
+                  {isAdmin ? BRL(userRow.payout) : <LockedValue value={userRow.payout} canSee={false} />}
+                </div>
               </div>
             </div>
             {proximaFaixa && (
               <div className="mt-3 rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs">
                 Faltam <span className="font-bold tabular-nums">{fmtNum(proximaFaixa.gap)}</span> para
-                a próxima faixa <span className="font-semibold">({proximaFaixa.desc})</span> ={" "}
-                <span className="font-bold text-emerald-600">+{BRL(proximaFaixa.payout - userRow.payout)}</span>
+                a próxima faixa <span className="font-semibold">({proximaFaixa.desc})</span>
+                {isAdmin ? (
+                  <> = <span className="font-bold text-emerald-600">+{BRL(proximaFaixa.payout - userRow.payout)}</span></>
+                ) : null}
               </div>
             )}
           </div>

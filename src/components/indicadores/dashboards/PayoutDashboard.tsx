@@ -227,77 +227,129 @@ export function PayoutDashboard() {
         <KpiCard label="Colaboradores elegíveis" value={String(kpis.colaboradores)} accent="amber" />
       </div>
 
-      {/* Matrix */}
-      <div className="glass-card overflow-hidden">
-        <div className="border-b border-border/40 px-4 py-3">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
-            Matriz Loja × Cargo
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Clique numa célula para ver os indicadores</p>
-        </div>
-        <ScrollArea className="w-full">
-          <div className="min-w-fit">
-            <table className="w-full text-xs md:text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-muted/60 backdrop-blur px-3 py-2 text-left font-semibold border-r border-border/40 min-w-[180px]">
-                    Loja
-                  </th>
-                  {cargos.map((c) => (
-                    <th
-                      key={c}
-                      className={`px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[100px] ${hoverCol === c ? "bg-primary/10" : ""}`}
-                    >
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lojas.map((l) => (
-                  <tr
-                    key={l.code}
-                    className={`border-t border-border/30 ${hoverRow === l.code ? "bg-primary/5" : ""}`}
-                  >
-                    <td className="sticky left-0 z-10 bg-background/90 backdrop-blur px-3 py-2 font-medium border-r border-border/40 whitespace-nowrap">
-                      {l.nome}
-                    </td>
-                    {cargos.map((c) => {
-                      const cell = matrix.get(`${l.code}|${c}`);
-                      const exists = !!cell;
-                      const v = cell?.payout_total_brl;
-                      let bg = "bg-muted/20 text-muted-foreground";
-                      if (exists && v != null) {
-                        bg = v > 0
-                          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 cursor-pointer"
-                          : "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 cursor-pointer";
-                      }
-                      return (
-                        <td
-                          key={c}
-                          className={`px-2 py-2 text-center transition-colors ${bg}`}
-                          onMouseEnter={() => { setHoverRow(l.code); setHoverCol(c); }}
-                          onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
-                          onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
-                        >
-                          {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {lojas.length === 0 && (
-                  <tr>
-                    <td colSpan={cargos.length + 1} className="p-8 text-center text-muted-foreground">
-                      Nenhuma loja disponível.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+      {/* Tabs */}
+      <Tabs defaultValue="geral" className="w-full">
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex h-auto p-1 gap-1">
+            <TabsTrigger value="geral" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" /> Geral
+            </TabsTrigger>
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "atendimento").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "operacao").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "budgets").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
-      </div>
+
+        <TabsContent value="geral" className="mt-4">
+          {/* Matrix */}
+          <div className="glass-card overflow-hidden">
+            <div className="border-b border-border/40 px-4 py-3">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
+                Matriz Loja × Cargo
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Clique numa célula para ver os indicadores</p>
+            </div>
+            <ScrollArea className="w-full">
+              <div className="min-w-fit">
+                <table className="w-full text-xs md:text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-muted/60 backdrop-blur px-3 py-2 text-left font-semibold border-r border-border/40 min-w-[180px]">
+                        Loja
+                      </th>
+                      {cargos.map((c) => (
+                        <th
+                          key={c}
+                          className={`px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[100px] ${hoverCol === c ? "bg-primary/10" : ""}`}
+                        >
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lojas.map((l) => (
+                      <tr
+                        key={l.code}
+                        className={`border-t border-border/30 ${hoverRow === l.code ? "bg-primary/5" : ""}`}
+                      >
+                        <td className="sticky left-0 z-10 bg-background/90 backdrop-blur px-3 py-2 font-medium border-r border-border/40 whitespace-nowrap">
+                          {l.nome}
+                        </td>
+                        {cargos.map((c) => {
+                          const cell = matrix.get(`${l.code}|${c}`);
+                          const exists = !!cell;
+                          const v = cell?.payout_total_brl;
+                          let bg = "bg-muted/20 text-muted-foreground";
+                          if (exists && v != null) {
+                            bg = v > 0
+                              ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 cursor-pointer"
+                              : "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 cursor-pointer";
+                          }
+                          return (
+                            <td
+                              key={c}
+                              className={`px-2 py-2 text-center transition-colors ${bg}`}
+                              onMouseEnter={() => { setHoverRow(l.code); setHoverCol(c); }}
+                              onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
+                              onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
+                            >
+                              {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    {lojas.length === 0 && (
+                      <tr>
+                        <td colSpan={cargos.length + 1} className="p-8 text-center text-muted-foreground">
+                          Nenhuma loja disponível.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ScrollArea>
+          </div>
+        </TabsContent>
+
+        {INDICATORS.map((ind) => (
+          <TabsContent key={ind.id} value={ind.id} className="mt-4">
+            <IndicatorRankingTab
+              indicator={ind.id}
+              direction={ind.direction}
+              description={ind.description}
+              brandFilter={ind.brandFilter}
+              registry={data?.registry ?? []}
+              rules={data?.rules ?? []}
+              consolidated={data?.consolidated ?? []}
+              allLojas={allLojas}
+              isAdmin={isAdmin}
+              isGerenteUnidade={isGerenteUnidade}
+              userLojaCode={userLojaCode}
+              accessibleLojaCodes={allowedCodes}
+              mesRef={data?.mes_ref ?? null}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {/* Drill-down */}
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>

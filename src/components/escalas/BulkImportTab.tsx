@@ -32,8 +32,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAddEmployee } from "@/hooks/useEmployees";
+import { useAddEmployee, useEmployees } from "@/hooks/useEmployees";
 import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
+import {
+  classifyImportRows,
+  type DedupResult,
+  type DedupDecision,
+} from "@/lib/escalas/employeeDedup";
 import * as XLSX from "xlsx";
 
 const ACCEPT = ".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg";

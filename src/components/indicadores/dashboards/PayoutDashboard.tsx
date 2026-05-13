@@ -478,8 +478,8 @@ export function PayoutDashboard() {
 }
 
 function KpiCard({
-  label, value, hint, accent,
-}: { label: string; value: string; hint?: string; accent: "emerald" | "blue" | "red" | "amber" }) {
+  label, value, hint, accent, locked,
+}: { label: string; value: string | null; hint?: string; accent: "emerald" | "blue" | "red" | "amber"; locked?: boolean }) {
   const accentMap = {
     emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-300",
     blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-300",
@@ -487,10 +487,20 @@ function KpiCard({
     amber: "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-300",
   } as const;
   return (
-    <div className={`glass-card bg-gradient-to-br ${accentMap[accent]} p-3 md:p-4`}>
+    <div className={`glass-card bg-gradient-to-br ${accentMap[accent]} p-3 md:p-4 ${locked ? "relative" : ""}`}>
       <div className="text-[10px] md:text-xs uppercase tracking-wider opacity-80 font-semibold">{label}</div>
-      <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums">{value}</div>
+      {locked ? (
+        <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums flex items-center gap-1.5"
+             aria-label="Valor de pagamento oculto - disponível apenas para administradores">
+          <X className="h-4 w-4 opacity-60" />
+          <span className="cj-locked">●●●</span>
+        </div>
+      ) : (
+        <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums">{value}</div>
+      )}
       {hint && <div className="mt-0.5 text-[10px] opacity-70">{hint}</div>}
+      {locked && <div className="mt-0.5 text-[10px] opacity-60">Apenas admin</div>}
     </div>
   );
 }
+

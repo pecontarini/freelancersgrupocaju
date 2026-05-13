@@ -291,7 +291,8 @@ export function IndicatorRankingTab({
               <div className="flex flex-wrap gap-1.5">
                 {cargosElegiveis.map(([cargo, payout]) => (
                   <Badge key={cargo} variant="outline" className="font-normal">
-                    {cargo} · até {BRL(payout)}
+                    {cargo}
+                    {isAdmin && <> · até {BRL(payout)}</>}
                   </Badge>
                 ))}
               </div>
@@ -302,7 +303,7 @@ export function IndicatorRankingTab({
           {faixas.length > 0 && (
             <div className="mt-3">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-semibold">
-                Faixas de payout
+                Faixas {isAdmin ? "de payout" : "de atingimento"}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {faixas.map((f) => (
@@ -312,7 +313,7 @@ export function IndicatorRankingTab({
                     style={{ borderColor: TIER_COLOR[f.tier] + "55", color: TIER_COLOR[f.tier], background: TIER_COLOR[f.tier] + "12" }}
                   >
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: TIER_COLOR[f.tier] }} />
-                    {f.descricao} · {BRL(f.payoutMax)}
+                    {f.descricao}{isAdmin && <> · {BRL(f.payoutMax)}</>}
                   </span>
                 ))}
               </div>

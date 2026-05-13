@@ -166,6 +166,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "action_plans_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       agenda_eventos: {
@@ -297,6 +304,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_alerts_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       audit_sector_scores: {
@@ -360,6 +374,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_sector_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       audit_upload_logs: {
@@ -413,6 +434,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_upload_logs_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -468,6 +496,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "avaliacoes_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       bonus_config: {
@@ -505,6 +540,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bonus_config_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -613,6 +655,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "checkin_approvals_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       checkin_budget_entries: {
@@ -692,6 +741,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "checkin_budget_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       checkin_stations: {
@@ -732,6 +788,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checkin_stations_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -776,6 +839,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_corrections_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "checklist_corrections_response_id_fkey"
@@ -897,6 +967,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "checklist_responses_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "checklist_responses_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -940,6 +1017,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_sector_links_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "checklist_sector_links_template_id_fkey"
@@ -1043,6 +1127,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "checklist_templates_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       cmv_camara: {
@@ -1142,6 +1233,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cmv_contagens_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       cmv_ignored_items: {
@@ -1207,6 +1305,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_inventory_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1298,6 +1403,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cmv_movements_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       cmv_nfe_mappings: {
@@ -1379,6 +1491,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cmv_pending_sales_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1604,20 +1723,29 @@ export type Database = {
       }
       config_lojas: {
         Row: {
+          brand: string | null
+          code: string | null
           created_at: string
           id: string
+          is_active: boolean
           nome: string
           pin_contagem: string | null
         }
         Insert: {
+          brand?: string | null
+          code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           nome: string
           pin_contagem?: string | null
         }
         Update: {
+          brand?: string | null
+          code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           nome?: string
           pin_contagem?: string | null
         }
@@ -1655,6 +1783,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_budgets_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1696,6 +1831,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_sales_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1760,6 +1902,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "daily_stock_positions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       employees: {
@@ -1822,6 +1971,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1911,6 +2067,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "escala_minima_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       escala_template: {
@@ -1963,6 +2126,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escala_template_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2112,6 +2282,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "freelancer_checkins_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "freelancer_checkins_schedule_id_fkey"
             columns: ["schedule_id"]
             isOneToOne: false
@@ -2183,6 +2360,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "freelancer_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "freelancer_entries_schedule_id_fkey"
@@ -2336,6 +2520,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "holding_freelancer_forecast_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       holding_freelancer_rates: {
@@ -2385,6 +2576,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holding_freelancer_rates_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2447,6 +2645,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holding_staffing_config_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2646,6 +2851,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "inventarios_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "inventarios_setor_id_fkey"
             columns: ["setor_id"]
             isOneToOne: false
@@ -2705,6 +2917,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_transactions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2789,6 +3008,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "job_titles_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       leadership_calculation_log: {
@@ -2841,6 +3067,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leadership_calculation_log_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "leadership_calculation_log_trigger_audit_id_fkey"
@@ -2904,6 +3137,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leadership_performance_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2970,6 +3210,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "leadership_store_scores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       maintenance_budgets: {
@@ -3001,6 +3248,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_budgets_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: true
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3060,6 +3314,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3175,6 +3436,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "metas_snapshot_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3408,6 +3676,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "missoes_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       movimentacoes_estoque: {
@@ -3454,6 +3729,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimentacoes_estoque_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "movimentacoes_estoque_setor_destino_id_fkey"
@@ -3521,6 +3803,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "n8n_webhook_endpoints_loja_id_default_fkey"
+            columns: ["loja_id_default"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3688,7 +3977,194 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "operational_expenses_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
+      }
+      payout_indicator_sources: {
+        Row: {
+          brand_filter: string | null
+          cargo: string | null
+          created_at: string
+          id: number
+          indicador: string
+          is_active: boolean
+          notes: string | null
+          parser_fn: string
+          source_meta_key: string
+        }
+        Insert: {
+          brand_filter?: string | null
+          cargo?: string | null
+          created_at?: string
+          id?: number
+          indicador: string
+          is_active?: boolean
+          notes?: string | null
+          parser_fn: string
+          source_meta_key: string
+        }
+        Update: {
+          brand_filter?: string | null
+          cargo?: string | null
+          created_at?: string
+          id?: number
+          indicador?: string
+          is_active?: boolean
+          notes?: string | null
+          parser_fn?: string
+          source_meta_key?: string
+        }
+        Relationships: []
+      }
+      payout_results_monthly: {
+        Row: {
+          breakpoint_atingido: number | null
+          breakpoint_descricao: string | null
+          cargo: string
+          computed_at: string
+          computed_by: string
+          id: number
+          indicador: string
+          loja_id: string
+          mes_ref: string
+          override_reason: string | null
+          override_user_id: string | null
+          payout_brl: number
+          resultado_valor: number | null
+          run_id: string | null
+          source_meta_key: string | null
+          source_origin: string
+        }
+        Insert: {
+          breakpoint_atingido?: number | null
+          breakpoint_descricao?: string | null
+          cargo: string
+          computed_at?: string
+          computed_by?: string
+          id?: number
+          indicador: string
+          loja_id: string
+          mes_ref: string
+          override_reason?: string | null
+          override_user_id?: string | null
+          payout_brl?: number
+          resultado_valor?: number | null
+          run_id?: string | null
+          source_meta_key?: string | null
+          source_origin: string
+        }
+        Update: {
+          breakpoint_atingido?: number | null
+          breakpoint_descricao?: string | null
+          cargo?: string
+          computed_at?: string
+          computed_by?: string
+          id?: number
+          indicador?: string
+          loja_id?: string
+          mes_ref?: string
+          override_reason?: string | null
+          override_user_id?: string | null
+          payout_brl?: number
+          resultado_valor?: number | null
+          run_id?: string | null
+          source_meta_key?: string | null
+          source_origin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_results_monthly_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_results_monthly_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      payout_role_target: {
+        Row: {
+          cargo: string
+          id: number
+          remuneracao_total_brl: number
+          source: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cargo: string
+          id?: number
+          remuneracao_total_brl: number
+          source?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cargo?: string
+          id?: number
+          remuneracao_total_brl?: number
+          source?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      payout_rules: {
+        Row: {
+          breakpoint: number
+          cargo: string
+          created_at: string
+          descricao: string
+          direcao: string
+          id: number
+          indicador: string
+          is_active: boolean
+          payout_brl: number
+          source: string
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          breakpoint: number
+          cargo: string
+          created_at?: string
+          descricao: string
+          direcao: string
+          id?: number
+          indicador: string
+          is_active?: boolean
+          payout_brl: number
+          source?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          breakpoint?: number
+          cargo?: string
+          created_at?: string
+          descricao?: string
+          direcao?: string
+          id?: number
+          indicador?: string
+          is_active?: boolean
+          payout_brl?: number
+          source?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: []
       }
       pix_validation_log: {
         Row: {
@@ -3814,6 +4290,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pracas_plano_chao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       profiles: {
@@ -3854,6 +4337,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3920,6 +4410,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reclamacoes_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       reclamacoes_comentarios: {
@@ -3982,6 +4479,13 @@ export type Database = {
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "reclamacoes_comentarios_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["sheets_source_id"]
+          },
         ]
       }
       reclamacoes_config: {
@@ -4016,6 +4520,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reclamacoes_config_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["sheets_source_id"]
           },
         ]
       }
@@ -4075,6 +4586,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -4322,6 +4840,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "schedule_drafts_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       schedules: {
@@ -4518,6 +5043,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sectors_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       semanas_cmv: {
@@ -4564,6 +5096,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "semanas_cmv_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -4617,6 +5156,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "setor_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "setor_items_setor_id_fkey"
             columns: ["setor_id"]
             isOneToOne: false
@@ -4657,6 +5203,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "setores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -4707,6 +5260,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sheets_blocks_snapshot_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["sheets_source_id"]
           },
         ]
       }
@@ -4825,11 +5385,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sheets_staging_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "sheets_staging_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sheets_staging_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["sheets_source_id"]
           },
           {
             foreignKeyName: "sheets_staging_sync_id_fkey"
@@ -4922,6 +5496,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sincronizacoes_sheets_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5017,6 +5598,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "store_budgets_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       store_performance: {
@@ -5067,6 +5655,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "store_performance_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       store_performance_entries: {
@@ -5114,6 +5709,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "store_performance_entries_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       supervision_audits: {
@@ -5157,6 +5759,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervision_audits_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5229,6 +5838,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supervision_failures_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5307,6 +5923,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "turno_config_unidade_id_fkey"
+            columns: ["unidade_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       unit_partnerships: {
@@ -5340,11 +5963,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "unit_partnerships_partner_unit_id_fkey"
+            columns: ["partner_unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+          {
             foreignKeyName: "unit_partnerships_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_partnerships_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5465,6 +6102,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_stores_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       utensilios_config: {
@@ -5502,6 +6146,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_config_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5549,6 +6200,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_contagens_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "utensilios_contagens_utensilio_item_id_fkey"
@@ -5611,6 +6269,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "utensilios_items_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       utensilios_pedidos: {
@@ -5667,6 +6332,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utensilios_pedidos_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "utensilios_pedidos_utensilio_item_id_fkey"
@@ -5747,6 +6419,53 @@ export type Database = {
       }
     }
     Views: {
+      v_payout_consolidated: {
+        Row: {
+          brand: string | null
+          cargo: string | null
+          detalhamento: Json | null
+          loja_code: string | null
+          loja_id: string | null
+          loja_nome: string | null
+          mes_ref: string | null
+          metas_atingidas: number | null
+          metas_total: number | null
+          metas_zeradas: number | null
+          payout_total_brl: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_results_monthly_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payout_results_monthly_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      v_payout_jobs_to_compute: {
+        Row: {
+          brand: string | null
+          cargo: string | null
+          indicador: string | null
+          loja_code: string | null
+          loja_id: string | null
+          loja_nome: string | null
+          mes_ref: string | null
+          parser_fn: string | null
+          sheets_source_id: string | null
+          source_meta_key: string | null
+          source_status: string | null
+        }
+        Relationships: []
+      }
       v_salmon_daily: {
         Row: {
           consumption_kg: number | null
@@ -5801,6 +6520,13 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
         ]
       }
       v_salmon_monthly_summary: {
@@ -5823,6 +6549,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -5854,6 +6587,15 @@ export type Database = {
           waste_qty: number
         }[]
       }
+      classify_payout: {
+        Args: { p_cargo: string; p_indicador: string; p_valor: number }
+        Returns: {
+          breakpoint_atingido: number
+          breakpoint_descricao: string
+          direcao: string
+          payout_brl: number
+        }[]
+      }
       cleanup_units_schedule_data: {
         Args: { p_unit_ids: string[] }
         Returns: Json
@@ -5874,6 +6616,16 @@ export type Database = {
           total_entry: number
           total_sales: number
           total_waste: number
+        }[]
+      }
+      compute_payouts: {
+        Args: { p_mes_ref: string }
+        Returns: {
+          errors: Json
+          failed: number
+          processed: number
+          run_id: string
+          succeeded: number
         }[]
       }
       consume_pix_magic_link: {
@@ -5909,6 +6661,14 @@ export type Database = {
         Returns: boolean
       }
       holding_sector_label: { Args: { p_key: string }; Returns: string }
+      import_payout_rules_from_sheet: {
+        Args: never
+        Returns: {
+          errors: string[]
+          inserted: number
+          updated: number
+        }[]
+      }
       is_first_user: { Args: never; Returns: boolean }
       is_missao_creator: {
         Args: { _missao_id: string; _user_id: string }

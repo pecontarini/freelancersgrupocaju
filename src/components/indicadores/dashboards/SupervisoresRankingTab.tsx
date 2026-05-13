@@ -131,12 +131,20 @@ export function SupervisoresRankingTab({ userLojaCode }: { userLojaCode?: string
       if (b.block_type !== "ranking") continue;
       const itens = (b.payload?.items ?? []) as RankItem[];
       if (!itens.length) continue;
+      // separa lojas com valor > 0 (auditadas) das demais (não auditadas)
+      const auditadas = itens.filter((it) => Number(it.valor) > 0);
+      const naoAuditadas = itens.filter((it) => !(Number(it.valor) > 0));
+      // re-rankeia para que `posicao` reflita só lojas auditadas
+      const reRanked = [...auditadas]
+        .sort((a, b) => b.valor - a.valor)
+        .map((it, i) => ({ ...it, posicao: i + 1 }));
       cats.push({
         key: b.block_key,
         label: b.payload?.label ?? b.block_key,
         periodo: b.payload?.periodo ?? "",
         suffix: b.payload?.suffix ?? "%",
-        itens: [...itens].sort((a, b) => a.posicao - b.posicao),
+        itens: reRanked,
+        naoAuditadas,
       });
     }
     return cats;

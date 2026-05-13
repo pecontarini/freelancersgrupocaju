@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   usePayoutSnapshot,
@@ -14,6 +15,36 @@ import {
 } from "@/hooks/usePayoutSnapshot";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
+import { IndicatorRankingTab } from "./IndicatorRankingTab";
+
+const INDICATORS: {
+  id: string;
+  label: string;
+  direction: "HIGH" | "LOW";
+  description: string;
+  brandFilter?: "Caminito" | "Nazo";
+  icon: typeof Trophy;
+  group: "atendimento" | "operacao" | "budgets";
+}[] = [
+  { id: "NPS Salão", label: "NPS Salão", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "Mede a qualidade do atendimento presencial através de reclamações. Quanto maior o R$ faturado por avaliação 1-3, melhor a experiência do cliente." },
+  { id: "NPS Delivery", label: "NPS Delivery", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "R$ faturado por avaliação 1-3 no canal delivery. Mede a percepção do cliente após receber o pedido em casa." },
+  { id: "Conformidade", label: "Conformidade", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "Mede a aderência aos POPs operacionais via checklist supervisionado. Quanto maior o %, melhor a disciplina operacional." },
+  { id: "Tempo de Prato", label: "Tempo de Prato", direction: "LOW", icon: Zap, group: "operacao",
+    description: "Tempo médio do pedido na cozinha vs. target. Quanto menor o desvio acima do target, melhor." },
+  { id: "Tempo Delivery", label: "Tempo Delivery", direction: "LOW", icon: Zap, group: "operacao",
+    description: "Tempo médio entre pedido e saída do delivery. Quanto menor, melhor a operação." },
+  { id: "CMV", label: "CMV", direction: "LOW", icon: TrendingUp, group: "budgets",
+    description: "Custo da mercadoria vendida sobre faturamento. Quanto menor o %, maior a margem." },
+  { id: "CMV CAMINITO", label: "CMV Caminito", direction: "LOW", brandFilter: "Caminito", icon: Flame, group: "budgets",
+    description: "Diferença % entre carne pesada no destino e carne transferida do CPD. Quanto menor a diferença, melhor o controle de quebra." },
+  { id: "CMV NAZO", label: "CMV Nazo", direction: "LOW", brandFilter: "Nazo", icon: Fish, group: "budgets",
+    description: "kg de salmão consumido por R$1.000 vendido. Quanto menor, melhor o aproveitamento do insumo." },
+  { id: "Budget", label: "Budget", direction: "HIGH", icon: TrendingUp, group: "budgets",
+    description: "% de economia ou excesso sobre o orçado. Quanto maior a economia, melhor a gestão de despesa." },
+];
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/19FL9uaJbmVxPiKHYMM6DRX51M9W8pFvrJt9qOljmUzQ";
 
@@ -136,6 +167,32 @@ export function PayoutDashboard() {
     return { total, lojasFull, lojasCriticas, colaboradores, totalLojas: lojas.length };
   }, [lojas, cargos, matrix]);
 
+  // Lista completa de lojas (sem RBAC) — usada pelo IndicatorRankingTab
+  const allLojas = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of data?.consolidated ?? []) {
+      const code = normalizeLojaCode(c.loja_code);
+      if (code) map.set(code, c.loja_nome ?? code);
+    }
+    for (const r of data?.registry ?? []) {
+      const code = normalizeLojaCode(r.loja_code);
+      if (code && !map.has(code)) map.set(code, r.loja_nome ?? code);
+    }
+    return Array.from(map.entries())
+      .map(([code, nome]) => ({ code, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [data]);
+
+  // Loja do gerente_unidade
+  const userLojaCode = useMemo<string | null>(() => {
+    if (!isGerenteUnidade) return null;
+    for (const u of unidades) {
+      const c = lojaCodigoFromNome(u.nome);
+      if (c) return normalizeLojaCode(c);
+    }
+    return null;
+  }, [isGerenteUnidade, unidades]);
+
   const handleSync = async () => {
     try {
       await syncAll();
@@ -196,77 +253,129 @@ export function PayoutDashboard() {
         <KpiCard label="Colaboradores elegíveis" value={String(kpis.colaboradores)} accent="amber" />
       </div>
 
-      {/* Matrix */}
-      <div className="glass-card overflow-hidden">
-        <div className="border-b border-border/40 px-4 py-3">
-          <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
-            Matriz Loja × Cargo
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Clique numa célula para ver os indicadores</p>
-        </div>
-        <ScrollArea className="w-full">
-          <div className="min-w-fit">
-            <table className="w-full text-xs md:text-sm">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="sticky left-0 z-10 bg-muted/60 backdrop-blur px-3 py-2 text-left font-semibold border-r border-border/40 min-w-[180px]">
-                    Loja
-                  </th>
-                  {cargos.map((c) => (
-                    <th
-                      key={c}
-                      className={`px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[100px] ${hoverCol === c ? "bg-primary/10" : ""}`}
-                    >
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lojas.map((l) => (
-                  <tr
-                    key={l.code}
-                    className={`border-t border-border/30 ${hoverRow === l.code ? "bg-primary/5" : ""}`}
-                  >
-                    <td className="sticky left-0 z-10 bg-background/90 backdrop-blur px-3 py-2 font-medium border-r border-border/40 whitespace-nowrap">
-                      {l.nome}
-                    </td>
-                    {cargos.map((c) => {
-                      const cell = matrix.get(`${l.code}|${c}`);
-                      const exists = !!cell;
-                      const v = cell?.payout_total_brl;
-                      let bg = "bg-muted/20 text-muted-foreground";
-                      if (exists && v != null) {
-                        bg = v > 0
-                          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 cursor-pointer"
-                          : "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 cursor-pointer";
-                      }
-                      return (
-                        <td
-                          key={c}
-                          className={`px-2 py-2 text-center transition-colors ${bg}`}
-                          onMouseEnter={() => { setHoverRow(l.code); setHoverCol(c); }}
-                          onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
-                          onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
-                        >
-                          {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {lojas.length === 0 && (
-                  <tr>
-                    <td colSpan={cargos.length + 1} className="p-8 text-center text-muted-foreground">
-                      Nenhuma loja disponível.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+      {/* Tabs */}
+      <Tabs defaultValue="geral" className="w-full">
+        <ScrollArea className="w-full whitespace-nowrap">
+          <TabsList className="inline-flex h-auto p-1 gap-1">
+            <TabsTrigger value="geral" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" /> Geral
+            </TabsTrigger>
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "atendimento").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "operacao").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            {INDICATORS.filter((i) => i.group === "budgets").map((i) => (
+              <TabsTrigger key={i.id} value={i.id} className="gap-1.5">
+                <i.icon className="h-3.5 w-3.5" /> {i.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
         </ScrollArea>
-      </div>
+
+        <TabsContent value="geral" className="mt-4">
+          {/* Matrix */}
+          <div className="glass-card overflow-hidden">
+            <div className="border-b border-border/40 px-4 py-3">
+              <h2 className="font-display text-sm font-semibold uppercase tracking-wide">
+                Matriz Loja × Cargo
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Clique numa célula para ver os indicadores</p>
+            </div>
+            <ScrollArea className="w-full">
+              <div className="min-w-fit">
+                <table className="w-full text-xs md:text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-muted/60 backdrop-blur px-3 py-2 text-left font-semibold border-r border-border/40 min-w-[180px]">
+                        Loja
+                      </th>
+                      {cargos.map((c) => (
+                        <th
+                          key={c}
+                          className={`px-2 py-2 text-center font-semibold whitespace-nowrap min-w-[100px] ${hoverCol === c ? "bg-primary/10" : ""}`}
+                        >
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lojas.map((l) => (
+                      <tr
+                        key={l.code}
+                        className={`border-t border-border/30 ${hoverRow === l.code ? "bg-primary/5" : ""}`}
+                      >
+                        <td className="sticky left-0 z-10 bg-background/90 backdrop-blur px-3 py-2 font-medium border-r border-border/40 whitespace-nowrap">
+                          {l.nome}
+                        </td>
+                        {cargos.map((c) => {
+                          const cell = matrix.get(`${l.code}|${c}`);
+                          const exists = !!cell;
+                          const v = cell?.payout_total_brl;
+                          let bg = "bg-muted/20 text-muted-foreground";
+                          if (exists && v != null) {
+                            bg = v > 0
+                              ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 cursor-pointer"
+                              : "bg-red-500/10 hover:bg-red-500/20 text-red-700 dark:text-red-300 cursor-pointer";
+                          }
+                          return (
+                            <td
+                              key={c}
+                              className={`px-2 py-2 text-center transition-colors ${bg}`}
+                              onMouseEnter={() => { setHoverRow(l.code); setHoverCol(c); }}
+                              onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
+                              onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
+                            >
+                              {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                    {lojas.length === 0 && (
+                      <tr>
+                        <td colSpan={cargos.length + 1} className="p-8 text-center text-muted-foreground">
+                          Nenhuma loja disponível.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ScrollArea>
+          </div>
+        </TabsContent>
+
+        {INDICATORS.map((ind) => (
+          <TabsContent key={ind.id} value={ind.id} className="mt-4">
+            <IndicatorRankingTab
+              indicator={ind.id}
+              direction={ind.direction}
+              description={ind.description}
+              brandFilter={ind.brandFilter}
+              registry={data?.registry ?? []}
+              rules={data?.rules ?? []}
+              consolidated={data?.consolidated ?? []}
+              allLojas={allLojas}
+              isAdmin={isAdmin}
+              isGerenteUnidade={isGerenteUnidade}
+              userLojaCode={userLojaCode}
+              accessibleLojaCodes={allowedCodes}
+              mesRef={data?.mes_ref ?? null}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {/* Drill-down */}
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>

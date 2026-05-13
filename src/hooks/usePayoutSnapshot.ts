@@ -25,9 +25,11 @@ export interface TargetItem {
 export interface RulesItem {
   cargo?: string;
   meta?: string;
-  breakpoint?: string;
+  indicador?: string;
+  breakpoint?: number | string | null;
   descricao?: string;
   payout?: number | null;
+  payout_brl?: number | null;
 }
 
 export interface PayoutSnapshot {

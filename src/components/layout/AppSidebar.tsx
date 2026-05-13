@@ -11,7 +11,8 @@ import {
   ChevronRight,
   ClipboardCheck,
   
-  BarChart2,
+  Activity,
+  Trophy,
   Users,
   LayoutGrid,
   Calendar,
@@ -97,16 +98,16 @@ const adminMenuItems = [
 
 const gestaoMenuItems = [
   {
-    title: "PAINEL DE INDICADORES",
+    title: "INDICADORES OPERACIONAIS",
     id: "painel",
-    icon: BarChart2,
-    description: "Resultados e indicadores da rede",
+    icon: Activity,
+    description: "Como estamos indo · NPS, CMV, KDS, Conformidade",
   },
   {
-    title: "METAS VARIÁVEIS",
+    title: "REMUNERAÇÃO VARIÁVEL",
     id: "metas-variaveis",
-    icon: BarChart2,
-    description: "Payouts mensais por loja e cargo",
+    icon: Trophy,
+    description: "Quem ganha o quê · Payout mensal por meta",
   },
 ];
 

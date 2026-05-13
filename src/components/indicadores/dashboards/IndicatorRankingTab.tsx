@@ -370,19 +370,22 @@ export function IndicatorRankingTab({
                     onClick={() => handleClickLoja(it.code)}
                     className={`rounded-xl p-3 text-center border cursor-pointer transition ${
                       isFirst
-                        ? "bg-amber-500 border-amber-400 text-black scale-105 shadow-lg"
-                        : "bg-card border-border/50 hover:border-primary/40"
+                        ? "bg-gradient-to-br from-[#E05C1A] to-[#FF7A30] border-[#FFB84D] text-white scale-105 shadow-[0_8px_30px_rgba(224,92,26,0.45)]"
+                        : it.posicao === 2
+                        ? "bg-gradient-to-br from-slate-300/30 to-slate-200/10 border-slate-300/40"
+                        : "bg-gradient-to-br from-amber-700/20 to-amber-600/5 border-amber-600/30"
                     }`}
+                    style={{ minHeight: isFirst ? 116 : it.posicao === 2 ? 82 : 66 }}
                   >
                     <Icon
                       className={`h-5 w-5 mx-auto mb-1 ${
-                        isFirst ? "text-black" : it.posicao === 2 ? "text-slate-400" : "text-orange-500"
+                        isFirst ? "text-white" : it.posicao === 2 ? "text-slate-400" : "text-orange-500"
                       }`}
                     />
-                    <div className={`text-xs font-bold truncate ${isFirst ? "text-black/80" : "text-muted-foreground"}`}>
+                    <div className={`text-xs font-bold truncate ${isFirst ? "text-white/90" : "text-muted-foreground"}`}>
                       {it.nome}
                     </div>
-                    <div className={`text-lg font-bold tabular-nums ${isFirst ? "text-black" : "text-foreground"}`}>
+                    <div className={`text-lg font-bold tabular-nums ${isFirst ? "text-white" : "text-foreground"}`}>
                       {fmtNum(it.resultado)}
                     </div>
                   </div>

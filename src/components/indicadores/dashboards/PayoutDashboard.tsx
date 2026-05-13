@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3 } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

@@ -1604,20 +1604,29 @@ export type Database = {
       }
       config_lojas: {
         Row: {
+          brand: string | null
+          code: string | null
           created_at: string
           id: string
+          is_active: boolean
           nome: string
           pin_contagem: string | null
         }
         Insert: {
+          brand?: string | null
+          code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           nome: string
           pin_contagem?: string | null
         }
         Update: {
+          brand?: string | null
+          code?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           nome?: string
           pin_contagem?: string | null
         }

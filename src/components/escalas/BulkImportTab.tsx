@@ -32,8 +32,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useAddEmployee } from "@/hooks/useEmployees";
+import { useAddEmployee, useEmployees } from "@/hooks/useEmployees";
 import { useJobTitles, useUpsertJobTitle } from "@/hooks/useJobTitles";
+import {
+  classifyImportRows,
+  type DedupResult,
+  type DedupDecision,
+} from "@/lib/escalas/employeeDedup";
 import * as XLSX from "xlsx";
 
 const ACCEPT = ".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg";
@@ -347,6 +352,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const addEmployee = useAddEmployee();
   const upsertJobTitle = useUpsertJobTitle();
   const { data: dbJobTitles = [] } = useJobTitles(unitId);
+  const { data: existingEmployees = [] } = useEmployees(unitId);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Merge DB titles with defaults
@@ -359,6 +365,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [parsed, setParsed] = useState<ParsedEmployee[] | null>(null);
+  const [dedup, setDedup] = useState<DedupResult[] | null>(null);
   const [fileName, setFileName] = useState("");
 
   const [processingMode, setProcessingMode] = useState<"local" | "ai" | null>(null);
@@ -366,6 +373,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     setParsed(null);
+    setDedup(null);
     setFileName(file.name);
 
     try {
@@ -400,17 +408,24 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       }
 
       setParsed(result);
+      const dedupResult = classifyImportRows(result, existingEmployees);
+      setDedup(dedupResult);
 
-      const lowConfCount = result.filter(
-        (e) => !e.confidence.name || !e.confidence.job_title || !e.confidence.phone
+      const dupCount = dedupResult.filter(
+        (d) => d.status === "duplicate_db" || d.status === "duplicate_file"
       ).length;
+      const possibleCount = dedupResult.filter((d) => d.status === "possible").length;
+      const newCount = dedupResult.filter((d) => d.status === "new").length;
 
-      if (lowConfCount > 0) {
-        toast.info(`${result.length} extraído(s) — ${lowConfCount} campo(s) precisam de revisão`, {
-          icon: <AlertTriangle className="h-4 w-4 text-yellow-500" />,
-        });
+      if (possibleCount > 0) {
+        toast.warning(
+          `${newCount} novos · ${dupCount} já cadastrados · ${possibleCount} para revisar`,
+          { icon: <AlertTriangle className="h-4 w-4 text-yellow-500" /> }
+        );
+      } else if (dupCount > 0) {
+        toast.info(`${newCount} novos · ${dupCount} já cadastrados (serão ignorados)`);
       } else {
-        toast.success(`${result.length} funcionário(s) extraído(s) com alta confiança!`);
+        toast.success(`${newCount} funcionário(s) novo(s) prontos para importar!`);
       }
     } catch (err: any) {
       console.error("Import error:", err);
@@ -419,7 +434,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       setProcessing(false);
       setProcessingMode(null);
     }
-  }, []);
+  }, [existingEmployees]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -447,12 +462,27 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       const updated = { ...next[idx], [field]: value };
       updated.confidence = assessConfidence(updated);
       next[idx] = updated;
+      // Re-classify if name or job_title changed
+      if (field === "name" || field === "job_title") {
+        const reclassified = classifyImportRows(next, existingEmployees);
+        setDedup(reclassified);
+      }
       return next;
     });
   };
 
   const removeRow = (idx: number) => {
     setParsed((prev) => prev?.filter((_, i) => i !== idx) ?? null);
+    setDedup((prev) => prev?.filter((_, i) => i !== idx) ?? null);
+  };
+
+  const setDecision = (idx: number, decision: DedupDecision) => {
+    setDedup((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], decision };
+      return next;
+    });
   };
 
   const handleConfirm = async () => {
@@ -460,10 +490,17 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       toast.error("Selecione uma unidade antes de importar.");
       return;
     }
-    if (!parsed?.length) return;
-    const validRows = parsed.filter((e) => e.name.trim());
-    if (validRows.length === 0) {
-      toast.error("Nenhum funcionário válido para importar.");
+    if (!parsed?.length || !dedup?.length) return;
+
+    // Só insere linhas marcadas como "create"
+    const toInsert = parsed
+      .map((emp, idx) => ({ emp, dec: dedup[idx] }))
+      .filter(({ emp, dec }) => emp.name.trim() && dec.decision === "create");
+
+    const skipped = parsed.length - toInsert.length;
+
+    if (toInsert.length === 0) {
+      toast.error("Nenhum funcionário novo para importar — todos foram marcados como já existentes.");
       return;
     }
 
@@ -473,7 +510,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       let success = 0;
       let errors = 0;
 
-      for (const emp of validRows) {
+      for (const { emp } of toInsert) {
         try {
           // Resolve job_title_id
           let jobTitleId: string | undefined;
@@ -498,13 +535,19 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
         }
       }
 
+      const parts: string[] = [`${success} criado(s)`];
+      if (skipped > 0) parts.push(`${skipped} ignorado(s) (já existiam)`);
+      if (errors > 0) parts.push(`${errors} com erro`);
+      const msg = parts.join(" · ");
+
       if (errors > 0) {
-        toast.warning(`${success} cadastrado(s), ${errors} com erro.`);
+        toast.warning(msg);
       } else {
-        toast.success(`Equipe cadastrada com sucesso! ${success} funcionário(s).`);
+        toast.success(msg);
       }
 
       setParsed(null);
+      setDedup(null);
       setFileName("");
       onDone();
     } finally {
@@ -537,11 +580,21 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   }
 
   // --- Render: Review Table ---
-  if (parsed && parsed.length > 0) {
-    const validCount = parsed.filter((e) => e.name.trim()).length;
+  if (parsed && parsed.length > 0 && dedup) {
+    const newCount = dedup.filter((d) => d.decision === "create" && d.status === "new").length;
+    const possibleCreateCount = dedup.filter(
+      (d) => d.decision === "create" && d.status === "possible"
+    ).length;
+    const dupCount = dedup.filter(
+      (d) => d.status === "duplicate_db" || d.status === "duplicate_file"
+    ).length;
+    const possibleCount = dedup.filter((d) => d.status === "possible").length;
+    const toImportCount = newCount + possibleCreateCount;
     const lowConfCount = parsed.filter(
       (e) => !e.confidence.name || !e.confidence.job_title || !e.confidence.phone
     ).length;
+
+    const reset = () => { setParsed(null); setDedup(null); setFileName(""); };
 
     return (
       <div className="space-y-3 pt-2">
@@ -550,17 +603,34 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-primary" />
             <span className="text-foreground font-medium">
-              {parsed.length} funcionário(s) de <span className="text-primary">{fileName}</span>
+              {parsed.length} extraído(s) de <span className="text-primary">{fileName}</span>
             </span>
           </div>
           <Button
             variant="ghost"
             size="sm"
             className="text-xs text-muted-foreground"
-            onClick={() => { setParsed(null); setFileName(""); }}
+            onClick={reset}
           >
             Novo arquivo
           </Button>
+        </div>
+
+        {/* Dedup summary */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
+            {newCount} novo(s)
+          </span>
+          {dupCount > 0 && (
+            <span className="rounded-full border border-muted-foreground/30 bg-muted/40 px-2.5 py-1 text-muted-foreground">
+              {dupCount} já cadastrado(s)
+            </span>
+          )}
+          {possibleCount > 0 && (
+            <span className="rounded-full border border-yellow-400/50 bg-yellow-400/10 px-2.5 py-1 text-yellow-700 dark:text-yellow-300">
+              {possibleCount} para revisar
+            </span>
+          )}
         </div>
 
         {/* Confidence warning */}
@@ -578,74 +648,121 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[35%]">Nome</TableHead>
-                <TableHead className="w-[30%]">Cargo</TableHead>
-                <TableHead className="w-[25%]">Telefone</TableHead>
+                <TableHead className="w-[28%]">Nome</TableHead>
+                <TableHead className="w-[22%]">Cargo</TableHead>
+                <TableHead className="w-[20%]">Telefone</TableHead>
+                <TableHead className="w-[25%]">Status</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {parsed.map((emp, idx) => (
-                <TableRow key={idx}>
-                  <TableCell className="py-1.5">
-                    <ConfidenceInput
-                      value={emp.name}
-                      confident={emp.confidence.name}
-                      onChange={(v) => updateRow(idx, "name", v)}
-                      placeholder="Nome completo"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <div className={!emp.confidence.job_title ? "ring-1 ring-yellow-400 rounded-md" : ""}>
-                      <Select
-                        value={allJobTitleNames.includes(emp.job_title) ? emp.job_title : "__custom__"}
-                        onValueChange={(v) =>
-                          updateRow(idx, "job_title", v === "__custom__" ? emp.job_title : v)
-                        }
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Cargo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allJobTitleNames.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {t}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="__custom__">✏️ Outro</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {!allJobTitleNames.includes(emp.job_title) && emp.job_title !== "" && (
-                      <Input
-                        value={emp.job_title}
-                        onChange={(e) => updateRow(idx, "job_title", e.target.value)}
-                        className="h-7 mt-1 text-xs"
-                        placeholder="Digite o cargo"
+              {parsed.map((emp, idx) => {
+                const d = dedup[idx];
+                const rowClass =
+                  d.status === "duplicate_db" || d.status === "duplicate_file"
+                    ? "bg-muted/30 opacity-70"
+                    : d.status === "possible"
+                    ? "bg-yellow-400/5"
+                    : "";
+                return (
+                  <TableRow key={idx} className={rowClass}>
+                    <TableCell className="py-1.5">
+                      <ConfidenceInput
+                        value={emp.name}
+                        confident={emp.confidence.name}
+                        onChange={(v) => updateRow(idx, "name", v)}
+                        placeholder="Nome completo"
                       />
-                    )}
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <ConfidenceInput
-                      value={emp.phone}
-                      confident={emp.confidence.phone}
-                      onChange={(v) => updateRow(idx, "phone", normalizePhone(v))}
-                      placeholder="(XX) XXXXX-XXXX"
-                      inputMode="tel"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => removeRow(idx)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <div className={!emp.confidence.job_title ? "ring-1 ring-yellow-400 rounded-md" : ""}>
+                        <Select
+                          value={allJobTitleNames.includes(emp.job_title) ? emp.job_title : "__custom__"}
+                          onValueChange={(v) =>
+                            updateRow(idx, "job_title", v === "__custom__" ? emp.job_title : v)
+                          }
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Cargo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allJobTitleNames.map((t) => (
+                              <SelectItem key={t} value={t}>
+                                {t}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="__custom__">Outro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {!allJobTitleNames.includes(emp.job_title) && emp.job_title !== "" && (
+                        <Input
+                          value={emp.job_title}
+                          onChange={(e) => updateRow(idx, "job_title", e.target.value)}
+                          className="h-7 mt-1 text-xs"
+                          placeholder="Digite o cargo"
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <ConfidenceInput
+                        value={emp.phone}
+                        confident={emp.confidence.phone}
+                        onChange={(v) => updateRow(idx, "phone", normalizePhone(v))}
+                        placeholder="(XX) XXXXX-XXXX"
+                        inputMode="tel"
+                      />
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      {d.status === "new" && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                          <CheckCircle2 className="h-3 w-3" /> Novo
+                        </span>
+                      )}
+                      {d.status === "duplicate_db" && (
+                        <span className="text-[11px] text-muted-foreground" title={d.candidate?.name}>
+                          Já cadastrado{d.candidate ? ` (${d.candidate.name})` : ""}
+                        </span>
+                      )}
+                      {d.status === "duplicate_file" && (
+                        <span className="text-[11px] text-muted-foreground">
+                          Repetido no arquivo
+                        </span>
+                      )}
+                      {d.status === "possible" && (
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-yellow-700 dark:text-yellow-300 leading-tight">
+                            Parecido com <strong>{d.candidate?.name}</strong> ({Math.round(d.similarity * 100)}%)
+                          </p>
+                          <Select
+                            value={d.decision}
+                            onValueChange={(v) => setDecision(idx, v as DedupDecision)}
+                          >
+                            <SelectTrigger className="h-7 text-[11px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ignore">Ignorar</SelectItem>
+                              <SelectItem value="merge">Mesclar</SelectItem>
+                              <SelectItem value="create">Criar novo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-1.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeRow(idx)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -655,21 +772,21 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => { setParsed(null); setFileName(""); }}
+            onClick={reset}
           >
             Cancelar
           </Button>
           <Button
             className="flex-1 gap-2"
             onClick={handleConfirm}
-            disabled={saving || validCount === 0}
+            disabled={saving || toImportCount === 0}
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Users className="h-4 w-4" />
             )}
-            Importar {validCount} Funcionário(s)
+            Importar {toImportCount} novo(s)
           </Button>
         </div>
       </div>

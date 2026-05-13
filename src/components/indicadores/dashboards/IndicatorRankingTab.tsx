@@ -84,6 +84,8 @@ export interface IndicatorRankingTabProps {
   userLojaCode?: string | null;
   accessibleLojaCodes: Set<string> | null;
   mesRef: string | null;
+  /** Optional extra content to render in the drill-down modal, below the cargos list. */
+  renderExtraDrillContent?: (lojaCode: string, lojaNome: string) => React.ReactNode;
 }
 
 export function IndicatorRankingTab({

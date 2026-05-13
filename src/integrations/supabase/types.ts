@@ -6692,6 +6692,7 @@ export type Database = {
         Returns: {
           errors: Json
           failed: number
+          orphans: number
           processed: number
           run_id: string
           succeeded: number
@@ -6705,6 +6706,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_latest_payload: { Args: { p_meta_key: string }; Returns: Json }
       get_realtime_stock_positions: {
         Args: { p_unit_id: string }
         Returns: {
@@ -6733,8 +6735,9 @@ export type Database = {
       import_payout_rules_from_sheet: {
         Args: never
         Returns: {
-          errors: string[]
+          errors: Json
           inserted: number
+          skipped: number
           updated: number
         }[]
       }
@@ -6772,6 +6775,35 @@ export type Database = {
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
       normalize_loja_code: { Args: { p_raw: string }; Returns: string }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
+      parse_cmv_carnes_diff: {
+        Args: { p_loja_id: string; p_mes_ref: string }
+        Returns: number
+      }
+      parse_cmv_salmao_avg: {
+        Args: { p_loja_id: string; p_mes_ref: string }
+        Returns: number
+      }
+      parse_conformidade: {
+        Args: { p_loja_id: string; p_mes_ref: string }
+        Returns: number
+      }
+      parse_kds_brand_avg: {
+        Args: { p_loja_id: string; p_mes_ref: string; p_meta_key?: string }
+        Returns: number
+      }
+      parse_nps_revenue: {
+        Args: { p_canal: string; p_loja_id: string; p_mes_ref: string }
+        Returns: number
+      }
+      parse_payout_registry_to_results: {
+        Args: never
+        Returns: {
+          errors: Json
+          inserted: number
+          orphans: number
+          updated: number
+        }[]
+      }
       peek_pix_magic_link: { Args: { p_token: string }; Returns: Json }
       promote_approved_checkins: {
         Args: { p_approval_id: string }
@@ -6783,6 +6815,7 @@ export type Database = {
       }
       reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
+      resolve_loja_id: { Args: { p_raw_identifier: string }; Returns: string }
       set_user_pin: { Args: { p_pin: string }; Returns: Json }
       user_can_see_missao: {
         Args: { _missao_id: string; _user_id: string }
@@ -6791,6 +6824,17 @@ export type Database = {
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
         Returns: boolean
+      }
+      validate_payouts: {
+        Args: { p_mes_ref: string }
+        Returns: {
+          divergencias: number
+          divergencias_detalhe: Json
+          match_pct: number
+          matches: number
+          total_auto: number
+          total_manual: number
+        }[]
       }
       validate_schedule_clt: {
         Args: {

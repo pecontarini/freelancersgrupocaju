@@ -230,20 +230,29 @@ export function PayoutDashboard() {
     );
   }
 
+  const canSeePayout = isAdmin;
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
-            Painel de Metas Variáveis · {data?.mes_ref ?? "—"}
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
+              Painel de Metas Variáveis · {data?.mes_ref ?? "—"}
+            </h1>
+            {canSeePayout && (
+              <Badge variant="outline" className="gap-1 border-[color:var(--cj-orange)] text-[color:var(--cj-orange)]">
+                <ShieldCheck className="h-3 w-3" /> Apenas Admin
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             Último sync: {relTime(data?.last_sync ?? null)}
           </p>
         </div>
-        <Button onClick={handleSync} disabled={syncing} className="gap-2">
+        <Button onClick={handleSync} disabled={syncing} className="gap-2 cj-glass-btn">
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Sincronizando…" : "Sincronizar agora"}
         </Button>
@@ -251,10 +260,20 @@ export function PayoutDashboard() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Payout total" value={BRL(kpis.total)} accent="emerald" />
+        <KpiCard
+          label="Payout total"
+          value={canSeePayout ? BRL(kpis.total) : null}
+          locked={!canSeePayout}
+          accent="emerald"
+        />
         <KpiCard label="Lojas com 100%" value={`${kpis.lojasFull} de ${kpis.totalLojas}`} accent="blue" />
         <KpiCard label="Lojas críticas" value={String(kpis.lojasCriticas)} hint="3+ metas zeradas" accent="red" />
-        <KpiCard label="Colaboradores elegíveis" value={String(kpis.colaboradores)} accent="amber" />
+        <KpiCard
+          label="Colaboradores elegíveis"
+          value={canSeePayout ? String(kpis.colaboradores) : null}
+          locked={!canSeePayout}
+          accent="amber"
+        />
       </div>
 
       {/* Tabs */}

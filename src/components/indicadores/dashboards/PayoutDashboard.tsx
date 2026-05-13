@@ -16,6 +16,8 @@ import {
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
 import { IndicatorRankingTab } from "./IndicatorRankingTab";
+import { SupervisoresRankingTab } from "./SupervisoresRankingTab";
+import { SalmaoDiarioDrillContent } from "./SalmaoDiarioDrillContent";
 
 const INDICATORS: {
   id: string;

@@ -1498,6 +1498,11 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
     case 'ranking-supervisores': return parseSupervisoresRanking(grid);
+    case 'payout_rules': return parsePayoutRules(grid);
+    case 'payout_target_by_role': return parsePayoutTargetByRole(grid);
+    case 'payout_consolidated': return parsePayoutConsolidated(grid);
+    case 'payout_registry': return parsePayoutRegistry(grid);
+    case 'salmao_diario': return parseSalmaoDiarioV2(grid);
     default: return parseGenericMeta(grid);
   }
 }

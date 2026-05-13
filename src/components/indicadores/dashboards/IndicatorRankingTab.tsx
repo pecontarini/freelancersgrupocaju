@@ -576,6 +576,8 @@ export function IndicatorRankingTab({
                     ))}
                   </div>
                 </div>
+
+                {drill && drillLoja && renderExtraDrillContent?.(drill, drillLoja.nome)}
               </div>
             </ScrollArea>
             <div className="border-t p-4 flex flex-wrap items-center justify-between gap-3">

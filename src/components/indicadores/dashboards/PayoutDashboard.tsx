@@ -167,6 +167,32 @@ export function PayoutDashboard() {
     return { total, lojasFull, lojasCriticas, colaboradores, totalLojas: lojas.length };
   }, [lojas, cargos, matrix]);
 
+  // Lista completa de lojas (sem RBAC) — usada pelo IndicatorRankingTab
+  const allLojas = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of data?.consolidated ?? []) {
+      const code = normalizeLojaCode(c.loja_code);
+      if (code) map.set(code, c.loja_nome ?? code);
+    }
+    for (const r of data?.registry ?? []) {
+      const code = normalizeLojaCode(r.loja_code);
+      if (code && !map.has(code)) map.set(code, r.loja_nome ?? code);
+    }
+    return Array.from(map.entries())
+      .map(([code, nome]) => ({ code, nome }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [data]);
+
+  // Loja do gerente_unidade
+  const userLojaCode = useMemo<string | null>(() => {
+    if (!isGerenteUnidade) return null;
+    for (const u of unidades) {
+      const c = lojaCodigoFromNome(u.nome);
+      if (c) return normalizeLojaCode(c);
+    }
+    return null;
+  }, [isGerenteUnidade, unidades]);
+
   const handleSync = async () => {
     try {
       await syncAll();

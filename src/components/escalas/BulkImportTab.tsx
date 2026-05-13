@@ -462,12 +462,27 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       const updated = { ...next[idx], [field]: value };
       updated.confidence = assessConfidence(updated);
       next[idx] = updated;
+      // Re-classify if name or job_title changed
+      if (field === "name" || field === "job_title") {
+        const reclassified = classifyImportRows(next, existingEmployees);
+        setDedup(reclassified);
+      }
       return next;
     });
   };
 
   const removeRow = (idx: number) => {
     setParsed((prev) => prev?.filter((_, i) => i !== idx) ?? null);
+    setDedup((prev) => prev?.filter((_, i) => i !== idx) ?? null);
+  };
+
+  const setDecision = (idx: number, decision: DedupDecision) => {
+    setDedup((prev) => {
+      if (!prev) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], decision };
+      return next;
+    });
   };
 
   const handleConfirm = async () => {
@@ -475,10 +490,17 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       toast.error("Selecione uma unidade antes de importar.");
       return;
     }
-    if (!parsed?.length) return;
-    const validRows = parsed.filter((e) => e.name.trim());
-    if (validRows.length === 0) {
-      toast.error("Nenhum funcionário válido para importar.");
+    if (!parsed?.length || !dedup?.length) return;
+
+    // Só insere linhas marcadas como "create"
+    const toInsert = parsed
+      .map((emp, idx) => ({ emp, dec: dedup[idx] }))
+      .filter(({ emp, dec }) => emp.name.trim() && dec.decision === "create");
+
+    const skipped = parsed.length - toInsert.length;
+
+    if (toInsert.length === 0) {
+      toast.error("Nenhum funcionário novo para importar — todos foram marcados como já existentes.");
       return;
     }
 
@@ -488,7 +510,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       let success = 0;
       let errors = 0;
 
-      for (const emp of validRows) {
+      for (const { emp } of toInsert) {
         try {
           // Resolve job_title_id
           let jobTitleId: string | undefined;
@@ -513,13 +535,19 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
         }
       }
 
+      const parts: string[] = [`${success} criado(s)`];
+      if (skipped > 0) parts.push(`${skipped} ignorado(s) (já existiam)`);
+      if (errors > 0) parts.push(`${errors} com erro`);
+      const msg = parts.join(" · ");
+
       if (errors > 0) {
-        toast.warning(`${success} cadastrado(s), ${errors} com erro.`);
+        toast.warning(msg);
       } else {
-        toast.success(`Equipe cadastrada com sucesso! ${success} funcionário(s).`);
+        toast.success(msg);
       }
 
       setParsed(null);
+      setDedup(null);
       setFileName("");
       onDone();
     } finally {

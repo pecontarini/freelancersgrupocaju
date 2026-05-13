@@ -575,7 +575,7 @@ export function IndicatorRankingTab({
                             {fmtNum(r.resultado)}
                           </div>
                           <div className="font-bold text-emerald-600 tabular-nums">
-                            {BRL(r.payout_brl)}
+                            {isAdmin ? BRL(r.payout_brl) : <LockedValue value={r.payout_brl} canSee={false} />}
                           </div>
                         </div>
                       </div>
@@ -589,7 +589,9 @@ export function IndicatorRankingTab({
             <div className="border-t p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total nesta loja:</span>{" "}
-                <span className="font-bold text-lg">{BRL(drillTotal)}</span>
+                <span className="font-bold text-lg">
+                  {isAdmin ? BRL(drillTotal) : <LockedValue value={drillTotal} canSee={false} />}
+                </span>
               </div>
               <div className="flex gap-2">
                 <Button asChild variant="outline" size="sm">

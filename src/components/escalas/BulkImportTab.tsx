@@ -352,6 +352,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const addEmployee = useAddEmployee();
   const upsertJobTitle = useUpsertJobTitle();
   const { data: dbJobTitles = [] } = useJobTitles(unitId);
+  const { data: existingEmployees = [] } = useEmployees(unitId);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Merge DB titles with defaults
@@ -364,6 +365,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [parsed, setParsed] = useState<ParsedEmployee[] | null>(null);
+  const [dedup, setDedup] = useState<DedupResult[] | null>(null);
   const [fileName, setFileName] = useState("");
 
   const [processingMode, setProcessingMode] = useState<"local" | "ai" | null>(null);

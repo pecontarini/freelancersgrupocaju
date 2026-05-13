@@ -373,6 +373,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
   const handleFile = useCallback(async (file: File) => {
     setProcessing(true);
     setParsed(null);
+    setDedup(null);
     setFileName(file.name);
 
     try {
@@ -407,17 +408,24 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       }
 
       setParsed(result);
+      const dedupResult = classifyImportRows(result, existingEmployees);
+      setDedup(dedupResult);
 
-      const lowConfCount = result.filter(
-        (e) => !e.confidence.name || !e.confidence.job_title || !e.confidence.phone
+      const dupCount = dedupResult.filter(
+        (d) => d.status === "duplicate_db" || d.status === "duplicate_file"
       ).length;
+      const possibleCount = dedupResult.filter((d) => d.status === "possible").length;
+      const newCount = dedupResult.filter((d) => d.status === "new").length;
 
-      if (lowConfCount > 0) {
-        toast.info(`${result.length} extraído(s) — ${lowConfCount} campo(s) precisam de revisão`, {
-          icon: <AlertTriangle className="h-4 w-4 text-yellow-500" />,
-        });
+      if (possibleCount > 0) {
+        toast.warning(
+          `${newCount} novos · ${dupCount} já cadastrados · ${possibleCount} para revisar`,
+          { icon: <AlertTriangle className="h-4 w-4 text-yellow-500" /> }
+        );
+      } else if (dupCount > 0) {
+        toast.info(`${newCount} novos · ${dupCount} já cadastrados (serão ignorados)`);
       } else {
-        toast.success(`${result.length} funcionário(s) extraído(s) com alta confiança!`);
+        toast.success(`${newCount} funcionário(s) novo(s) prontos para importar!`);
       }
     } catch (err: any) {
       console.error("Import error:", err);
@@ -426,7 +434,7 @@ export function BulkImportTab({ unitId: propUnitId, onDone, showUnitSelector, av
       setProcessing(false);
       setProcessingMode(null);
     }
-  }, []);
+  }, [existingEmployees]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {

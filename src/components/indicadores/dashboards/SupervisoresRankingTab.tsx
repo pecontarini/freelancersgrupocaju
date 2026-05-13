@@ -219,6 +219,23 @@ export function SupervisoresRankingTab({ userLojaCode }: { userLojaCode?: string
               </div>
               <Lista itens={c.itens} userN={userN} />
             </div>
+            {c.naoAuditadas.length > 0 && (
+              <div className="glass-card p-4 md:p-5 border-l-4 border-l-muted-foreground/30">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                  Não auditadas no período ({c.naoAuditadas.length})
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Estas lojas ainda não tiveram auditoria registrada no período e não entram no ranking nem no cálculo de média da rede.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {c.naoAuditadas.map((it) => (
+                    <Badge key={it.loja_codigo} variant="outline" className="text-xs">
+                      {lojaNome(it.loja_codigo)} · <span className="ml-1 text-muted-foreground">Sem dado</span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
         ))}
       </Tabs>

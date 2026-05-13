@@ -89,7 +89,8 @@ export function SalmaoDiarioDrillContent({ lojaCode }: { lojaCode: string }) {
   const stats = useMemo(() => {
     if (lojaItems.length === 0) return null;
     const valores = lojaItems.map((i) => i.salmao_ratio);
-    const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+    const media = calculateMeanIgnoringMissing(valores);
+    if (media == null) return null;
     const min = Math.min(...valores);
     const max = Math.max(...valores);
     return { media, min, max, n: valores.length };

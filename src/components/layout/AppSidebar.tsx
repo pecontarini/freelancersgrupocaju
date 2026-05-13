@@ -102,6 +102,12 @@ const gestaoMenuItems = [
     icon: BarChart2,
     description: "Resultados e indicadores da rede",
   },
+  {
+    title: "METAS VARIÁVEIS",
+    id: "metas-variaveis",
+    icon: BarChart2,
+    description: "Payouts mensais por loja e cargo",
+  },
 ];
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {

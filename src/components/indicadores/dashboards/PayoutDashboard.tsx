@@ -363,7 +363,11 @@ export function PayoutDashboard() {
                               onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
                               onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
                             >
-                              {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
+                              {exists ? (
+                                v == null ? "—" : (
+                                  canSeePayout ? BRL(v) : <LockedValue value={v} canSee={false} noTooltip />
+                                )
+                              ) : <span className="opacity-40">—</span>}
                             </td>
                           );
                         })}

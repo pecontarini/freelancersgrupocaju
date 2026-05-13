@@ -3699,6 +3699,155 @@ export type Database = {
           },
         ]
       }
+      payout_indicator_sources: {
+        Row: {
+          brand_filter: string | null
+          cargo: string | null
+          created_at: string
+          id: number
+          indicador: string
+          is_active: boolean
+          notes: string | null
+          parser_fn: string
+          source_meta_key: string
+        }
+        Insert: {
+          brand_filter?: string | null
+          cargo?: string | null
+          created_at?: string
+          id?: number
+          indicador: string
+          is_active?: boolean
+          notes?: string | null
+          parser_fn: string
+          source_meta_key: string
+        }
+        Update: {
+          brand_filter?: string | null
+          cargo?: string | null
+          created_at?: string
+          id?: number
+          indicador?: string
+          is_active?: boolean
+          notes?: string | null
+          parser_fn?: string
+          source_meta_key?: string
+        }
+        Relationships: []
+      }
+      payout_results_monthly: {
+        Row: {
+          breakpoint_atingido: number | null
+          breakpoint_descricao: string | null
+          cargo: string
+          computed_at: string
+          computed_by: string
+          id: number
+          indicador: string
+          loja_id: string
+          mes_ref: string
+          override_reason: string | null
+          override_user_id: string | null
+          payout_brl: number
+          resultado_valor: number | null
+          run_id: string | null
+          source_meta_key: string | null
+          source_origin: string
+        }
+        Insert: {
+          breakpoint_atingido?: number | null
+          breakpoint_descricao?: string | null
+          cargo: string
+          computed_at?: string
+          computed_by?: string
+          id?: number
+          indicador: string
+          loja_id: string
+          mes_ref: string
+          override_reason?: string | null
+          override_user_id?: string | null
+          payout_brl?: number
+          resultado_valor?: number | null
+          run_id?: string | null
+          source_meta_key?: string | null
+          source_origin: string
+        }
+        Update: {
+          breakpoint_atingido?: number | null
+          breakpoint_descricao?: string | null
+          cargo?: string
+          computed_at?: string
+          computed_by?: string
+          id?: number
+          indicador?: string
+          loja_id?: string
+          mes_ref?: string
+          override_reason?: string | null
+          override_user_id?: string | null
+          payout_brl?: number
+          resultado_valor?: number | null
+          run_id?: string | null
+          source_meta_key?: string | null
+          source_origin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payout_results_monthly_loja_id_fkey"
+            columns: ["loja_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payout_rules: {
+        Row: {
+          breakpoint: number
+          cargo: string
+          created_at: string
+          descricao: string
+          direcao: string
+          id: number
+          indicador: string
+          is_active: boolean
+          payout_brl: number
+          source: string
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+        }
+        Insert: {
+          breakpoint: number
+          cargo: string
+          created_at?: string
+          descricao: string
+          direcao: string
+          id?: number
+          indicador: string
+          is_active?: boolean
+          payout_brl: number
+          source?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Update: {
+          breakpoint?: number
+          cargo?: string
+          created_at?: string
+          descricao?: string
+          direcao?: string
+          id?: number
+          indicador?: string
+          is_active?: boolean
+          payout_brl?: number
+          source?: string
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+        }
+        Relationships: []
+      }
       pix_validation_log: {
         Row: {
           attempted_chave_pix: string | null

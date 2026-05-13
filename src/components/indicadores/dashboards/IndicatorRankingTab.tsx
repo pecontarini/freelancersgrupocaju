@@ -42,6 +42,18 @@ function tierFromDesc(desc: string | null | undefined): Tier {
   return "none";
 }
 
+function rulePayout(r: RulesItem): number {
+  return r.payout_brl ?? r.payout ?? 0;
+}
+function ruleBp(r: RulesItem): number | null {
+  if (typeof r.breakpoint === "number") return r.breakpoint;
+  if (typeof r.breakpoint === "string") {
+    const n = parseFloat(r.breakpoint.replace(/[^\d.,-]/g, "").replace(",", "."));
+    return isNaN(n) ? null : n;
+  }
+  return null;
+}
+
 const TIER_COLOR: Record<Tier, string> = {
   excelente: "#10B981",
   bom: "#3B82F6",

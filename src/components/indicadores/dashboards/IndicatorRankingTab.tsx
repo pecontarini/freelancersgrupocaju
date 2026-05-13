@@ -22,6 +22,7 @@ import {
   type RulesItem,
   type ConsolidatedItem,
 } from "@/hooks/usePayoutSnapshot";
+import { LockedValue } from "../payout/LockedValue";
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/19FL9uaJbmVxPiKHYMM6DRX51M9W8pFvrJt9qOljmUzQ";
 
@@ -290,7 +291,8 @@ export function IndicatorRankingTab({
               <div className="flex flex-wrap gap-1.5">
                 {cargosElegiveis.map(([cargo, payout]) => (
                   <Badge key={cargo} variant="outline" className="font-normal">
-                    {cargo} · até {BRL(payout)}
+                    {cargo}
+                    {isAdmin && <> · até {BRL(payout)}</>}
                   </Badge>
                 ))}
               </div>
@@ -301,7 +303,7 @@ export function IndicatorRankingTab({
           {faixas.length > 0 && (
             <div className="mt-3">
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 font-semibold">
-                Faixas de payout
+                Faixas {isAdmin ? "de payout" : "de atingimento"}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {faixas.map((f) => (
@@ -311,7 +313,7 @@ export function IndicatorRankingTab({
                     style={{ borderColor: TIER_COLOR[f.tier] + "55", color: TIER_COLOR[f.tier], background: TIER_COLOR[f.tier] + "12" }}
                   >
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: TIER_COLOR[f.tier] }} />
-                    {f.descricao} · {BRL(f.payoutMax)}
+                    {f.descricao}{isAdmin && <> · {BRL(f.payoutMax)}</>}
                   </span>
                 ))}
               </div>
@@ -335,14 +337,18 @@ export function IndicatorRankingTab({
               </div>
               <div className="text-right">
                 <div className="text-2xl font-bold tabular-nums">{fmtNum(userRow.resultado)}</div>
-                <div className="text-xs text-emerald-600 font-semibold">{BRL(userRow.payout)}</div>
+                <div className="text-xs text-emerald-600 font-semibold">
+                  {isAdmin ? BRL(userRow.payout) : <LockedValue value={userRow.payout} canSee={false} />}
+                </div>
               </div>
             </div>
             {proximaFaixa && (
               <div className="mt-3 rounded-lg bg-primary/5 border border-primary/20 p-2.5 text-xs">
                 Faltam <span className="font-bold tabular-nums">{fmtNum(proximaFaixa.gap)}</span> para
-                a próxima faixa <span className="font-semibold">({proximaFaixa.desc})</span> ={" "}
-                <span className="font-bold text-emerald-600">+{BRL(proximaFaixa.payout - userRow.payout)}</span>
+                a próxima faixa <span className="font-semibold">({proximaFaixa.desc})</span>
+                {isAdmin ? (
+                  <> = <span className="font-bold text-emerald-600">+{BRL(proximaFaixa.payout - userRow.payout)}</span></>
+                ) : null}
               </div>
             )}
           </div>
@@ -364,19 +370,22 @@ export function IndicatorRankingTab({
                     onClick={() => handleClickLoja(it.code)}
                     className={`rounded-xl p-3 text-center border cursor-pointer transition ${
                       isFirst
-                        ? "bg-amber-500 border-amber-400 text-black scale-105 shadow-lg"
-                        : "bg-card border-border/50 hover:border-primary/40"
+                        ? "bg-gradient-to-br from-[#E05C1A] to-[#FF7A30] border-[#FFB84D] text-white scale-105 shadow-[0_8px_30px_rgba(224,92,26,0.45)]"
+                        : it.posicao === 2
+                        ? "bg-gradient-to-br from-slate-300/30 to-slate-200/10 border-slate-300/40"
+                        : "bg-gradient-to-br from-amber-700/20 to-amber-600/5 border-amber-600/30"
                     }`}
+                    style={{ minHeight: isFirst ? 116 : it.posicao === 2 ? 82 : 66 }}
                   >
                     <Icon
                       className={`h-5 w-5 mx-auto mb-1 ${
-                        isFirst ? "text-black" : it.posicao === 2 ? "text-slate-400" : "text-orange-500"
+                        isFirst ? "text-white" : it.posicao === 2 ? "text-slate-400" : "text-orange-500"
                       }`}
                     />
-                    <div className={`text-xs font-bold truncate ${isFirst ? "text-black/80" : "text-muted-foreground"}`}>
+                    <div className={`text-xs font-bold truncate ${isFirst ? "text-white/90" : "text-muted-foreground"}`}>
                       {it.nome}
                     </div>
-                    <div className={`text-lg font-bold tabular-nums ${isFirst ? "text-black" : "text-foreground"}`}>
+                    <div className={`text-lg font-bold tabular-nums ${isFirst ? "text-white" : "text-foreground"}`}>
                       {fmtNum(it.resultado)}
                     </div>
                   </div>
@@ -569,7 +578,7 @@ export function IndicatorRankingTab({
                             {fmtNum(r.resultado)}
                           </div>
                           <div className="font-bold text-emerald-600 tabular-nums">
-                            {BRL(r.payout_brl)}
+                            {isAdmin ? BRL(r.payout_brl) : <LockedValue value={r.payout_brl} canSee={false} />}
                           </div>
                         </div>
                       </div>
@@ -583,7 +592,9 @@ export function IndicatorRankingTab({
             <div className="border-t p-4 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total nesta loja:</span>{" "}
-                <span className="font-bold text-lg">{BRL(drillTotal)}</span>
+                <span className="font-bold text-lg">
+                  {isAdmin ? BRL(drillTotal) : <LockedValue value={drillTotal} canSee={false} />}
+                </span>
               </div>
               <div className="flex gap-2">
                 <Button asChild variant="outline" size="sm">

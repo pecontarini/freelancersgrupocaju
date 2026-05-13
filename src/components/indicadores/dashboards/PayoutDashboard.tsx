@@ -18,6 +18,8 @@ import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/l
 import { IndicatorRankingTab } from "./IndicatorRankingTab";
 import { SupervisoresRankingTab } from "./SupervisoresRankingTab";
 import { SalmaoDiarioDrillContent } from "./SalmaoDiarioDrillContent";
+import { LockedValue } from "../payout/LockedValue";
+import { ShieldCheck } from "lucide-react";
 
 const INDICATORS: {
   id: string;
@@ -228,20 +230,29 @@ export function PayoutDashboard() {
     );
   }
 
+  const canSeePayout = isAdmin;
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
-            Painel de Metas Variáveis · {data?.mes_ref ?? "—"}
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-2xl md:text-3xl font-bold uppercase tracking-tight">
+              Painel de Metas Variáveis · {data?.mes_ref ?? "—"}
+            </h1>
+            {canSeePayout && (
+              <Badge variant="outline" className="gap-1 border-[color:var(--cj-orange)] text-[color:var(--cj-orange)]">
+                <ShieldCheck className="h-3 w-3" /> Apenas Admin
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             Último sync: {relTime(data?.last_sync ?? null)}
           </p>
         </div>
-        <Button onClick={handleSync} disabled={syncing} className="gap-2">
+        <Button onClick={handleSync} disabled={syncing} className="gap-2 cj-glass-btn">
           <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Sincronizando…" : "Sincronizar agora"}
         </Button>
@@ -249,10 +260,20 @@ export function PayoutDashboard() {
 
       {/* KPI Strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <KpiCard label="Payout total" value={BRL(kpis.total)} accent="emerald" />
+        <KpiCard
+          label="Payout total"
+          value={canSeePayout ? BRL(kpis.total) : null}
+          locked={!canSeePayout}
+          accent="emerald"
+        />
         <KpiCard label="Lojas com 100%" value={`${kpis.lojasFull} de ${kpis.totalLojas}`} accent="blue" />
         <KpiCard label="Lojas críticas" value={String(kpis.lojasCriticas)} hint="3+ metas zeradas" accent="red" />
-        <KpiCard label="Colaboradores elegíveis" value={String(kpis.colaboradores)} accent="amber" />
+        <KpiCard
+          label="Colaboradores elegíveis"
+          value={canSeePayout ? String(kpis.colaboradores) : null}
+          locked={!canSeePayout}
+          accent="amber"
+        />
       </div>
 
       {/* Tabs */}
@@ -342,7 +363,11 @@ export function PayoutDashboard() {
                               onMouseLeave={() => { setHoverRow(null); setHoverCol(null); }}
                               onClick={() => exists && v != null && setDrill({ lojaCode: l.code, lojaNome: l.nome, cargo: c })}
                             >
-                              {exists ? (v == null ? "—" : BRL(v)) : <span className="opacity-40">—</span>}
+                              {exists ? (
+                                v == null ? "—" : (
+                                  canSeePayout ? BRL(v) : <LockedValue value={v} canSee={false} noTooltip />
+                                )
+                              ) : <span className="opacity-40">—</span>}
                             </td>
                           );
                         })}
@@ -425,7 +450,7 @@ export function PayoutDashboard() {
                         </span>
                       </span>
                       <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                        {BRL(r.payout_brl)}
+                        {canSeePayout ? BRL(r.payout_brl) : <LockedValue value={r.payout_brl} canSee={false} />}
                       </span>
                     </div>
                   </div>
@@ -436,7 +461,9 @@ export function PayoutDashboard() {
           <div className="border-t border-border/40 p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm">
               <span className="text-muted-foreground">Total:</span>{" "}
-              <span className="font-bold text-lg">{BRL(drillTotal)}</span>
+              <span className="font-bold text-lg">
+                {canSeePayout ? BRL(drillTotal) : <LockedValue value={drillTotal} canSee={false} />}
+              </span>
             </div>
             <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">
@@ -457,8 +484,8 @@ export function PayoutDashboard() {
 }
 
 function KpiCard({
-  label, value, hint, accent,
-}: { label: string; value: string; hint?: string; accent: "emerald" | "blue" | "red" | "amber" }) {
+  label, value, hint, accent, locked,
+}: { label: string; value: string | null; hint?: string; accent: "emerald" | "blue" | "red" | "amber"; locked?: boolean }) {
   const accentMap = {
     emerald: "from-emerald-500/15 to-emerald-500/5 text-emerald-700 dark:text-emerald-300",
     blue: "from-blue-500/15 to-blue-500/5 text-blue-700 dark:text-blue-300",
@@ -466,10 +493,20 @@ function KpiCard({
     amber: "from-amber-500/15 to-amber-500/5 text-amber-700 dark:text-amber-300",
   } as const;
   return (
-    <div className={`glass-card bg-gradient-to-br ${accentMap[accent]} p-3 md:p-4`}>
+    <div className={`glass-card bg-gradient-to-br ${accentMap[accent]} p-3 md:p-4 ${locked ? "relative" : ""}`}>
       <div className="text-[10px] md:text-xs uppercase tracking-wider opacity-80 font-semibold">{label}</div>
-      <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums">{value}</div>
+      {locked ? (
+        <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums flex items-center gap-1.5"
+             aria-label="Valor de pagamento oculto - disponível apenas para administradores">
+          <X className="h-4 w-4 opacity-60" />
+          <span className="cj-locked">●●●</span>
+        </div>
+      ) : (
+        <div className="mt-1 text-xl md:text-2xl font-bold tabular-nums">{value}</div>
+      )}
       {hint && <div className="mt-0.5 text-[10px] opacity-70">{hint}</div>}
+      {locked && <div className="mt-0.5 text-[10px] opacity-60">Apenas admin</div>}
     </div>
   );
 }
+

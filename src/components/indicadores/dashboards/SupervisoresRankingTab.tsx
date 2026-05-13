@@ -18,6 +18,7 @@ interface CategoryBlock {
   periodo: string;
   suffix: string;
   itens: RankItem[];
+  naoAuditadas: RankItem[];
 }
 
 function pctColor(v: number): string {

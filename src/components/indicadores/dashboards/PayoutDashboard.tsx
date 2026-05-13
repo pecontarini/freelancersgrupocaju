@@ -18,6 +18,8 @@ import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/l
 import { IndicatorRankingTab } from "./IndicatorRankingTab";
 import { SupervisoresRankingTab } from "./SupervisoresRankingTab";
 import { SalmaoDiarioDrillContent } from "./SalmaoDiarioDrillContent";
+import { LockedValue } from "../payout/LockedValue";
+import { ShieldCheck } from "lucide-react";
 
 const INDICATORS: {
   id: string;

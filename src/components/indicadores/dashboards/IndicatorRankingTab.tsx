@@ -121,7 +121,7 @@ export function IndicatorRankingTab({
     for (const r of indicatorRules) {
       if (!r.cargo) continue;
       const cur = m.get(r.cargo) ?? 0;
-      const v = r.payout ?? 0;
+      const v = rulePayout(r);
       if (v > cur) m.set(r.cargo, v);
     }
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1]);
@@ -135,7 +135,7 @@ export function IndicatorRankingTab({
       if (!key) continue;
       const tier = tierFromDesc(r.descricao);
       const cur = seen.get(key);
-      const p = r.payout ?? 0;
+      const p = rulePayout(r);
       if (!cur || p > cur.payoutMax) seen.set(key, { tier, descricao: key, payoutMax: p });
     }
     const arr = Array.from(seen.values());
@@ -202,18 +202,16 @@ export function IndicatorRankingTab({
   // Próxima faixa para o user
   const proximaFaixa = useMemo(() => {
     if (!userRow || userRow.resultado == null) return null;
-    // breakpoints com payout maior que atual
     const bps = indicatorRules
-      .filter((r) => (r.payout ?? 0) > userRow.payout && typeof r.breakpoint === "number")
+      .map((r) => ({ ...r, _bp: ruleBp(r), _pay: rulePayout(r) }))
+      .filter((r) => r._bp != null && r._pay > userRow.payout)
       .sort((a, b) =>
-        direction === "HIGH"
-          ? (a.breakpoint as number) - (b.breakpoint as number)
-          : (b.breakpoint as number) - (a.breakpoint as number),
+        direction === "HIGH" ? (a._bp as number) - (b._bp as number) : (b._bp as number) - (a._bp as number),
       );
     const next = bps[0];
-    if (!next || typeof next.breakpoint !== "number") return null;
-    const gap = direction === "HIGH" ? next.breakpoint - userRow.resultado : userRow.resultado - next.breakpoint;
-    return { gap: Math.abs(gap), payout: next.payout ?? 0, desc: next.descricao };
+    if (!next || next._bp == null) return null;
+    const gap = direction === "HIGH" ? next._bp - userRow.resultado : userRow.resultado - next._bp;
+    return { gap: Math.abs(gap), payout: next._pay, desc: next.descricao };
   }, [userRow, indicatorRules, direction]);
 
   const drillItems = useMemo(() => {
@@ -253,8 +251,8 @@ export function IndicatorRankingTab({
   }));
 
   const numericBreakpoints = indicatorRules
-    .filter((r) => typeof r.breakpoint === "number")
-    .map((r) => ({ value: r.breakpoint as number, label: tierFromDesc(r.descricao) }));
+    .map((r) => ({ value: ruleBp(r), label: tierFromDesc(r.descricao) }))
+    .filter((b): b is { value: number; label: Tier } => b.value != null);
 
   return (
     <TooltipProvider>

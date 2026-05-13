@@ -1685,6 +1685,36 @@ export type Database = {
           },
         ]
       }
+      cnpj_administrativo: {
+        Row: {
+          cnpj: string
+          created_at: string
+          holding_principal: string
+          id: number
+          notas: string | null
+          razao_social: string
+          tipo: string
+        }
+        Insert: {
+          cnpj: string
+          created_at?: string
+          holding_principal: string
+          id?: number
+          notas?: string | null
+          razao_social: string
+          tipo: string
+        }
+        Update: {
+          cnpj?: string
+          created_at?: string
+          holding_principal?: string
+          id?: number
+          notas?: string | null
+          razao_social?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       config_funcoes: {
         Row: {
           created_at: string
@@ -1724,6 +1754,7 @@ export type Database = {
       config_lojas: {
         Row: {
           brand: string | null
+          cnpj: string | null
           code: string | null
           created_at: string
           id: string
@@ -1733,6 +1764,7 @@ export type Database = {
         }
         Insert: {
           brand?: string | null
+          cnpj?: string | null
           code?: string | null
           created_at?: string
           id?: string
@@ -1742,6 +1774,7 @@ export type Database = {
         }
         Update: {
           brand?: string | null
+          cnpj?: string | null
           code?: string | null
           created_at?: string
           id?: string
@@ -4018,6 +4051,42 @@ export type Database = {
           is_active?: boolean
           notes?: string | null
           parser_fn?: string
+          source_meta_key?: string
+        }
+        Relationships: []
+      }
+      payout_orphan_records: {
+        Row: {
+          detected_at: string
+          id: number
+          raw_loja_identifier: string
+          raw_payload: Json | null
+          resolution_notes: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          source_meta_key: string
+        }
+        Insert: {
+          detected_at?: string
+          id?: number
+          raw_loja_identifier: string
+          raw_payload?: Json | null
+          resolution_notes?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          source_meta_key: string
+        }
+        Update: {
+          detected_at?: string
+          id?: number
+          raw_loja_identifier?: string
+          raw_payload?: Json | null
+          resolution_notes?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
           source_meta_key?: string
         }
         Relationships: []
@@ -6701,6 +6770,7 @@ export type Database = {
         }[]
       }
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
+      normalize_loja_code: { Args: { p_raw: string }; Returns: string }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
       peek_pix_magic_link: { Args: { p_token: string }; Returns: Json }
       promote_approved_checkins: {

@@ -66,3 +66,18 @@ Buckets de fotos de utensílios, fotos de checklist, anexos de manutenção decl
 1. Concluir Etapa 3 (PR 1 → 2 → 3 → 4).
 2. Abrir PR de hardening: rodar `supabase--linter`, exportar lista exata, gerar migration única corrigindo `search_path` em lote + RLS nas tabelas faltantes.
 3. Validar que contagem de warnings cai para ≤ 5 (apenas extensions/buckets intencionais).
+
+## Decisão C · gerente_unidade vê todos os cargos da loja
+
+**Data:** 2026-05-13
+**Owner:** Pedro Contarini
+
+**Contexto.** A coluna `cargo` não existe em `profiles`. Reside em `employees.role` ou `job_titles`. Resolver o lookup na Fase B exigia migration estrutural extra fora do escopo.
+
+**Decisão.** A policy `p_results_gerente_self` em `payout_results_monthly` filtra apenas por loja, sem filtrar por cargo.
+
+**Impacto.** Um `gerente_unidade` enxerga o payout de TODOS os colaboradores (chefes + outro gerente) da sua loja.
+
+**Aceitável porque.** Gerentes já têm visão de equipe operacionalmente. O dado é interno à liderança da unidade.
+
+**Refinar quando.** Fase D (UI). Esconder no front-end os cargos que não são do usuário logado, OU implementar lookup `profiles → employees → role` para filtrar no banco.

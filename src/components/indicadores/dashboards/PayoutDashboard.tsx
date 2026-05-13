@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3 } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,8 @@ import {
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
 import { IndicatorRankingTab } from "./IndicatorRankingTab";
+import { SupervisoresRankingTab } from "./SupervisoresRankingTab";
+import { SalmaoDiarioDrillContent } from "./SalmaoDiarioDrillContent";
 
 const INDICATORS: {
   id: string;
@@ -278,6 +280,10 @@ export function PayoutDashboard() {
                 <i.icon className="h-3.5 w-3.5" /> {i.label}
               </TabsTrigger>
             ))}
+            <span className="px-2 text-xs text-muted-foreground self-center">·</span>
+            <TabsTrigger value="supervisores" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" /> Ranking Supervisores
+            </TabsTrigger>
           </TabsList>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
@@ -372,9 +378,18 @@ export function PayoutDashboard() {
               userLojaCode={userLojaCode}
               accessibleLojaCodes={allowedCodes}
               mesRef={data?.mes_ref ?? null}
+              renderExtraDrillContent={
+                ind.id === "CMV NAZO"
+                  ? (lojaCode) => <SalmaoDiarioDrillContent lojaCode={lojaCode} />
+                  : undefined
+              }
             />
           </TabsContent>
         ))}
+
+        <TabsContent value="supervisores" className="mt-4">
+          <SupervisoresRankingTab userLojaCode={userLojaCode} />
+        </TabsContent>
       </Tabs>
 
       {/* Drill-down */}

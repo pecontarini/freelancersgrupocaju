@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -84,6 +84,8 @@ export interface IndicatorRankingTabProps {
   userLojaCode?: string | null;
   accessibleLojaCodes: Set<string> | null;
   mesRef: string | null;
+  /** Optional extra content to render in the drill-down modal, below the cargos list. */
+  renderExtraDrillContent?: (lojaCode: string, lojaNome: string) => ReactNode;
 }
 
 export function IndicatorRankingTab({
@@ -100,6 +102,7 @@ export function IndicatorRankingTab({
   userLojaCode,
   accessibleLojaCodes,
   mesRef,
+  renderExtraDrillContent,
 }: IndicatorRankingTabProps) {
   const isMobile = useIsMobile();
   const [hovered, setHovered] = useState<string | null>(null);
@@ -573,6 +576,8 @@ export function IndicatorRankingTab({
                     ))}
                   </div>
                 </div>
+
+                {drill && drillLoja && renderExtraDrillContent?.(drill, drillLoja.nome)}
               </div>
             </ScrollArea>
             <div className="border-t p-4 flex flex-wrap items-center justify-between gap-3">

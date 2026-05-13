@@ -378,9 +378,18 @@ export function PayoutDashboard() {
               userLojaCode={userLojaCode}
               accessibleLojaCodes={allowedCodes}
               mesRef={data?.mes_ref ?? null}
+              renderExtraDrillContent={
+                ind.id === "CMV NAZO"
+                  ? (lojaCode) => <SalmaoDiarioDrillContent lojaCode={lojaCode} />
+                  : undefined
+              }
             />
           </TabsContent>
         ))}
+
+        <TabsContent value="supervisores" className="mt-4">
+          <SupervisoresRankingTab userLojaCode={userLojaCode} />
+        </TabsContent>
       </Tabs>
 
       {/* Drill-down */}

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, X, Trophy, Zap, Flame, Fish, TrendingUp, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   usePayoutSnapshot,
@@ -14,6 +15,36 @@ import {
 } from "@/hooks/usePayoutSnapshot";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { lojaCodigoFromNome } from "@/components/dashboard/painel-metas/shared/lojaMapping";
+import { IndicatorRankingTab } from "./IndicatorRankingTab";
+
+const INDICATORS: {
+  id: string;
+  label: string;
+  direction: "HIGH" | "LOW";
+  description: string;
+  brandFilter?: "Caminito" | "Nazo";
+  icon: typeof Trophy;
+  group: "atendimento" | "operacao" | "budgets";
+}[] = [
+  { id: "NPS Salão", label: "NPS Salão", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "Mede a qualidade do atendimento presencial através de reclamações. Quanto maior o R$ faturado por avaliação 1-3, melhor a experiência do cliente." },
+  { id: "NPS Delivery", label: "NPS Delivery", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "R$ faturado por avaliação 1-3 no canal delivery. Mede a percepção do cliente após receber o pedido em casa." },
+  { id: "Conformidade", label: "Conformidade", direction: "HIGH", icon: Trophy, group: "atendimento",
+    description: "Mede a aderência aos POPs operacionais via checklist supervisionado. Quanto maior o %, melhor a disciplina operacional." },
+  { id: "Tempo de Prato", label: "Tempo de Prato", direction: "LOW", icon: Zap, group: "operacao",
+    description: "Tempo médio do pedido na cozinha vs. target. Quanto menor o desvio acima do target, melhor." },
+  { id: "Tempo Delivery", label: "Tempo Delivery", direction: "LOW", icon: Zap, group: "operacao",
+    description: "Tempo médio entre pedido e saída do delivery. Quanto menor, melhor a operação." },
+  { id: "CMV", label: "CMV", direction: "LOW", icon: TrendingUp, group: "budgets",
+    description: "Custo da mercadoria vendida sobre faturamento. Quanto menor o %, maior a margem." },
+  { id: "CMV CAMINITO", label: "CMV Caminito", direction: "LOW", brandFilter: "Caminito", icon: Flame, group: "budgets",
+    description: "Diferença % entre carne pesada no destino e carne transferida do CPD. Quanto menor a diferença, melhor o controle de quebra." },
+  { id: "CMV NAZO", label: "CMV Nazo", direction: "LOW", brandFilter: "Nazo", icon: Fish, group: "budgets",
+    description: "kg de salmão consumido por R$1.000 vendido. Quanto menor, melhor o aproveitamento do insumo." },
+  { id: "Budget", label: "Budget", direction: "HIGH", icon: TrendingUp, group: "budgets",
+    description: "% de economia ou excesso sobre o orçado. Quanto maior a economia, melhor a gestão de despesa." },
+];
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/19FL9uaJbmVxPiKHYMM6DRX51M9W8pFvrJt9qOljmUzQ";
 

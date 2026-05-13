@@ -133,6 +133,10 @@ const Index = () => {
         navigate("/painel/metas");
         return;
       }
+      if (tab === "metas-variaveis") {
+        navigate("/painel/metas-variaveis");
+        return;
+      }
       setActiveTab(tab);
     },
     [navigate]

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSheetsBlocks } from "@/hooks/useSheetsBlocks";
+import { isMissingValue, toNumberOrNull, calculateMeanIgnoringMissing } from "@/lib/data-quality";
 
 const FAIXA_VERDE = 1.55;
 const FAIXA_AMARELO = 1.65;

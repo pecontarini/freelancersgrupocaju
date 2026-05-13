@@ -6618,6 +6618,16 @@ export type Database = {
           total_waste: number
         }[]
       }
+      compute_payouts: {
+        Args: { p_mes_ref: string }
+        Returns: {
+          errors: Json
+          failed: number
+          processed: number
+          run_id: string
+          succeeded: number
+        }[]
+      }
       consume_pix_magic_link: {
         Args: {
           p_new_chave_pix: string
@@ -6651,6 +6661,14 @@ export type Database = {
         Returns: boolean
       }
       holding_sector_label: { Args: { p_key: string }; Returns: string }
+      import_payout_rules_from_sheet: {
+        Args: never
+        Returns: {
+          errors: string[]
+          inserted: number
+          updated: number
+        }[]
+      }
       is_first_user: { Args: never; Returns: boolean }
       is_missao_creator: {
         Args: { _missao_id: string; _user_id: string }

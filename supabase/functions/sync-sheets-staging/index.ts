@@ -1277,6 +1277,181 @@ function parseBaseAvaliacoes(grid: string[][]): ParseResult {
 }
 
 // ──────────────────────────────────────────────────────────────
+// FASE B · 5 parsers do Painel de Metas / Payout
+// ──────────────────────────────────────────────────────────────
+
+/** A1=Cargo, B1=Meta, C1=Breakpoint, D1=Descrição, E1=Payout. Header em row 0. */
+function parsePayoutRules(grid: string[][]): ParseResult {
+  const items: Array<Record<string, unknown>> = [];
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i] || [];
+    const cargo = (r[0] || '').trim();
+    const indicador = (r[1] || '').trim();
+    const breakpointRaw = (r[2] || '').trim();
+    const descricao = (r[3] || '').trim();
+    const payoutRaw = (r[4] || '').trim();
+    if (!cargo || !indicador || !breakpointRaw) continue;
+    const breakpoint = parseNum(breakpointRaw);
+    const payout_brl = parseNum(payoutRaw);
+    items.push({ cargo, indicador, breakpoint, descricao, payout_brl });
+  }
+  const blocks: Block[] = [{
+    block_key: 'payout_rules_table',
+    block_type: 'item_table',
+    payload: { label: 'Regras de Payout', total: items.length, items },
+    ordem: 0,
+  }];
+  return { rows: [], blocks };
+}
+
+/** Header row 1; data rows 2..10. WIDE→LONG por POSIÇÃO (5 pares). */
+function parsePayoutTargetByRole(grid: string[][]): ParseResult {
+  const items: Array<Record<string, unknown>> = [];
+  // Header esperado em linha 1 (índice 1). Dados nas linhas 2..10.
+  for (let i = 2; i < Math.min(grid.length, 11); i++) {
+    const r = grid[i] || [];
+    const cargo = (r[0] || '').trim();
+    if (!cargo) continue;
+    const remuneracao_total = parseNum(r[1] || '');
+    const metas: Array<{ meta: string; valor: number | null }> = [];
+    // Pares (META, REMUNERAÇÃO) começam na coluna 2, vão até col 11 (5 pares)
+    for (let p = 0; p < 5; p++) {
+      const metaCol = 2 + p * 2;
+      const valCol = 3 + p * 2;
+      const meta = (r[metaCol] || '').trim();
+      if (!meta || meta === '-' || meta === '—') continue;
+      metas.push({ meta, valor: parseNum(r[valCol] || '') });
+    }
+    items.push({ cargo, remuneracao_total, metas });
+  }
+  const blocks: Block[] = [{
+    block_key: 'payout_target_by_role_table',
+    block_type: 'item_table',
+    payload: { label: 'Remuneração-Alvo por Cargo', total: items.length, items },
+    ordem: 0,
+  }];
+  return { rows: [], blocks };
+}
+
+/** Header row 1, dados row 2+. Col0 vazia, Col1=Loja, Col2-10=Cargos. WIDE→LONG. */
+function parsePayoutConsolidated(grid: string[][]): ParseResult {
+  const headerRow = grid[1] || [];
+  const cargos: string[] = [];
+  for (let c = 2; c <= 10; c++) cargos.push((headerRow[c] || '').trim());
+
+  const items: Array<Record<string, unknown>> = [];
+  for (let i = 2; i < grid.length; i++) {
+    const r = grid[i] || [];
+    const loja_nome = (r[1] || '').trim();
+    if (!loja_nome) continue;
+    const loja_code = matchLojaCodigo(loja_nome);
+    for (let c = 0; c < cargos.length; c++) {
+      const cargo = cargos[c];
+      if (!cargo) continue;
+      const raw = (r[2 + c] || '').trim();
+      const payout_total_brl = parseNum(raw); // "-" → null via parseNum
+      items.push({ loja_nome, loja_code, cargo, payout_total_brl });
+    }
+  }
+  const blocks: Block[] = [{
+    block_key: 'payout_consolidated_table',
+    block_type: 'item_table',
+    payload: { label: 'Payout Consolidado por Loja×Cargo', total: items.length, items },
+    ordem: 0,
+  }];
+  return { rows: [], blocks };
+}
+
+/** Header row 0, dados row 1+. Captura periodo_global em J1 (linha 0, col 9). */
+function parsePayoutRegistry(grid: string[][]): ParseResult {
+  const header0 = grid[0] || [];
+  const periodo_global = (header0[9] || '').trim() || null;
+  const items: Array<Record<string, unknown>> = [];
+  for (let i = 1; i < grid.length; i++) {
+    const r = grid[i] || [];
+    const loja_nome = (r[0] || '').trim();
+    const cargo = (r[1] || '').trim();
+    const indicador = (r[2] || '').trim();
+    if (!loja_nome || !cargo || !indicador) continue;
+    const resultado = parseNum(r[3] || '');
+    const breakpoint_desc = (r[4] || '').trim();
+    const payout_brl = parseNum(r[5] || '');
+    const periodoLinha = (r[6] || '').trim();
+    const periodo = periodoLinha || periodo_global;
+    const loja_code = matchLojaCodigo(loja_nome);
+    items.push({
+      loja_nome, loja_code, cargo, indicador,
+      resultado, breakpoint_desc, payout_brl, periodo,
+    });
+  }
+  const blocks: Block[] = [{
+    block_key: 'payout_registry_table',
+    block_type: 'item_table',
+    payload: { label: 'Registry de Payout', periodo_global, total: items.length, items },
+    ordem: 0,
+  }];
+  return { rows: [], blocks };
+}
+
+/** Layout WIDE: 1 linha/dia × 4 unidades. Header de unidades em row 6. */
+function parseSalmaoDiarioV2(grid: string[][]): ParseResult {
+  const SALMAO_MAP: Record<string, string> = {
+    'AGUAS CLARAS': 'NZ_AC',
+    'SIG': 'NZ_SG',
+    'ASA SUL': 'NZ_AS',
+    'GOIANIA': 'NZ_GO',
+  };
+  // Procura header de unidades — esperado em row 6, mas tolera deslocamento
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(grid.length, 12); i++) {
+    const cellB = normTxt((grid[i] || [])[1] || '');
+    if (cellB === 'UNIDADE') { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) {
+    return { rows: [], blocks: [{
+      block_key: 'salmao_diario_series',
+      block_type: 'series',
+      payload: { label: 'Salmão Diário', total: 0, items: [], warning: 'Header "Unidade" não encontrado' },
+      ordem: 0,
+    }] };
+  }
+  const headerRow = grid[headerIdx] || [];
+  // Mapear colunas D-G (idx 3-6) → loja_code
+  const colMap: Array<{ col: number; loja_code: string; nome: string }> = [];
+  for (let c = 3; c <= 6; c++) {
+    const nome = (headerRow[c] || '').trim();
+    const code = SALMAO_MAP[normTxt(nome)] || matchLojaCodigo(nome);
+    if (code) colMap.push({ col: c, loja_code: code, nome });
+  }
+
+  // Dados começam após linha "Data | Dia da Semana" (headerIdx + 2)
+  const items: Array<Record<string, unknown>> = [];
+  for (let i = headerIdx + 2; i < grid.length; i++) {
+    const r = grid[i] || [];
+    const dataRaw = (r[1] || '').trim();
+    if (!dataRaw) continue;
+    // Formato dd/mm/yyyy → yyyy-mm-dd
+    const m = dataRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) continue;
+    const data = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    for (const cm of colMap) {
+      const raw = (r[cm.col] || '').trim();
+      if (!raw || raw.includes('#DIV/0') || raw.includes('#REF') || raw.includes('#N/A')) continue;
+      const salmao_ratio = parseNum(raw);
+      if (salmao_ratio === null) continue;
+      items.push({ data, loja_code: cm.loja_code, loja_nome: cm.nome, salmao_ratio });
+    }
+  }
+  const blocks: Block[] = [{
+    block_key: 'salmao_diario_series',
+    block_type: 'series',
+    payload: { label: 'Salmão Diário (kg/R$1000)', total: items.length, items },
+    ordem: 0,
+  }];
+  return { rows: [], blocks };
+}
+
+// ──────────────────────────────────────────────────────────────
 // Fallback genérico
 // ──────────────────────────────────────────────────────────────
 function parseGenericMeta(grid: string[][]): ParseResult {
@@ -1323,6 +1498,11 @@ function dispatchParser(metaKey: string, grid: string[][]): ParseResult {
     case 'cmv-salmao': return parseCmvSalmaoSeries(grid);
     case 'cmv-carnes': return parseCmvCarnesItens(grid);
     case 'ranking-supervisores': return parseSupervisoresRanking(grid);
+    case 'payout_rules': return parsePayoutRules(grid);
+    case 'payout_target_by_role': return parsePayoutTargetByRole(grid);
+    case 'payout_consolidated': return parsePayoutConsolidated(grid);
+    case 'payout_registry': return parsePayoutRegistry(grid);
+    case 'salmao_diario': return parseSalmaoDiarioV2(grid);
     default: return parseGenericMeta(grid);
   }
 }
@@ -1384,7 +1564,7 @@ serve(async (req) => {
 
     // Grid principal: CSV preserva linhas de cabeçalho em abas com células mescladas;
     // gviz é mantido para abas por nome (ex.: BASE dados) onde export CSV ignora sheet=.
-    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes'].includes(metaKey);
+    const preferCsv = ['atendimento-medias', 'cmv-salmao', 'cmv-carnes', 'payout_rules', 'payout_target_by_role', 'payout_consolidated', 'payout_registry', 'salmao_diario'].includes(metaKey);
     let grid = preferCsv
       ? await fetchCsvGrid(buildCsvExportUrl(sheetId, gid ?? sheetName))
       : await fetchGvizGrid(buildGvizUrl(sheetId, gid ?? sheetName));

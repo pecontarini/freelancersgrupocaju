@@ -30,6 +30,7 @@ import EscalaDraft from "./pages/escalas/EscalaDraft";
 import Seguranca from "./pages/perfil/Seguranca";
 import { PageTransition } from "@/components/motion";
 import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
+import { CJAppBackground } from "@/components/ui/cj-app-background";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ function App() {
           <AuthProvider>
             <UnidadeProvider>
               <TooltipProvider>
+                <CJAppBackground />
                 <Toaster />
                 <Sonner />
                 <VersionUpdateBanner />

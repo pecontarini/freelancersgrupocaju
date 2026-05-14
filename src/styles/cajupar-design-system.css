@@ -1,0 +1,222 @@
+/* ============================================================
+ * Cajupar Design System · Apple-minimal global tokens
+ * Onda 1 · Fundação. Aplicado globalmente sem remover tokens shadcn.
+ * Usa .dark (next-themes) E [data-theme="dark"|"light"] (compat).
+ * ============================================================ */
+
+:root,
+[data-theme="dark"],
+.dark,
+.dark[data-theme] {
+  /* Texto */
+  --cj-text: rgba(255, 255, 255, 0.95);
+  --cj-text-dim: rgba(255, 255, 255, 0.5);
+  --cj-text-muted: rgba(255, 255, 255, 0.35);
+
+  /* Superfícies */
+  --cj-bg-base: #000000;
+  --cj-card-bg: rgba(255, 255, 255, 0.03);
+  --cj-card-hover: rgba(255, 255, 255, 0.06);
+  --cj-divider: rgba(255, 255, 255, 0.06);
+
+  /* Sombras */
+  --cj-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --cj-card-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Glass */
+  --cj-glass-blur: blur(20px) saturate(180%);
+
+  /* Acento */
+  --cj-accent: #FF8A4C;
+  --cj-accent-strong: #FF8A4C;
+  --cj-accent-bg: rgba(255, 138, 76, 0.10);
+  --cj-accent-border: rgba(255, 138, 76, 0.30);
+  --cj-accent-glow: 0 0 24px rgba(255, 138, 76, 0.20);
+
+  /* Status */
+  --cj-good: #6EE7B7;
+  --cj-warn: #FCD34D;
+  --cj-bad: #FCA5A5;
+
+  /* Blobs (fundo) */
+  --cj-blob-1: radial-gradient(circle, #FF8A4C 0%, transparent 70%);
+  --cj-blob-2: radial-gradient(circle, #E05C1A 0%, transparent 70%);
+  --cj-blob-1-opacity: 0.18;
+  --cj-blob-2-opacity: 0.14;
+}
+
+/* Light: aplicado quando NÃO está em .dark E NÃO tem data-theme=dark */
+:root:not(.dark):not([data-theme="dark"]),
+[data-theme="light"] {
+  /* Texto */
+  --cj-text: #1a1a1f;
+  --cj-text-dim: rgba(26, 26, 31, 0.55);
+  --cj-text-muted: rgba(26, 26, 31, 0.35);
+
+  /* Superfícies */
+  --cj-bg-base: #faf9f7;
+  --cj-card-bg: #ffffff;
+  --cj-card-hover: #fafaf9;
+  --cj-divider: rgba(26, 26, 31, 0.08);
+
+  /* Sombras */
+  --cj-card-shadow: 0 1px 2px rgba(26, 26, 31, 0.04), 0 1px 0 rgba(26, 26, 31, 0.03);
+  --cj-card-shadow-hover: 0 4px 12px rgba(26, 26, 31, 0.08);
+
+  /* Glass (light: blur leve, mas cards opacos) */
+  --cj-glass-blur: blur(18px) saturate(170%);
+
+  /* Acento */
+  --cj-accent: #D55A1E;
+  --cj-accent-strong: #B84A14;
+  --cj-accent-bg: rgba(213, 90, 30, 0.07);
+  --cj-accent-border: rgba(213, 90, 30, 0.22);
+  --cj-accent-glow: 0 4px 12px rgba(213, 90, 30, 0.12);
+
+  /* Status */
+  --cj-good: #15803D;
+  --cj-warn: #B45309;
+  --cj-bad: #B91C1C;
+
+  /* Blobs */
+  --cj-blob-1: radial-gradient(circle, #FFD9C0 0%, #FFE4D0 60%, transparent 100%);
+  --cj-blob-2: radial-gradient(circle, #FFE4D0 0%, #FFF1E3 60%, transparent 100%);
+  --cj-blob-1-opacity: 0.7;
+  --cj-blob-2-opacity: 0.65;
+}
+
+/* ===== GLOBAL · tipografia base e background ===== */
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+               'Inter', system-ui, sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Util utilities */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* ===== CJ Card primitive ===== */
+.cj-card {
+  background: var(--cj-card-bg);
+  border: 1px solid var(--cj-divider);
+  border-radius: 14px;
+  box-shadow: var(--cj-card-shadow);
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cj-card:not(.cj-card-flat):hover {
+  background: var(--cj-card-hover);
+  box-shadow: var(--cj-card-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.cj-card-highlight {
+  border-left: 3px solid var(--cj-accent);
+}
+
+.cj-card-flat {
+  /* sem hover, sem transform */
+}
+
+/* Dark only: backdrop blur nos cards */
+.dark .cj-card,
+[data-theme="dark"] .cj-card {
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .dark .cj-card,
+  [data-theme="dark"] .cj-card {
+    background: rgba(20, 20, 22, 0.92);
+  }
+}
+
+/* ===== App background blobs ===== */
+.cj-app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--cj-bg-base);
+  overflow: hidden;
+}
+.cj-app-bg__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  will-change: transform;
+}
+.cj-app-bg__blob--1 {
+  width: 520px; height: 520px;
+  top: -120px; left: -120px;
+  background: var(--cj-blob-1);
+  opacity: var(--cj-blob-1-opacity);
+  animation: cj-drift-1 20s ease-in-out infinite;
+}
+.cj-app-bg__blob--2 {
+  width: 460px; height: 460px;
+  bottom: -160px; right: -140px;
+  background: var(--cj-blob-2);
+  opacity: var(--cj-blob-2-opacity);
+  animation: cj-drift-2 24s ease-in-out infinite;
+}
+
+@keyframes cj-drift-1 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(20px, 20px, 0); }
+}
+@keyframes cj-drift-2 {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-20px, -20px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cj-app-bg__blob {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* ===== LockedValue ===== */
+.cj-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--cj-text-dim);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+}
+.cj-locked-icon { opacity: 0.65; }
+
+/* ===== Icon button ===== */
+.cj-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cj-text-dim);
+  border: 1px solid transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cj-icon-btn:hover {
+  background: var(--cj-card-hover);
+  color: var(--cj-text);
+  border-color: var(--cj-divider);
+}
+
+/* ===== Focus visible global ===== */
+.cj-focus :focus-visible,
+.cj-card :focus-visible {
+  outline: 2px solid var(--cj-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}

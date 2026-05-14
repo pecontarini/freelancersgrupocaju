@@ -106,6 +106,7 @@ export function BudgetDrillDownDialog({
   budgetAmount,
   monthYear,
 }: BudgetDrillDownDialogProps) {
+  const { deleteEntry } = useFreelancerEntries();
   const config = CATEGORY_CONFIG[category];
   const Icon = config.icon;
 

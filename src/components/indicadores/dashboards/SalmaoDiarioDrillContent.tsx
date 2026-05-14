@@ -114,24 +114,26 @@ export function SalmaoDiarioDrillContent({ lojaCode }: { lojaCode: string }) {
     <div style={{ width: "100%", height: 220 }}>
       <ResponsiveContainer>
         <LineChart data={chartData} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-          <XAxis dataKey="dia" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+          <CartesianGrid strokeDasharray="3 3" opacity={0.12} vertical={false} />
+          <XAxis dataKey="dia" tick={{ fontSize: 11, fill: "var(--cj-text-muted)" }} />
           <YAxis
             domain={[0, yMax]}
-            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--cj-text-muted)" }}
             width={32}
           />
           <ReferenceLine
             y={FAIXA_VERDE}
-            stroke="#10B981"
+            stroke="var(--cj-good)"
             strokeDasharray="3 3"
-            label={{ value: "Excelente 1.55", fontSize: 9, fill: "#10B981", position: "right" }}
+            opacity={0.4}
+            label={{ value: "Excelente 1.55", fontSize: 9, fill: "var(--cj-good)", position: "right" }}
           />
           <ReferenceLine
             y={FAIXA_AMARELO}
-            stroke="#F59E0B"
+            stroke="var(--cj-warn)"
             strokeDasharray="3 3"
-            label={{ value: "Atenção 1.65", fontSize: 9, fill: "#F59E0B", position: "right" }}
+            opacity={0.4}
+            label={{ value: "Atenção 1.65", fontSize: 9, fill: "var(--cj-warn)", position: "right" }}
           />
           <RTooltip
             contentStyle={{
@@ -146,8 +148,8 @@ export function SalmaoDiarioDrillContent({ lojaCode }: { lojaCode: string }) {
           <Line
             type="monotone"
             dataKey="valor"
-            stroke="hsl(var(--primary))"
-            strokeWidth={2}
+            stroke="var(--cj-accent)"
+            strokeWidth={2.5}
             dot={(props: any) => {
               const v = props.payload?.valor as number;
               return (
@@ -157,7 +159,7 @@ export function SalmaoDiarioDrillContent({ lojaCode }: { lojaCode: string }) {
                   cy={props.cy}
                   r={3}
                   fill={tierColor(v)}
-                  stroke="hsl(var(--background))"
+                  stroke="var(--cj-bg-base)"
                   strokeWidth={1}
                 />
               );

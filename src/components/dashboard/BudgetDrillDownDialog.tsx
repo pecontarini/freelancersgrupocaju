@@ -28,6 +28,19 @@ import { cn } from "@/lib/utils";
 import { EditOperationalExpenseDialog } from "@/components/EditOperationalExpenseDialog";
 import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import {
   Users,
   Wrench,
@@ -36,6 +49,7 @@ import {
   UtensilsCrossed,
   Calendar,
   ShoppingBag,
+  Trash2,
 } from "lucide-react";
 
 export type BudgetCategory = "freelancer" | "maintenance" | "uniforms" | "cleaning" | "utensils" | "apoio_venda";

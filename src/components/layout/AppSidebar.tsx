@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ThemeToggle } from "@/components/ThemeToggle";
+// ThemeToggle moved to PortalHeader (Onda 2)
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
@@ -127,7 +127,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   };
 
   return (
-    <Sidebar collapsible="icon" className="glass-sidebar bg-sidebar/70">
+    <Sidebar collapsible="icon" className="cj-sidebar glass-sidebar bg-sidebar/70">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (
@@ -241,9 +241,6 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border pt-4 space-y-2">
-        <div className="flex justify-center">
-          <ThemeToggle />
-        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

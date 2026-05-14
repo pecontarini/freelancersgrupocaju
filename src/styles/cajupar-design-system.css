@@ -330,3 +330,182 @@ html, body {
   background: var(--cj-accent-strong);
   filter: brightness(1.05);
 }
+
+/* ============================================================
+ * Onda 3-4-5 · Global overrides (Apple-minimal)
+ * Aplica cj tokens em .glass-card / shadcn Card / Tabs / Dialog
+ * Tooltip / Badge sem mudar a estrutura JSX.
+ * ============================================================ */
+
+/* ----- .glass-card é usado em todo o projeto: vira cj-card ----- */
+.glass-card {
+  background: var(--cj-card-bg) !important;
+  border: 1px solid var(--cj-divider) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--cj-card-shadow) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.dark .glass-card,
+[data-theme="dark"] .glass-card {
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+/* glass-header transparente como cj-header */
+.glass-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--cj-divider) !important;
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+/* ----- Tabs (shadcn) → segmented control estilo iOS ----- */
+.cj-seg-bar,
+[role="tablist"] {
+  background: var(--cj-card-bg);
+  border: 1px solid var(--cj-divider);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 2px;
+}
+.dark [role="tablist"],
+[data-theme="dark"] [role="tablist"] {
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+[role="tab"] {
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  color: var(--cj-text-dim);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[role="tab"]:hover {
+  color: var(--cj-text);
+  background: var(--cj-card-hover);
+}
+[role="tab"][data-state="active"] {
+  background: var(--cj-card-hover) !important;
+  color: var(--cj-text) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.dark [role="tab"][data-state="active"],
+[data-theme="dark"] [role="tab"][data-state="active"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+:root:not(.dark) [role="tab"][data-state="active"] {
+  background: #ffffff !important;
+  box-shadow: 0 1px 2px rgba(26, 26, 31, 0.08);
+}
+
+/* ----- Dialog/Modal: backdrop e card cj ----- */
+[role="dialog"] {
+  background: var(--cj-card-bg) !important;
+  border: 1px solid var(--cj-divider) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35) !important;
+}
+.dark [role="dialog"],
+[data-theme="dark"] [role="dialog"] {
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+/* ----- Tooltip cj-style ----- */
+[data-radix-popper-content-wrapper] [role="tooltip"],
+.cj-tooltip {
+  background: var(--cj-card-bg) !important;
+  border: 1px solid var(--cj-divider) !important;
+  color: var(--cj-text) !important;
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+/* ----- Recharts: tokens cj para tooltip e eixos ----- */
+.recharts-default-tooltip {
+  background: var(--cj-card-bg) !important;
+  border: 1px solid var(--cj-divider) !important;
+  border-radius: 10px !important;
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+/* ----- Insight card pattern ----- */
+.cj-insight {
+  border-left: 3px solid var(--cj-accent);
+  background: var(--cj-card-bg);
+  border-radius: 12px;
+  padding: 14px 18px 14px 22px;
+}
+
+/* ----- List card row pattern ----- */
+.cj-list-card { padding: 0 !important; overflow: hidden; }
+.cj-rank-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto 18px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--cj-divider);
+  transition: background 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cj-rank-row:last-child { border-bottom: none; }
+.cj-rank-row:hover { background: var(--cj-card-hover); }
+.cj-rank-row--leader { color: var(--cj-accent); font-weight: 600; }
+.cj-rank-row--you {
+  background: var(--cj-accent-bg);
+  color: var(--cj-accent);
+}
+
+/* ============================================================
+ * ONDA 5 · Mobile, A11y, Reduced motion, Performance
+ * ============================================================ */
+
+@media (max-width: 767px) {
+  .cj-card { padding: 16px !important; }
+  .cj-app-bg__blob { filter: blur(80px); }
+  .glass-card { backdrop-filter: blur(12px) saturate(160%); }
+}
+
+/* Hover-less devices: desliga efeitos hover */
+@media (hover: none) {
+  .cj-card:hover { transform: none; }
+  [data-sidebar="menu-button"]:hover { transform: none; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .cj-app-bg__blob { animation: none !important; transform: none !important; }
+}
+
+/* Focus visible global */
+button:focus-visible,
+a:focus-visible,
+[role="tab"]:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--cj-accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Fallback sem backdrop-filter */
+@supports not (backdrop-filter: blur(1px)) {
+  .dark .glass-card,
+  [data-theme="dark"] .glass-card,
+  .dark [role="dialog"],
+  [data-theme="dark"] [role="dialog"] {
+    background: rgba(20, 20, 22, 0.92) !important;
+  }
+}

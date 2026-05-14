@@ -220,3 +220,113 @@ html, body {
   outline-offset: 2px;
   border-radius: 8px;
 }
+
+/* ============================================================
+ * Onda 2 · Sidebar + Header (overrides shadcn sem mudar estrutura)
+ * ============================================================ */
+
+/* ----- Sidebar skin ----- */
+.cj-sidebar [data-sidebar="sidebar"] {
+  background: var(--cj-card-bg);
+  border-right: 1px solid var(--cj-divider);
+}
+.dark .cj-sidebar [data-sidebar="sidebar"],
+[data-theme="dark"] .cj-sidebar [data-sidebar="sidebar"] {
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+
+.cj-sidebar [data-sidebar="group-label"] {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cj-text-muted);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding-top: 24px;
+}
+
+.cj-sidebar [data-sidebar="menu-button"] {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cj-text-dim);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cj-sidebar [data-sidebar="menu-button"]:hover {
+  background: var(--cj-card-hover);
+  color: var(--cj-text);
+}
+.cj-sidebar [data-sidebar="menu-button"][data-active="true"] {
+  background: var(--cj-accent-bg);
+  color: var(--cj-accent);
+}
+.cj-sidebar [data-sidebar="menu-button"] svg {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+.cj-sidebar [data-sidebar="menu-button"][data-active="true"] svg {
+  color: var(--cj-accent);
+}
+
+.cj-sidebar [data-sidebar="separator"] {
+  background: var(--cj-divider);
+}
+
+/* ----- Header skin ----- */
+.cj-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--cj-divider);
+  padding: 16px 24px;
+  backdrop-filter: var(--cj-glass-blur);
+  -webkit-backdrop-filter: var(--cj-glass-blur);
+}
+.cj-header__title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--cj-text);
+}
+.cj-header__subtitle {
+  font-size: 14px;
+  color: var(--cj-text-dim);
+}
+
+/* Botões secundários no header */
+.cj-btn-secondary {
+  background: var(--cj-card-bg);
+  border: 1px solid var(--cj-divider);
+  color: var(--cj-text);
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cj-btn-secondary:hover {
+  background: var(--cj-card-hover);
+  border-color: var(--cj-accent-border);
+  color: var(--cj-accent);
+}
+
+.cj-btn-primary {
+  background: var(--cj-accent);
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--cj-accent-glow);
+}
+.cj-btn-primary:hover {
+  background: var(--cj-accent-strong);
+  filter: brightness(1.05);
+}

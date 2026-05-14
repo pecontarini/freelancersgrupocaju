@@ -28,6 +28,19 @@ import { cn } from "@/lib/utils";
 import { EditOperationalExpenseDialog } from "@/components/EditOperationalExpenseDialog";
 import { EditFreelancerDialog } from "@/components/EditFreelancerDialog";
 import { EditMaintenanceDialog } from "@/components/EditMaintenanceDialog";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
 import {
   Users,
   Wrench,
@@ -36,6 +49,7 @@ import {
   UtensilsCrossed,
   Calendar,
   ShoppingBag,
+  Trash2,
 } from "lucide-react";
 
 export type BudgetCategory = "freelancer" | "maintenance" | "uniforms" | "cleaning" | "utensils" | "apoio_venda";
@@ -92,6 +106,7 @@ export function BudgetDrillDownDialog({
   budgetAmount,
   monthYear,
 }: BudgetDrillDownDialogProps) {
+  const { deleteEntry } = useFreelancerEntries();
   const config = CATEGORY_CONFIG[category];
   const Icon = config.icon;
 
@@ -260,6 +275,54 @@ export function BudgetDrillDownDialog({
                         {item.originalFreelancer && <EditFreelancerDialog entry={item.originalFreelancer} />}
                         {item.originalMaintenance && <EditMaintenanceDialog entry={item.originalMaintenance} />}
                         {item.originalExpense && <EditOperationalExpenseDialog expense={item.originalExpense} />}
+                        {item.originalFreelancer && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                title="Excluir lançamento"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {item.description} — {formatCurrency(item.value)}
+                                  <br />
+                                  <br />
+                                  Este lançamento será removido do Budget Gerencial e <strong>não entrará na próxima ordem de pagamento</strong>.
+                                  {item.originalFreelancer?.origem === "escala" && (
+                                    <>
+                                      <br />
+                                      <br />
+                                      <span className="text-amber-600">Origem: Escala. A escala em si não será alterada — apenas o lançamento financeiro.</span>
+                                    </>
+                                  )}
+                                  {item.originalFreelancer?.origem === "checkin" && (
+                                    <>
+                                      <br />
+                                      <br />
+                                      <span className="text-amber-600">Origem: Check-in. O check-in em si não será alterado — apenas o lançamento financeiro.</span>
+                                    </>
+                                  )}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteEntry.mutate(item.originalFreelancer!.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                         <Badge variant="secondary">
                           {formatCurrency(item.value)}
                         </Badge>

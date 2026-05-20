@@ -129,7 +129,7 @@ function DesktopScheduler() {
   const { data: shifts = [] } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
   const { data: matrix = [] } = useStaffingMatrix(sectorIds);
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit);
   const { data: schedules = [], isLoading: loadingSch } = useSchedulesBySector(
     selectedSector ? [selectedSector] : [],
     weekStart,

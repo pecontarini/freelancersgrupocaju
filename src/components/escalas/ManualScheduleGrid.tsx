@@ -199,7 +199,7 @@ export function ManualScheduleGrid() {
 
   const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
 
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit, additionalUnitIds);
+  const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit, additionalUnitIds);
   const { data: schedules = [], isLoading: loadingSch } = useManualSchedules(selectedUnit, weekStart, weekEnd);
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();

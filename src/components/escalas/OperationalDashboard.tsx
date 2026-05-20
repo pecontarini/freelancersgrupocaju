@@ -45,7 +45,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
 import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
 import { AdminGlobalView } from "./AdminGlobalView";
@@ -101,7 +101,7 @@ export function OperationalDashboard() {
   const { data: shifts = [] } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
   const { data: matrix = [] } = useStaffingMatrix(sectorIds);
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit);
 
   const currentShift = shifts.find((s) => s.type === shiftType);
 

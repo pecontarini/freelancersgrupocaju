@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, useCopyEmployeeWeek, useCopyEmployeeToNextWeek, useCopyWeekToNextWeek, useUpsertSchedule, useCancelSchedule, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { useGridSelection, getSelectionRect, isInRect, type Cell } from "./grid/useGridSelection";
 import { resolveShortcutPatch, isShortcutKey } from "./grid/gridShortcuts";
@@ -200,6 +200,7 @@ export function ManualScheduleGrid() {
   const additionalUnitIds = partnerSectorMeta ? [partnerSectorMeta.unitId] : [];
 
   const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit, additionalUnitIds);
+  const { data: schedulableEmployees = [] } = useSchedulableEmployees(selectedUnit, additionalUnitIds);
   const { data: schedules = [], isLoading: loadingSch } = useManualSchedules(selectedUnit, weekStart, weekEnd);
   const { data: budgets = [] } = useDailyBudgets(selectedUnit, weekStart, weekEnd);
   const upsertBudget = useUpsertDailyBudget();
@@ -314,12 +315,12 @@ export function ManualScheduleGrid() {
   // Secondary: CLT employees linked to sector but NOT scheduled (base do setor)
   const sectorBaseEmployees = useMemo(() => {
     if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) return [];
-    return employees.filter((emp) => {
-      if (emp.worker_type === "freelancer") return false;
+    // Use schedulable list — only CLTs synced with Secullum
+    return schedulableEmployees.filter((emp) => {
       if (scheduledEmployeeIds.has(emp.id)) return false;
       return emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id);
     });
-  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
+  }, [schedulableEmployees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
   // Sort mode + job title filter
   const [sortMode, setSortMode] = useState<"function" | "alpha">("function");

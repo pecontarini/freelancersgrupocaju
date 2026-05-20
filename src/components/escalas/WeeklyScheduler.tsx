@@ -50,7 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
-import { useEmployees, useAddEmployee } from "@/hooks/useEmployees";
+import { useSchedulableEmployees, useAddEmployee } from "@/hooks/useEmployees";
 import { useSchedulesBySector, useAddSchedule, useRemoveSchedule } from "@/hooks/useSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 
@@ -129,7 +129,7 @@ function DesktopScheduler() {
   const { data: shifts = [] } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
   const { data: matrix = [] } = useStaffingMatrix(sectorIds);
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit);
   const { data: schedules = [], isLoading: loadingSch } = useSchedulesBySector(
     selectedSector ? [selectedSector] : [],
     weekStart,
@@ -386,7 +386,7 @@ function DesktopScheduler() {
                 <div className="text-center py-8 space-y-3">
                   <p className="text-muted-foreground text-sm">
                     {employees.length === 0
-                      ? 'Nenhum funcionário cadastrado. Clique em "Funcionário" para adicionar.'
+                      ? "Nenhum funcionário CLT sincronizado nesta unidade. Verifique se o cadastro no Secullum foi feito. A sync acontece todo dia às 5h."
                       : "Nenhum funcionário com cargo vinculado a este setor."}
                   </p>
                   {employees.length > 0 && !showAllRoles && (

@@ -386,7 +386,7 @@ function DesktopScheduler() {
                 <div className="text-center py-8 space-y-3">
                   <p className="text-muted-foreground text-sm">
                     {employees.length === 0
-                      ? 'Nenhum funcionário cadastrado. Clique em "Funcionário" para adicionar.'
+                      ? "Nenhum funcionário CLT sincronizado nesta unidade. Verifique se o cadastro no Secullum foi feito. A sync acontece todo dia às 5h."
                       : "Nenhum funcionário com cargo vinculado a este setor."}
                   </p>
                   {employees.length > 0 && !showAllRoles && (

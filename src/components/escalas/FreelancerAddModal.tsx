@@ -15,7 +15,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Link2, Search, CheckCircle2, UserPlus, AlertTriangle, Plus, Building2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Loader2,
+  Link2,
+  Search,
+  CheckCircle2,
+  Plus,
+  Building2,
+  Info,
+  AlertCircle,
+} from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
@@ -23,6 +39,7 @@ import { useJobTitles } from "@/hooks/useJobTitles";
 import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCPF } from "@/lib/formatters";
+import { isValidCpf, unmaskCpf } from "@/lib/cpf";
 import { toast } from "sonner";
 import { QuickCreateJobTitleDialog } from "./QuickCreateJobTitleDialog";
 
@@ -33,11 +50,9 @@ interface FreelancerAddModalProps {
   unitName?: string;
   sectorId: string;
   date: string;
-  /** When sector is shared with a partner unit */
   partnerUnitId?: string;
   partnerUnitName?: string;
   partnerSectorId?: string;
-  /** All sectors of the unit (allows choosing any sector). */
   sectors?: { id: string; name: string }[];
   onAdded?: (employeeId: string) => void;
 }
@@ -55,16 +70,12 @@ export function FreelancerAddModal({
   sectors = [],
   onAdded,
 }: FreelancerAddModalProps) {
-  // User-chosen sector (defaults to the one the button was clicked from)
   const [chosenSectorId, setChosenSectorId] = useState<string>(sectorId);
-  // Only allow partner-unit toggle when user is operating on the originally paired sector
   const isShared = !!partnerUnitId && !!partnerSectorId && chosenSectorId === sectorId;
 
-  // Track which side (loja) the freelancer will be linked to
   const [targetUnitId, setTargetUnitId] = useState<string>(unitId);
   const targetSectorId = isShared && targetUnitId === partnerUnitId ? partnerSectorId! : chosenSectorId;
 
-  // Fetch employees from BOTH units (so existing-employee detection covers both sides)
   const { data: employees = [] } = useEmployees(unitId, isShared ? [partnerUnitId!] : undefined);
   const { data: sectorJobTitles = [] } = useSectorJobTitles(
     isShared ? [chosenSectorId, partnerSectorId!] : [chosenSectorId]
@@ -87,10 +98,11 @@ export function FreelancerAddModal({
     [allJobTitles, allowedJobTitleIds]
   );
 
-  // Form state — CPF-first flow
-  const [noCpfMode, setNoCpfMode] = useState(false);
+  // Form state — CPF obrigatório
   const [cpfValue, setCpfValue] = useState("");
+  const [cpfTouched, setCpfTouched] = useState(false);
   const [name, setName] = useState("");
+  const [gender, setGender] = useState<"M" | "F" | "">("");
   const [phone, setPhone] = useState("");
   const [pixKey, setPixKey] = useState("");
   const [pixType, setPixType] = useState("");
@@ -99,35 +111,28 @@ export function FreelancerAddModal({
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("16:20");
 
-  // Auto-fill markers (per field, for green highlight)
-  const [filled, setFilled] = useState({
-    name: false,
-    phone: false,
-    pix: false,
-  });
+  const [filled, setFilled] = useState({ name: false, phone: false, pix: false, gender: false });
 
-  // When CPF matches an existing employee in target unit → silent reuse
   const [linkedEmployeeId, setLinkedEmployeeId] = useState<string | null>(null);
   const [linkedSourceLabel, setLinkedSourceLabel] = useState<string | null>(null);
   const [searchedCpf, setSearchedCpf] = useState<string>("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Reset form & target when modal opens
   useEffect(() => {
     if (open) {
       setChosenSectorId(sectorId);
       setTargetUnitId(unitId);
       resetForm();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, unitId, sectorId]);
 
-  // When user changes sector, clear cargo (job titles list will refresh)
   useEffect(() => {
     setSelectedJobTitleId("");
   }, [chosenSectorId]);
 
   const isSaving = upsertSchedule.isPending;
 
-  /** Find existing employee in target unit by clean CPF */
   const findExistingEmployee = useCallback(
     (cleanCpf: string) => {
       return employees.find(
@@ -148,7 +153,6 @@ export function FreelancerAddModal({
       setCpfValue(formatted);
       const clean = formatted.replace(/\D/g, "");
 
-      // Reset linked state if user is editing CPF
       if (clean.length < 11) {
         setLinkedEmployeeId(null);
         setLinkedSourceLabel(null);
@@ -158,37 +162,44 @@ export function FreelancerAddModal({
 
       if (clean.length === 11 && clean !== searchedCpf) {
         setSearchedCpf(clean);
+        if (!isValidCpf(clean)) return;
 
-        // 1. Quick check: is this freelancer already in our employees list for target unit?
         const existing = findExistingEmployee(clean);
         if (existing) {
           setLinkedEmployeeId(existing.id);
-          setLinkedSourceLabel(`Vinculado a cadastro existente${existing.unit_id !== targetUnitId ? "" : " desta loja"}`);
-          setName(existing.name);
-          setPhone(existing.phone || "");
+          setLinkedSourceLabel("Freelancer já cadastrado — dados preenchidos automaticamente.");
+          if (!name) setName(existing.name);
+          if (!phone) setPhone(existing.phone || "");
+          if (!gender && (existing.gender === "M" || existing.gender === "F")) {
+            setGender(existing.gender);
+            setFilled((f) => ({ ...f, gender: true }));
+          }
           if (existing.job_title_id && allowedJobTitleIds.has(existing.job_title_id)) {
             setSelectedJobTitleId(existing.job_title_id);
           }
           if (existing.default_rate) setRate(String(existing.default_rate));
-          setFilled({ name: true, phone: !!existing.phone, pix: false });
-          toast.success(`Freelancer "${existing.name}" já cadastrado — dados carregados.`);
+          setFilled((f) => ({
+            ...f,
+            name: true,
+            phone: !!existing.phone,
+          }));
           return;
         }
 
-        // 2. Unified lookup across freelancer_profiles, employees (other units), freelancer_entries
         const result = await lookupUnifiedByCpf(formatted);
         if (result) {
-          setName(result.nome_completo || "");
-          setPhone(result.telefone || "");
-          setPixKey(result.chave_pix || "");
-          setPixType(result.tipo_chave_pix || "");
-          setFilled({
+          setLinkedSourceLabel("Freelancer já cadastrado — dados preenchidos automaticamente.");
+          if (!name) setName(result.nome_completo || "");
+          if (!phone) setPhone(result.telefone || "");
+          if (!pixKey) setPixKey(result.chave_pix || "");
+          if (!pixType) setPixType(result.tipo_chave_pix || "");
+          setFilled((f) => ({
+            ...f,
             name: !!result.nome_completo,
             phone: !!result.telefone,
             pix: !!result.chave_pix,
-          });
+          }));
 
-          // Try to match the historical "funcao" to an allowed job title
           if (result.funcao) {
             const match = allowedJobTitles.find(
               (jt) => jt.name.toLowerCase() === result.funcao!.toLowerCase()
@@ -198,17 +209,16 @@ export function FreelancerAddModal({
         }
       }
     },
-    [searchedCpf, findExistingEmployee, lookupUnifiedByCpf, allowedJobTitles, allowedJobTitleIds, targetUnitId]
+    [searchedCpf, findExistingEmployee, lookupUnifiedByCpf, allowedJobTitles, allowedJobTitleIds, name, phone, gender, pixKey, pixType]
   );
 
-  // When the user changes target unit (shared sector), re-evaluate linked state
   useEffect(() => {
     if (cpfValue.replace(/\D/g, "").length === 11) {
       const clean = cpfValue.replace(/\D/g, "");
       const existing = findExistingEmployee(clean);
       if (existing) {
         setLinkedEmployeeId(existing.id);
-        setLinkedSourceLabel("Vinculado a cadastro existente");
+        setLinkedSourceLabel("Freelancer já cadastrado — dados preenchidos automaticamente.");
       } else {
         setLinkedEmployeeId(null);
         setLinkedSourceLabel(null);
@@ -216,106 +226,67 @@ export function FreelancerAddModal({
     }
   }, [targetUnitId, cpfValue, findExistingEmployee]);
 
+  const cleanCpf = unmaskCpf(cpfValue);
+  const cpfReady = cleanCpf.length === 11;
+  const cpfValid = isValidCpf(cleanCpf);
+  const nameWordsOk = name.trim().split(/\s+/).filter((w) => w.length >= 2).length >= 2;
+  const phoneDigits = phone.replace(/\D/g, "");
+  const rateNum = parseFloat(rate) || 0;
+
+  const isFormValid =
+    cpfValid &&
+    nameWordsOk &&
+    !!selectedJobTitleId &&
+    !!chosenSectorId &&
+    phoneDigits.length >= 10 &&
+    rateNum > 0 &&
+    !!startTime &&
+    !!endTime &&
+    startTime < endTime &&
+    (gender === "M" || gender === "F");
+
   async function handleSubmit() {
-    const rateNum = parseFloat(rate) || 0;
-    const cleanCpf = cpfValue.replace(/\D/g, "");
+    setSubmitError(null);
 
-    if (!noCpfMode) {
-      if (!cleanCpf || cleanCpf.length !== 11) {
-        toast.error("Informe um CPF válido (11 dígitos).");
-        return;
-      }
-    }
-    if (!name.trim()) {
-      toast.error("Nome é obrigatório.");
-      return;
-    }
-    if (!selectedJobTitleId) {
-      toast.error("Selecione um cargo.");
+    if (!isFormValid) {
+      toast.error("Preencha todos os campos obrigatórios.");
       return;
     }
 
+    const cpfToStore = unmaskCpf(cpfValue);
     let empId = linkedEmployeeId;
 
     if (!empId) {
-      // Create the employee
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         const chosenJt = allowedJobTitles.find((jt) => jt.id === selectedJobTitleId);
 
-        // In no-CPF mode, leave cpf NULL so we don't pollute lookup tables
-        const cpfToStore = noCpfMode ? null : cleanCpf;
+        const { data, error } = await supabase
+          .from("employees")
+          .insert({
+            unit_id: targetUnitId,
+            name: name.trim(),
+            gender: gender as "M" | "F",
+            worker_type: "freelancer" as const,
+            default_rate: rateNum,
+            job_title: chosenJt?.name || "Freelancer",
+            job_title_id: selectedJobTitleId,
+            cpf: cpfToStore,
+            phone: phone.trim() || null,
+            active: true,
+          })
+          .select("id")
+          .single();
 
-        // Defensive lookup: when in no-CPF mode (or CPF didn't match), check if there's
-        // already an active employee with the same name in this unit to avoid creating
-        // homonyms that violate unique_active_employee_no_cpf.
-        if (noCpfMode) {
-          const { data: existingByName } = await supabase
-            .from("employees")
-            .select("id, name, default_rate, job_title_id")
-            .eq("unit_id", targetUnitId)
-            .eq("active", true)
-            .ilike("name", name.trim())
-            .order("created_at", { ascending: true })
-            .limit(1);
+        if (error) throw error;
+        empId = data.id;
 
-          if (existingByName && existingByName.length > 0) {
-            empId = existingByName[0].id;
-            toast.info(
-              `Reutilizando cadastro existente de "${existingByName[0].name}" nesta loja.`
-            );
-          }
-        }
-
-        if (!empId) {
-          const { data, error } = await supabase
-            .from("employees")
-            .insert({
-              unit_id: targetUnitId,
-              name: name.trim(),
-              gender: "M",
-              worker_type: "freelancer" as const,
-              default_rate: rateNum,
-              job_title: chosenJt?.name || "Freelancer",
-              job_title_id: selectedJobTitleId,
-              cpf: cpfToStore,
-              phone: phone.trim() || null,
-            })
-            .select("id")
-            .single();
-
-          if (error) {
-            // Race condition with unique_active_employee_no_cpf → re-fetch
-            if ((error as any).code === "23505") {
-              const { data: race } = await supabase
-                .from("employees")
-                .select("id")
-                .eq("unit_id", targetUnitId)
-                .eq("active", true)
-                .ilike("name", name.trim())
-                .order("created_at", { ascending: true })
-                .limit(1);
-              if (race && race.length > 0) {
-                empId = race[0].id;
-                toast.info("Reutilizando cadastro existente desta loja.");
-              } else {
-                throw error;
-              }
-            } else {
-              throw error;
-            }
-          } else {
-            empId = data.id;
-          }
-        }
-
-        // Only persist to freelancer_profiles when we have a real CPF
-        if (!noCpfMode && (pixKey || phone)) {
+        if (pixKey || phone) {
           await supabase
             .from("freelancer_profiles" as any)
             .upsert(
               {
-                cpf: cleanCpf,
+                cpf: cpfToStore,
                 nome_completo: name.trim(),
                 telefone: phone.trim() || null,
                 chave_pix: pixKey.trim() || null,
@@ -325,13 +296,17 @@ export function FreelancerAddModal({
             );
         }
       } catch (err: any) {
-        toast.error(friendlyEmployeeError(err));
+        const friendly = friendlyEmployeeError(err);
+        setSubmitError(friendly);
+        toast.error(friendly);
         return;
       }
     }
 
     if (!empId) {
-      toast.error("Não foi possível identificar o freelancer.");
+      const msg = "Não foi possível identificar o freelancer.";
+      setSubmitError(msg);
+      toast.error(msg);
       return;
     }
 
@@ -347,24 +322,21 @@ export function FreelancerAddModal({
         agreed_rate: rateNum,
       });
 
-      if (noCpfMode) {
-        toast.warning("Freelancer escalado sem CPF. Lembre de completar o cadastro depois para liberar pagamento.", {
-          duration: 5000,
-        });
-      }
-
       onAdded?.(empId);
       onClose();
       resetForm();
     } catch (err: any) {
-      toast.error("Erro ao escalar: " + err.message);
+      const msg = "Erro ao escalar: " + err.message;
+      setSubmitError(msg);
+      toast.error(msg);
     }
   }
 
   function resetForm() {
-    setNoCpfMode(false);
     setCpfValue("");
+    setCpfTouched(false);
     setName("");
+    setGender("");
     setPhone("");
     setPixKey("");
     setPixType("");
@@ -372,14 +344,33 @@ export function FreelancerAddModal({
     setRate("120");
     setStartTime("08:00");
     setEndTime("16:20");
-    setFilled({ name: false, phone: false, pix: false });
+    setFilled({ name: false, phone: false, pix: false, gender: false });
     setLinkedEmployeeId(null);
     setLinkedSourceLabel(null);
     setSearchedCpf("");
+    setSubmitError(null);
   }
 
-  const cpfReady = cpfValue.replace(/\D/g, "").length === 11;
-  const showFormFields = cpfReady || noCpfMode;
+  // Helper text para CPF
+  let cpfHelper: { text: string; tone: "muted" | "error" | "success" } = {
+    text: "Obrigatório. Sem CPF não dá pra escalar nem pagar.",
+    tone: "muted",
+  };
+  if (cpfReady && !cpfValid && cpfTouched) {
+    cpfHelper = { text: "CPF inválido. Confira os números.", tone: "error" };
+  } else if (cpfReady && cpfValid && linkedSourceLabel) {
+    cpfHelper = { text: linkedSourceLabel, tone: "success" };
+  } else if (cpfReady && cpfValid && !linkedSourceLabel) {
+    cpfHelper = { text: "CPF válido. Preencha os demais campos pra cadastrar.", tone: "muted" };
+  }
+
+  const showFormFields = cpfReady && cpfValid;
+
+  const buttonLabel = isSaving
+    ? "Escalando…"
+    : linkedEmployeeId
+      ? "Escalar freelancer"
+      : "Cadastrar e escalar";
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
@@ -396,7 +387,20 @@ export function FreelancerAddModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Sector selector — choose any sector of the unit */}
+          {submitError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{submitError}</AlertDescription>
+            </Alert>
+          )}
+
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Sem CPF não dá pra escalar nem registrar pagamento. Digite o CPF: se o freelancer já trabalhou aqui, os dados completam automaticamente.
+            </AlertDescription>
+          </Alert>
+
           {sectors.length > 1 && (
             <div className="space-y-1.5">
               <Label className="text-xs flex items-center gap-1.5">
@@ -416,7 +420,6 @@ export function FreelancerAddModal({
             </div>
           )}
 
-          {/* Shared sector → unit toggle */}
           {isShared && (
             <div className="space-y-1.5 rounded-md border-2 border-primary/30 bg-primary/5 p-3">
               <Label className="text-xs flex items-center gap-1.5">
@@ -437,75 +440,43 @@ export function FreelancerAddModal({
             </div>
           )}
 
-          {/* CPF — primary entry (skipped in no-CPF mode) */}
-          {!noCpfMode && (
-            <div className="space-y-1.5">
-              <Label className="text-sm font-semibold flex items-center gap-1.5">
-                <Search className="h-3.5 w-3.5 text-primary" />
-                CPF do freelancer *
-              </Label>
-              <div className="relative">
-                <Input
-                  value={cpfValue}
-                  onChange={(e) => handleCpfChange(e.target.value)}
-                  placeholder="000.000.000-00"
-                  maxLength={14}
-                  inputMode="numeric"
-                  className="text-base"
-                  autoFocus
-                />
-                {isLookingUp && (
-                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
-                )}
-              </div>
-              {linkedSourceLabel && (
-                <p className="text-xs text-primary flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {linkedSourceLabel}
-                </p>
-              )}
-              {!cpfReady && (
-                <>
-                  <p className="text-[11px] text-muted-foreground">
-                    Ao informar o CPF, o sistema busca automaticamente os dados nos cadastros existentes.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2"
-                    onClick={() => setNoCpfMode(true)}
-                  >
-                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                    Lançar sem CPF (cadastro provisório)
-                  </Button>
-                </>
+          {/* CPF — obrigatório */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Search className="h-3.5 w-3.5 text-primary" />
+              CPF do freelancer *
+            </Label>
+            <div className="relative">
+              <Input
+                value={cpfValue}
+                onChange={(e) => handleCpfChange(e.target.value)}
+                onBlur={() => setCpfTouched(true)}
+                placeholder="000.000.000-00"
+                maxLength={14}
+                inputMode="numeric"
+                className={`text-base ${cpfTouched && cpfReady && !cpfValid ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                autoFocus
+                aria-required="true"
+                aria-invalid={cpfTouched && cpfReady && !cpfValid}
+              />
+              {isLookingUp && (
+                <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
               )}
             </div>
-          )}
-
-          {noCpfMode && (
-            <div className="rounded-md border-2 border-destructive/40 bg-destructive/10 p-3 space-y-2">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                <div className="flex-1 text-xs text-foreground">
-                  <p className="font-semibold">Modo sem CPF ativado</p>
-                  <p className="text-muted-foreground mt-0.5">
-                    O freelancer entrará na escala como cadastro provisório. Sem CPF, o pagamento via Budget Gerencial fica pendente até completar os dados.
-                  </p>
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full h-7 text-xs"
-                onClick={() => { setNoCpfMode(false); }}
-              >
-                ← Voltar e informar CPF
-              </Button>
-            </div>
-          )}
+            <p
+              className={
+                cpfHelper.tone === "error"
+                  ? "text-xs text-destructive flex items-center gap-1"
+                  : cpfHelper.tone === "success"
+                    ? "text-xs text-primary flex items-center gap-1"
+                    : "text-xs text-muted-foreground"
+              }
+            >
+              {cpfHelper.tone === "success" && <CheckCircle2 className="h-3 w-3" />}
+              {cpfHelper.tone === "error" && <AlertCircle className="h-3 w-3" />}
+              {cpfHelper.text}
+            </p>
+          </div>
 
           {showFormFields && (
             <>
@@ -516,8 +487,27 @@ export function FreelancerAddModal({
                   onChange={(e) => { setName(e.target.value); setFilled((f) => ({ ...f, name: false })); }}
                   placeholder="Nome completo"
                   className={filled.name ? "border-primary bg-primary/5" : ""}
-                  autoFocus={noCpfMode}
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="freelancer-gender">Gênero *</Label>
+                <Select
+                  value={gender}
+                  onValueChange={(v) => { setGender(v as "M" | "F"); setFilled((f) => ({ ...f, gender: false })); }}
+                >
+                  <SelectTrigger
+                    id="freelancer-gender"
+                    aria-required="true"
+                    className={filled.gender ? "border-primary bg-primary/5" : ""}
+                  >
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">Masculino</SelectItem>
+                    <SelectItem value="F">Feminino</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
@@ -567,29 +557,28 @@ export function FreelancerAddModal({
                 )}
               </div>
 
-
-              {!noCpfMode && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Telefone <span className="text-muted-foreground">(opcional — confirmado no check-in)</span></Label>
-                    <Input
-                      value={phone}
-                      onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
-                      placeholder="(00) 00000-0000"
-                      className={filled.phone ? "border-primary bg-primary/5" : ""}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Chave PIX</Label>
-                    <Input
-                      value={pixKey}
-                      onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
-                      placeholder="Chave PIX"
-                      className={filled.pix ? "border-primary bg-primary/5" : ""}
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Telefone *</Label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value); setFilled((f) => ({ ...f, phone: false })); }}
+                    placeholder="(00) 00000-0000"
+                    inputMode="tel"
+                    className={`text-base ${filled.phone ? "border-primary bg-primary/5" : ""}`}
+                    aria-required="true"
+                  />
                 </div>
-              )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Chave PIX</Label>
+                  <Input
+                    value={pixKey}
+                    onChange={(e) => { setPixKey(e.target.value); setFilled((f) => ({ ...f, pix: false })); }}
+                    placeholder="Chave PIX"
+                    className={filled.pix ? "border-primary bg-primary/5" : ""}
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -603,7 +592,7 @@ export function FreelancerAddModal({
               </div>
 
               <div className="space-y-1.5">
-                <Label>Valor da Diária (R$)</Label>
+                <Label>Valor da Diária (R$) *</Label>
                 <Input
                   type="number"
                   min={0}
@@ -613,14 +602,27 @@ export function FreelancerAddModal({
                 />
               </div>
 
-              <Button className="w-full" onClick={handleSubmit} disabled={isSaving}>
-                {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {linkedEmployeeId
-                  ? "Adicionar à Escala"
-                  : noCpfMode
-                    ? "Escalar sem CPF (provisório)"
-                    : "Cadastrar e Adicionar à Escala"}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full">
+                      <Button
+                        className="w-full min-h-11"
+                        onClick={handleSubmit}
+                        disabled={!isFormValid || isSaving}
+                      >
+                        {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                        {buttonLabel}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {!isFormValid && (
+                    <TooltipContent>
+                      Preencha CPF e demais campos obrigatórios para escalar.
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
         </div>
@@ -633,7 +635,6 @@ export function FreelancerAddModal({
         sectorId={targetSectorId}
         alreadyLinkedIds={allowedJobTitleIds}
         onLinked={(jt) => {
-          // Pré-seleciona automaticamente o cargo recém-criado
           setSelectedJobTitleId(jt.id);
         }}
       />

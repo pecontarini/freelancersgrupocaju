@@ -49,7 +49,7 @@ import {
   useShifts,
   useStaffingMatrix,
 } from "@/hooks/useStaffingMatrix";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useSchedulableEmployees } from "@/hooks/useEmployees";
 import {
   useSchedulesBySector,
   useAddSchedule,
@@ -72,7 +72,7 @@ export function MobileScheduler() {
   const { data: shifts = [] } = useShifts();
   const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
   const { data: matrix = [] } = useStaffingMatrix(sectorIds);
-  const { data: employees = [], isLoading: loadingEmp } = useEmployees(selectedUnit);
+  const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit);
   const { data: schedules = [], isLoading: loadingSch } = useSchedulesBySector(
     sectorIds,
     dateStr,

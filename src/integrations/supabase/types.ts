@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      _backup_employees_pre_secullum: {
+        Row: {
+          active: boolean | null
+          cpf: string | null
+          created_at: string | null
+          data_backup: string | null
+          default_rate: number | null
+          gender: string | null
+          id: string | null
+          job_title: string | null
+          job_title_id: string | null
+          name: string | null
+          phone: string | null
+          unit_id: string | null
+          updated_at: string | null
+          worker_type: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Insert: {
+          active?: boolean | null
+          cpf?: string | null
+          created_at?: string | null
+          data_backup?: string | null
+          default_rate?: number | null
+          gender?: string | null
+          id?: string | null
+          job_title?: string | null
+          job_title_id?: string | null
+          name?: string | null
+          phone?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+          worker_type?: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Update: {
+          active?: boolean | null
+          cpf?: string | null
+          created_at?: string | null
+          data_backup?: string | null
+          default_rate?: number | null
+          gender?: string | null
+          id?: string | null
+          job_title?: string | null
+          job_title_id?: string | null
+          name?: string | null
+          phone?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+          worker_type?: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Relationships: []
+      }
+      _backup_orfaos_20mai_2026: {
+        Row: {
+          active: boolean | null
+          aguardando_secullum: boolean | null
+          backup_em: string | null
+          backup_motivo: string | null
+          banco_id: number | null
+          cpf: string | null
+          created_at: string | null
+          default_rate: number | null
+          gender: string | null
+          id: string | null
+          job_title: string | null
+          job_title_id: string | null
+          name: string | null
+          phone: string | null
+          secullum_id: number | null
+          sincronizado_em: string | null
+          unit_id: string | null
+          updated_at: string | null
+          worker_type: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Insert: {
+          active?: boolean | null
+          aguardando_secullum?: boolean | null
+          backup_em?: string | null
+          backup_motivo?: string | null
+          banco_id?: number | null
+          cpf?: string | null
+          created_at?: string | null
+          default_rate?: number | null
+          gender?: string | null
+          id?: string | null
+          job_title?: string | null
+          job_title_id?: string | null
+          name?: string | null
+          phone?: string | null
+          secullum_id?: number | null
+          sincronizado_em?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+          worker_type?: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Update: {
+          active?: boolean | null
+          aguardando_secullum?: boolean | null
+          backup_em?: string | null
+          backup_motivo?: string | null
+          banco_id?: number | null
+          cpf?: string | null
+          created_at?: string | null
+          default_rate?: number | null
+          gender?: string | null
+          id?: string | null
+          job_title?: string | null
+          job_title_id?: string | null
+          name?: string | null
+          phone?: string | null
+          secullum_id?: number | null
+          sincronizado_em?: string | null
+          unit_id?: string | null
+          updated_at?: string | null
+          worker_type?: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Relationships: []
+      }
       _sprint0_sheets_sources_backup: {
         Row: {
           ativo: boolean | null
@@ -1947,6 +2064,8 @@ export type Database = {
       employees: {
         Row: {
           active: boolean
+          aguardando_secullum: boolean | null
+          banco_id: number | null
           cpf: string | null
           created_at: string
           default_rate: number | null
@@ -1956,12 +2075,16 @@ export type Database = {
           job_title_id: string | null
           name: string
           phone: string | null
+          secullum_id: number | null
+          sincronizado_em: string | null
           unit_id: string
           updated_at: string
           worker_type: Database["public"]["Enums"]["worker_type"]
         }
         Insert: {
           active?: boolean
+          aguardando_secullum?: boolean | null
+          banco_id?: number | null
           cpf?: string | null
           created_at?: string
           default_rate?: number | null
@@ -1971,12 +2094,16 @@ export type Database = {
           job_title_id?: string | null
           name: string
           phone?: string | null
+          secullum_id?: number | null
+          sincronizado_em?: string | null
           unit_id: string
           updated_at?: string
           worker_type?: Database["public"]["Enums"]["worker_type"]
         }
         Update: {
           active?: boolean
+          aguardando_secullum?: boolean | null
+          banco_id?: number | null
           cpf?: string | null
           created_at?: string
           default_rate?: number | null
@@ -1986,6 +2113,8 @@ export type Database = {
           job_title_id?: string | null
           name?: string
           phone?: string | null
+          secullum_id?: number | null
+          sincronizado_em?: string | null
           unit_id?: string
           updated_at?: string
           worker_type?: Database["public"]["Enums"]["worker_type"]
@@ -2753,6 +2882,50 @@ export type Database = {
           total_linhas?: number
         }
         Relationships: []
+      }
+      inativacoes_audit_log: {
+        Row: {
+          acao: string
+          contexto: Json | null
+          employee_id: string
+          estado_anterior: Json
+          estado_novo: Json
+          executado_em: string
+          executado_por: string | null
+          id: number
+          motivo: string
+        }
+        Insert: {
+          acao: string
+          contexto?: Json | null
+          employee_id: string
+          estado_anterior: Json
+          estado_novo: Json
+          executado_em?: string
+          executado_por?: string | null
+          id?: number
+          motivo: string
+        }
+        Update: {
+          acao?: string
+          contexto?: Json | null
+          employee_id?: string
+          estado_anterior?: Json
+          estado_novo?: Json
+          executado_em?: string
+          executado_por?: string | null
+          id?: number
+          motivo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inativacoes_audit_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       indicadores_snapshots: {
         Row: {
@@ -5575,6 +5748,72 @@ export type Database = {
           },
         ]
       }
+      solicitacoes_cadastro_urgente: {
+        Row: {
+          banco_id_criado: number | null
+          cargo: string
+          cpf: string | null
+          created_at: string
+          data_inicio_prevista: string
+          data_revisao: string | null
+          id: string
+          justificativa: string
+          nome_funcionario: string
+          observacao_revisao: string | null
+          revisado_por: string | null
+          secullum_id_criado: number | null
+          solicitante_email: string | null
+          solicitante_id: string
+          solicitante_nome: string
+          status: Database["public"]["Enums"]["status_solicitacao_cadastro"]
+          unit_id: string
+          updated_at: string
+          urgencia: Database["public"]["Enums"]["urgencia_cadastro"]
+        }
+        Insert: {
+          banco_id_criado?: number | null
+          cargo: string
+          cpf?: string | null
+          created_at?: string
+          data_inicio_prevista: string
+          data_revisao?: string | null
+          id?: string
+          justificativa: string
+          nome_funcionario: string
+          observacao_revisao?: string | null
+          revisado_por?: string | null
+          secullum_id_criado?: number | null
+          solicitante_email?: string | null
+          solicitante_id: string
+          solicitante_nome: string
+          status?: Database["public"]["Enums"]["status_solicitacao_cadastro"]
+          unit_id: string
+          updated_at?: string
+          urgencia?: Database["public"]["Enums"]["urgencia_cadastro"]
+        }
+        Update: {
+          banco_id_criado?: number | null
+          cargo?: string
+          cpf?: string | null
+          created_at?: string
+          data_inicio_prevista?: string
+          data_revisao?: string | null
+          id?: string
+          justificativa?: string
+          nome_funcionario?: string
+          observacao_revisao?: string | null
+          revisado_por?: string | null
+          secullum_id_criado?: number | null
+          solicitante_email?: string | null
+          solicitante_id?: string
+          solicitante_nome?: string
+          status?: Database["public"]["Enums"]["status_solicitacao_cadastro"]
+          unit_id?: string
+          updated_at?: string
+          urgencia?: Database["public"]["Enums"]["urgencia_cadastro"]
+        }
+        Relationships: []
+      }
       staffing_matrix: {
         Row: {
           created_at: string
@@ -6741,6 +6980,11 @@ export type Database = {
           updated: number
         }[]
       }
+      inativar_employee: {
+        Args: { p_contexto?: Json; p_employee_id: string; p_motivo: string }
+        Returns: boolean
+      }
+      is_aprovador_cadastro_urgente: { Args: never; Returns: boolean }
       is_first_user: { Args: never; Returns: boolean }
       is_missao_creator: {
         Args: { _missao_id: string; _user_id: string }
@@ -6805,6 +7049,20 @@ export type Database = {
         }[]
       }
       peek_pix_magic_link: { Args: { p_token: string }; Returns: Json }
+      processar_inativacoes_diarias: {
+        Args: {
+          p_dias_aguardando_max?: number
+          p_dias_sem_vinculo_max?: number
+          p_dry_run?: boolean
+        }
+        Returns: {
+          acao: string
+          employee_id: string
+          nome: string
+          regra: string
+          unidade: string
+        }[]
+      }
       promote_approved_checkins: {
         Args: { p_approval_id: string }
         Returns: number
@@ -6813,10 +7071,15 @@ export type Database = {
         Args: { p_draft_id: string; p_override_pin?: string }
         Returns: Json
       }
+      reativar_employee: {
+        Args: { p_contexto?: Json; p_employee_id: string; p_motivo: string }
+        Returns: boolean
+      }
       reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
       resolve_loja_id: { Args: { p_raw_identifier: string }; Returns: string }
       set_user_pin: { Args: { p_pin: string }; Returns: Json }
+      sync_funcionarios_secullum: { Args: { p_payload: Json }; Returns: Json }
       user_can_see_missao: {
         Args: { _missao_id: string; _user_id: string }
         Returns: boolean
@@ -6863,6 +7126,7 @@ export type Database = {
         | "chefe_setor"
         | "operator"
         | "employee"
+        | "aprovador_cadastro_urgente"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
       categoria_cargo: "gerencia" | "chefia"
       codigo_meta:
@@ -6910,6 +7174,12 @@ export type Database = {
         | "banco_horas"
       sector_type: "salao" | "back" | "apv" | "delivery"
       setor_back: "cozinha" | "bar" | "parrilla" | "sushi"
+      status_solicitacao_cadastro:
+        | "pendente"
+        | "em_analise"
+        | "concluido"
+        | "rejeitado"
+      urgencia_cadastro: "baixa" | "media" | "alta" | "critica"
       worker_type: "clt" | "freelancer"
     }
     CompositeTypes: {
@@ -7046,6 +7316,7 @@ export const Constants = {
         "chefe_setor",
         "operator",
         "employee",
+        "aprovador_cadastro_urgente",
       ],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
       categoria_cargo: ["gerencia", "chefia"],
@@ -7100,6 +7371,13 @@ export const Constants = {
       ],
       sector_type: ["salao", "back", "apv", "delivery"],
       setor_back: ["cozinha", "bar", "parrilla", "sushi"],
+      status_solicitacao_cadastro: [
+        "pendente",
+        "em_analise",
+        "concluido",
+        "rejeitado",
+      ],
+      urgencia_cadastro: ["baixa", "media", "alta", "critica"],
       worker_type: ["clt", "freelancer"],
     },
   },

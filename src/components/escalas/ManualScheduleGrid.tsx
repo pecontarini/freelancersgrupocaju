@@ -52,7 +52,7 @@ import {
 } from "@/components/ui/popover";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
-import { useEmployees } from "@/hooks/useEmployees";
+import { useEmployees, useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useManualSchedules, useCopyPreviousDay, useCancelEmployeeWeek, useCopyEmployeeWeek, useCopyEmployeeToNextWeek, useCopyWeekToNextWeek, useUpsertSchedule, useCancelSchedule, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { useGridSelection, getSelectionRect, isInRect, type Cell } from "./grid/useGridSelection";
 import { resolveShortcutPatch, isShortcutKey } from "./grid/gridShortcuts";

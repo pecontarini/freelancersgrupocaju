@@ -50,7 +50,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
-import { useEmployees, useAddEmployee } from "@/hooks/useEmployees";
+import { useSchedulableEmployees, useAddEmployee } from "@/hooks/useEmployees";
 import { useSchedulesBySector, useAddSchedule, useRemoveSchedule } from "@/hooks/useSchedules";
 import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 

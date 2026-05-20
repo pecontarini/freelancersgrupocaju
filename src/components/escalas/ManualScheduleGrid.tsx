@@ -315,12 +315,12 @@ export function ManualScheduleGrid() {
   // Secondary: CLT employees linked to sector but NOT scheduled (base do setor)
   const sectorBaseEmployees = useMemo(() => {
     if (showAllEmployees || !activeSectorId || sectorLinkedJobTitleIds.size === 0) return [];
-    return employees.filter((emp) => {
-      if (emp.worker_type === "freelancer") return false;
+    // Use schedulable list — only CLTs synced with Secullum
+    return schedulableEmployees.filter((emp) => {
       if (scheduledEmployeeIds.has(emp.id)) return false;
       return emp.job_title_id && sectorLinkedJobTitleIds.has(emp.job_title_id);
     });
-  }, [employees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
+  }, [schedulableEmployees, showAllEmployees, activeSectorId, sectorLinkedJobTitleIds, scheduledEmployeeIds]);
 
   // Sort mode + job title filter
   const [sortMode, setSortMode] = useState<"function" | "alpha">("function");

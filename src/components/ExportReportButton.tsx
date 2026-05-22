@@ -472,83 +472,100 @@ export function ExportReportButton({
     return null;
   }
 
+  const cnpjDialogNode = cnpjDialog ? (
+    <CnpjQuickRegisterDialog
+      open={!!cnpjDialog}
+      onOpenChange={(o) => !o && setCnpjDialog(null)}
+      lojaId={cnpjDialog.lojaId}
+      lojaNome={cnpjDialog.lojaNome}
+      onSaved={handleCnpjSaved}
+    />
+  ) : null;
+
   // Simple button variant for prominent placement
   if (variant === "button") {
     return (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          onClick={generatePDF}
-          disabled={isGeneratingPDF}
-          className="gap-2"
-        >
-          {isGeneratingPDF ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando PDF...
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4" />
-              Gerar Ordem de Pagamento (PDF)
-            </>
-          )}
-        </Button>
-        <Button
-          onClick={handleExportPaymentCsv}
-          disabled={isGeneratingCsv}
-          variant="outline"
-          className="gap-2"
-        >
-          {isGeneratingCsv ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando CSV...
-            </>
-          ) : (
-            <>
-              <FileSpreadsheet className="h-4 w-4" />
-              CSV de Pagamento (Sistema)
-            </>
-          )}
-        </Button>
-      </div>
+      <>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={generatePDF}
+            disabled={isGeneratingPDF}
+            className="gap-2"
+          >
+            {isGeneratingPDF ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando PDF...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                Gerar Ordem de Pagamento (PDF)
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleExportPaymentCsv}
+            disabled={isGeneratingCsv}
+            variant="outline"
+            className="gap-2"
+          >
+            {isGeneratingCsv ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando CSV...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="h-4 w-4" />
+                CSV de Pagamento (Sistema)
+              </>
+            )}
+          </Button>
+        </div>
+        {cnpjDialogNode}
+      </>
     );
   }
 
   // Dropdown variant (default)
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={isGeneratingPDF || isGeneratingCsv}>
-          {isGeneratingPDF || isGeneratingCsv ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Gerando...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4" />
-              Exportar
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={generatePDF} className="gap-2 cursor-pointer">
-          <FileDown className="h-4 w-4" />
-          Gerar Ordem de Pagamento (PDF)
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleExportPaymentCsv} className="gap-2 cursor-pointer">
-          <FileSpreadsheet className="h-4 w-4" />
-          CSV de Pagamento (Sistema)
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
-          <Download className="h-4 w-4" />
-          Exportar Relatório (Excel)
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" className="gap-2" disabled={isGeneratingPDF || isGeneratingCsv}>
+            {isGeneratingPDF || isGeneratingCsv ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Gerando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Exportar
+              </>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={generatePDF} className="gap-2 cursor-pointer">
+            <FileDown className="h-4 w-4" />
+            Gerar Ordem de Pagamento (PDF)
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleExportPaymentCsv} className="gap-2 cursor-pointer">
+            <FileSpreadsheet className="h-4 w-4" />
+            CSV de Pagamento (Sistema)
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
+            <Download className="h-4 w-4" />
+            Exportar Relatório (Excel)
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {cnpjDialogNode}
+    </>
   );
 }
+
 

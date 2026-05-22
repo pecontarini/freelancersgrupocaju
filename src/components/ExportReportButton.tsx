@@ -23,6 +23,8 @@ import {
   sanitizeUnitName,
   ymdCompact,
 } from "@/lib/paymentCsv";
+import { CnpjQuickRegisterDialog } from "@/components/CnpjQuickRegisterDialog";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 interface ExportReportButtonProps {
   entries: FreelancerEntry[];

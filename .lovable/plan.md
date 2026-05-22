@@ -1,74 +1,82 @@
-# Plano — Refactor BulkImport (Fase 6 v2)
+# Plano — Export CSV de Pagamento (consolidado por freelancer)
 
-## Escopo
-Substituir totalmente o `src/components/escalas/BulkImportTab.tsx` (877 linhas) por um fluxo template-driven baseado nas RPCs já existentes no backend (`get_bulk_import_template_data`, `import_schedule_slots`) e na tabela `bulk_import_logs`. Nenhuma escrita em `employees`, `job_titles` ou `cargo_aliases` no client.
+## Objetivo
+Adicionar opção **"Gerar CSV de Pagamento (sistema)"** no mesmo `ExportReportButton` que hoje exporta PDF/Excel. O arquivo segue **100% fiel** ao template enviado para importação direta no ERP.
 
-## Premissas validadas
-- RPCs e tabela já existem nos types gerados (`src/integrations/supabase/types.ts`).
-- Único consumidor do componente: `TeamManagement.tsx` (passa `unitId`, `onDone`, `showUnitSelector={false}`). Contrato de props preservado.
-- Hooks de unidade existentes serão reusados: `useAccessibleStores` (filtra por user_stores) e `useUnidade` (contexto). `xlsx` já está no projeto.
+## Onde
+- **Arquivo modificado:** `src/components/ExportReportButton.tsx` (já recebe `entries: FreelancerEntry[]` e `dateRange`).
+  - Adicionar item ao `DropdownMenu`: "Gerar CSV de Pagamento (Sistema)".
+  - Adicionar bot�o equivalente no variant `"button"` (segundo bot�o ao lado, mesmo estilo).
+- **Arquivo novo:** `src/lib/paymentCsv.ts` — gerador puro do CSV (testável, isolado).
 
-## Estrutura de arquivos
+Como o componente já é renderizado em `BudgetDrillDownDialog` (drill-down de Freelancers) e em `BudgetsGerenciaisTab` (topo), o CSV passa a estar disponível **exatamente nos mesmos pontos do PDF de Ordem de Pagamento**.
 
-### Novos
-- `src/components/escalas/bulkImport/BulkImportTab.tsx` — orquestrador (substitui o legado, mesmo caminho de import via re-export).
-- `src/components/escalas/bulkImport/UnitWeekControls.tsx` — dropdown unidade + date picker semana (com normalização para segunda-feira e label "DD/MM até DD/MM").
-- `src/components/escalas/bulkImport/DownloadTemplateButton.tsx` — fluxo Tarefa 2 (gera XLSX 3 abas).
-- `src/components/escalas/bulkImport/UploadAndConfirm.tsx` — file picker + preview 5 linhas + confirmar (Tarefa 3).
-- `src/components/escalas/bulkImport/ImportResultCard.tsx` — resumo sucesso/erro + tabela de erros + link draft.
-- `src/components/escalas/bulkImport/ImportHistoryModal.tsx` — modal Tarefa 4.
-- `src/components/escalas/bulkImport/lib/weekUtils.ts` — `normalizeToMonday(date)`, `formatWeekRange(monday)`.
-- `src/components/escalas/bulkImport/lib/timeUtils.ts` — `normalizarHora(valor)`.
-- `src/components/escalas/bulkImport/lib/xlsxTemplate.ts` — builders `buildTemplateWorkbook(data, weekStart)` e `parseFilledWorkbook(file, weekStart)` retornando `{ slots, previewRows }`.
+## Layout fiel ao template
 
-### Modificado
-- `src/components/escalas/BulkImportTab.tsx` → vira re-export (`export { BulkImportTab } from "./bulkImport/BulkImportTab"`) para não tocar em `TeamManagement.tsx`.
+**Encoding:** Windows-1252 (Latin-1), separador `;`, EOL `\r\n`, **sem BOM**. Geração via `TextEncoder` não suporta Latin-1 nativo no browser → uso `Uint8Array` com map manual de caracteres (helper `toLatin1Bytes`) e fallback `?` para char fora da tabela. Nome do freelancer **sem acentos** (NFD + strip `\u0300-\u036f`) e em MAIÚSCULAS antes de gravar.
 
-### Removido (após nova versão funcional)
-- Todo conteúdo legado do arquivo antigo: matching por CPF, criação/upsert em `employees`, criação client-side de `schedule_drafts`, geração de template em branco, qualquer chamada de mutação a `job_titles`/`cargo_aliases`. Como o arquivo vira re-export, a remoção é a própria substituição.
+**Header (linha 1, idêntico ao template):**
+```
+CNPJ Empresa;Série Título;Nº Título;Nº Parcela;Nº Documento;CNPJ Fornecedor;Portador;Data Documento;Data Vencimento;Data Competência;Valor Desconto;Valor Multa Atraso;Valor Juros Dia; Valor Original ;Observações do Título;Cód Conta Gerencial;Cód Centro de Custo;Evento;RFP
+```
+(Replicado byte-a-byte do arquivo enviado, inclusive os espaços ao redor de " Valor Original " e os acentos.)
 
-### Não tocar
-- `FreelancerAddModal`, triggers do banco, fluxo de IA (`ai_draft_slots`), `useEmployees`, `useJobTitles`.
+**Uma linha por freelancer** (agrupamento por `cpf`):
 
-## Comportamento da UI
+| Campo | Valor |
+|---|---|
+| CNPJ Empresa | `config_lojas.cnpj` da unidade do drill-down (formatado XX.XXX.XXX/XXXX-XX). Se vazio → bloqueia export com toast. |
+| Série Título | vazio |
+| Nº Título | vazio |
+| Nº Parcela | `1` |
+| Nº Documento | vazio |
+| CNPJ Fornecedor | `entry.cpf` formatado `XXX.XXX.XXX-XX` (igual exemplo) |
+| Portador | `2` |
+| Data Documento | **primeiro dia do período filtrado** (`dateRange.start`) em `DD/MM/YYYY` |
+| Data Vencimento | idem (mesma data) |
+| Data Competência | idem (mesma data) |
+| Valor Desconto | `0` |
+| Valor Multa Atraso | `0` |
+| Valor Juros Dia | `0` |
+| Valor Original | soma de `entry.valor` do freelancer no período, formato `123,45` (vírgula decimal, sem separador de milhar — igual exemplo `100`) |
+| Observações do Título | `FREELANCER {NOME_SEM_ACENTO} - {N} DIA(S) {DD/MM} A {DD/MM}` |
+| Cód Conta Gerencial | `272` |
+| Cód Centro de Custo | `3` |
+| Evento | vazio |
+| RFP | vazio |
 
-**Props mantidas:** `{ unitId?: string | null; onDone?: () => void; showUnitSelector?: boolean }`.
+## Lógica de consolidação
+```ts
+// agrupar por CPF (normalizado: só dígitos)
+// somar valor, contar dias distintos (Set de data_pop)
+// pegar nome do primeiro registro
+// ordenar por nome ASC
+```
 
-**Seleção de unidade:**
-- Se `showUnitSelector === false` e `unitId` veio por prop → usa direto (caso `TeamManagement`).
-- Senão: lista de `useAccessibleStores()`. Se 1 unidade, pré-seleciona e desabilita dropdown.
+## Validações antes do download
+- `entries.length > 0` (já bloqueado no componente).
+- `dateRange.start` presente → senão toast "Selecione um período para gerar o CSV".
+- Todas as entries têm a mesma `loja_id` → senão toast "Selecione uma unidade específica para exportar o CSV" (ERP exige CNPJ único por arquivo). No drill-down isso já é garantido.
+- CNPJ da loja presente em `config_lojas` → senão toast "Cadastre o CNPJ da unidade {nome} antes de gerar o CSV". Lookup via `supabase.from('config_lojas').select('cnpj').eq('id', lojaId).single()`.
+- Toda entry tem CPF válido (11 dígitos) → entries inválidas são listadas em toast de aviso e **puladas** (não bloqueiam o restante).
 
-**Semana de referência:** Popover + `Calendar` (shadcn) `mode="single"`, com `pointer-events-auto`. Estado interno guarda segunda-feira normalizada. Label "DD/MM até DD/MM" (segunda a domingo).
-
-**Botão "Baixar Modelo"**: disabled enquanto unitId ou weekStart vazios. Chama `get_bulk_import_template_data` e gera workbook com 3 abas conforme spec (coluna ID oculta com `hidden:true, wch:0`).
-
-**Upload**: input `accept=".xlsx"`. Após selecionar arquivo, parse imediato → mostra preview (tabela com 5 primeiras linhas com horários detectados) + botão "Confirmar Importação". Botão "Cancelar" limpa estado.
-
-**Confirmar**: monta `slots[]` (um por dia preenchido — só se início E fim presentes), chama `import_schedule_slots`. Toasts conforme `result.status` (sucesso/parcial/erro).
-
-**Resultado**: card com `total_sucesso` (verde) / `total_erro` (laranja), timestamp, nome do arquivo, link "Ver draft criado" (`/escalas/draft/{draft_id}` — confirmar rota com fallback para console se não existir). Tabela de erros se `total_erro > 0`, resolvendo `employee_id → nome` via mapa do template carregado em memória durante o import.
-
-**Histórico**: link abaixo do resultado abre `Dialog` que consulta `bulk_import_logs` (top 20 por unidade), com expand para `erros` JSONB.
+## Nome do arquivo
+`PAGAMENTO_FREELANCERS_{UNIDADE_SANITIZADA}_{YYYYMMDD_inicio}_{YYYYMMDD_fim}.csv`
 
 ## Detalhes técnicos
-
-**Tipagem:** usa `Database['public']['Functions']['get_bulk_import_template_data']['Returns']` e tipa `import_schedule_slots` return como `{ log_id: string; draft_id: string; total_linhas: number; total_sucesso: number; total_erro: number; erros: Array<{linha:number; employee_id?:string; data?:string; motivo:string}>; status: 'sucesso'|'parcial'|'erro' }`.
-
-**Normalização de semana:** `normalizeToMonday`: `const d = new Date(date); const day = d.getDay(); const diff = day === 0 ? -6 : 1 - day; d.setDate(d.getDate()+diff); return d;` — operando em data local, gravando YYYY-MM-DD via helper para evitar bug de timezone (regra do projeto).
-
-**Payload do slot:** `schedule_date` calculado somando dias à segunda **em data local** (não usar `toISOString()` direto sobre `Date` mutado — usa formato `yyyy-MM-dd` via `date-fns/format` já presente, conforme padrão do projeto).
-
-**`normalizarHora`:** conforme spec, com suporte a número Excel (fração do dia) e string `HH:MM`/`H:MM`/`HH:MM:SS`. Lança erro capturado pelo parser, que acumula em `previewErrors` exibido antes do submit.
-
-**Permissão**: erro da RPC `get_bulk_import_template_data` (RLS) → toast "Sem acesso a essa unidade ou erro no servidor". Sem fallback.
-
-## Acessibilidade
-Labels em todos inputs/selects, `aria-label` nos botões de ação, focus inicial no primeiro controle do modal de histórico, `DialogTitle` obrigatório.
-
-## Testes de aceitação (Tarefa 6)
-Documentar no chat após implementação. Não automatizar — execução manual pelo usuário (gerente MULT 14 / CAJU 01 conforme spec). Reporto status esperado de cada cenário.
+- Helper `toLatin1Bytes(str: string): Uint8Array` em `paymentCsv.ts` — itera codepoints, mapeia 0x00-0xFF direto, demais via tabela mínima de acentos PT-BR; fallback `0x3F` (`?`).
+- Download via `Blob([bytes], { type: 'text/csv;charset=windows-1252' })` + `URL.createObjectURL` (mesmo padrão do `downloadWorkbook`).
+- `formatCpfMask`, `formatCnpjMask`, `stripAccents`, `formatBrlPlain` — helpers puros no mesmo arquivo.
+- `formatBrlPlain(100)` → `"100"`, `formatBrlPlain(123.45)` → `"123,45"`, `formatBrlPlain(1500)` → `"1500"` (sem milhar, vírgula só se tiver decimal — fiel ao exemplo `100`).
 
 ## Fora de escopo
-- Não alterar `TeamManagement.tsx`.
-- Não criar migrações (backend pronto).
-- Não tocar em fluxo IA nem em `FreelancerAddModal`.
+- Não altera schema do banco.
+- Não toca em PDF, Excel ou WhatsApp existentes.
+- Não cria edge function — geração 100% client-side (formato textual simples).
+
+## Teste manual de aceitação
+1. Filtrar 16/05 a 21/05, unidade Parrilla, no drill-down de Freelancers → "Exportar" → "Gerar CSV de Pagamento (Sistema)".
+2. Abrir CSV no Excel/Bloco de Notas → header idêntico ao template, datas todas `16/05/2025`, valores consolidados por CPF.
+3. Importar no ERP → aceitar sem erro de encoding/coluna.
+4. Sem filtro de data → toast de erro.
+5. Filtro "todas as lojas" → toast pedindo unidade específica.

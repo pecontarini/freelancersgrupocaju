@@ -79,6 +79,43 @@ export function ExportReportButton({
   };
 
   const [isGeneratingCsv, setIsGeneratingCsv] = useState(false);
+  const [cnpjDialog, setCnpjDialog] = useState<{
+    lojaId: string;
+    lojaNome: string;
+  } | null>(null);
+  const { isAdmin } = useUserProfile();
+
+  // Gera o CSV a partir de um CNPJ já validado (14 dígitos).
+  const generateCsvWithCnpj = (
+    cnpj: string,
+    lojaNome: string,
+    startDate: string,
+    endDate: string,
+  ) => {
+    const result = buildPaymentCsv({
+      entries,
+      startDate,
+      endDate,
+      cnpjEmpresa: cnpj,
+    });
+    if (result.rowsCount === 0) {
+      toast.error("Nenhum freelancer com CPF válido para exportar.");
+      return;
+    }
+    const unidadeName = lojaNome || customTitle || entries[0].loja || "UNIDADE";
+    const filename = `PAGAMENTO_FREELANCERS_${sanitizeUnitName(unidadeName)}_${ymdCompact(startDate)}_${ymdCompact(endDate)}.csv`;
+    downloadCsvBytes(result.bytes, filename);
+
+    if (result.skippedCpfs.length > 0) {
+      toast.warning(
+        `${result.rowsCount} freelancer(s) exportado(s). ${result.skippedCpfs.length} ignorado(s) por CPF inválido.`,
+      );
+    } else {
+      toast.success(`CSV gerado: ${result.rowsCount} freelancer(s).`, {
+        description: filename,
+      });
+    }
+  };
 
   const handleExportPaymentCsv = async () => {
     if (entries.length === 0) {
@@ -89,7 +126,6 @@ export function ExportReportButton({
       toast.error("Selecione um período (data início e fim) para gerar o CSV de pagamento.");
       return;
     }
-    // CNPJ é por unidade — exige uma única loja selecionada
     const lojaIds = Array.from(
       new Set(entries.map((e) => e.loja_id).filter((id): id is string => !!id)),
     );
@@ -105,38 +141,21 @@ export function ExportReportButton({
     setIsGeneratingCsv(true);
     try {
       const { cnpj, nome } = await fetchUnitCnpj(lojaIds[0]);
+      const lojaNome = nome || entries[0].loja || "Unidade";
+
       if (!cnpj || cnpj.replace(/\D/g, "").length !== 14) {
-        toast.error(
-          `Cadastre o CNPJ da unidade ${nome ?? ""} antes de gerar o CSV de pagamento.`,
-        );
+        if (isAdmin) {
+          // Abre dialog inline para admin cadastrar CNPJ
+          setCnpjDialog({ lojaId: lojaIds[0], lojaNome });
+        } else {
+          toast.error(
+            `Unidade ${lojaNome} não tem CNPJ cadastrado. Peça a um administrador para cadastrar.`,
+          );
+        }
         return;
       }
 
-      const result = buildPaymentCsv({
-        entries,
-        startDate: dateRange.start,
-        endDate: dateRange.end,
-        cnpjEmpresa: cnpj,
-      });
-
-      if (result.rowsCount === 0) {
-        toast.error("Nenhum freelancer com CPF válido para exportar.");
-        return;
-      }
-
-      const unidadeName = nome || customTitle || entries[0].loja || "UNIDADE";
-      const filename = `PAGAMENTO_FREELANCERS_${sanitizeUnitName(unidadeName)}_${ymdCompact(dateRange.start)}_${ymdCompact(dateRange.end)}.csv`;
-      downloadCsvBytes(result.bytes, filename);
-
-      if (result.skippedCpfs.length > 0) {
-        toast.warning(
-          `${result.rowsCount} freelancer(s) exportado(s). ${result.skippedCpfs.length} ignorado(s) por CPF inválido.`,
-        );
-      } else {
-        toast.success(`CSV gerado: ${result.rowsCount} freelancer(s).`, {
-          description: filename,
-        });
-      }
+      generateCsvWithCnpj(cnpj, lojaNome, dateRange.start, dateRange.end);
     } catch (err) {
       console.error("Erro ao gerar CSV de pagamento:", err);
       toast.error("Erro ao gerar o CSV. Tente novamente.");
@@ -144,6 +163,19 @@ export function ExportReportButton({
       setIsGeneratingCsv(false);
     }
   };
+
+  // Callback do dialog: após salvar CNPJ, gera o CSV automaticamente.
+  const handleCnpjSaved = (cnpj: string) => {
+    if (!cnpjDialog || !dateRange?.start || !dateRange?.end) return;
+    generateCsvWithCnpj(
+      cnpj,
+      cnpjDialog.lojaNome,
+      dateRange.start,
+      dateRange.end,
+    );
+    setCnpjDialog(null);
+  };
+
 
 
   const generatePDF = async () => {

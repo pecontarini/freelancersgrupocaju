@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ChevronDown, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
@@ -128,8 +128,8 @@ export function ImportHistoryModal({ open, onOpenChange, unitId }: Props) {
                   const isOpen = expanded.has(r.id);
                   const errosArr = Array.isArray(r.erros) ? r.erros : [];
                   return (
-                    <>
-                      <TableRow key={r.id}>
+                    <Fragment key={r.id}>
+                      <TableRow>
                         <TableCell>
                           {errosArr.length > 0 && (
                             <Button
@@ -191,7 +191,7 @@ export function ImportHistoryModal({ open, onOpenChange, unitId }: Props) {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </TableBody>

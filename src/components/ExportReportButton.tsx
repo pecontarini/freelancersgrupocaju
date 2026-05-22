@@ -441,23 +441,43 @@ export function ExportReportButton({
   // Simple button variant for prominent placement
   if (variant === "button") {
     return (
-      <Button 
-        onClick={generatePDF} 
-        disabled={isGeneratingPDF}
-        className="gap-2"
-      >
-        {isGeneratingPDF ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Gerando PDF...
-          </>
-        ) : (
-          <>
-            <FileText className="h-4 w-4" />
-            Gerar Ordem de Pagamento (PDF)
-          </>
-        )}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={generatePDF}
+          disabled={isGeneratingPDF}
+          className="gap-2"
+        >
+          {isGeneratingPDF ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Gerando PDF...
+            </>
+          ) : (
+            <>
+              <FileText className="h-4 w-4" />
+              Gerar Ordem de Pagamento (PDF)
+            </>
+          )}
+        </Button>
+        <Button
+          onClick={handleExportPaymentCsv}
+          disabled={isGeneratingCsv}
+          variant="outline"
+          className="gap-2"
+        >
+          {isGeneratingCsv ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Gerando CSV...
+            </>
+          ) : (
+            <>
+              <FileSpreadsheet className="h-4 w-4" />
+              CSV de Pagamento (Sistema)
+            </>
+          )}
+        </Button>
+      </div>
     );
   }
 
@@ -465,8 +485,8 @@ export function ExportReportButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={isGeneratingPDF}>
-          {isGeneratingPDF ? (
+        <Button variant="outline" className="gap-2" disabled={isGeneratingPDF || isGeneratingCsv}>
+          {isGeneratingPDF || isGeneratingCsv ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Gerando...
@@ -484,6 +504,11 @@ export function ExportReportButton({
           <FileDown className="h-4 w-4" />
           Gerar Ordem de Pagamento (PDF)
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleExportPaymentCsv} className="gap-2 cursor-pointer">
+          <FileSpreadsheet className="h-4 w-4" />
+          CSV de Pagamento (Sistema)
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleExportExcel} className="gap-2 cursor-pointer">
           <Download className="h-4 w-4" />
           Exportar Relatório (Excel)
@@ -492,3 +517,4 @@ export function ExportReportButton({
     </DropdownMenu>
   );
 }
+

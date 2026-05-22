@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileDown, FileText, Loader2 } from "lucide-react";
+import { Download, FileDown, FileText, FileSpreadsheet, Loader2 } from "lucide-react";
 import { jsPDF } from "jspdf";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -15,6 +16,13 @@ import { exportToExcel } from "@/lib/excelUtils";
 import { FreelancerEntry } from "@/types/freelancer";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
+import {
+  buildPaymentCsv,
+  downloadCsvBytes,
+  fetchUnitCnpj,
+  sanitizeUnitName,
+  ymdCompact,
+} from "@/lib/paymentCsv";
 
 interface ExportReportButtonProps {
   entries: FreelancerEntry[];

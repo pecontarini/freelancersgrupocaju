@@ -65,6 +65,60 @@ export type Database = {
         }
         Relationships: []
       }
+      _backup_job_titles_dedup_21mai_2026: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          id: string | null
+          is_canonical: boolean | null
+          name: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_canonical?: boolean | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_canonical?: boolean | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_job_titles_lixos_21mai_2026: {
+        Row: {
+          categoria: string | null
+          created_at: string | null
+          id: string | null
+          is_canonical: boolean | null
+          name: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_canonical?: boolean | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_canonical?: boolean | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
       _backup_orfaos_20mai_2026: {
         Row: {
           active: boolean | null
@@ -128,6 +182,60 @@ export type Database = {
           unit_id?: string | null
           updated_at?: string | null
           worker_type?: Database["public"]["Enums"]["worker_type"] | null
+        }
+        Relationships: []
+      }
+      _backup_sectors_dedup_20mai_2026: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          name: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
+      _backup_staffing_matrix_dedup_20mai_2026: {
+        Row: {
+          created_at: string | null
+          day_of_week: number | null
+          extras_count: number | null
+          id: string | null
+          required_count: number | null
+          sector_id: string | null
+          shift_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week?: number | null
+          extras_count?: number | null
+          id?: string | null
+          required_count?: number | null
+          sector_id?: string | null
+          shift_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number | null
+          extras_count?: number | null
+          id?: string | null
+          required_count?: number | null
+          sector_id?: string | null
+          shift_type?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -693,6 +801,144 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      bulk_import_logs: {
+        Row: {
+          arquivo_nome: string | null
+          draft_id: string | null
+          erros: Json
+          id: string
+          imported_at: string
+          imported_by: string | null
+          status: string
+          total_erro: number
+          total_linhas: number
+          total_sucesso: number
+          unit_id: string
+          week_start_date: string
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          draft_id?: string | null
+          erros?: Json
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          status: string
+          total_erro?: number
+          total_linhas?: number
+          total_sucesso?: number
+          unit_id: string
+          week_start_date: string
+        }
+        Update: {
+          arquivo_nome?: string | null
+          draft_id?: string | null
+          erros?: Json
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          status?: string
+          total_erro?: number
+          total_linhas?: number
+          total_sucesso?: number
+          unit_id?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_logs_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_logs_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      cargo_aliases: {
+        Row: {
+          cargo_texto: string
+          categoria: string
+          created_at: string
+          id: string
+          nome_canonico: string | null
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          cargo_texto: string
+          categoria: string
+          created_at?: string
+          id?: string
+          nome_canonico?: string | null
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cargo_texto?: string
+          categoria?: string
+          created_at?: string
+          id?: string
+          nome_canonico?: string | null
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cargo_aliases_pendentes: {
+        Row: {
+          cargo_texto: string
+          first_seen: string
+          id: string
+          last_seen: string
+          notas: string | null
+          qtd_funcionarios: number
+          revisado: boolean
+          unit_id: string | null
+        }
+        Insert: {
+          cargo_texto: string
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          notas?: string | null
+          qtd_funcionarios?: number
+          revisado?: boolean
+          unit_id?: string | null
+        }
+        Update: {
+          cargo_texto?: string
+          first_seen?: string
+          id?: string
+          last_seen?: string
+          notas?: string | null
+          qtd_funcionarios?: number
+          revisado?: boolean
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cargo_aliases_pendentes_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cargo_aliases_pendentes_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
       }
       cargos: {
         Row: {
@@ -3189,20 +3435,26 @@ export type Database = {
       }
       job_titles: {
         Row: {
+          categoria: string | null
           created_at: string
           id: string
+          is_canonical: boolean
           name: string
           unit_id: string
         }
         Insert: {
+          categoria?: string | null
           created_at?: string
           id?: string
+          is_canonical?: boolean
           name: string
           unit_id: string
         }
         Update: {
+          categoria?: string | null
           created_at?: string
           id?: string
+          is_canonical?: boolean
           name?: string
           unit_id?: string
         }
@@ -6727,6 +6979,19 @@ export type Database = {
       }
     }
     Views: {
+      v_cargos_pendentes_revisao: {
+        Row: {
+          cargo_texto: string | null
+          first_seen: string | null
+          id: string | null
+          last_seen: string | null
+          notas: string | null
+          qtd_funcionarios: number | null
+          revisado: boolean | null
+          unidade: string | null
+        }
+        Relationships: []
+      }
       v_payout_consolidated: {
         Row: {
           brand: string | null
@@ -6945,6 +7210,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_bulk_import_template_data: {
+        Args: { p_unit_id: string }
+        Returns: {
+          cargo: string
+          cpf_mascarado: string
+          employee_id: string
+          job_title_id: string
+          nome: string
+          sector_id_padrao: string
+          setor_padrao: string
+        }[]
+      }
       get_latest_payload: { Args: { p_meta_key: string }; Returns: Json }
       get_realtime_stock_positions: {
         Args: { p_unit_id: string }
@@ -6979,6 +7256,15 @@ export type Database = {
           skipped: number
           updated: number
         }[]
+      }
+      import_schedule_slots: {
+        Args: {
+          p_arquivo_nome?: string
+          p_payload: Json
+          p_unit_id: string
+          p_week_start_date: string
+        }
+        Returns: Json
       }
       inativar_employee: {
         Args: { p_contexto?: Json; p_employee_id: string; p_motivo: string }
@@ -7077,6 +7363,13 @@ export type Database = {
       }
       reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
+      resolve_cargo_canonico: {
+        Args: { p_cargo_texto: string; p_unit_id: string }
+        Returns: {
+          canonico_id: string
+          categoria: string
+        }[]
+      }
       resolve_loja_id: { Args: { p_raw_identifier: string }; Returns: string }
       set_user_pin: { Args: { p_pin: string }; Returns: Json }
       sync_funcionarios_secullum: { Args: { p_payload: Json }; Returns: Json }

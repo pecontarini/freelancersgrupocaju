@@ -209,6 +209,24 @@ export function D1ManagementPanel() {
         </CardContent>
       </Card>
 
+      {/* Banner de duplicados */}
+      {selectedUnit && duplicateGroups.length > 0 && canManage && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between gap-3 flex-wrap text-xs">
+            <span className="text-amber-800 dark:text-amber-200">
+              <strong>{duplicateGroups.length}</strong> pessoa(s) com cadastro duplicado nesta unidade.
+              O D-1 mostra a identidade do Secullum quando disponível.
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)} className="h-7 text-xs">
+              Revisar e fundir no Secullum
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+
+
       {/* KPI Summary */}
       {selectedUnit && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

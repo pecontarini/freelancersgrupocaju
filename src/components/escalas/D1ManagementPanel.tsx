@@ -261,6 +261,14 @@ export function D1ManagementPanel() {
           buildWhatsAppLink={buildWhatsAppLink}
         />
       )}
+
+      <D1MergeDuplicatesDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        unitId={selectedUnit}
+        unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "—"}
+        groups={duplicateGroups}
+      />
     </div>
   );
 }

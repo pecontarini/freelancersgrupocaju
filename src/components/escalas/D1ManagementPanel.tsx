@@ -53,7 +53,10 @@ export function D1ManagementPanel() {
   const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(tomorrow);
 
-  const { data: schedules = [], isLoading } = useD1Schedules(selectedUnit, selectedDate);
+  const { data, isLoading } = useD1Schedules(selectedUnit, selectedDate);
+  const schedules = data?.schedules || [];
+  const duplicateGroups = data?.duplicateGroups || [];
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   // Split into 3 groups
   const { confirmed, denied, pending, sectorGroups } = useMemo(() => {

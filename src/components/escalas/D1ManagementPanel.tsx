@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -22,9 +23,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
+import { D1MergeDuplicatesDialog } from "./D1MergeDuplicatesDialog";
 import { useD1Schedules, type D1Schedule } from "@/hooks/useD1Schedules";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -50,7 +53,10 @@ export function D1ManagementPanel() {
   const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(tomorrow);
 
-  const { data: schedules = [], isLoading } = useD1Schedules(selectedUnit, selectedDate);
+  const { data, isLoading } = useD1Schedules(selectedUnit, selectedDate);
+  const schedules = data?.schedules || [];
+  const duplicateGroups = data?.duplicateGroups || [];
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   // Split into 3 groups
   const { confirmed, denied, pending, sectorGroups } = useMemo(() => {
@@ -203,6 +209,24 @@ export function D1ManagementPanel() {
         </CardContent>
       </Card>
 
+      {/* Banner de duplicados */}
+      {selectedUnit && duplicateGroups.length > 0 && canManage && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between gap-3 flex-wrap text-xs">
+            <span className="text-amber-800 dark:text-amber-200">
+              <strong>{duplicateGroups.length}</strong> pessoa(s) com cadastro duplicado nesta unidade.
+              O D-1 mostra a identidade do Secullum quando disponível.
+            </span>
+            <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)} className="h-7 text-xs">
+              Revisar e fundir no Secullum
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+
+
       {/* KPI Summary */}
       {selectedUnit && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -237,6 +261,14 @@ export function D1ManagementPanel() {
           buildWhatsAppLink={buildWhatsAppLink}
         />
       )}
+
+      <D1MergeDuplicatesDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        unitId={selectedUnit}
+        unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "—"}
+        groups={duplicateGroups}
+      />
     </div>
   );
 }

@@ -175,25 +175,29 @@ export function QuickCreateEmployeeModal({ open, onOpenChange, unitId, sectorId 
     const resolvedTitle =
       jobTitle === "__custom__" ? customJobTitle.trim() : jobTitle.trim();
 
-    // pre-check duplicate (sem CPF)
-    const normalizedName = name.trim().toLowerCase();
-    const normalizedTitle = resolvedTitle.toLowerCase();
+    // pre-check duplicate: normaliza nome (remove sufixos entre parênteses, acentos, case)
+    const normalize = (s: string) =>
+      s
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s*\([^)]*\)\s*$/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    const normalizedName = normalize(name);
     if (!cpf) {
-      const dup = employees.find((e) => {
-        const hasNoCpf = !e.cpf || e.cpf === "";
-        return (
-          hasNoCpf &&
-          e.name.trim().toLowerCase() === normalizedName &&
-          (e.job_title || "").trim().toLowerCase() === normalizedTitle
-        );
-      });
+      const dup = employees.find((e) => normalize(e.name) === normalizedName);
       if (dup) {
-        const m = `Já existe um funcionário "${dup.name}" com o cargo "${dup.job_title || "—"}". Adicione um sobrenome ou informe o CPF.`;
+        const isSecullum = !!(dup as any).secullum_id;
+        const m = isSecullum
+          ? `Já existe um cadastro Secullum "${dup.name}" nesta unidade. Reaproveite o cadastro existente em vez de criar novo.`
+          : `Já existe um funcionário "${dup.name}" nesta unidade. Informe o CPF para diferenciar ou edite o cadastro existente.`;
         setSubmitError(m);
-        toast.error(m, { duration: 6000 });
+        toast.error(m, { duration: 8000 });
         return;
       }
     }
+
 
     try {
       const jt = await upsertJobTitle.mutateAsync({

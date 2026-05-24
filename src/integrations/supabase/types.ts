@@ -7811,6 +7811,10 @@ export type Database = {
         }[]
       }
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
+      merge_employees_into_secullum: {
+        Args: { p_pairs: Json; p_unit_id: string }
+        Returns: Json
+      }
       normalize_loja_code: { Args: { p_raw: string }; Returns: string }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
       normalize_unit_code: { Args: { p_code: string }; Returns: string }

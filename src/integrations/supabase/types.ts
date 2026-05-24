@@ -2585,6 +2585,70 @@ export type Database = {
           },
         ]
       }
+      extras_checkins: {
+        Row: {
+          checkin_ts: string
+          checkout_ts: string | null
+          cpf_hash: string | null
+          external_id: string | null
+          id: string
+          nome_freelancer: string
+          plataforma: string
+          raw_payload: Json | null
+          sector_id: string | null
+          synced_at: string
+          unit_id: string
+        }
+        Insert: {
+          checkin_ts: string
+          checkout_ts?: string | null
+          cpf_hash?: string | null
+          external_id?: string | null
+          id?: string
+          nome_freelancer: string
+          plataforma: string
+          raw_payload?: Json | null
+          sector_id?: string | null
+          synced_at?: string
+          unit_id: string
+        }
+        Update: {
+          checkin_ts?: string
+          checkout_ts?: string | null
+          cpf_hash?: string | null
+          external_id?: string | null
+          id?: string
+          nome_freelancer?: string
+          plataforma?: string
+          raw_payload?: Json | null
+          sector_id?: string | null
+          synced_at?: string
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extras_checkins_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extras_checkins_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extras_checkins_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
       freelancer_checkins: {
         Row: {
           approved_at: string | null
@@ -4742,6 +4806,275 @@ export type Database = {
           },
         ]
       }
+      pop_ajustes_manuais: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: string
+          employee_id: string | null
+          id: string
+          justificativa: string
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_destino: string | null
+          sector_origem: string | null
+          tipo: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data: string
+          employee_id?: string | null
+          id?: string
+          justificativa: string
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_destino?: string | null
+          sector_origem?: string | null
+          tipo: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          employee_id?: string | null
+          id?: string
+          justificativa?: string
+          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_destino?: string | null
+          sector_origem?: string | null
+          tipo?: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pop_ajustes_manuais_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_ajustes_manuais_sector_destino_fkey"
+            columns: ["sector_destino"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_ajustes_manuais_sector_origem_fkey"
+            columns: ["sector_origem"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_ajustes_manuais_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_ajustes_manuais_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      pop_minimo_padrao: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
+          id: string
+          quantidade_minima: number
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id: string
+          unit_id: string
+          versao_documento: string
+          vigente_ate: string | null
+          vigente_desde: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
+          id?: string
+          quantidade_minima: number
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id: string
+          unit_id: string
+          versao_documento: string
+          vigente_ate?: string | null
+          vigente_desde: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dia_semana?: Database["public"]["Enums"]["pop_dia_semana_enum"]
+          id?: string
+          quantidade_minima?: number
+          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id?: string
+          unit_id?: string
+          versao_documento?: string
+          vigente_ate?: string | null
+          vigente_desde?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      pop_overrides: {
+        Row: {
+          aprovado_por: string
+          comunicado_ao_conselho: boolean
+          created_at: string
+          created_by: string | null
+          data: string
+          id: string
+          motivo: string
+          quantidade_minima: number
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          aprovado_por: string
+          comunicado_ao_conselho?: boolean
+          created_at?: string
+          created_by?: string | null
+          data: string
+          id?: string
+          motivo: string
+          quantidade_minima: number
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          aprovado_por?: string
+          comunicado_ao_conselho?: boolean
+          created_at?: string
+          created_by?: string | null
+          data?: string
+          id?: string
+          motivo?: string
+          quantidade_minima?: number
+          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pop_overrides_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_overrides_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_overrides_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      pop_relatorios_enviados: {
+        Row: {
+          data: string
+          enviado_em: string
+          erro: string | null
+          evolution_message_id: string | null
+          id: string
+          mensagem: string
+          payload_json: Json | null
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          status_envio: Database["public"]["Enums"]["pop_status_envio_enum"]
+          tentativa: number
+          unit_id: string
+        }
+        Insert: {
+          data: string
+          enviado_em?: string
+          erro?: string | null
+          evolution_message_id?: string | null
+          id?: string
+          mensagem: string
+          payload_json?: Json | null
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          status_envio?: Database["public"]["Enums"]["pop_status_envio_enum"]
+          tentativa?: number
+          unit_id: string
+        }
+        Update: {
+          data?: string
+          enviado_em?: string
+          erro?: string | null
+          evolution_message_id?: string | null
+          id?: string
+          mensagem?: string
+          payload_json?: Json | null
+          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
+          status_envio?: Database["public"]["Enums"]["pop_status_envio_enum"]
+          tentativa?: number
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pop_relatorios_enviados_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_relatorios_enviados_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
       pracas_plano_chao: {
         Row: {
           created_at: string
@@ -6408,6 +6741,106 @@ export type Database = {
           },
         ]
       }
+      sync_secullum_log: {
+        Row: {
+          ate_ts: string | null
+          desde_ts: string | null
+          duracao_ms: number | null
+          erro: string | null
+          executado_em: string
+          id: string
+          max_fonte_dados_id: number | null
+          qtd_inserida: number
+          qtd_orfas: number
+          qtd_puxada: number
+        }
+        Insert: {
+          ate_ts?: string | null
+          desde_ts?: string | null
+          duracao_ms?: number | null
+          erro?: string | null
+          executado_em?: string
+          id?: string
+          max_fonte_dados_id?: number | null
+          qtd_inserida?: number
+          qtd_orfas?: number
+          qtd_puxada?: number
+        }
+        Update: {
+          ate_ts?: string | null
+          desde_ts?: string | null
+          duracao_ms?: number | null
+          erro?: string | null
+          executado_em?: string
+          id?: string
+          max_fonte_dados_id?: number | null
+          qtd_inserida?: number
+          qtd_orfas?: number
+          qtd_puxada?: number
+        }
+        Relationships: []
+      }
+      time_punches: {
+        Row: {
+          banco_id: number
+          employee_id: string | null
+          id: string
+          punch_ts: string
+          punch_type: Database["public"]["Enums"]["pop_punch_type_enum"] | null
+          raw_payload: Json | null
+          secullum_employee_id: number
+          source: string
+          synced_at: string
+          unit_id: string | null
+        }
+        Insert: {
+          banco_id?: number
+          employee_id?: string | null
+          id?: string
+          punch_ts: string
+          punch_type?: Database["public"]["Enums"]["pop_punch_type_enum"] | null
+          raw_payload?: Json | null
+          secullum_employee_id: number
+          source?: string
+          synced_at?: string
+          unit_id?: string | null
+        }
+        Update: {
+          banco_id?: number
+          employee_id?: string | null
+          id?: string
+          punch_ts?: string
+          punch_type?: Database["public"]["Enums"]["pop_punch_type_enum"] | null
+          raw_payload?: Json | null
+          secullum_employee_id?: number
+          source?: string
+          synced_at?: string
+          unit_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_punches_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_punches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_punches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
       turno_config: {
         Row: {
           ativo: boolean
@@ -6538,6 +6971,51 @@ export type Database = {
           },
           {
             foreignKeyName: "unit_partnerships_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      unit_secullum_mapping: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          notas: string | null
+          secullum_empresa_id: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          notas?: string | null
+          secullum_empresa_id: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          notas?: string | null
+          secullum_empresa_id?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_secullum_mapping_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_secullum_mapping_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "v_payout_jobs_to_compute"
@@ -7132,6 +7610,28 @@ export type Database = {
           },
         ]
       }
+      v_sync_secullum_health: {
+        Row: {
+          batidas_24h: number | null
+          batidas_com_raw_payload: number | null
+          batidas_historico_total: number | null
+          batidas_orfas_24h: number | null
+          batidas_sem_punch_type_24h: number | null
+          consultado_em: string | null
+          cursor_temporal: string | null
+          execucoes_24h: number | null
+          falhas_24h: number | null
+          funcionarios_distintos_24h: number | null
+          minutos_desde_ultima_sync: number | null
+          pct_resolucao_24h: number | null
+          status_semaforo: string | null
+          tamanho_raw_payload_total: string | null
+          ultima_duracao_ms: number | null
+          ultima_exec_qualquer: string | null
+          ultima_sucesso: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       build_daily_stock_snapshot: {
@@ -7210,6 +7710,13 @@ export type Database = {
         }
         Returns: Json
       }
+      find_employee_by_secullum_id: {
+        Args: { p_secullum_id: number }
+        Returns: {
+          employee_id: string
+          unit_id: string
+        }[]
+      }
       get_bulk_import_template_data: {
         Args: { p_unit_id: string }
         Returns: {
@@ -7240,6 +7747,7 @@ export type Database = {
           unidade: string
         }[]
       }
+      get_sync_batidas_cursor: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -7305,6 +7813,7 @@ export type Database = {
       merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
       normalize_loja_code: { Args: { p_raw: string }; Returns: string }
       normalize_sales_item_name: { Args: { name: string }; Returns: string }
+      normalize_unit_code: { Args: { p_code: string }; Returns: string }
       parse_cmv_carnes_diff: {
         Args: { p_loja_id: string; p_mes_ref: string }
         Returns: number
@@ -7335,6 +7844,15 @@ export type Database = {
         }[]
       }
       peek_pix_magic_link: { Args: { p_token: string }; Returns: Json }
+      pop_cleanup_raw_payloads: {
+        Args: { p_dias_retencao?: number }
+        Returns: {
+          data_corte: string
+          duracao_ms: number
+          linhas_limpas: number
+          mb_liberados: number
+        }[]
+      }
       processar_inativacoes_diarias: {
         Args: {
           p_dias_aguardando_max?: number
@@ -7371,7 +7889,13 @@ export type Database = {
         }[]
       }
       resolve_loja_id: { Args: { p_raw_identifier: string }; Returns: string }
+      resolve_punch_type_secullum: {
+        Args: { p_sequencia: number }
+        Returns: Database["public"]["Enums"]["pop_punch_type_enum"]
+      }
       set_user_pin: { Args: { p_pin: string }; Returns: Json }
+      sync_batidas_secullum: { Args: { p_payload: Json }; Returns: Json }
+      sync_batidas_secullum_v2: { Args: { p_payload: Json }; Returns: Json }
       sync_funcionarios_secullum: { Args: { p_payload: Json }; Returns: Json }
       user_can_see_missao: {
         Args: { _missao_id: string; _user_id: string }
@@ -7420,6 +7944,7 @@ export type Database = {
         | "operator"
         | "employee"
         | "aprovador_cadastro_urgente"
+        | "dp_auditor"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
       categoria_cargo: "gerencia" | "chefia"
       codigo_meta:
@@ -7454,6 +7979,12 @@ export type Database = {
       missao_prioridade: "alta" | "media" | "baixa"
       missao_status: "a_fazer" | "em_andamento" | "aguardando" | "concluido"
       origem_dado: "sheets" | "pdf" | "kds" | "manual"
+      pop_ajuste_tipo_enum: "REMANEJAMENTO" | "RESERVA" | "AJUSTE_PONTO"
+      pop_dia_semana_enum: "SEG" | "TER" | "QUA" | "QUI" | "SEX" | "SAB" | "DOM"
+      pop_punch_type_enum: "entrada" | "saida_intervalo" | "retorno" | "saida"
+      pop_refeicao_enum: "ALMOCO" | "JANTAR"
+      pop_status_cor_enum: "verde" | "amarelo" | "vermelho"
+      pop_status_envio_enum: "sucesso" | "falha" | "retry_agendado"
       position_type:
         | "gerente_front"
         | "gerente_back"
@@ -7610,6 +8141,7 @@ export const Constants = {
         "operator",
         "employee",
         "aprovador_cadastro_urgente",
+        "dp_auditor",
       ],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
       categoria_cargo: ["gerencia", "chefia"],
@@ -7649,6 +8181,12 @@ export const Constants = {
       missao_prioridade: ["alta", "media", "baixa"],
       missao_status: ["a_fazer", "em_andamento", "aguardando", "concluido"],
       origem_dado: ["sheets", "pdf", "kds", "manual"],
+      pop_ajuste_tipo_enum: ["REMANEJAMENTO", "RESERVA", "AJUSTE_PONTO"],
+      pop_dia_semana_enum: ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"],
+      pop_punch_type_enum: ["entrada", "saida_intervalo", "retorno", "saida"],
+      pop_refeicao_enum: ["ALMOCO", "JANTAR"],
+      pop_status_cor_enum: ["verde", "amarelo", "vermelho"],
+      pop_status_envio_enum: ["sucesso", "falha", "retry_agendado"],
       position_type: [
         "gerente_front",
         "gerente_back",

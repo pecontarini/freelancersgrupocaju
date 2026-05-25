@@ -189,10 +189,39 @@ export function OperationalDashboard() {
     });
   }, [sectors, matrix, schedules, attendanceMap, currentShift, dayOfWeek, shiftType, today]);
 
-  // Totals for KPI
-  const totalMeta = sectorStats.reduce((a, s) => a + s.metaPOP, 0);
-  const totalEscalados = sectorStats.reduce((a, s) => a + s.escalados, 0);
-  const totalPresentes = sectorStats.reduce((a, s) => a + s.presentes, 0);
+  // ─── RPC-backed overview stats (substitui Meta/Escalados/Presentes na visão "Todos os setores") ───
+  const { data: popRows = [] } = usePopStatusDiario(today);
+
+  const overviewSectorStats = useMemo(() => {
+    if (!selectedUnit) return [] as Array<{
+      sector: typeof sectors[number];
+      meta: number; escalados: number; presentes: number; status: PopStatus | null;
+    }>;
+    const filtered = popRows.filter((r) => r.unit_id === selectedUnit && r.refeicao === shiftType);
+    const bySector = new Map<string, typeof filtered>();
+    for (const r of filtered) {
+      if (!bySector.has(r.sector_id)) bySector.set(r.sector_id, []);
+      bySector.get(r.sector_id)!.push(r);
+    }
+    return sectors.map((sector) => {
+      const rows = bySector.get(sector.id) || [];
+      return {
+        sector,
+        meta: rows.reduce((a, r) => a + (r.pop_total || 0), 0),
+        escalados: rows.reduce((a, r) => a + (r.escalados_clt || 0), 0),
+        presentes: rows.reduce((a, r) => a + (r.ponto_clt || 0) + (r.checkin_free || 0), 0),
+        status: aggregateStatus(rows),
+      };
+    });
+  }, [selectedUnit, popRows, shiftType, sectors]);
+
+  // Totals for KPI (visão "Todos os setores" usa RPC)
+  const totalMeta = overviewSectorStats.reduce((a, s) => a + s.meta, 0);
+  const totalEscalados = overviewSectorStats.reduce((a, s) => a + s.escalados, 0);
+  const totalPresentes = overviewSectorStats.reduce((a, s) => a + s.presentes, 0);
+  const overviewAggStatus = aggregateStatus(
+    overviewSectorStats.filter((s) => s.status).map((s) => ({ status: s.status as PopStatus }))
+  );
 
   // Single-sector derived values
   const singleSectorStat = !isAllSectors

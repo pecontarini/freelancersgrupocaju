@@ -265,6 +265,8 @@ const Index = () => {
         );
       case "gestao-pessoas":
         return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
+      case "quadro-operacional":
+        return <OperationalDashboard />;
       case "budgets":
         return (
           <div className="space-y-4">

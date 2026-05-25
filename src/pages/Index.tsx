@@ -21,6 +21,7 @@ import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab
 import { RedeTab } from "@/components/dashboard/RedeTab";
 
 import { EscalasTab } from "@/components/escalas/EscalasTab";
+import { OperationalDashboard } from "@/components/escalas/OperationalDashboard";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
 // PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas

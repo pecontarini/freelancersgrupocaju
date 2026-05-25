@@ -16,6 +16,7 @@ import {
   Users,
   LayoutGrid,
   Calendar,
+  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -66,6 +67,12 @@ const menuItems = [
     id: "gestao-pessoas",
     icon: Users,
     description: "Escalas e Presença Freelancers",
+  },
+  {
+    title: "QUADRO OPERACIONAL",
+    id: "quadro-operacional",
+    icon: ShieldCheck,
+    description: "Visão geral do quadro operacional por unidade",
   },
   {
     title: "DIAGNÓSTICO AUDITORIA",

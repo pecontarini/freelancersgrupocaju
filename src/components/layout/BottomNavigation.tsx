@@ -9,6 +9,7 @@ import {
   BarChart2,
   LayoutGrid,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
@@ -80,6 +81,14 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 {isAdmin ? "Administrador" : isChefeSetor ? "Chefe de Setor" : "Gerente de Unidade"}
               </div>
               <div className="space-y-2 border-t pt-4">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={() => onTabChange("quadro-operacional")}
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Quadro Operacional
+                </Button>
                 <Button
                   variant="ghost"
                   className="w-full justify-start"

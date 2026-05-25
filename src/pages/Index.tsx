@@ -21,6 +21,7 @@ import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab
 import { RedeTab } from "@/components/dashboard/RedeTab";
 
 import { EscalasTab } from "@/components/escalas/EscalasTab";
+import { OperationalDashboard } from "@/components/escalas/OperationalDashboard";
 import { UtensiliosTab } from "@/components/utensilios";
 import { EstoqueTab } from "@/components/estoque";
 // PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
@@ -45,6 +46,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
   "gestao-pessoas": {
     title: "Gestão de Pessoas",
     subtitle: "Escalas e presença de freelancers",
+  },
+  "quadro-operacional": {
+    title: "Quadro Operacional",
+    subtitle: "Visão geral do quadro operacional por unidade e setor",
   },
   budgets: {
     title: "Budgets Gerenciais",
@@ -260,6 +265,8 @@ const Index = () => {
         );
       case "gestao-pessoas":
         return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
+      case "quadro-operacional":
+        return <OperationalDashboard />;
       case "budgets":
         return (
           <div className="space-y-4">

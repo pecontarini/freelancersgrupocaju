@@ -48,7 +48,27 @@ import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMat
 import { useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
 import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
+import { usePopStatusDiario, aggregateStatus, type PopStatus } from "@/hooks/usePopStatusDiario";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import { AdminGlobalView } from "./AdminGlobalView";
+
+function statusBadgeClass(status: PopStatus | null): string {
+  switch (status) {
+    case "VERMELHO": return "bg-red-500/15 text-red-700 border-red-500/30";
+    case "AMARELO": return "bg-yellow-500/15 text-yellow-700 border-yellow-500/30";
+    case "VERDE_RESSALVA":
+    case "VERDE_PURO": return "bg-green-500/15 text-green-700 border-green-500/30";
+    default: return "bg-muted text-muted-foreground border-border";
+  }
+}
+function statusLabel(status: PopStatus | null): string {
+  if (status === "VERMELHO") return "Crítico";
+  if (status === "AMARELO") return "Excesso";
+  if (status === "VERDE_RESSALVA") return "OK (mix)";
+  if (status === "VERDE_PURO") return "Completo";
+  return "—";
+}
 
 function getCurrentShiftType(): string {
   const hour = new Date().getHours();
@@ -169,10 +189,39 @@ export function OperationalDashboard() {
     });
   }, [sectors, matrix, schedules, attendanceMap, currentShift, dayOfWeek, shiftType, today]);
 
-  // Totals for KPI
-  const totalMeta = sectorStats.reduce((a, s) => a + s.metaPOP, 0);
-  const totalEscalados = sectorStats.reduce((a, s) => a + s.escalados, 0);
-  const totalPresentes = sectorStats.reduce((a, s) => a + s.presentes, 0);
+  // ─── RPC-backed overview stats (substitui Meta/Escalados/Presentes na visão "Todos os setores") ───
+  const { data: popRows = [] } = usePopStatusDiario(today);
+
+  const overviewSectorStats = useMemo(() => {
+    if (!selectedUnit) return [] as Array<{
+      sector: typeof sectors[number];
+      meta: number; escalados: number; presentes: number; status: PopStatus | null;
+    }>;
+    const filtered = popRows.filter((r) => r.unit_id === selectedUnit && r.refeicao === shiftType);
+    const bySector = new Map<string, typeof filtered>();
+    for (const r of filtered) {
+      if (!bySector.has(r.sector_id)) bySector.set(r.sector_id, []);
+      bySector.get(r.sector_id)!.push(r);
+    }
+    return sectors.map((sector) => {
+      const rows = bySector.get(sector.id) || [];
+      return {
+        sector,
+        meta: rows.reduce((a, r) => a + (r.pop_total || 0), 0),
+        escalados: rows.reduce((a, r) => a + (r.escalados_clt || 0), 0),
+        presentes: rows.reduce((a, r) => a + (r.ponto_clt || 0) + (r.checkin_free || 0), 0),
+        status: aggregateStatus(rows),
+      };
+    });
+  }, [selectedUnit, popRows, shiftType, sectors]);
+
+  // Totals for KPI (visão "Todos os setores" usa RPC)
+  const totalMeta = overviewSectorStats.reduce((a, s) => a + s.meta, 0);
+  const totalEscalados = overviewSectorStats.reduce((a, s) => a + s.escalados, 0);
+  const totalPresentes = overviewSectorStats.reduce((a, s) => a + s.presentes, 0);
+  const overviewAggStatus = aggregateStatus(
+    overviewSectorStats.filter((s) => s.status).map((s) => ({ status: s.status as PopStatus }))
+  );
 
   // Single-sector derived values
   const singleSectorStat = !isAllSectors
@@ -232,10 +281,14 @@ export function OperationalDashboard() {
         `🎯 Meta Total: ${totalMeta} | 👥 Escalados: ${totalEscalados} | ✅ Presentes: ${totalPresentes}`,
         ``,
       ];
-      sectorStats.forEach((ss) => {
-        const pct = ss.metaPOP > 0 ? Math.round((ss.presentes / ss.metaPOP) * 100) : 0;
-        const icon = ss.presentes >= ss.metaPOP ? "✅" : ss.presentes >= ss.metaPOP * 0.7 ? "⚠️" : "🔴";
-        lines.push(`${icon} *${ss.sector.name}*: ${ss.presentes}/${ss.metaPOP} (${pct}%) — Escalados: ${ss.escalados}`);
+      overviewSectorStats.forEach((ss) => {
+        const pct = ss.meta > 0 ? Math.round((ss.presentes / ss.meta) * 100) : 0;
+        const icon =
+          ss.status === "VERMELHO" ? "🔴" :
+          ss.status === "AMARELO" ? "⚠️" :
+          ss.status === "VERDE_RESSALVA" ? "🟡" :
+          ss.status === "VERDE_PURO" ? "✅" : "▫️";
+        lines.push(`${icon} *${ss.sector.name}*: ${ss.presentes}/${ss.meta} (${pct}%) — Escalados: ${ss.escalados}`);
       });
       navigator.clipboard.writeText(lines.join("\n")).then(() => {
         toast.success("Resumo consolidado copiado!");
@@ -398,20 +451,16 @@ export function OperationalDashboard() {
               <CardContent className="pt-6 flex items-center gap-4">
                 <div
                   className={`rounded-full p-3 ${
-                    totalPresentes >= totalMeta
-                      ? "bg-green-500/10"
-                      : totalPresentes >= totalMeta * 0.7
-                      ? "bg-yellow-500/10"
-                      : "bg-red-500/10"
+                    overviewAggStatus === "VERMELHO" ? "bg-red-500/10" :
+                    overviewAggStatus === "AMARELO" ? "bg-yellow-500/10" :
+                    overviewAggStatus ? "bg-green-500/10" : "bg-muted"
                   }`}
                 >
                   <UserCheck
                     className={`h-6 w-6 ${
-                      totalPresentes >= totalMeta
-                        ? "text-green-500"
-                        : totalPresentes >= totalMeta * 0.7
-                        ? "text-yellow-500"
-                        : "text-red-500"
+                      overviewAggStatus === "VERMELHO" ? "text-red-500" :
+                      overviewAggStatus === "AMARELO" ? "text-yellow-500" :
+                      overviewAggStatus ? "text-green-500" : "text-muted-foreground"
                     }`}
                   />
                 </div>
@@ -432,7 +481,7 @@ export function OperationalDashboard() {
                 size="sm"
                 className="gap-1.5"
                 onClick={handleCopyResume}
-                disabled={sectorStats.length === 0}
+                disabled={overviewSectorStats.length === 0}
               >
                 <ClipboardCopy className="h-4 w-4" />
                 Gerar Resumo Consolidado
@@ -443,62 +492,66 @@ export function OperationalDashboard() {
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
-              ) : sectorStats.length === 0 ? (
+              ) : overviewSectorStats.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
                   Nenhum setor cadastrado para esta unidade.
                 </p>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {sectorStats.map((ss) => {
-                    const pct = ss.metaPOP > 0 ? Math.round((ss.presentes / ss.metaPOP) * 100) : 0;
-                    const isComplete = ss.presentes >= ss.metaPOP && ss.metaPOP > 0;
-                    const isPartial = !isComplete && ss.presentes >= ss.metaPOP * 0.7;
-                    const isCritical = !isComplete && !isPartial;
-
-                    return (
-                      <button
-                        key={ss.sector.id}
-                        onClick={() => setSelectedSector(ss.sector.id)}
-                        className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold text-sm">{ss.sector.name}</h4>
-                          {ss.metaPOP > 0 && (
-                            <Badge
-                              variant={isComplete ? "default" : "outline"}
-                              className={
-                                isComplete
-                                  ? "bg-green-500/15 text-green-700 border-green-500/30"
-                                  : isPartial
-                                  ? "bg-yellow-500/15 text-yellow-700 border-yellow-500/30"
-                                  : "bg-red-500/15 text-red-700 border-red-500/30"
-                              }
-                            >
-                              {isComplete ? (
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                              ) : isPartial ? (
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                              ) : (
-                                <XCircle className="h-3 w-3 mr-1" />
+                <TooltipProvider delayDuration={150}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {overviewSectorStats.map((ss) => {
+                      const pct = ss.meta > 0 ? Math.round((ss.presentes / ss.meta) * 100) : 0;
+                      return (
+                        <button
+                          key={ss.sector.id}
+                          onClick={() => setSelectedSector(ss.sector.id)}
+                          className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between mb-2 gap-2">
+                            <h4 className="font-semibold text-sm">{ss.sector.name}</h4>
+                            <div className="flex items-center gap-1">
+                              {ss.status === "VERDE_RESSALVA" && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="inline-flex items-center text-yellow-600"
+                                    >
+                                      <Info className="h-3.5 w-3.5" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Mix desviado (CLT/Free fora do plano)</TooltipContent>
+                                </Tooltip>
                               )}
-                              {isComplete ? "Completo" : isPartial ? "Parcial" : "Crítico"}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Meta: {ss.metaEfetivos}{ss.metaExtras > 0 ? `+${ss.metaExtras}` : ""}</span>
-                            <span>Escalados: {ss.escalados}</span>
-                            <span>Presentes: {ss.presentes}</span>
+                              {ss.meta > 0 && ss.status && (
+                                <Badge variant="outline" className={statusBadgeClass(ss.status)}>
+                                  {ss.status === "VERMELHO" ? (
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                  ) : ss.status === "AMARELO" ? (
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  )}
+                                  {statusLabel(ss.status)}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <Progress value={pct} className="h-2" />
-                          <p className="text-xs text-muted-foreground text-right">{pct}%</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Meta: {ss.meta}</span>
+                              <span>Escalados: {ss.escalados}</span>
+                              <span>Presentes: {ss.presentes}</span>
+                            </div>
+                            <Progress value={pct} className="h-2" />
+                            <p className="text-xs text-muted-foreground text-right">{pct}%</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
               )}
             </CardContent>
           </Card>

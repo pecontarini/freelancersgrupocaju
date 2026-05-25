@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarDays, Users, ShieldCheck, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
+import { CalendarDays, Users, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
 import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
 import { OperationalDashboard } from "./OperationalDashboard";
@@ -55,11 +55,6 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
             </span>
           )}
         </TabsTrigger>
-        <TabsTrigger value="quadro" className="gap-1.5">
-          <ShieldCheck className="h-4 w-4" />
-          <span className="hidden sm:inline">Quadro Operacional</span>
-          <span className="sm:hidden">Quadro</span>
-        </TabsTrigger>
         {showPopDashboard && (
           <TabsTrigger value="pop-dashboard" className="gap-1.5">
             <BarChart3 className="h-4 w-4" />
@@ -100,9 +95,6 @@ export function EscalasTab({ defaultTab }: EscalasTabProps) {
       </TabsContent>
       <TabsContent value="d1">
         <D1ManagementPanel />
-      </TabsContent>
-      <TabsContent value="quadro">
-        <OperationalDashboard />
       </TabsContent>
       {showPopDashboard && (
         <TabsContent value="pop-dashboard">

@@ -451,20 +451,16 @@ export function OperationalDashboard() {
               <CardContent className="pt-6 flex items-center gap-4">
                 <div
                   className={`rounded-full p-3 ${
-                    totalPresentes >= totalMeta
-                      ? "bg-green-500/10"
-                      : totalPresentes >= totalMeta * 0.7
-                      ? "bg-yellow-500/10"
-                      : "bg-red-500/10"
+                    overviewAggStatus === "VERMELHO" ? "bg-red-500/10" :
+                    overviewAggStatus === "AMARELO" ? "bg-yellow-500/10" :
+                    overviewAggStatus ? "bg-green-500/10" : "bg-muted"
                   }`}
                 >
                   <UserCheck
                     className={`h-6 w-6 ${
-                      totalPresentes >= totalMeta
-                        ? "text-green-500"
-                        : totalPresentes >= totalMeta * 0.7
-                        ? "text-yellow-500"
-                        : "text-red-500"
+                      overviewAggStatus === "VERMELHO" ? "text-red-500" :
+                      overviewAggStatus === "AMARELO" ? "text-yellow-500" :
+                      overviewAggStatus ? "text-green-500" : "text-muted-foreground"
                     }`}
                   />
                 </div>

@@ -147,7 +147,7 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
                 return (
                   <button
                     key={loja.id}
-                    onClick={() => onSelectUnit(loja.id)}
+                    onClick={() => setDetailUnit({ id: loja.id, nome: loja.nome })}
                     className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-3 gap-2">

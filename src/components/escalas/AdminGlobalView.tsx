@@ -96,6 +96,34 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
     );
   }
 
+  if (detailUnit) {
+    return (
+      <Tabs defaultValue="detalhado" className="w-full">
+        <TabsList>
+          <TabsTrigger value="detalhado">Quadro Detalhado</TabsTrigger>
+          <TabsTrigger
+            value="conferencia"
+            onClick={() => {
+              const id = detailUnit.id;
+              setDetailUnit(null);
+              onSelectUnit(id);
+            }}
+          >
+            Lista de Conferência
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="detalhado" className="mt-4">
+          <QuadroDetalhado
+            unitId={detailUnit.id}
+            unitName={detailUnit.nome}
+            data={today}
+            onBack={() => setDetailUnit(null)}
+          />
+        </TabsContent>
+      </Tabs>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">

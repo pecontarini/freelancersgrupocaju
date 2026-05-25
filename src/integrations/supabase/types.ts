@@ -4893,7 +4893,9 @@ export type Database = {
           created_by: string | null
           dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
           id: string
-          quantidade_minima: number
+          minimo_clt: number
+          minimo_freelancer: number
+          quantidade_minima: number | null
           refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
           sector_id: string
           unit_id: string
@@ -4906,7 +4908,9 @@ export type Database = {
           created_by?: string | null
           dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
           id?: string
-          quantidade_minima: number
+          minimo_clt?: number
+          minimo_freelancer?: number
+          quantidade_minima?: number | null
           refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
           sector_id: string
           unit_id: string
@@ -4919,7 +4923,9 @@ export type Database = {
           created_by?: string | null
           dia_semana?: Database["public"]["Enums"]["pop_dia_semana_enum"]
           id?: string
-          quantidade_minima?: number
+          minimo_clt?: number
+          minimo_freelancer?: number
+          quantidade_minima?: number | null
           refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
           sector_id?: string
           unit_id?: string
@@ -5018,6 +5024,39 @@ export type Database = {
           },
         ]
       }
+      pop_reconciliacao_log: {
+        Row: {
+          duracao_ms: number | null
+          erro: string | null
+          executado_em: string
+          funcionarios_distintos_resolvidos: number
+          id: string
+          qtd_orfas_antes: number
+          qtd_orfas_depois: number
+          qtd_reconciliadas: number
+        }
+        Insert: {
+          duracao_ms?: number | null
+          erro?: string | null
+          executado_em?: string
+          funcionarios_distintos_resolvidos?: number
+          id?: string
+          qtd_orfas_antes?: number
+          qtd_orfas_depois?: number
+          qtd_reconciliadas?: number
+        }
+        Update: {
+          duracao_ms?: number | null
+          erro?: string | null
+          executado_em?: string
+          funcionarios_distintos_resolvidos?: number
+          id?: string
+          qtd_orfas_antes?: number
+          qtd_orfas_depois?: number
+          qtd_reconciliadas?: number
+        }
+        Relationships: []
+      }
       pop_relatorios_enviados: {
         Row: {
           data: string
@@ -5074,6 +5113,24 @@ export type Database = {
             referencedColumns: ["loja_id"]
           },
         ]
+      }
+      pop_unidades_agregadas: {
+        Row: {
+          observacao: string | null
+          unit_id_agregada: string
+          unit_id_principal: string
+        }
+        Insert: {
+          observacao?: string | null
+          unit_id_agregada: string
+          unit_id_principal: string
+        }
+        Update: {
+          observacao?: string | null
+          unit_id_agregada?: string
+          unit_id_principal?: string
+        }
+        Relationships: []
       }
       pracas_plano_chao: {
         Row: {
@@ -7855,6 +7912,29 @@ export type Database = {
           duracao_ms: number
           linhas_limpas: number
           mb_liberados: number
+        }[]
+      }
+      pop_reconciliar_orfas: { Args: never; Returns: Json }
+      pop_status_diario: {
+        Args: { p_data?: string }
+        Returns: {
+          brand: string
+          checkin_free: number
+          data_referencia: string
+          dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
+          escalados_clt: number
+          ponto_clt: number
+          pop_clt: number
+          pop_free: number
+          pop_total: number
+          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
+          sector_id: string
+          sector_name: string
+          status: string
+          status_detalhe: string
+          total_real: number
+          unit_id: string
+          unit_nome: string
         }[]
       }
       processar_inativacoes_diarias: {

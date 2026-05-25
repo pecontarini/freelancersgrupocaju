@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.pop_status_diario(DATE) TO authenticated, anon, service_role;

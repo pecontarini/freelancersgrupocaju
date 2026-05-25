@@ -16,6 +16,7 @@ import {
   Users,
   LayoutGrid,
   Calendar,
+  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 

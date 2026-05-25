@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Users,
   UserCheck,
@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { usePopStatusDiario, aggregateStatus, type PopStatus } from "@/hooks/usePopStatusDiario";
+import { QuadroDetalhado } from "./QuadroDetalhado";
 
 interface ConfigOption {
   id: string;
@@ -58,6 +60,7 @@ function StatusIcon({ status }: { status: PopStatus | null }) {
 
 export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: AdminGlobalViewProps) {
   const { data: rows = [], isLoading } = usePopStatusDiario(today);
+  const [detailUnit, setDetailUnit] = useState<{ id: string; nome: string } | null>(null);
 
   const unitStatsMap = useMemo(() => {
     const map: Record<string, UnitStats> = {};
@@ -93,6 +96,34 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
     );
   }
 
+  if (detailUnit) {
+    return (
+      <Tabs defaultValue="detalhado" className="w-full">
+        <TabsList>
+          <TabsTrigger value="detalhado">Quadro Detalhado</TabsTrigger>
+          <TabsTrigger
+            value="conferencia"
+            onClick={() => {
+              const id = detailUnit.id;
+              setDetailUnit(null);
+              onSelectUnit(id);
+            }}
+          >
+            Lista de Conferência
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="detalhado" className="mt-4">
+          <QuadroDetalhado
+            unitId={detailUnit.id}
+            unitName={detailUnit.nome}
+            data={today}
+            onBack={() => setDetailUnit(null)}
+          />
+        </TabsContent>
+      </Tabs>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -116,7 +147,7 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
                 return (
                   <button
                     key={loja.id}
-                    onClick={() => onSelectUnit(loja.id)}
+                    onClick={() => setDetailUnit({ id: loja.id, nome: loja.nome })}
                     className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
                   >
                     <div className="flex items-center justify-between mb-3 gap-2">

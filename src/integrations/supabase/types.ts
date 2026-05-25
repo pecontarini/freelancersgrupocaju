@@ -7914,6 +7914,30 @@ export type Database = {
           mb_liberados: number
         }[]
       }
+      pop_quadro_detalhado: {
+        Args: { p_data: string; p_unit_id: string }
+        Returns: {
+          atraso_minutos: number
+          effective_end_time: string
+          effective_start_time: string
+          employee_id: string
+          employee_name: string
+          punch_in_hora: string
+          punch_in_ts: string
+          refeicao: string
+          schedule_id: string
+          scheduled_end_ts: string
+          scheduled_fim_hora: string
+          scheduled_inicio_hora: string
+          scheduled_start_ts: string
+          sector_id: string
+          sector_name: string
+          shift_id: string
+          shift_name: string
+          status: string
+          unit_id: string
+        }[]
+      }
       pop_reconciliar_orfas: { Args: never; Returns: Json }
       pop_status_diario: {
         Args: { p_data?: string }

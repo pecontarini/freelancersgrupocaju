@@ -60,6 +60,7 @@ function StatusIcon({ status }: { status: PopStatus | null }) {
 
 export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: AdminGlobalViewProps) {
   const { data: rows = [], isLoading } = usePopStatusDiario(today);
+  const [detailUnit, setDetailUnit] = useState<{ id: string; nome: string } | null>(null);
 
   const unitStatsMap = useMemo(() => {
     const map: Record<string, UnitStats> = {};

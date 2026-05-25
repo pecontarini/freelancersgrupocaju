@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
 import {
   Users,
   UserCheck,
@@ -7,11 +7,13 @@ import {
   AlertTriangle,
   XCircle,
   Loader2,
+  Info,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePopStatusDiario, aggregateStatus, type PopStatus } from "@/hooks/usePopStatusDiario";
 
 interface ConfigOption {
   id: string;
@@ -30,129 +32,55 @@ interface UnitStats {
   meta: number;
   escalados: number;
   presentes: number;
+  status: PopStatus | null;
+}
+
+function statusBadgeClass(status: PopStatus | null): string {
+  switch (status) {
+    case "VERMELHO":
+      return "bg-red-500/15 text-red-700 border-red-500/30";
+    case "AMARELO":
+      return "bg-yellow-500/15 text-yellow-700 border-yellow-500/30";
+    case "VERDE_RESSALVA":
+      return "bg-green-500/15 text-green-700 border-green-500/30";
+    case "VERDE_PURO":
+      return "bg-green-500/15 text-green-700 border-green-500/30";
+    default:
+      return "bg-muted text-muted-foreground border-border";
+  }
+}
+
+function StatusIcon({ status }: { status: PopStatus | null }) {
+  if (status === "VERMELHO") return <XCircle className="h-3 w-3 mr-1" />;
+  if (status === "AMARELO") return <AlertTriangle className="h-3 w-3 mr-1" />;
+  return <CheckCircle2 className="h-3 w-3 mr-1" />;
 }
 
 export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: AdminGlobalViewProps) {
-  const [loading, setLoading] = useState(true);
-  const [unitStatsMap, setUnitStatsMap] = useState<Record<string, UnitStats>>({});
+  const { data: rows = [], isLoading } = usePopStatusDiario(today);
 
-  // Batch-load all data in a single effect instead of per-card hooks
-  useEffect(() => {
-    if (allLojas.length === 0) {
-      setLoading(false);
-      return;
+  const unitStatsMap = useMemo(() => {
+    const map: Record<string, UnitStats> = {};
+    for (const loja of allLojas) {
+      map[loja.id] = { meta: 0, escalados: 0, presentes: 0, status: null };
     }
-
-    let cancelled = false;
-
-    async function fetchAll() {
-      try {
-        const unitIds = allLojas.map((l) => l.id);
-
-        // 1) Fetch all sectors for all units
-        const { data: sectors = [] } = await supabase
-          .from("sectors")
-          .select("id, unit_id, name")
-          .in("unit_id", unitIds);
-
-        const sectorIds = sectors.map((s) => s.id);
-        if (sectorIds.length === 0) {
-          if (!cancelled) {
-            setUnitStatsMap({});
-            setLoading(false);
-          }
-          return;
-        }
-
-        // 2) Fetch shift for this type
-        const { data: shifts = [] } = await supabase
-          .from("shifts")
-          .select("id, type")
-          .eq("type", shiftType)
-          .limit(1);
-
-        const currentShift = shifts[0];
-        if (!currentShift) {
-          if (!cancelled) {
-            setUnitStatsMap({});
-            setLoading(false);
-          }
-          return;
-        }
-
-        const dayOfWeek = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
-
-        // 3) Batch fetch: staffing matrix, schedules, attendance
-        const [matrixRes, schedulesRes, attendanceRes] = await Promise.all([
-          supabase
-            .from("staffing_matrix")
-            .select("sector_id, day_of_week, shift_type, required_count, extras_count")
-            .in("sector_id", sectorIds)
-            .eq("day_of_week", dayOfWeek)
-            .eq("shift_type", shiftType),
-          supabase
-            .from("schedules")
-            .select("id, sector_id, employee_id, schedule_date, shift_id")
-            .in("sector_id", sectorIds)
-            .eq("schedule_date", today)
-            .eq("shift_id", currentShift.id),
-          supabase
-            .from("schedule_attendance")
-            .select("schedule_id, status")
-            .eq("attendance_date", today)
-            .eq("shift_id", currentShift.id),
-        ]);
-
-        const matrix = matrixRes.data || [];
-        const schedules = schedulesRes.data || [];
-        const attendance = attendanceRes.data || [];
-
-        // Build attendance map
-        const attMap = new Map<string, string>();
-        attendance.forEach((a) => attMap.set(a.schedule_id, a.status));
-
-        // Build sector→unit map
-        const sectorUnitMap = new Map<string, string>();
-        sectors.forEach((s) => sectorUnitMap.set(s.id, s.unit_id));
-
-        // Compute stats per unit
-        const stats: Record<string, UnitStats> = {};
-        unitIds.forEach((uid) => {
-          stats[uid] = { meta: 0, escalados: 0, presentes: 0 };
-        });
-
-        // Add matrix targets
-        matrix.forEach((m) => {
-          const unitId = sectorUnitMap.get(m.sector_id);
-          if (unitId && stats[unitId]) {
-            stats[unitId].meta += (m.required_count ?? 0) + (m.extras_count ?? 0);
-          }
-        });
-
-        // Count schedules and attendance
-        schedules.forEach((s) => {
-          const unitId = sectorUnitMap.get(s.sector_id);
-          if (unitId && stats[unitId]) {
-            stats[unitId].escalados += 1;
-            if (attMap.get(s.id) === "presente") {
-              stats[unitId].presentes += 1;
-            }
-          }
-        });
-
-        if (!cancelled) {
-          setUnitStatsMap(stats);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error("AdminGlobalView fetch error:", err);
-        if (!cancelled) setLoading(false);
-      }
+    const filtered = rows.filter((r) => r.refeicao === shiftType);
+    const byUnit = new Map<string, typeof rows>();
+    for (const r of filtered) {
+      if (!byUnit.has(r.unit_id)) byUnit.set(r.unit_id, []);
+      byUnit.get(r.unit_id)!.push(r);
     }
-
-    fetchAll();
-    return () => { cancelled = true; };
-  }, [allLojas, shiftType, today]);
+    for (const [unitId, unitRows] of byUnit) {
+      if (!map[unitId]) continue;
+      map[unitId] = {
+        meta: unitRows.reduce((a, r) => a + (r.pop_total || 0), 0),
+        escalados: unitRows.reduce((a, r) => a + (r.escalados_clt || 0), 0),
+        presentes: unitRows.reduce((a, r) => a + (r.ponto_clt || 0) + (r.checkin_free || 0), 0),
+        status: aggregateStatus(unitRows),
+      };
+    }
+    return map;
+  }, [rows, shiftType, allLojas]);
 
   if (allLojas.length === 0) {
     return (
@@ -173,78 +101,78 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
         </p>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {isLoading ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {allLojas.map((loja) => {
-              const stats = unitStatsMap[loja.id] || { meta: 0, escalados: 0, presentes: 0 };
-              const pct = stats.meta > 0 ? Math.round((stats.presentes / stats.meta) * 100) : 0;
-              const isComplete = stats.presentes >= stats.meta && stats.meta > 0;
-              const isPartial = !isComplete && stats.presentes >= stats.meta * 0.7;
+          <TooltipProvider delayDuration={150}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {allLojas.map((loja) => {
+                const stats = unitStatsMap[loja.id] || { meta: 0, escalados: 0, presentes: 0, status: null };
+                const pct = stats.meta > 0 ? Math.round((stats.presentes / stats.meta) * 100) : 0;
 
-              return (
-                <button
-                  key={loja.id}
-                  onClick={() => onSelectUnit(loja.id)}
-                  className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-sm truncate">{loja.nome}</h4>
-                    {stats.meta > 0 ? (
-                      <Badge
-                        variant={isComplete ? "default" : "outline"}
-                        className={
-                          isComplete
-                            ? "bg-green-500/15 text-green-700 border-green-500/30"
-                            : isPartial
-                            ? "bg-yellow-500/15 text-yellow-700 border-yellow-500/30"
-                            : "bg-red-500/15 text-red-700 border-red-500/30"
-                        }
-                      >
-                        {isComplete ? (
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                        ) : isPartial ? (
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                        ) : (
-                          <XCircle className="h-3 w-3 mr-1" />
+                return (
+                  <button
+                    key={loja.id}
+                    onClick={() => onSelectUnit(loja.id)}
+                    className="text-left rounded-lg border bg-card/70 backdrop-blur-sm p-4 hover:border-primary/50 hover:shadow-md transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-3 gap-2">
+                      <h4 className="font-semibold text-sm truncate">{loja.nome}</h4>
+                      <div className="flex items-center gap-1">
+                        {stats.status === "VERDE_RESSALVA" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center text-yellow-600"
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Mix desviado (CLT/Free fora do plano)</TooltipContent>
+                          </Tooltip>
                         )}
-                        {pct}%
-                      </Badge>
-                    ) : null}
-                  </div>
+                        {stats.meta > 0 && stats.status && (
+                          <Badge variant="outline" className={statusBadgeClass(stats.status)}>
+                            <StatusIcon status={stats.status} />
+                            {pct}%
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-center mb-2">
-                    <div>
-                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                        <Target className="h-3 w-3" />
+                    <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Target className="h-3 w-3" />
+                        </div>
+                        <p className="text-lg font-bold">{stats.meta}</p>
+                        <p className="text-[10px] text-muted-foreground">Meta</p>
                       </div>
-                      <p className="text-lg font-bold">{stats.meta}</p>
-                      <p className="text-[10px] text-muted-foreground">Meta</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                        <Users className="h-3 w-3" />
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <Users className="h-3 w-3" />
+                        </div>
+                        <p className="text-lg font-bold">{stats.escalados}</p>
+                        <p className="text-[10px] text-muted-foreground">Escalados</p>
                       </div>
-                      <p className="text-lg font-bold">{stats.escalados}</p>
-                      <p className="text-[10px] text-muted-foreground">Escalados</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                        <UserCheck className="h-3 w-3" />
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                          <UserCheck className="h-3 w-3" />
+                        </div>
+                        <p className="text-lg font-bold">{stats.presentes}</p>
+                        <p className="text-[10px] text-muted-foreground">Presentes</p>
                       </div>
-                      <p className="text-lg font-bold">{stats.presentes}</p>
-                      <p className="text-[10px] text-muted-foreground">Presentes</p>
                     </div>
-                  </div>
 
-                  <Progress value={pct} className="h-2" />
-                </button>
-              );
-            })}
-          </div>
+                    <Progress value={pct} className="h-2" />
+                  </button>
+                );
+              })}
+            </div>
+          </TooltipProvider>
         )}
       </CardContent>
     </Card>

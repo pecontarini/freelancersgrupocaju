@@ -9,6 +9,7 @@ import {
   BarChart2,
   LayoutGrid,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";

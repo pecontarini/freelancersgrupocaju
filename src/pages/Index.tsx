@@ -47,6 +47,10 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "Gestão de Pessoas",
     subtitle: "Escalas e presença de freelancers",
   },
+  "quadro-operacional": {
+    title: "Quadro Operacional",
+    subtitle: "Visão geral do quadro operacional por unidade e setor",
+  },
   budgets: {
     title: "Budgets Gerenciais",
     subtitle: "Controle diário de gastos operacionais",

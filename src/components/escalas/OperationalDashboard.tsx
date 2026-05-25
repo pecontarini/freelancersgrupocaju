@@ -48,7 +48,27 @@ import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMat
 import { useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
 import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
+import { usePopStatusDiario, aggregateStatus, type PopStatus } from "@/hooks/usePopStatusDiario";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import { AdminGlobalView } from "./AdminGlobalView";
+
+function statusBadgeClass(status: PopStatus | null): string {
+  switch (status) {
+    case "VERMELHO": return "bg-red-500/15 text-red-700 border-red-500/30";
+    case "AMARELO": return "bg-yellow-500/15 text-yellow-700 border-yellow-500/30";
+    case "VERDE_RESSALVA":
+    case "VERDE_PURO": return "bg-green-500/15 text-green-700 border-green-500/30";
+    default: return "bg-muted text-muted-foreground border-border";
+  }
+}
+function statusLabel(status: PopStatus | null): string {
+  if (status === "VERMELHO") return "Crítico";
+  if (status === "AMARELO") return "Excesso";
+  if (status === "VERDE_RESSALVA") return "OK (mix)";
+  if (status === "VERDE_PURO") return "Completo";
+  return "—";
+}
 
 function getCurrentShiftType(): string {
   const hour = new Date().getHours();

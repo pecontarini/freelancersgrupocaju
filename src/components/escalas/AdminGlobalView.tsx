@@ -64,7 +64,8 @@ export function AdminGlobalView({ allLojas, shiftType, today, onSelectUnit }: Ad
     for (const loja of allLojas) {
       map[loja.id] = { meta: 0, escalados: 0, presentes: 0, status: null };
     }
-    const filtered = rows.filter((r) => r.refeicao === shiftType);
+    const shiftUpper = (shiftType || "").toUpperCase();
+    const filtered = rows.filter((r) => r.refeicao === shiftUpper);
     const byUnit = new Map<string, typeof rows>();
     for (const r of filtered) {
       if (!byUnit.has(r.unit_id)) byUnit.set(r.unit_id, []);

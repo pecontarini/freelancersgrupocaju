@@ -10,8 +10,8 @@ export interface PopStatusRow {
   brand: string | null;
   sector_id: string;
   sector_name: string;
-  dia_semana: number;
-  refeicao: "almoco" | "jantar" | string;
+  dia_semana: "SEG" | "TER" | "QUA" | "QUI" | "SEX" | "SAB" | "DOM" | string;
+  refeicao: "ALMOCO" | "JANTAR" | string;
   pop_clt: number;
   pop_free: number;
   pop_total: number;

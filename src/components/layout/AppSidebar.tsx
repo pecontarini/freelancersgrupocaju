@@ -69,6 +69,12 @@ const menuItems = [
     description: "Escalas e Presença Freelancers",
   },
   {
+    title: "QUADRO OPERACIONAL",
+    id: "quadro-operacional",
+    icon: ShieldCheck,
+    description: "Visão geral do quadro operacional por unidade",
+  },
+  {
     title: "DIAGNÓSTICO AUDITORIA",
     id: "diagnostico",
     icon: ClipboardCheck,

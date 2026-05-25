@@ -281,10 +281,14 @@ export function OperationalDashboard() {
         `🎯 Meta Total: ${totalMeta} | 👥 Escalados: ${totalEscalados} | ✅ Presentes: ${totalPresentes}`,
         ``,
       ];
-      sectorStats.forEach((ss) => {
-        const pct = ss.metaPOP > 0 ? Math.round((ss.presentes / ss.metaPOP) * 100) : 0;
-        const icon = ss.presentes >= ss.metaPOP ? "✅" : ss.presentes >= ss.metaPOP * 0.7 ? "⚠️" : "🔴";
-        lines.push(`${icon} *${ss.sector.name}*: ${ss.presentes}/${ss.metaPOP} (${pct}%) — Escalados: ${ss.escalados}`);
+      overviewSectorStats.forEach((ss) => {
+        const pct = ss.meta > 0 ? Math.round((ss.presentes / ss.meta) * 100) : 0;
+        const icon =
+          ss.status === "VERMELHO" ? "🔴" :
+          ss.status === "AMARELO" ? "⚠️" :
+          ss.status === "VERDE_RESSALVA" ? "🟡" :
+          ss.status === "VERDE_PURO" ? "✅" : "▫️";
+        lines.push(`${icon} *${ss.sector.name}*: ${ss.presentes}/${ss.meta} (${pct}%) — Escalados: ${ss.escalados}`);
       });
       navigator.clipboard.writeText(lines.join("\n")).then(() => {
         toast.success("Resumo consolidado copiado!");

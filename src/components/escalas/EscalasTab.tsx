@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarDays, Users, Settings2, Briefcase, ClipboardList, BarChart3, Building2, Sparkles } from "lucide-react";
 import { GeradorEscalaIA } from "./GeradorEscalaIA";
 import { ManualScheduleGrid } from "./ManualScheduleGrid";
-import { OperationalDashboard } from "./OperationalDashboard";
 import { D1ManagementPanel } from "./D1ManagementPanel";
 import { TeamManagement } from "./TeamManagement";
 import { SectorJobTitleMapping } from "./SectorJobTitleMapping";

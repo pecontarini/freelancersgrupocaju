@@ -116,7 +116,7 @@ export function CMVSalesProcessor() {
           });
         } catch (error) {
           // Silently fail - item may already exist
-          console.log("Item already in pending:", itemName);
+          
         }
       }
 

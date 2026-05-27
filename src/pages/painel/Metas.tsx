@@ -27,7 +27,6 @@ import { toast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 
 const METRIC_KEYS: RankingMetric[] = ["nps", "cmv-salmao", "cmv-carnes", "kds", "conformidade"];
-void METRIC_KEYS;
 
 export default function MetasPage() {
   const navigate = useNavigate();

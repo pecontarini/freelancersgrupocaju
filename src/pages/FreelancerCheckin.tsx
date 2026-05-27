@@ -86,7 +86,7 @@ export default function FreelancerCheckin() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => console.log("Geolocation denied")
+        () => {}
       );
     }
   }, []);

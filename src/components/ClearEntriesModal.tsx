@@ -56,10 +56,6 @@ export function ClearEntriesModal() {
         throw error;
       }
 
-      // Log the action to console (audit trail)
-      console.log(
-        `[AUDIT] Admin ${user?.email} cleared all entries for store "${selectedLoja.nome}" (ID: ${selectedLojaId}) at ${new Date().toISOString()}`
-      );
 
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });

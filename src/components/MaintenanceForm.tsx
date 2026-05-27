@@ -222,7 +222,7 @@ export function MaintenanceForm() {
                 newExtractedFields.data_servico = true;
               }
             } catch {
-              console.log("Could not parse date:", extracted.data_servico);
+              console.warn("Could not parse date:", extracted.data_servico);
             }
           }
           

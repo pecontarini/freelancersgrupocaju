@@ -206,7 +206,7 @@ export function UnifiedExpenseForm({ storeId }: UnifiedExpenseFormProps) {
                 setDate(parsedDate);
               }
             } catch {
-              console.log("Could not parse date:", extracted.data_servico);
+              console.warn("Could not parse date:", extracted.data_servico);
             }
           }
           if (extracted.valor) {

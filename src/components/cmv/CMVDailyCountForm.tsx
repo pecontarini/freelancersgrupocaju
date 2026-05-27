@@ -184,7 +184,7 @@ export function CMVDailyCountForm() {
     try {
       doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 15);
     } catch (e) {
-      console.log("Logo not available");
+      
     }
 
     // Header

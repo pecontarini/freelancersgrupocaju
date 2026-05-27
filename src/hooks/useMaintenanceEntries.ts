@@ -64,7 +64,6 @@ export function useMaintenanceEntries() {
       return data;
     },
     onSuccess: (data) => {
-      console.log("Maintenance entry added successfully:", data);
       queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
       toast.success("Manutenção cadastrada com sucesso!", {
         description: `${data.fornecedor} - R$ ${data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,

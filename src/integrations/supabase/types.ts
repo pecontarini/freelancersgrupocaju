@@ -2307,6 +2307,57 @@ export type Database = {
           },
         ]
       }
+      employee_merge_log: {
+        Row: {
+          canonico_id: string
+          canonico_name: string
+          canonico_secullum_id: number | null
+          duplicata_id: string
+          duplicata_name: string
+          duplicata_secullum_id: number | null
+          executado_em: string
+          id: string
+          motivo: string | null
+          payload_extra: Json | null
+          schedules_deletadas: number
+          schedules_remapeadas: number
+          time_punches_deletados: number
+          time_punches_remapeados: number
+        }
+        Insert: {
+          canonico_id: string
+          canonico_name: string
+          canonico_secullum_id?: number | null
+          duplicata_id: string
+          duplicata_name: string
+          duplicata_secullum_id?: number | null
+          executado_em?: string
+          id?: string
+          motivo?: string | null
+          payload_extra?: Json | null
+          schedules_deletadas?: number
+          schedules_remapeadas?: number
+          time_punches_deletados?: number
+          time_punches_remapeados?: number
+        }
+        Update: {
+          canonico_id?: string
+          canonico_name?: string
+          canonico_secullum_id?: number | null
+          duplicata_id?: string
+          duplicata_name?: string
+          duplicata_secullum_id?: number | null
+          executado_em?: string
+          id?: string
+          motivo?: string | null
+          payload_extra?: Json | null
+          schedules_deletadas?: number
+          schedules_remapeadas?: number
+          time_punches_deletados?: number
+          time_punches_remapeados?: number
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           active: boolean
@@ -6807,6 +6858,7 @@ export type Database = {
           executado_em: string
           id: string
           max_fonte_dados_id: number | null
+          origens_distribuicao: Json | null
           qtd_inserida: number
           qtd_orfas: number
           qtd_puxada: number
@@ -6819,6 +6871,7 @@ export type Database = {
           executado_em?: string
           id?: string
           max_fonte_dados_id?: number | null
+          origens_distribuicao?: Json | null
           qtd_inserida?: number
           qtd_orfas?: number
           qtd_puxada?: number
@@ -6831,6 +6884,7 @@ export type Database = {
           executado_em?: string
           id?: string
           max_fonte_dados_id?: number | null
+          origens_distribuicao?: Json | null
           qtd_inserida?: number
           qtd_orfas?: number
           qtd_puxada?: number
@@ -7867,7 +7921,16 @@ export type Database = {
           tipo_chave_pix: string
         }[]
       }
-      merge_duplicate_employees: { Args: { p_unit_id: string }; Returns: Json }
+      merge_duplicate_employees:
+        | {
+            Args: {
+              p_canonico_id: string
+              p_duplicata_ids: string[]
+              p_motivo?: string
+            }
+            Returns: Json
+          }
+        | { Args: { p_unit_id: string }; Returns: Json }
       merge_employees_into_secullum: {
         Args: { p_pairs: Json; p_unit_id: string }
         Returns: Json
@@ -7912,6 +7975,18 @@ export type Database = {
           duracao_ms: number
           linhas_limpas: number
           mb_liberados: number
+        }[]
+      }
+      pop_extras_hoje: {
+        Args: { p_data: string; p_unit_id: string }
+        Returns: {
+          employee_id: string
+          employee_name: string
+          job_title: string
+          punch_in_hora: string
+          punch_in_ts: string
+          secullum_id: number
+          unit_id: string
         }[]
       }
       pop_quadro_detalhado: {
@@ -7988,6 +8063,10 @@ export type Database = {
         Returns: boolean
       }
       reset_cmv_module: { Args: { p_unit_ids?: string[] }; Returns: Json }
+      reset_sync_secullum_cursor: {
+        Args: { p_motivo?: string; p_novo_cursor: number }
+        Returns: Json
+      }
       reset_unit_sales_data: { Args: { target_unit_id: string }; Returns: Json }
       resolve_cargo_canonico: {
         Args: { p_cargo_texto: string; p_unit_id: string }

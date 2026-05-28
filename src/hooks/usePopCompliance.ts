@@ -187,10 +187,19 @@ export function usePopCompliance(
 
           for (const sector of storeSectors) {
             for (const shift of shiftTypes) {
-              const matrixEntry = matrixData.find(
-                (m) => m.sector_id === sector.id && m.day_of_week === dow && m.shift_type === shift
+              const diaEnum = POP_DAY_ENUM[dow];
+              const refeicaoEnum = shift.toUpperCase(); // "almoco" -> "ALMOCO"
+              const popEntry = popData.find(
+                (m) =>
+                  m.sector_id === sector.id &&
+                  m.unit_id === store.id &&
+                  m.dia_semana === diaEnum &&
+                  m.refeicao === refeicaoEnum
               );
-              const required = (matrixEntry?.required_count ?? 0) + (matrixEntry?.extras_count ?? 0);
+              // PISO: prefer generated column quantidade_minima, fallback to soma manual.
+              const required = popEntry
+                ? (popEntry.quantidade_minima ?? ((popEntry.minimo_clt ?? 0) + (popEntry.minimo_freelancer ?? 0)))
+                : 0;
               if (required === 0) continue; // no POP defined
 
               const scheduled = countScheduled(sector.id, dateStr, shift);

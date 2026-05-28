@@ -42,7 +42,7 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.setTextColor(...PDF_COLORS.gray800);
+  doc.setTextColor(...PDF_COLORS.graphite);
   doc.text("Controle de Intervalos", margin + 26, 14);
 
   doc.setFont("helvetica", "normal");
@@ -52,7 +52,7 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
 
   const dateLabel = format(parseISO(date + "T12:00:00"), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR });
   doc.setFontSize(10);
-  doc.setTextColor(...PDF_COLORS.gray800);
+  doc.setTextColor(...PDF_COLORS.graphite);
   doc.text(dateLabel, pageWidth - margin, 14, { align: "right" });
 
   doc.setDrawColor(...PDF_COLORS.gray200);
@@ -83,7 +83,7 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
     doc.rect(margin, cursorY, pageWidth - margin * 2, 7, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.setTextColor(...PDF_COLORS.gray800);
+    doc.setTextColor(...PDF_COLORS.graphite);
     doc.text(sectorName.toUpperCase(), margin + 2, cursorY + 5);
     cursorY += 9;
 
@@ -119,14 +119,14 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
         font: "helvetica",
         fontSize: 9,
         cellPadding: 2.2,
-        textColor: PDF_COLORS.gray800 as any,
+        textColor: PDF_COLORS.graphite as any,
         lineColor: PDF_COLORS.gray200 as any,
         lineWidth: 0.2,
         minCellHeight: 9, // espaço para escrever à mão
       },
       headStyles: {
         fillColor: PDF_COLORS.gray100 as any,
-        textColor: PDF_COLORS.gray800 as any,
+        textColor: PDF_COLORS.graphite as any,
         fontStyle: "bold",
         fontSize: 8.5,
       },

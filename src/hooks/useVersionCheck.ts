@@ -73,7 +73,9 @@ function reloadWithBust(buildId: string | null) {
     if ("caches" in window) {
       caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
     }
-  } catch {}
+  } catch (error) {
+    console.warn('[useVersionCheck] limpeza de caches antes do reload falhou:', error);
+  }
   const url = new URL(window.location.href);
   url.searchParams.set("v", buildId ?? String(Date.now()));
   window.location.replace(url.toString());

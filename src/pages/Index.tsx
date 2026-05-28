@@ -12,21 +12,16 @@ import { PortalHeader } from "@/components/layout/PortalHeader";
 import { RedFlagBanner } from "@/components/metas/RedFlagBanner";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
 
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
-import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
 
-import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { OperationalDashboard } from "@/components/escalas/OperationalDashboard";
 import { UtensiliosTab } from "@/components/utensilios";
-import { EstoqueTab } from "@/components/estoque";
 // PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
-import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
 import { UnitariosGerentesTab } from "@/components/dashboard/UnitariosGerentesTab";
 import { GestaoPessoasTab } from "@/components/dashboard/GestaoPessoasTab";
@@ -51,21 +46,9 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "Quadro Operacional",
     subtitle: "Visão geral do quadro operacional por unidade e setor",
   },
-  budgets: {
-    title: "Budgets Gerenciais",
-    subtitle: "Controle diário de gastos operacionais",
-  },
   diagnostico: {
     title: "Diagnóstico de Auditoria",
     subtitle: "Análise de não conformidades e plano de ação",
-  },
-  cmv: {
-    title: "CMV (Unitários)",
-    subtitle: "Controle de insumos e estoque",
-  },
-  presenca: {
-    title: "Presença Freelancers",
-    subtitle: "Check-in/check-out e validação de presença",
   },
   configuracoes: {
     title: "Configurações",
@@ -75,17 +58,9 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "Visão Rede",
     subtitle: "Consolidado de todas as unidades",
   },
-  escalas: {
-    title: "Escalas",
-    subtitle: "Construtor de escalas com validação CLT e compliance POP",
-  },
   utensilios: {
     title: "Utensílios",
     subtitle: "Controle de utensílios, contagem e budget mensal",
-  },
-  estoque: {
-    title: "Estoque Geral",
-    subtitle: "Gestão de estoque por setor com inventários e movimentações",
   },
   painel: {
     title: "Painel de Indicadores",
@@ -238,7 +213,7 @@ const Index = () => {
     );
   }
 
-  const currentTabConfig = tabConfig[activeTab] || tabConfig.budgets;
+  const currentTabConfig = tabConfig[activeTab] || tabConfig["unitarios-gerentes"];
 
   const renderTabContent = () => {
     const budgetsProps = {
@@ -267,13 +242,6 @@ const Index = () => {
         return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
       case "quadro-operacional":
         return <OperationalDashboard />;
-      case "budgets":
-        return (
-          <div className="space-y-4">
-            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
-            <BudgetsGerenciaisTab {...budgetsProps} />
-          </div>
-        );
       case "diagnostico":
         return (
           <AuditDiagnosticDashboard
@@ -281,16 +249,8 @@ const Index = () => {
             isAdmin={isAdmin}
           />
         );
-      case "cmv":
-        return <CMVTab />;
-      case "escalas":
-        return <EscalasTab />;
-      case "presenca":
-        return <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />;
       case "utensilios":
         return <UtensiliosTab />;
-      case "estoque":
-        return <EstoqueTab />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

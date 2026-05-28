@@ -60,7 +60,6 @@ function App() {
                   element={<ChecklistCorrections />}
                 />
                 <Route path="/checkin" element={<FreelancerCheckin />} />
-                <Route path="/checkin-demo" element={<FreelancerCheckinDemo />} />
                 <Route path="/estacao-checkin" element={<EstacaoCheckin />} />
                 <Route path="/aprovar-escala/:token" element={<AprovarEscala />} />
                 <Route path="/atualizar-pix/:token" element={<AtualizarPix />} />

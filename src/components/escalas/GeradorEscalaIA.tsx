@@ -184,7 +184,7 @@ export function GeradorEscalaIA() {
   // holding_staffing_config.month_year.
   const monthYear = useMemo(() => toMondayISO(semana).slice(0, 7), [semana]);
 
-  // Canônica: lê POP de holding_staffing_config (não mais escala_minima).
+  // Canônica: lê POP de holding_staffing_config (legacy escala_minima removido).
   // Setor é traduzido via legacyToSectorKey (turno_config.setor → sector_key).
   const { data: holdingRows } = useQuery({
     queryKey: ["holding_staffing_config", effectiveUnidadeId, unitBrand, setor, monthYear],
@@ -342,7 +342,7 @@ export function GeradorEscalaIA() {
           acc.push({
             setor: s,
             status: "skipped",
-            motivo: "Configuração ausente (turno_config ou escala_minima).",
+            motivo: "Configuração ausente (turno_config ou holding_staffing_config).",
           });
         } else if (error) {
           acc.push({ setor: s, status: "fail", motivo: errMsg || "Erro na edge function" });

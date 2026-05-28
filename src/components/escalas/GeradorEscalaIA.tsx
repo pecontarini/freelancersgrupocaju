@@ -293,24 +293,29 @@ export function GeradorEscalaIA() {
     setBatchResults([]);
     setBatchProgress({ idx: 0, total: setores.length, current: setores[0] ?? "" });
 
-    // Pré-carrega quais setores têm escala_minima cadastrada (necessário pela edge function)
-    const { data: minRows } = await supabase
-      .from("escala_minima")
-      .select("setor")
-      .eq("unidade_id", effectiveUnidadeId);
-    const setoresComMinima = new Set((minRows ?? []).map((r: any) => r.setor));
+    // Pré-carrega quais sector_keys têm POP cadastrado no holding_staffing_config
+    // (necessário pela edge function — sem POP a função devolve 404).
+    const monthYear = semanaMonday.slice(0, 7);
+    const { data: holdingMinRows } = await supabase
+      .from("holding_staffing_config")
+      .select("sector_key")
+      .eq("unit_id", effectiveUnidadeId)
+      .eq("month_year", monthYear);
+    const sectorKeysComPOP = new Set(
+      (holdingMinRows ?? []).map((r: any) => r.sector_key as string),
+    );
 
     const acc: BatchResult[] = [];
     for (let i = 0; i < setores.length; i++) {
       const s = setores[i];
       setBatchProgress({ idx: i + 1, total: setores.length, current: s });
 
-      // Skip cedo: sem escala_minima a edge function devolve 404
-      if (!setoresComMinima.has(s)) {
+      // Skip cedo: sem POP a edge function devolve 404
+      if (!sectorKeysComPOP.has(legacyToSectorKey(s))) {
         acc.push({
           setor: s,
           status: "skipped",
-          motivo: "Sem escala_minima cadastrada para este setor (configure POP antes).",
+          motivo: "Sem POP cadastrado para este setor no mês corrente (configure em Holding antes).",
         });
         setBatchResults([...acc]);
         continue;

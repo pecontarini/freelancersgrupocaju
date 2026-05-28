@@ -44,7 +44,7 @@ import { toast } from "sonner";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useAccessibleStores } from "@/hooks/useAccessibleStores";
 import { useUnidade } from "@/contexts/UnidadeContext";
-import { useSectors, useShifts, useStaffingMatrix } from "@/hooks/useStaffingMatrix";
+import { useSectors, useShifts } from "@/hooks/useStaffingMatrix";
 import { useSchedulableEmployees } from "@/hooks/useEmployees";
 import { useSchedulesBySector } from "@/hooks/useSchedules";
 import { useAttendance, useMarkPresent, useMarkAbsent } from "@/hooks/useAttendance";
@@ -120,7 +120,6 @@ export function OperationalDashboard() {
   const { data: sectors = [] } = useSectors(selectedUnit);
   const { data: shifts = [] } = useShifts();
   const sectorIds = sectors.map((s) => s.id);
-  const { data: matrix = [] } = useStaffingMatrix(sectorIds);
   const { data: employees = [], isLoading: loadingEmp } = useSchedulableEmployees(selectedUnit);
 
   const currentShift = shifts.find((s) => s.type === shiftType);
@@ -149,21 +148,30 @@ export function OperationalDashboard() {
     return map;
   }, [attendance]);
 
-  const dayOfWeek = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  // ─── RPC-backed POP rows (única fonte de meta — substitui staffing_matrix) ───
+  const { data: popRows = [] } = usePopStatusDiario(today);
 
   // ─── Per-sector stats (used by both views) ───
+  // Meta agora vem de pop_minimo_padrao via RPC pop_status_diario,
+  // filtrada por unit_id + refeicao(uppercase). Mapeamento:
+  //   metaEfetivos ← Σ pop_clt | metaExtras ← Σ pop_free | metaPOP ← Σ pop_total
   const sectorStats = useMemo(() => {
-    if (!currentShift) return [];
+    if (!currentShift || !selectedUnit) return [];
+    const shiftUpper = shiftType.toUpperCase();
+    const filtered = popRows.filter(
+      (r) => r.unit_id === selectedUnit && r.refeicao === shiftUpper
+    );
+    const bySector = new Map<string, typeof filtered>();
+    for (const r of filtered) {
+      if (!bySector.has(r.sector_id)) bySector.set(r.sector_id, []);
+      bySector.get(r.sector_id)!.push(r);
+    }
+
     return sectors.map((sector) => {
-      const me = matrix.find(
-        (m) =>
-          m.sector_id === sector.id &&
-          m.day_of_week === dayOfWeek &&
-          m.shift_type === shiftType
-      );
-      const metaEfetivos = me?.required_count ?? 0;
-      const metaExtras = me?.extras_count ?? 0;
-      const metaPOP = metaEfetivos + metaExtras;
+      const rows = bySector.get(sector.id) || [];
+      const metaEfetivos = rows.reduce((a, r) => a + (r.pop_clt || 0), 0);
+      const metaExtras = rows.reduce((a, r) => a + (r.pop_free || 0), 0);
+      const metaPOP = rows.reduce((a, r) => a + (r.pop_total || 0), 0);
 
       const sectorSchedules = schedules.filter(
         (s) =>
@@ -187,17 +195,14 @@ export function OperationalDashboard() {
         schedules: sectorSchedules,
       };
     });
-  }, [sectors, matrix, schedules, attendanceMap, currentShift, dayOfWeek, shiftType, today]);
-
-  // ─── RPC-backed overview stats (substitui Meta/Escalados/Presentes na visão "Todos os setores") ───
-  const { data: popRows = [] } = usePopStatusDiario(today);
+  }, [sectors, popRows, selectedUnit, shiftType, schedules, attendanceMap, currentShift, today]);
 
   const overviewSectorStats = useMemo(() => {
     if (!selectedUnit) return [] as Array<{
       sector: typeof sectors[number];
       meta: number; escalados: number; presentes: number; status: PopStatus | null;
     }>;
-    const filtered = popRows.filter((r) => r.unit_id === selectedUnit && r.refeicao === shiftType);
+    const filtered = popRows.filter((r) => r.unit_id === selectedUnit && r.refeicao === shiftType.toUpperCase());
     const bySector = new Map<string, typeof filtered>();
     for (const r of filtered) {
       if (!bySector.has(r.sector_id)) bySector.set(r.sector_id, []);

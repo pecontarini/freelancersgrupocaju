@@ -29,8 +29,9 @@ export function useVersionCheck() {
           setRemoteBuildId(data.buildId);
           setUpdateAvailable(true);
         }
-      } catch {
+      } catch (error) {
         // silencioso — rede instável não deve causar barulho
+        console.warn('[useVersionCheck] version.json fetch falhou (silencioso):', error);
       }
     };
 

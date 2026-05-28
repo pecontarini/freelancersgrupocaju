@@ -94,7 +94,9 @@ function generateSectorPDF(
     // Logo
     try {
       doc.addImage(LOGO_BASE64, "JPEG", margin, y - 5, 22, 15);
-    } catch {}
+    } catch (error) {
+      console.warn('[SectorReportGenerator] addImage do logo falhou:', error);
+    }
 
     // Title
     doc.setFont("helvetica", "bold");

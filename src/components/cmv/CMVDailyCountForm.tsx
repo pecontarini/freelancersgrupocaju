@@ -183,8 +183,8 @@ export function CMVDailyCountForm() {
     // Logo
     try {
       doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 15);
-    } catch (e) {
-      
+    } catch (error) {
+      console.warn('[CMVDailyCountForm] falha ao adicionar logo no PDF:', error);
     }
 
     // Header

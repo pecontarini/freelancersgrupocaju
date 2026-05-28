@@ -83,6 +83,7 @@ import { calculateDailyMetrics } from "@/lib/peakHours";
 import { ScheduleExcelFlow } from "./ScheduleExcelFlow";
 import { ScheduleAIGenerator, type AIProposalShift } from "./ScheduleAIGenerator";
 import { MasterExportButton } from "./MasterExportButton";
+import { IntervalosButton } from "./IntervalosButton";
 import { WeeklyHoursSummary } from "./WeeklyHoursSummary";
 import { ClearSchedulesModal } from "./ClearSchedulesModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -1142,6 +1143,12 @@ export function ManualScheduleGrid() {
               unitId={selectedUnit}
               unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "Unidade"}
               weekStart={currentWeekBase}
+            />
+          )}
+          {canManage && selectedUnit && (
+            <IntervalosButton
+              unitId={selectedUnit}
+              unitName={lojas.options.find((l) => l.id === selectedUnit)?.nome || "Unidade"}
             />
           )}
           {activeSectorId && (

@@ -1,9 +1,16 @@
 // Edge function: gerar-escala-ia
-// Lê turno_config + escala_minima da unidade/setor, chama Lovable AI Gateway (gpt-5),
-// valida, persiste em escala_template e retorna { template_id, escala }.
+// Lê turno_config + holding_staffing_config (POP canônico) da unidade/setor,
+// chama Lovable AI Gateway (gpt-5), valida, persiste em escala_template
+// e retorna { template_id, escala }.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { SYSTEM_PROMPT, buildUserPrompt } from "./prompt.ts";
+import { legacyToSectorKey } from "./sectorAlias.ts";
+
+// Holding convention: 0=DOM..6=SAB (mesma de sectors.ts no frontend).
+const DIA_TO_HOLDING_DOW: Record<string, number> = {
+  DOM: 0, SEG: 1, TER: 2, QUA: 3, QUI: 4, SEX: 5, SAB: 6,
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,12 +49,28 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const [{ data: pop }, { data: config }, { data: sectorRow }] = await Promise.all([
+    // Resolve brand do unidade_id para isolamento explícito do POP holding.
+    const { data: unitRow } = await supabase
+      .from("config_lojas")
+      .select("brand")
+      .eq("id", unidade_id)
+      .maybeSingle();
+    const unitBrand = (unitRow as { brand?: string } | null)?.brand;
+    if (!unitBrand) {
+      return json({ error: "Brand não encontrada para a unidade informada." }, 404);
+    }
+
+    const sectorKey = legacyToSectorKey(setor);
+    const monthYear = String(semana_inicio).slice(0, 7); // YYYY-MM
+
+    const [{ data: popRaw }, { data: config }, { data: sectorRow }] = await Promise.all([
       supabase
-        .from("escala_minima")
-        .select("dia_semana, turno, qtd_efetivos, qtd_extras")
-        .eq("unidade_id", unidade_id)
-        .eq("setor", setor),
+        .from("holding_staffing_config")
+        .select("day_of_week, shift_type, required_count, extras_count")
+        .eq("unit_id", unidade_id)
+        .eq("brand", unitBrand)
+        .eq("sector_key", sectorKey)
+        .eq("month_year", monthYear),
       supabase
         .from("turno_config")
         .select("*")
@@ -60,9 +83,29 @@ Deno.serve(async (req) => {
         .eq("unit_id", unidade_id),
     ]);
 
-    if (!pop?.length || !config) {
-      return json({ error: "Configuração não encontrada para este setor." }, 404);
+    if (!popRaw?.length || !config) {
+      return json({ error: "Configuração não encontrada para este setor (holding_staffing_config)." }, 404);
     }
+
+    // Agrega multi-regime: SUM por (day_of_week, shift_type).
+    type PopAgg = { day_of_week: number; shift_type: string; required_count: number; extras_count: number };
+    const popAggMap = new Map<string, PopAgg>();
+    for (const r of popRaw as Array<{ day_of_week: number; shift_type: string; required_count: number | null; extras_count: number | null }>) {
+      const k = `${r.day_of_week}|${r.shift_type}`;
+      const prev = popAggMap.get(k);
+      if (prev) {
+        prev.required_count += Number(r.required_count ?? 0);
+        prev.extras_count += Number(r.extras_count ?? 0);
+      } else {
+        popAggMap.set(k, {
+          day_of_week: r.day_of_week,
+          shift_type: r.shift_type,
+          required_count: Number(r.required_count ?? 0),
+          extras_count: Number(r.extras_count ?? 0),
+        });
+      }
+    }
+    const pop = Array.from(popAggMap.values());
 
     // Resolver sector_id pelo nome (normalizado) para calcular headcount real do setor
     const norm = (s: string) =>
@@ -155,14 +198,15 @@ Deno.serve(async (req) => {
     console.log(`[gerar-escala-ia] setor=${setor} headcount_vinculado=${headcountVinculado} headcount_equivalente=${headcountEquivalente} headcount_max=${headcountMax}`);
 
     const tabelaMinima = DIAS.map((dia) => {
-      const al = pop.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));
-      const ja = pop.find((r) => r.dia_semana === dia && r.turno === "JANTAR");
+      const dow = DIA_TO_HOLDING_DOW[dia];
+      const al = pop.find((r) => r.day_of_week === dow && r.shift_type === "almoco");
+      const ja = pop.find((r) => r.day_of_week === dow && r.shift_type === "jantar");
       return {
         dia,
-        almoco_efetivos: al?.qtd_efetivos ?? 0,
-        almoco_extras: al?.qtd_extras ?? 0,
-        jantar_efetivos: ja?.qtd_efetivos ?? 0,
-        jantar_extras: ja?.qtd_extras ?? 0,
+        almoco_efetivos: al?.required_count ?? 0,
+        almoco_extras: al?.extras_count ?? 0,
+        jantar_efetivos: ja?.required_count ?? 0,
+        jantar_extras: ja?.extras_count ?? 0,
       };
     });
 

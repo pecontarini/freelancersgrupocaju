@@ -1,6 +1,6 @@
 import { useState } from "react";
 // ThemeToggle moved to PortalHeader (Onda 2)
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Wallet,
   
@@ -283,6 +283,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 {user?.email}
               </p>
             </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link to="/perfil/seguranca">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Segurança
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={signOut}

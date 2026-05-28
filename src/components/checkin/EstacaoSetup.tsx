@@ -54,7 +54,9 @@ export function EstacaoSetup({ onReady }: Props) {
             if (fromUrl && (data || []).some((l) => l.id === fromUrl)) {
               setLojaId(fromUrl);
             }
-          } catch {}
+          } catch (error) {
+            console.warn('[EstacaoSetup] parse de ?unidade= falhou:', error);
+          }
         }
       });
   }, []);

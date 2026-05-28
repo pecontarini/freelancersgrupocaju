@@ -61,7 +61,9 @@ export function CMVClosingReport() {
 
     try {
       doc.addImage(LOGO_BASE64, "PNG", 14, 10, 30, 15);
-    } catch {}
+    } catch (error) {
+      console.warn('[CMVClosingReport] addImage do logo no PDF falhou:', error);
+    }
 
     doc.setFontSize(16);
     doc.text("Relatório de Fechamento CMV", 50, 18);

@@ -462,7 +462,11 @@ export function ManualScheduleGrid() {
       if (d.unitId && d.unitId !== selectedUnit) setLocalUnitId(d.unitId);
       if (d.sectorId) setSelectedSectorId(d.sectorId);
       if (d.weekStart) {
-        try { setCurrentWeekBase(new Date(`${d.weekStart}T12:00:00`)); } catch {}
+        try {
+          setCurrentWeekBase(new Date(`${d.weekStart}T12:00:00`));
+        } catch (error) {
+          console.warn('[ManualScheduleGrid] parse de weekStart falhou:', error);
+        }
       }
     }
     window.addEventListener("ai-drafts-ready", onDrafts as any);

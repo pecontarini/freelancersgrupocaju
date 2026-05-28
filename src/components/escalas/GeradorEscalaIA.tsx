@@ -16,8 +16,14 @@ import {
 import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight, ListChecks, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { insertDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
+import { legacyToSectorKey } from "@/lib/holding/sectorAlias";
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
+
+// DIAS index (0=SEG..6=DOM, convenção popConventions) → holding_staffing_config.day_of_week (0=DOM..6=SAB)
+const DIA_TO_HOLDING_DOW: Record<string, number> = {
+  SEG: 1, TER: 2, QUA: 3, QUI: 4, SEX: 5, SAB: 6, DOM: 0,
+};
 
 // Normaliza qualquer data YYYY-MM-DD para a segunda-feira (00:00) da mesma semana ISO.
 // Mantém string pura para evitar problemas de timezone.
@@ -40,12 +46,12 @@ interface TurnoConfigRow {
   observacoes: string | null;
 }
 
-interface EscalaMinimaRow {
-  setor: string;
-  dia_semana: string;
-  turno: string;
-  qtd_efetivos: number;
-  qtd_extras: number;
+interface HoldingStaffingRow {
+  sector_key: string;
+  day_of_week: number;   // 0=DOM..6=SAB
+  shift_type: string;    // "almoco" | "jantar"
+  required_count: number;
+  extras_count: number;
 }
 
 interface SlotResponse {
@@ -158,17 +164,42 @@ export function GeradorEscalaIA() {
     },
   });
 
-  const { data: escalaMinimas } = useQuery({
-    queryKey: ["escala_minima", effectiveUnidadeId, setor],
-    enabled: !!effectiveUnidadeId && !!setor,
+  // Brand da unidade — necessário para isolar query de holding_staffing_config
+  // (P1: isolamento explícito contra cross-brand).
+  const { data: unitBrand } = useQuery({
+    queryKey: ["config-loja-brand", effectiveUnidadeId],
+    enabled: !!effectiveUnidadeId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("escala_minima")
-        .select("setor, dia_semana, turno, qtd_efetivos, qtd_extras")
-        .eq("unidade_id", effectiveUnidadeId!)
-        .eq("setor", setor);
+        .from("config_lojas")
+        .select("brand")
+        .eq("id", effectiveUnidadeId!)
+        .maybeSingle();
       if (error) throw error;
-      return (data ?? []) as EscalaMinimaRow[];
+      return (data?.brand ?? null) as string | null;
+    },
+  });
+
+  // Mês corrente derivado da semana selecionada (YYYY-MM) para casar com
+  // holding_staffing_config.month_year.
+  const monthYear = useMemo(() => toMondayISO(semana).slice(0, 7), [semana]);
+
+  // Canônica: lê POP de holding_staffing_config (legacy escala_minima removido).
+  // Setor é traduzido via legacyToSectorKey (turno_config.setor → sector_key).
+  const { data: holdingRows } = useQuery({
+    queryKey: ["holding_staffing_config", effectiveUnidadeId, unitBrand, setor, monthYear],
+    enabled: !!effectiveUnidadeId && !!unitBrand && !!setor,
+    queryFn: async () => {
+      const sectorKey = legacyToSectorKey(setor);
+      const { data, error } = await supabase
+        .from("holding_staffing_config")
+        .select("sector_key, day_of_week, shift_type, required_count, extras_count")
+        .eq("unit_id", effectiveUnidadeId!)
+        .eq("brand", unitBrand!)
+        .eq("sector_key", sectorKey)
+        .eq("month_year", monthYear);
+      if (error) throw error;
+      return (data ?? []) as HoldingStaffingRow[];
     },
   });
 
@@ -188,19 +219,28 @@ export function GeradorEscalaIA() {
   }
 
   const tabelaMinima = useMemo(() => {
-    if (!escalaMinimas) return [];
+    if (!holdingRows) return [];
     return DIAS.map((dia) => {
-      const al = escalaMinimas.find((r) => r.dia_semana === dia && (r.turno === "ALMOCO" || r.turno === "TARDE"));
-      const ja = escalaMinimas.find((r) => r.dia_semana === dia && r.turno === "JANTAR");
+      const dow = DIA_TO_HOLDING_DOW[dia];
+      // Agrega múltiplos regimes (5x2 + 6x1) somando required+extras por turno.
+      const aggregate = (shift: "almoco" | "jantar") => {
+        const rows = holdingRows.filter((r) => r.day_of_week === dow && r.shift_type === shift);
+        return {
+          efetivos: rows.reduce((a, r) => a + (r.required_count ?? 0), 0),
+          extras: rows.reduce((a, r) => a + (r.extras_count ?? 0), 0),
+        };
+      };
+      const al = aggregate("almoco");
+      const ja = aggregate("jantar");
       return {
         dia,
-        almoco_efetivos: al?.qtd_efetivos ?? 0,
-        almoco_extras: al?.qtd_extras ?? 0,
-        jantar_efetivos: ja?.qtd_efetivos ?? 0,
-        jantar_extras: ja?.qtd_extras ?? 0,
+        almoco_efetivos: al.efetivos,
+        almoco_extras: al.extras,
+        jantar_efetivos: ja.efetivos,
+        jantar_extras: ja.extras,
       };
     });
-  }, [escalaMinimas]);
+  }, [holdingRows]);
 
   const [templateId, setTemplateId] = useState<string | null>(null);
 
@@ -253,24 +293,29 @@ export function GeradorEscalaIA() {
     setBatchResults([]);
     setBatchProgress({ idx: 0, total: setores.length, current: setores[0] ?? "" });
 
-    // Pré-carrega quais setores têm escala_minima cadastrada (necessário pela edge function)
-    const { data: minRows } = await supabase
-      .from("escala_minima")
-      .select("setor")
-      .eq("unidade_id", effectiveUnidadeId);
-    const setoresComMinima = new Set((minRows ?? []).map((r: any) => r.setor));
+    // Pré-carrega quais sector_keys têm POP cadastrado no holding_staffing_config
+    // (necessário pela edge function — sem POP a função devolve 404).
+    const monthYear = semanaMonday.slice(0, 7);
+    const { data: holdingMinRows } = await supabase
+      .from("holding_staffing_config")
+      .select("sector_key")
+      .eq("unit_id", effectiveUnidadeId)
+      .eq("month_year", monthYear);
+    const sectorKeysComPOP = new Set(
+      (holdingMinRows ?? []).map((r: any) => r.sector_key as string),
+    );
 
     const acc: BatchResult[] = [];
     for (let i = 0; i < setores.length; i++) {
       const s = setores[i];
       setBatchProgress({ idx: i + 1, total: setores.length, current: s });
 
-      // Skip cedo: sem escala_minima a edge function devolve 404
-      if (!setoresComMinima.has(s)) {
+      // Skip cedo: sem POP a edge function devolve 404
+      if (!sectorKeysComPOP.has(legacyToSectorKey(s))) {
         acc.push({
           setor: s,
           status: "skipped",
-          motivo: "Sem escala_minima cadastrada para este setor (configure POP antes).",
+          motivo: "Sem POP cadastrado para este setor no mês corrente (configure em Holding antes).",
         });
         setBatchResults([...acc]);
         continue;
@@ -297,7 +342,7 @@ export function GeradorEscalaIA() {
           acc.push({
             setor: s,
             status: "skipped",
-            motivo: "Configuração ausente (turno_config ou escala_minima).",
+            motivo: "Configuração ausente (turno_config ou holding_staffing_config).",
           });
         } else if (error) {
           acc.push({ setor: s, status: "fail", motivo: errMsg || "Erro na edge function" });

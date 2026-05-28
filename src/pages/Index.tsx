@@ -247,13 +247,6 @@ const Index = () => {
         return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
       case "quadro-operacional":
         return <OperationalDashboard />;
-      case "budgets":
-        return (
-          <div className="space-y-4">
-            <TeamReadinessCard onNavigate={() => setActiveTab("gestao-pessoas")} />
-            <BudgetsGerenciaisTab {...budgetsProps} />
-          </div>
-        );
       case "diagnostico":
         return (
           <AuditDiagnosticDashboard
@@ -261,16 +254,8 @@ const Index = () => {
             isAdmin={isAdmin}
           />
         );
-      case "cmv":
-        return <CMVTab />;
-      case "escalas":
-        return <EscalasTab />;
-      case "presenca":
-        return <CheckinManagerDashboard selectedUnidadeId={selectedUnidadeId} />;
       case "utensilios":
         return <UtensiliosTab />;
-      case "estoque":
-        return <EstoqueTab />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
       case "rede":

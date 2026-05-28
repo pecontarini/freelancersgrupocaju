@@ -79,8 +79,6 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/liquid-glass" element={<LiquidGlassDemo />} />
-                <Route path="/liquid-glass-simulator" element={<LiquidGlassSimulator />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </PageTransition>

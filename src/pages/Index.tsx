@@ -218,7 +218,7 @@ const Index = () => {
     );
   }
 
-  const currentTabConfig = tabConfig[activeTab] || tabConfig.budgets;
+  const currentTabConfig = tabConfig[activeTab] || tabConfig["unitarios-gerentes"];
 
   const renderTabContent = () => {
     const budgetsProps = {

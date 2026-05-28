@@ -5622,6 +5622,56 @@ export type Database = {
           },
         ]
       }
+      schedule_breaks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ended_at: string | null
+          id: string
+          notes: string | null
+          planned_minutes: number | null
+          schedule_date: string
+          schedule_id: string
+          started_at: string | null
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          planned_minutes?: number | null
+          schedule_date: string
+          schedule_id: string
+          started_at?: string | null
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ended_at?: string | null
+          id?: string
+          notes?: string | null
+          planned_minutes?: number | null
+          schedule_date?: string
+          schedule_id?: string
+          started_at?: string | null
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_breaks_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedule_draft_slots: {
         Row: {
           agreed_rate: number

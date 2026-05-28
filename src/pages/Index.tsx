@@ -12,21 +12,16 @@ import { PortalHeader } from "@/components/layout/PortalHeader";
 import { RedFlagBanner } from "@/components/metas/RedFlagBanner";
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { BudgetsGerenciaisTab } from "@/components/dashboard/BudgetsGerenciaisTab";
 
 import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
 
-import { CMVTab } from "@/components/dashboard/CMVTab";
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
 import { RedeTab } from "@/components/dashboard/RedeTab";
 
-import { EscalasTab } from "@/components/escalas/EscalasTab";
 import { OperationalDashboard } from "@/components/escalas/OperationalDashboard";
 import { UtensiliosTab } from "@/components/utensilios";
-import { EstoqueTab } from "@/components/estoque";
 // PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
-import { CheckinManagerDashboard } from "@/components/checkin";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
 import { UnitariosGerentesTab } from "@/components/dashboard/UnitariosGerentesTab";
 import { GestaoPessoasTab } from "@/components/dashboard/GestaoPessoasTab";

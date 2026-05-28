@@ -6,6 +6,9 @@
  * paralelos coexistem hoje. Eliminação prevista em fase 8.6
  * via migration que normaliza turno_config.setor para
  * SectorKey canônico no banco.
+ *
+ * ⚠️ DUPLICATED in supabase/functions/gerar-escala-ia/sectorAlias.ts
+ *    (edge function Deno não importa src/). Manter os dois em sincronia.
  */
 
 import { SECTOR_LABELS, type SectorKey } from "./sectors";

@@ -4,6 +4,9 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { jsDayToPopDay } from "@/lib/popConventions";
 
+// POP canonical day index (0=Mon..6=Sun) -> pop_dia_semana_enum
+const POP_DAY_ENUM = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
+
 export interface SectorCompliance {
   sectorId: string;
   sectorName: string;
@@ -67,16 +70,21 @@ export function usePopCompliance(
         .order("name");
       if (secErr) throw secErr;
 
-      // Fetch staffing matrix for all sectors
+      // Fetch canonical POP minimum (pop_minimo_padrao) for all sectors,
+      // filtered by week vigência window.
+      // Semantics change: required is now PISO (minimo_clt + minimo_freelancer)
+      // and no longer TETO (required_count + extras_count from staffing_matrix).
       const sectorIds = allSectors?.map((s) => s.id) || [];
-      let matrixData: any[] = [];
+      let popData: any[] = [];
       if (sectorIds.length > 0) {
         const { data, error } = await supabase
-          .from("staffing_matrix")
-          .select("*")
-          .in("sector_id", sectorIds);
+          .from("pop_minimo_padrao")
+          .select("unit_id, sector_id, dia_semana, refeicao, minimo_clt, minimo_freelancer, quantidade_minima, vigente_desde, vigente_ate")
+          .in("sector_id", sectorIds)
+          .lte("vigente_desde", weekEnd)
+          .or(`vigente_ate.is.null,vigente_ate.gte.${weekStart}`);
         if (error) throw error;
-        matrixData = data || [];
+        popData = data || [];
       }
 
       // Fetch sector partnerships (shared sectors across paired stores)

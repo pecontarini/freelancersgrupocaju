@@ -284,6 +284,13 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
               </p>
             </div>
             <DropdownMenuSeparator />
+            <DropdownMenuItem asChild className="cursor-pointer">
+              <Link to="/perfil/seguranca">
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Segurança
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={signOut}
               className="text-destructive cursor-pointer"

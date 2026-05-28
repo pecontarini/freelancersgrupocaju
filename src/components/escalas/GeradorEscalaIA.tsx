@@ -16,8 +16,14 @@ import {
 import { Loader2, Sparkles, AlertTriangle, CheckCircle2, Copy, ArrowRight, ListChecks, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { insertDraftSlots, type DraftSlot, type DraftDay } from "@/hooks/useAIDraftSlots";
+import { legacyToSectorKey } from "@/lib/holding/sectorAlias";
 
 const DIAS = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
+
+// DIAS index (0=SEG..6=DOM, convenção popConventions) → holding_staffing_config.day_of_week (0=DOM..6=SAB)
+const DIA_TO_HOLDING_DOW: Record<string, number> = {
+  SEG: 1, TER: 2, QUA: 3, QUI: 4, SEX: 5, SAB: 6, DOM: 0,
+};
 
 // Normaliza qualquer data YYYY-MM-DD para a segunda-feira (00:00) da mesma semana ISO.
 // Mantém string pura para evitar problemas de timezone.
@@ -40,12 +46,12 @@ interface TurnoConfigRow {
   observacoes: string | null;
 }
 
-interface EscalaMinimaRow {
-  setor: string;
-  dia_semana: string;
-  turno: string;
-  qtd_efetivos: number;
-  qtd_extras: number;
+interface HoldingStaffingRow {
+  sector_key: string;
+  day_of_week: number;   // 0=DOM..6=SAB
+  shift_type: string;    // "almoco" | "jantar"
+  required_count: number;
+  extras_count: number;
 }
 
 interface SlotResponse {

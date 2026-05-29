@@ -271,8 +271,9 @@ export function QuickCreateEmployeeModal({ open, onOpenChange, unitId, sectorId 
               <Alert className="border-amber-500/40 bg-amber-500/10">
                 <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                  Cadastro CLT deve ser feito pelo Secullum primeiro. Use esta opção
-                  apenas em casos de urgência aprovada.
+                  Cadastro CLT deve ser feito pelo Secullum primeiro. Esta opção
+                  cria um pré-cadastro urgente que <strong>só entra na escala
+                  depois que o sync do Secullum reconciliar o CPF</strong> (até 7 dias).
                 </AlertDescription>
               </Alert>
             )}

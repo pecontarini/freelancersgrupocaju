@@ -20,8 +20,10 @@ export function SchedulableEmptyState({ className }: Props) {
           Nenhum funcionário CLT sincronizado nesta unidade.
         </p>
         <p className="text-xs text-muted-foreground">
-          Verifique se o cadastro no Secullum foi feito.
-          A sincronização acontece todo dia às 5h.
+          A escala usa apenas cadastros vindos do Secullum (sync diário às 5h).
+          Se um funcionário existe no Secullum mas não aparece aqui, confirme
+          que o CNPJ da loja está correto no Secullum e que o cadastro está
+          ativo e não está marcado como demitido.
         </p>
       </div>
       <Button

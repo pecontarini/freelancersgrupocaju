@@ -1,145 +1,141 @@
-# Plano — Controle de Intervalos no Editor de Escalas
+## Diagnóstico confirmado
 
-## Visão geral
+- A escala já filtra corretamente para mostrar apenas funcionários sincronizados do Secullum: `worker_type='clt'`, `banco_id IS NOT NULL`, `secullum_id IS NOT NULL`, `aguardando_secullum=false`.
+- Em Caju Itaim existem hoje **113 CLTs sincronizados** visíveis para escala.
+- Os nomes citados anteriormente foram cadastrados manualmente como `freelancer`, sem `banco_id`, sem `secullum_id` e sem `sincronizado_em`; por isso não aparecem na escala.
+- Se esses funcionários realmente existem no Secullum, o problema mais provável não é o editor: é a reconciliação/importação do sync não estar trazendo ou não estar vinculando esses CPFs à unidade Caju Itaim.
 
-Adicionar, no header do **Editor de Escalas** (`ManualScheduleGrid.tsx`), um botão **"Intervalos do dia"** que abre um drawer com:
-1. Lista de todos os escalados do dia (por setor) com horário previsto.
-2. Botão **"Imprimir folha de controle"** que gera PDF com colunas em branco para preenchimento manual.
-3. Para cada escala, ações **"Iniciar intervalo" / "Encerrar intervalo"** (cronômetro) + opção **"Editar horários"** (registro retroativo HH:MM).
-4. Suporte a **múltiplos intervalos** por escala (padrão visual = 1, botão "+ adicionar intervalo" para extras).
+## Objetivo
 
----
+Garantir que **somente cadastros originados do sync Secullum** apareçam no editor, e corrigir os cadastros que são do Secullum mas não aparecem sem abrir brecha para cadastro manual comum entrar na escala.
 
-## 1. Banco de dados (1 migration)
+## Plano de execução
 
-Nova tabela `public.schedule_breaks`:
+### 1. Auditar a função de sync de funcionários Secullum
 
-```sql
-CREATE TABLE public.schedule_breaks (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  schedule_id uuid NOT NULL REFERENCES public.schedules(id) ON DELETE CASCADE,
-  unit_id uuid NOT NULL REFERENCES public.unidades(id) ON DELETE CASCADE,
-  schedule_date date NOT NULL,
-  started_at timestamptz,            -- nullable: pode ser registrado depois
-  ended_at timestamptz,              -- nullable: enquanto aberto
-  planned_minutes int,               -- opcional (vem de schedules.break_duration)
-  notes text,
-  created_by uuid REFERENCES auth.users(id),
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
+Revisar a função de banco `sync_funcionarios_secullum(p_payload jsonb)`, que hoje:
 
-CREATE INDEX idx_schedule_breaks_schedule ON public.schedule_breaks(schedule_id);
-CREATE INDEX idx_schedule_breaks_unit_date ON public.schedule_breaks(unit_id, schedule_date);
+- recebe funcionários do payload externo;
+- identifica unidade por `Empresa.Documento` comparando com `config_lojas.cnpj`;
+- grava/atualiza `employees` por conflito em `(banco_id, secullum_id)`;
+- marca funcionários válidos como:
+  - `worker_type='clt'`
+  - `banco_id=75820`
+  - `secullum_id=<Id do Secullum>`
+  - `aguardando_secullum=false`
+  - `sincronizado_em=now()`
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.schedule_breaks TO authenticated;
-GRANT ALL ON public.schedule_breaks TO service_role;
+Ponto crítico a validar: se o funcionário existe no Secullum mas vem com CNPJ diferente, CNPJ sem mapeamento, demissão preenchida, ou payload incompleto, ele não entra na unidade e nunca aparece no editor.
 
-ALTER TABLE public.schedule_breaks ENABLE ROW LEVEL SECURITY;
+### 2. Criar diagnóstico seguro para CPFs/nome sem mexer em schema
 
--- Mesmo padrão das políticas de schedules: admin global + operador da unidade
-CREATE POLICY "Acesso por unidade" ON public.schedule_breaks
-  FOR ALL TO authenticated
-  USING (
-    public.has_role(auth.uid(), 'admin')
-    OR public.user_has_unit_access(auth.uid(), unit_id)
-  )
-  WITH CHECK (
-    public.has_role(auth.uid(), 'admin')
-    OR public.user_has_unit_access(auth.uid(), unit_id)
-  );
+Adicionar uma consulta/relatório de reconciliação para os CPFs manuais ativos em Caju Itaim:
 
--- Trigger updated_at (reusar função existente do projeto)
-CREATE TRIGGER trg_schedule_breaks_updated_at
-  BEFORE UPDATE ON public.schedule_breaks
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+- listar registros manuais ativos sem `secullum_id`;
+- cruzar por CPF com qualquer registro Secullum já existente em `employees`;
+- apontar status:
+  - `ja_sincronizado_mesma_unidade`
+  - `sincronizado_outra_unidade`
+  - `manual_sem_correspondente_local`
+  - `duplicado_manual_vs_secullum`
+
+Se não houver registro Secullum correspondente na tabela `employees`, isso indica que o sync ainda não recebeu/processou esse CPF no painel, mesmo que ele exista no sistema Secullum externo.
+
+### 3. Corrigir a função de sync para reconciliar CPF manual com Secullum
+
+Atualizar `sync_funcionarios_secullum` para, antes de inserir um novo CLT sincronizado, tentar reconciliar um cadastro manual ativo da mesma unidade pelo CPF limpo.
+
+Regra proposta:
+
+- Se chegar funcionário ativo do Secullum com `CPF` válido e `unit_id` mapeado:
+  - procurar em `employees` um registro ativo na mesma unidade, mesmo CPF, sem `secullum_id`;
+  - se existir, atualizar esse registro para virar o cadastro canônico Secullum:
+    - `worker_type='clt'`
+    - `banco_id=75820`
+    - `secullum_id=<Id>`
+    - `name`, `job_title`, `phone`, `gender`, `unit_id` vindos do Secullum
+    - `aguardando_secullum=false`
+    - `sincronizado_em=now()`
+  - se não existir, manter o fluxo atual de insert/upsert por `(banco_id, secullum_id)`.
+
+Isso preserva a regra: o funcionário só passa a aparecer quando o **Secullum confirmou** `banco_id/secullum_id`.
+
+### 4. Não liberar cadastro manual na escala
+
+Não alterar `useSchedulableEmployees` para incluir freelancers ou manuais.
+
+Manter o filtro como está:
+
+```ts
+active=true
+worker_type='clt'
+banco_id not null
+secullum_id not null
+aguardando_secullum is false/null
 ```
 
-Verificar antes da execução: nomes exatos de `has_role`, função `user_has_unit_access` (ou equivalente), e `set_updated_at` no schema atual. Se diferirem, ajustar.
+Isso evita bagunçar backend e impede que cadastro manual comum entre na grade.
 
----
+### 5. Ajustar UX para evitar novos cadastros manuais confundidos com Secullum
 
-## 2. Novos arquivos
+Alterar somente mensagens/fluxo visual onde necessário:
 
-### `src/hooks/useDailyRoster.ts`
-Hook que retorna todos os schedules `working` do dia para uma unidade (lookup setor → nome, employee → nome/cargo), reusando o padrão do `useD1Schedules` mas para qualquer data, sem dedup pesado (apenas lista).
+- `TeamManagement.tsx`: deixar claro que “Equipe” lista cadastros gerais, mas a escala usa apenas CLTs sincronizados do Secullum.
+- `QuickCreateEmployeeModal.tsx`: reforçar que cadastro urgente/manual não entra na escala fixa até ser reconciliado pelo sync.
+- `SchedulableEmptyState.tsx`: manter mensagem focada em Secullum e incluir orientação para conferir se o CPF/CNPJ da unidade está chegando no sync.
 
-### `src/hooks/useScheduleBreaks.ts`
-- `useScheduleBreaks(unitId, date)` → lista de breaks do dia.
-- Mutations: `startBreak(schedule_id)`, `endBreak(break_id)`, `upsertManualBreak({ schedule_id, started_at, ended_at, notes })`, `deleteBreak(id)`.
-- Invalida `["schedule-breaks", unitId, date]`.
+Sem mudança de schema e sem liberar manual na escala.
 
-### `src/lib/scheduleDailyControlPdf.ts`
-PDF A4 paisagem, agrupado por setor, reusando `PDF_COLORS`/`PDF_LAYOUT` e `LOGO_BASE64`. Colunas:
+### 6. Limpeza dos cadastros órfãos atuais
 
-| # | Nome | Cargo | Entrada | Saída | Interv. previsto | Saída p/ intervalo | Retorno | Assinatura |
+Após a correção da reconciliação, tratar os cadastros manuais de Caju Itaim de forma conservadora:
 
-Cabeçalho com unidade + data por extenso. Rodapé padrão do projeto (`addPageFooter`).
+- não deletar;
+- se o sync reconciliar por CPF, eles viram CLT canônico automaticamente;
+- se não reconciliar, continuam fora da escala;
+- opcionalmente, inativar manualmente os órfãos confirmados que não existem no Secullum.
 
-### `src/components/escalas/IntervalosDrawer.tsx`
-`Sheet` (shadcn) acionado pelo botão. Contém:
-- Cabeçalho: data (com `<Input type="date">` default = hoje) + botão "Imprimir folha".
-- Lista agrupada por setor, cada linha:
-  - Nome / cargo / horário previsto / intervalo previsto.
-  - **Status do intervalo**: badge "Aguardando" / "Em intervalo (cronômetro mm:ss)" / "Concluído (HH:MM → HH:MM, total Xmin)".
-  - Ações: `Iniciar` (vira `Encerrar` quando aberto), menu kebab com `Editar horários` (popover com 2 `<Input type="time">`), `Adicionar outro intervalo`, `Excluir`.
-- Toast de sucesso/erro.
-- Re-render do cronômetro com `setInterval` 1s enquanto houver breaks abertos.
+A inativação só deve acontecer após confirmar quais CPFs realmente não chegaram pelo sync.
 
-### `src/components/escalas/IntervalosButton.tsx`
-Botão pequeno (ícone `Coffee` do `lucide-react`) que abre o drawer. Recebe `unitId`, `unitName`.
+## Arquivos/tabelas envolvidos
 
----
+### Banco
 
-## 3. Integração no `ManualScheduleGrid.tsx`
+- Função: `public.sync_funcionarios_secullum(p_payload jsonb)`
+- Tabela: `public.employees`
+- Tabela de loja: `public.config_lojas`
+- Log: `public.sync_secullum_log`
 
-Inserir o `<IntervalosButton>` logo após o `<MasterExportButton>` (linha ~1146), apenas quando `canManage && selectedUnit`. Nenhuma outra mudança no grid.
+### Frontend
 
----
+- `src/hooks/useEmployees.ts`
+  - manter filtro de `useSchedulableEmployees`.
+- `src/components/escalas/TeamManagement.tsx`
+  - mensagem preventiva.
+- `src/components/escalas/QuickCreateEmployeeModal.tsx`
+  - mensagem preventiva para cadastro urgente/manual.
+- `src/components/escalas/SchedulableEmptyState.tsx`
+  - orientação de diagnóstico Secullum.
 
-## 4. Regras / detalhes
+## Validação esperada
 
-- **Cronômetro**: `started_at = now()` no clique; ao encerrar, `ended_at = now()`. Duração calculada em runtime.
-- **Edição manual**: usuário digita HH:MM; combinamos com `schedule_date` da escala para montar `timestamptz` no fuso local (segue padrão de datas do projeto — só essas duas colunas são `timestamptz` porque precisam de hora; data permanece `YYYY-MM-DD` em `schedule_date`).
-- **Múltiplos intervalos**: cada linha mostra o intervalo "principal" (o último ou o aberto); botão "+ intervalo" cria nova row. Histórico expansível por linha (collapsible).
-- **PDF** imprime apenas o **previsto** + colunas em branco (a folha física é a fonte de verdade no chão; o painel é o registro digital, opcional).
-- **Sem realtime** — refetch a cada 30s e on-focus, suficiente para o caso de uso.
-- **Memória**: data tratada como string `YYYY-MM-DD` para o filtro; timestamps mantêm padrão Postgres.
+1. Confirmar que o editor continua usando apenas `useSchedulableEmployees`.
+2. Confirmar que `useSchedulableEmployees` continua exigindo `banco_id` e `secullum_id`.
+3. Rodar query de auditoria em Caju Itaim:
+   - total ativos;
+   - total CLT Secullum;
+   - manuais sem `secullum_id`;
+   - duplicados por CPF.
+4. Validar função de sync com payload de exemplo contendo um CPF que já existe manualmente:
+   - antes: manual não aparece;
+   - depois do sync: mesmo registro recebe `banco_id/secullum_id`, vira `clt`, aparece na escala.
+5. Verificar que nenhum freelancer/manual sem `secullum_id` aparece no editor.
 
----
+## Riscos controlados
 
-## 5. Detalhes técnicos
-
-- Drawer: `Sheet` (shadcn) lateral direita, largura `sm:max-w-2xl`.
-- Cronômetro: hook local `useTick(1000)` que força re-render.
-- PDF: `jspdf` + `jspdf-autotable` (já no projeto).
-- Sem novas deps.
-
----
-
-## 6. Arquivos tocados
-
-**Criados (5):**
-- `supabase/migrations/<timestamp>_schedule_breaks.sql`
-- `src/hooks/useDailyRoster.ts`
-- `src/hooks/useScheduleBreaks.ts`
-- `src/lib/scheduleDailyControlPdf.ts`
-- `src/components/escalas/IntervalosDrawer.tsx`
-- `src/components/escalas/IntervalosButton.tsx`
-
-**Editados (1):**
-- `src/components/escalas/ManualScheduleGrid.tsx` (1 linha de import + 1 bloco `<IntervalosButton>`)
-
-**Memória nova:** `mem://features/escalas/break-control` resumindo a feature.
-
----
-
-## 7. Fora de escopo
-
-- Notificações automáticas de "voltou tarde" (pode virar fase 2).
-- Integração com ponto Secullum.
-- Relatório histórico de cumprimento de intervalo (pode virar gráfico no Dashboard POP futuramente).
-
----
-
-Aguardando **"aprovado"** para entrar em modo execução. Caso queira ajustar algo (ex.: drawer → aba; manter apenas cronômetro sem edição manual; usar `interval` no lugar de duas colunas timestamp), respondo com novo plano.
+- Não altera RLS.
+- Não cria tabela nova.
+- Não muda regra de escala.
+- Não apaga dados.
+- Não transforma cadastro manual em escalável sem confirmação do Secullum.
+- Corrige apenas a reconciliação quando o Secullum enviar o funcionário.

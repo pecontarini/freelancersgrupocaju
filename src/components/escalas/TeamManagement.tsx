@@ -243,6 +243,16 @@ export function TeamManagement() {
 
   return (
     <div className="space-y-4">
+      {/* Aviso: cadastro manual não entra na escala */}
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-900 dark:text-amber-100">
+        <p className="font-medium mb-0.5">A escala usa apenas cadastros do Secullum.</p>
+        <p className="opacity-90">
+          Funcionários CLT são sincronizados automaticamente do Secullum às 5h.
+          Cadastros criados aqui manualmente <strong>não aparecem no editor de escalas</strong>
+          até serem reconciliados pelo sync (via CPF).
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

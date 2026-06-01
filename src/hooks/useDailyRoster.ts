@@ -43,27 +43,71 @@ export function useDailyRoster(unitId: string | null, date: string) {
           id, schedule_date, employee_id, sector_id,
           start_time, end_time, break_duration, schedule_type,
           shifts!schedules_shift_id_fkey ( start_time, end_time ),
-          employees!schedules_employee_id_fkey ( id, name, job_title, worker_type )
+          employees!schedules_employee_id_fkey!inner ( id, name, job_title, worker_type, cpf, active )
         `)
         .in("sector_id", sectorIds)
         .eq("schedule_date", date)
         .eq("schedule_type", "working")
+        .eq("employees.active", true)
         .neq("status", "cancelled");
       if (error) throw error;
 
-      const rows: DailyRosterRow[] = (schedules || []).map((s: any) => ({
-        schedule_id: s.id,
-        employee_id: s.employee_id,
-        employee_name: s.employees?.name || "—",
-        job_title: s.employees?.job_title || null,
-        worker_type: s.employees?.worker_type || "clt",
-        sector_id: s.sector_id,
-        sector_name: sectorMap.get(s.sector_id) || "—",
-        start_time: s.start_time || s.shifts?.start_time || null,
-        end_time: s.end_time || s.shifts?.end_time || null,
-        break_duration: s.break_duration || 0,
-        schedule_date: s.schedule_date,
-      }));
+      // Normaliza nome para identity key robusto (acento + caixa + espaços)
+      const normalizeName = (s: string) =>
+        (s || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toUpperCase()
+          .trim()
+          .replace(/\s+/g, " ");
+
+      // Dedup defensivo por (sector_id, identity, start_time) — defesa em
+      // profundidade caso o trigger B2 falhe ou alguém reative um órfão.
+      const seen = new Map<string, DailyRosterRow>();
+      for (const s of schedules || []) {
+        const row: DailyRosterRow = {
+          schedule_id: s.id,
+          employee_id: s.employee_id,
+          employee_name: s.employees?.name || "—",
+          job_title: s.employees?.job_title || null,
+          worker_type: s.employees?.worker_type || "clt",
+          sector_id: s.sector_id,
+          sector_name: sectorMap.get(s.sector_id) || "—",
+          start_time: s.start_time || s.shifts?.start_time || null,
+          end_time: s.end_time || s.shifts?.end_time || null,
+          break_duration: s.break_duration || 0,
+          schedule_date: s.schedule_date,
+        };
+
+        const cpfDigits = (s.employees?.cpf || "").replace(/\D/g, "");
+        const identity =
+          cpfDigits.length >= 11
+            ? `cpf:${cpfDigits}`
+            : `name:${normalizeName(row.employee_name)}`;
+        const key = `${row.sector_id}::${identity}::${row.start_time ?? ""}`;
+
+        const prev = seen.get(key);
+        if (!prev) {
+          seen.set(key, row);
+        } else if (!prev.start_time && row.start_time) {
+          // mantém a versão com horário explícito
+          console.warn("[useDailyRoster] duplicata defensiva descartada", {
+            key,
+            kept: row.schedule_id,
+            dropped: prev.schedule_id,
+          });
+          seen.set(key, row);
+        } else {
+          console.warn("[useDailyRoster] duplicata defensiva descartada", {
+            key,
+            kept: prev.schedule_id,
+            dropped: row.schedule_id,
+          });
+        }
+      }
+
+      const rows: DailyRosterRow[] = Array.from(seen.values());
+
 
       rows.sort((a, b) => {
         const sd = a.sector_name.localeCompare(b.sector_name, "pt-BR");

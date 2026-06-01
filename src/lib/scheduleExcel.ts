@@ -12,6 +12,7 @@ export interface ScheduleEmployee {
   job_title: string | null;
   job_title_id?: string | null;
   worker_type: string;
+  cpf?: string | null;
 }
 
 export interface ParsedScheduleEntry {
@@ -42,10 +43,27 @@ export interface ScheduleParseError {
   message: string;
 }
 
+export interface UnmatchedCandidate {
+  id: string;
+  name: string;
+  similarity: number;
+  cpf?: string | null;
+}
+
 export interface UnmatchedEmployee {
   rowIndex: number;
   name: string;
   cargo: string;
+  cpf?: string | null;
+  reason: "no_match" | "ambiguous";
+  candidates?: UnmatchedCandidate[];
+  sectorHint?: string;
+}
+
+export interface MatchStats {
+  matchedByCpf: number;
+  matchedByExactName: number;
+  matchedByFuzzy: number;
 }
 
 export interface ScheduleParseResult {
@@ -55,6 +73,7 @@ export interface ScheduleParseResult {
   offCount: number;
   originalMonday: string | null;
   unmatchedEmployees: UnmatchedEmployee[];
+  matchStats: MatchStats;
 }
 
 // ─── Constants ───
@@ -64,6 +83,32 @@ const DAY_NAMES_NORM = DAY_NAMES.map((d) => normalizeString(d));
 const SUB_HEADERS = ["ENTRADA", "INTERV.", "SAÍDA"];
 const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas", "banco horas", "domingo mes", "domingo mês", "domingo mês ", "domingo mes ", "banco horas ", "atestado", "licença", "licenca", "suspensão", "suspensao"]);
 const METADATA_ROW_KEY = "__CAJU_SCHEDULE_META__";
+
+const CPF_HEADER_ALIASES = ["CPF", "C.P.F", "C P F", "CPF/MF", "DOCUMENTO", "DOC"];
+const FUZZY_THRESHOLD = 0.9;
+
+/** Normaliza CPF: strip não-dígitos. Retorna string vazia se inválido (≠ 11 dígitos). */
+export function normalizeCpf(v: any): string {
+  if (v === null || v === undefined) return "";
+  const digits = String(v).replace(/\D/g, "");
+  return digits.length === 11 ? digits : "";
+}
+
+/** Detecta coluna CPF varrendo as linhas 0..maxRow do header. Retorna -1 se nada. */
+function detectCpfColumn(rawData: any[][], maxRow: number): number {
+  for (let r = 0; r < Math.min(maxRow + 1, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const v = normalizeString(cellToString(row[c]));
+      if (!v) continue;
+      if (CPF_HEADER_ALIASES.includes(v) || v.includes("CPF")) {
+        return c;
+      }
+    }
+  }
+  return -1;
+}
 
 // ─── Template Generator (3 columns per day) ───
 

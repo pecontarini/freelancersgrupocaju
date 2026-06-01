@@ -91,7 +91,8 @@ export function ScheduleExcelFlow({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [targetMonday, setTargetMonday] = useState<Date | undefined>(undefined);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [unmatchedRegs, setUnmatchedRegs] = useState<UnmatchedRegistration[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewDecisions, setReviewDecisions] = useState<ReviewDecision[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 

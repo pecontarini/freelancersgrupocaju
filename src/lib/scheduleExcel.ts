@@ -470,6 +470,7 @@ function parse3ColSheet(
   const unmatchedEmployees: UnmatchedEmployee[] = [];
   let workingCount = 0;
   let offCount = 0;
+  const matchStats: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
 
   // Find the sub-header row (ENTRADA)
   let subHeaderRow = -1;
@@ -491,8 +492,11 @@ function parse3ColSheet(
   }
 
   if (subHeaderRow < 0) {
-    return { entries, errors, workingCount, offCount, originalMonday: null, unmatchedEmployees };
+    return { entries, errors, workingCount, offCount, originalMonday: null, unmatchedEmployees, matchStats };
   }
+
+  // Detect CPF column from header rows (anywhere from row 0 up to subHeaderRow)
+  const cpfCol = detectCpfColumn(rawData, subHeaderRow);
 
   // Parse day columns: find all ENTRADA positions
   const dayColumns: number[] = []; // start column of each day (where ENTRADA is)
@@ -509,7 +513,6 @@ function parse3ColSheet(
   let originalMonday: string | null = null;
   if (titleRow >= 0 && rawData[titleRow]) {
     const titleStr = cellToString(rawData[titleRow][0]);
-    // "... SEMANA dd/MM a dd/MM" or "... SEMANA dd/MM/yyyy a dd/MM/yyyy"
     const semanaMatch = titleStr.match(/SEMANA\s+(\d{2})\/(\d{2})(?:\/(\d{4}))?\s+a/i);
     if (semanaMatch) {
       const day = semanaMatch[1];
@@ -532,7 +535,6 @@ function parse3ColSheet(
       dates.push(format(addDays(new Date(originalMonday + "T12:00:00"), i), "yyyy-MM-dd"));
     }
   } else {
-    // Fallback: current week
     const now = new Date();
     const monday = addDays(now, -(((now.getDay() + 6) % 7)));
     dates = [];
@@ -541,12 +543,14 @@ function parse3ColSheet(
     }
   }
 
-  // Build name→id map for fuzzy matching.
-  // When two employees share the same normalized name (homonyms without CPF),
-  // we keep the FIRST occurrence (assumed canonical / oldest) and warn — this
-  // prevents the importer from picking different IDs for the same logical person
-  // and triggering unique_active_schedule conflicts downstream.
-  const nameMap = new Map<string, { id: string; name: string }>();
+  // Build name→id map for exact/fuzzy matching + cpf→id map for primary matching.
+  // When two employees share the same normalized name (homonyms without CPF), we keep
+  // the FIRST occurrence (canonical/oldest) and warn — prevents picking different IDs
+  // for the same logical person, which causes unique_active_schedule conflicts later.
+  const nameMap = new Map<string, { id: string; name: string; cpf?: string | null }>();
+  const cpfMap = new Map<string, { id: string; name: string; cpf?: string | null }>();
+  const allCandidates: Array<{ id: string; name: string; cpf?: string | null }> = [];
+
   if (metaEmployees) {
     metaEmployees.forEach((v, k) => nameMap.set(k, v));
   }
@@ -554,7 +558,7 @@ function parse3ColSheet(
     for (const emp of allEmployees) {
       const norm = normalizeString(emp.name);
       if (!nameMap.has(norm)) {
-        nameMap.set(norm, { id: emp.id, name: emp.name });
+        nameMap.set(norm, { id: emp.id, name: emp.name, cpf: emp.cpf ?? null });
       } else {
         const existing = nameMap.get(norm)!;
         if (existing.id !== emp.id) {
@@ -565,6 +569,11 @@ function parse3ColSheet(
           );
         }
       }
+      const cpfNorm = normalizeCpf(emp.cpf);
+      if (cpfNorm && !cpfMap.has(cpfNorm)) {
+        cpfMap.set(cpfNorm, { id: emp.id, name: emp.name, cpf: cpfNorm });
+      }
+      allCandidates.push({ id: emp.id, name: emp.name, cpf: emp.cpf ?? null });
     }
   }
 
@@ -580,7 +589,7 @@ function parse3ColSheet(
     // Skip separator rows (e.g. "── EXTRAS / FREELANCERS ──")
     if (empName.startsWith("──") || empName.startsWith("--")) continue;
 
-    // Skip template rows where ALL day columns are empty (no schedule data at all)
+    // Skip template rows where ALL day columns are empty
     const hasAnyDayData = dayColumns.some((colBase) => {
       const val = cellToString(row[colBase]);
       return val !== "";
@@ -589,35 +598,67 @@ function parse3ColSheet(
 
     const cargo = cellToString(row[1]);
     const normName = normalizeString(empName);
+    const rowCpf = cpfCol >= 0 ? normalizeCpf(row[cpfCol]) : "";
 
-    // Try exact match first
     let empId: string | null = null;
     let resolvedName = empName;
 
-    if (nameMap.has(normName)) {
+    // 1) Primary match: CPF (when sheet has CPF column and row has valid CPF)
+    if (rowCpf && cpfMap.has(rowCpf)) {
+      const match = cpfMap.get(rowCpf)!;
+      empId = match.id;
+      resolvedName = match.name;
+      matchStats.matchedByCpf++;
+    }
+    // 2) Exact normalized name
+    else if (nameMap.has(normName)) {
       const match = nameMap.get(normName)!;
       empId = match.id;
       resolvedName = match.name;
+      matchStats.matchedByExactName++;
     } else {
-      // Fuzzy match
-      let bestSim = 0;
-      let bestMatch: { id: string; name: string } | null = null;
-      nameMap.forEach((val) => {
-        const sim = stringSimilarity(empName, val.name);
-        if (sim > bestSim) {
-          bestSim = sim;
-          bestMatch = val;
+      // 3) Fuzzy ≥ FUZZY_THRESHOLD — but if 2+ candidates qualify, mark ambiguous
+      const candidates: UnmatchedCandidate[] = [];
+      for (const cand of allCandidates) {
+        const sim = stringSimilarity(empName, cand.name);
+        if (sim >= FUZZY_THRESHOLD) {
+          candidates.push({ id: cand.id, name: cand.name, similarity: sim, cpf: cand.cpf });
         }
-      });
+      }
+      candidates.sort((a, b) => b.similarity - a.similarity);
 
-      if (bestMatch && bestSim >= 0.85) {
-        empId = bestMatch.id;
-        resolvedName = bestMatch.name;
+      if (candidates.length === 1) {
+        empId = candidates[0].id;
+        resolvedName = candidates[0].name;
+        matchStats.matchedByFuzzy++;
+      } else if (candidates.length >= 2) {
+        unmatchedEmployees.push({
+          rowIndex: r,
+          name: empName,
+          cargo,
+          cpf: rowCpf || null,
+          reason: "ambiguous",
+          candidates: candidates.slice(0, 5),
+        });
+        continue;
       } else {
-        unmatchedEmployees.push({ rowIndex: r, name: empName, cargo });
+        // No fuzzy candidate — collect top 5 suggestions (any similarity) for the modal
+        const suggestions: UnmatchedCandidate[] = allCandidates
+          .map((c) => ({ id: c.id, name: c.name, cpf: c.cpf, similarity: stringSimilarity(empName, c.name) }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 5);
+        unmatchedEmployees.push({
+          rowIndex: r,
+          name: empName,
+          cargo,
+          cpf: rowCpf || null,
+          reason: "no_match",
+          candidates: suggestions,
+        });
         continue;
       }
     }
+
 
     // Parse each day
     for (let d = 0; d < numDays; d++) {

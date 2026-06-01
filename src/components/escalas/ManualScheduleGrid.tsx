@@ -2015,16 +2015,16 @@ export function ManualScheduleGrid() {
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showSectorBase ? "rotate-0" : "-rotate-90"}`} />
                                 <Users className="h-3.5 w-3.5" />
-                                <span className="font-medium">Quadro base do setor</span>
+                                <span className="font-medium">Disponíveis no setor</span>
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                                   {sortedBase.length}
                                 </Badge>
-                                <span className="text-[10px]">— sem escala nesta semana</span>
+                                <span className="text-[10px]">— clique para escalar (sem escala nesta semana)</span>
                               </div>
                             </TableCell>
                           </TableRow>
                           {showSectorBase && sortedBase.map((emp) => (
-                            <TableRow key={emp.id} className="opacity-60">
+                            <TableRow key={emp.id} className="opacity-95">
                               <TableCell className="font-medium sticky left-0 bg-card/95 backdrop-blur z-10 border-r-2 border-primary/15">
                                 <div className="flex items-center gap-1.5">
                                   <span className="truncate max-w-[110px] uppercase">{emp.name}</span>
@@ -2038,17 +2038,20 @@ export function ManualScheduleGrid() {
                                 return (
                                   <TableCell
                                     key={i}
-                                    className="text-center p-1 cursor-pointer hover:bg-muted/50 transition-colors"
-                                    title="1 clique: folga · 2 cliques: editar"
+                                    className="text-center p-1 cursor-pointer hover:bg-primary/5 transition-colors"
+                                    title="Clique para escalar ou marcar folga"
                                     onClick={() => {
-                                      cancelPendingClick();
-                                      clickTimerRef.current = setTimeout(() => {
-                                        handleSingleClickToggleOff(emp, dateStr);
-                                        clickTimerRef.current = null;
-                                      }, 220);
-                                    }}
-                                    onDoubleClick={() => {
-                                      cancelPendingClick();
+                                      const KEY = "cajupar:first_use_b6";
+                                      if (typeof window !== "undefined" && !window.localStorage.getItem(KEY)) {
+                                        toast.info("Folga agora é uma opção dentro do editor", {
+                                          description: "Clique no funcionário do quadro base para escalar ou marcar folga.",
+                                          duration: 8000,
+                                          action: {
+                                            label: "Não mostrar mais",
+                                            onClick: () => window.localStorage.setItem(KEY, new Date().toISOString()),
+                                          },
+                                        });
+                                      }
                                       handleCellClick(emp, dateStr);
                                     }}
                                   >
@@ -2060,6 +2063,7 @@ export function ManualScheduleGrid() {
                               })}
                             </TableRow>
                           ))}
+
                         </>
                       )}
                     </TableBody>

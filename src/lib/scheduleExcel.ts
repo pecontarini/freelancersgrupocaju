@@ -893,6 +893,7 @@ export interface MultiSectorParseResult {
   offCount: number;
   originalMonday: string | null;
   unmatchedEmployees: UnmatchedEmployee[];
+  matchStats: MatchStats;
   /** True if the file had multiple sector tabs */
   isMultiSector: boolean;
   /** Sector mapping found in meta */

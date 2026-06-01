@@ -130,19 +130,11 @@ export function ScheduleExcelFlow({
   async function runParse(file: File, mondayISO: string) {
     setIsParsing(true);
     setParseResult(null);
-    setUnmatchedRegs([]);
+    setReviewDecisions(null);
     try {
       const allEmps = allUnitEmployees || employees;
       const result = await parseScheduleFile(file, mondayISO, allEmps);
       setParseResult(result);
-      // Initialize registration state for unmatched employees
-      setUnmatchedRegs(
-        (result.unmatchedEmployees || []).map((u) => ({
-          selected: true,
-          editedName: u.name,
-          cargo: u.cargo || "",
-        }))
-      );
     } catch (err: any) {
       toast.error(err.message);
       setImportModal(false);
@@ -168,8 +160,10 @@ export function ScheduleExcelFlow({
     setParseResult(null);
     setPendingFile(null);
     setTargetMonday(undefined);
-    setUnmatchedRegs([]);
+    setReviewDecisions(null);
+    setReviewOpen(false);
   }
+
 
   const showDateWarning =
     parseResult?.originalMonday &&

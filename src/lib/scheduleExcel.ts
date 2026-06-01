@@ -12,6 +12,7 @@ export interface ScheduleEmployee {
   job_title: string | null;
   job_title_id?: string | null;
   worker_type: string;
+  cpf?: string | null;
 }
 
 export interface ParsedScheduleEntry {
@@ -42,10 +43,27 @@ export interface ScheduleParseError {
   message: string;
 }
 
+export interface UnmatchedCandidate {
+  id: string;
+  name: string;
+  similarity: number;
+  cpf?: string | null;
+}
+
 export interface UnmatchedEmployee {
   rowIndex: number;
   name: string;
   cargo: string;
+  cpf?: string | null;
+  reason: "no_match" | "ambiguous";
+  candidates?: UnmatchedCandidate[];
+  sectorHint?: string;
+}
+
+export interface MatchStats {
+  matchedByCpf: number;
+  matchedByExactName: number;
+  matchedByFuzzy: number;
 }
 
 export interface ScheduleParseResult {
@@ -55,6 +73,7 @@ export interface ScheduleParseResult {
   offCount: number;
   originalMonday: string | null;
   unmatchedEmployees: UnmatchedEmployee[];
+  matchStats: MatchStats;
 }
 
 // ─── Constants ───
@@ -64,6 +83,32 @@ const DAY_NAMES_NORM = DAY_NAMES.map((d) => normalizeString(d));
 const SUB_HEADERS = ["ENTRADA", "INTERV.", "SAÍDA"];
 const OFF_KEYWORDS = new Set(["folga", "f", "off", "fga", "folg", "fds mês", "fds mes", "férias", "ferias", "banco de horas", "banco horas", "domingo mes", "domingo mês", "domingo mês ", "domingo mes ", "banco horas ", "atestado", "licença", "licenca", "suspensão", "suspensao"]);
 const METADATA_ROW_KEY = "__CAJU_SCHEDULE_META__";
+
+const CPF_HEADER_ALIASES = ["CPF", "C.P.F", "C P F", "CPF/MF", "DOCUMENTO", "DOC"];
+const FUZZY_THRESHOLD = 0.9;
+
+/** Normaliza CPF: strip não-dígitos. Retorna string vazia se inválido (≠ 11 dígitos). */
+export function normalizeCpf(v: any): string {
+  if (v === null || v === undefined) return "";
+  const digits = String(v).replace(/\D/g, "");
+  return digits.length === 11 ? digits : "";
+}
+
+/** Detecta coluna CPF varrendo as linhas 0..maxRow do header. Retorna -1 se nada. */
+function detectCpfColumn(rawData: any[][], maxRow: number): number {
+  for (let r = 0; r < Math.min(maxRow + 1, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const v = normalizeString(cellToString(row[c]));
+      if (!v) continue;
+      if (CPF_HEADER_ALIASES.includes(v) || v.includes("CPF")) {
+        return c;
+      }
+    }
+  }
+  return -1;
+}
 
 // ─── Template Generator (3 columns per day) ───
 
@@ -425,6 +470,7 @@ function parse3ColSheet(
   const unmatchedEmployees: UnmatchedEmployee[] = [];
   let workingCount = 0;
   let offCount = 0;
+  const matchStats: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
 
   // Find the sub-header row (ENTRADA)
   let subHeaderRow = -1;
@@ -446,8 +492,11 @@ function parse3ColSheet(
   }
 
   if (subHeaderRow < 0) {
-    return { entries, errors, workingCount, offCount, originalMonday: null, unmatchedEmployees };
+    return { entries, errors, workingCount, offCount, originalMonday: null, unmatchedEmployees, matchStats };
   }
+
+  // Detect CPF column from header rows (anywhere from row 0 up to subHeaderRow)
+  const cpfCol = detectCpfColumn(rawData, subHeaderRow);
 
   // Parse day columns: find all ENTRADA positions
   const dayColumns: number[] = []; // start column of each day (where ENTRADA is)
@@ -464,7 +513,6 @@ function parse3ColSheet(
   let originalMonday: string | null = null;
   if (titleRow >= 0 && rawData[titleRow]) {
     const titleStr = cellToString(rawData[titleRow][0]);
-    // "... SEMANA dd/MM a dd/MM" or "... SEMANA dd/MM/yyyy a dd/MM/yyyy"
     const semanaMatch = titleStr.match(/SEMANA\s+(\d{2})\/(\d{2})(?:\/(\d{4}))?\s+a/i);
     if (semanaMatch) {
       const day = semanaMatch[1];
@@ -487,7 +535,6 @@ function parse3ColSheet(
       dates.push(format(addDays(new Date(originalMonday + "T12:00:00"), i), "yyyy-MM-dd"));
     }
   } else {
-    // Fallback: current week
     const now = new Date();
     const monday = addDays(now, -(((now.getDay() + 6) % 7)));
     dates = [];
@@ -496,12 +543,14 @@ function parse3ColSheet(
     }
   }
 
-  // Build name→id map for fuzzy matching.
-  // When two employees share the same normalized name (homonyms without CPF),
-  // we keep the FIRST occurrence (assumed canonical / oldest) and warn — this
-  // prevents the importer from picking different IDs for the same logical person
-  // and triggering unique_active_schedule conflicts downstream.
-  const nameMap = new Map<string, { id: string; name: string }>();
+  // Build name→id map for exact/fuzzy matching + cpf→id map for primary matching.
+  // When two employees share the same normalized name (homonyms without CPF), we keep
+  // the FIRST occurrence (canonical/oldest) and warn — prevents picking different IDs
+  // for the same logical person, which causes unique_active_schedule conflicts later.
+  const nameMap = new Map<string, { id: string; name: string; cpf?: string | null }>();
+  const cpfMap = new Map<string, { id: string; name: string; cpf?: string | null }>();
+  const allCandidates: Array<{ id: string; name: string; cpf?: string | null }> = [];
+
   if (metaEmployees) {
     metaEmployees.forEach((v, k) => nameMap.set(k, v));
   }
@@ -509,7 +558,7 @@ function parse3ColSheet(
     for (const emp of allEmployees) {
       const norm = normalizeString(emp.name);
       if (!nameMap.has(norm)) {
-        nameMap.set(norm, { id: emp.id, name: emp.name });
+        nameMap.set(norm, { id: emp.id, name: emp.name, cpf: emp.cpf ?? null });
       } else {
         const existing = nameMap.get(norm)!;
         if (existing.id !== emp.id) {
@@ -520,6 +569,11 @@ function parse3ColSheet(
           );
         }
       }
+      const cpfNorm = normalizeCpf(emp.cpf);
+      if (cpfNorm && !cpfMap.has(cpfNorm)) {
+        cpfMap.set(cpfNorm, { id: emp.id, name: emp.name, cpf: cpfNorm });
+      }
+      allCandidates.push({ id: emp.id, name: emp.name, cpf: emp.cpf ?? null });
     }
   }
 
@@ -535,7 +589,7 @@ function parse3ColSheet(
     // Skip separator rows (e.g. "── EXTRAS / FREELANCERS ──")
     if (empName.startsWith("──") || empName.startsWith("--")) continue;
 
-    // Skip template rows where ALL day columns are empty (no schedule data at all)
+    // Skip template rows where ALL day columns are empty
     const hasAnyDayData = dayColumns.some((colBase) => {
       const val = cellToString(row[colBase]);
       return val !== "";
@@ -544,35 +598,67 @@ function parse3ColSheet(
 
     const cargo = cellToString(row[1]);
     const normName = normalizeString(empName);
+    const rowCpf = cpfCol >= 0 ? normalizeCpf(row[cpfCol]) : "";
 
-    // Try exact match first
     let empId: string | null = null;
     let resolvedName = empName;
 
-    if (nameMap.has(normName)) {
+    // 1) Primary match: CPF (when sheet has CPF column and row has valid CPF)
+    if (rowCpf && cpfMap.has(rowCpf)) {
+      const match = cpfMap.get(rowCpf)!;
+      empId = match.id;
+      resolvedName = match.name;
+      matchStats.matchedByCpf++;
+    }
+    // 2) Exact normalized name
+    else if (nameMap.has(normName)) {
       const match = nameMap.get(normName)!;
       empId = match.id;
       resolvedName = match.name;
+      matchStats.matchedByExactName++;
     } else {
-      // Fuzzy match
-      let bestSim = 0;
-      let bestMatch: { id: string; name: string } | null = null;
-      nameMap.forEach((val) => {
-        const sim = stringSimilarity(empName, val.name);
-        if (sim > bestSim) {
-          bestSim = sim;
-          bestMatch = val;
+      // 3) Fuzzy ≥ FUZZY_THRESHOLD — but if 2+ candidates qualify, mark ambiguous
+      const candidates: UnmatchedCandidate[] = [];
+      for (const cand of allCandidates) {
+        const sim = stringSimilarity(empName, cand.name);
+        if (sim >= FUZZY_THRESHOLD) {
+          candidates.push({ id: cand.id, name: cand.name, similarity: sim, cpf: cand.cpf });
         }
-      });
+      }
+      candidates.sort((a, b) => b.similarity - a.similarity);
 
-      if (bestMatch && bestSim >= 0.85) {
-        empId = bestMatch.id;
-        resolvedName = bestMatch.name;
+      if (candidates.length === 1) {
+        empId = candidates[0].id;
+        resolvedName = candidates[0].name;
+        matchStats.matchedByFuzzy++;
+      } else if (candidates.length >= 2) {
+        unmatchedEmployees.push({
+          rowIndex: r,
+          name: empName,
+          cargo,
+          cpf: rowCpf || null,
+          reason: "ambiguous",
+          candidates: candidates.slice(0, 5),
+        });
+        continue;
       } else {
-        unmatchedEmployees.push({ rowIndex: r, name: empName, cargo });
+        // No fuzzy candidate — collect top 5 suggestions (any similarity) for the modal
+        const suggestions: UnmatchedCandidate[] = allCandidates
+          .map((c) => ({ id: c.id, name: c.name, cpf: c.cpf, similarity: stringSimilarity(empName, c.name) }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 5);
+        unmatchedEmployees.push({
+          rowIndex: r,
+          name: empName,
+          cargo,
+          cpf: rowCpf || null,
+          reason: "no_match",
+          candidates: suggestions,
+        });
         continue;
       }
     }
+
 
     // Parse each day
     for (let d = 0; d < numDays; d++) {
@@ -641,8 +727,10 @@ function parse3ColSheet(
     }
   }
 
-  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees };
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees, matchStats };
 }
+
+const EMPTY_STATS: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
 
 // ─── Legacy Parser (1 col per day) ───
 
@@ -677,7 +765,7 @@ function parseLegacySheet(
   }
 
   if (dates.length === 0) {
-    return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+    return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [], matchStats: { ...EMPTY_STATS } };
   }
 
   const nameToMeta = new Map<string, (typeof metaData)[0]>();
@@ -753,7 +841,7 @@ function parseLegacySheet(
     }
   }
 
-  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [], matchStats: { ...EMPTY_STATS } };
 }
 
 /** Legacy time range parser for "HH:MM - HH:MM (break)" format */
@@ -805,6 +893,7 @@ export interface MultiSectorParseResult {
   offCount: number;
   originalMonday: string | null;
   unmatchedEmployees: UnmatchedEmployee[];
+  matchStats: MatchStats;
   /** True if the file had multiple sector tabs */
   isMultiSector: boolean;
   /** Sector mapping found in meta */
@@ -865,6 +954,7 @@ export function parseScheduleFile(
           const allEntries: ParsedScheduleEntry[] = [];
           const allErrors: ScheduleParseError[] = [];
           const allUnmatched: UnmatchedEmployee[] = [];
+          const aggStats: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
           let totalWorking = 0;
           let totalOff = 0;
           let firstMonday: string | null = null;
@@ -881,13 +971,18 @@ export function parseScheduleFile(
 
             if (detect3ColFormat(rawData)) {
               const result = parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees);
-              // Tag entries with sector_id
               for (const entry of result.entries) {
                 entry.sector_id = sectorId;
+              }
+              for (const u of result.unmatchedEmployees) {
+                u.sectorHint = sheetName;
               }
               allEntries.push(...result.entries);
               allErrors.push(...result.errors);
               allUnmatched.push(...result.unmatchedEmployees);
+              aggStats.matchedByCpf += result.matchStats.matchedByCpf;
+              aggStats.matchedByExactName += result.matchStats.matchedByExactName;
+              aggStats.matchedByFuzzy += result.matchStats.matchedByFuzzy;
               totalWorking += result.workingCount;
               totalOff += result.offCount;
               if (!firstMonday && result.originalMonday) firstMonday = result.originalMonday;
@@ -901,6 +996,7 @@ export function parseScheduleFile(
             offCount: totalOff,
             originalMonday: firstMonday,
             unmatchedEmployees: allUnmatched,
+            matchStats: aggStats,
             isMultiSector: true,
             sectorMap,
           });

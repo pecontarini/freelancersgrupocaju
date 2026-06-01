@@ -1,214 +1,211 @@
-# Plano Fase B — Lote B3 + B6
+# B5 — Importação Excel de Escalas: matching robusto + revisão manual
 
-Premissa: B1 (remap dos 643) e B2 (trigger guardião) já rodaram via SQL fora do Lovable. Este lote é puramente frontend defensivo + UX. Sem mudanças de schema, sem deploy, sem commits.
-
----
-
-## B3 — Hardening do `useDailyRoster`
-
-### a) Arquivo e linhas
-
-- `src/hooks/useDailyRoster.ts` (linhas 22–79) — **Modify**.
-- Único consumidor que importa o hook: `IntervalosDrawer` e `scheduleDailyControlPdf` (via prop). Não altero a assinatura `DailyRosterRow` nem a ordem dos campos.
-
-### b) Natureza da mudança
-
-Modify pontual em duas partes da `queryFn`:
-
-1. Apertar o JOIN com `employees` para descartar inativos.
-2. Adicionar passo de dedup defensivo no array final, antes do `sort`.
-
-### c) Estratégia (snippet conceitual)
-
-**Filtro inner restritivo no select**: trocar o relacionamento embutido para inner + filtro `active=true`, usando a sintaxe PostgREST que o projeto já usa em outros hooks:
-
-```ts
-.select(`
-  id, schedule_date, employee_id, sector_id,
-  start_time, end_time, break_duration, schedule_type,
-  shifts!schedules_shift_id_fkey ( start_time, end_time ),
-  employees!schedules_employee_id_fkey!inner (
-    id, name, job_title, worker_type, cpf, active
-  )
-`)
-.eq("employees.active", true)
-```
-
-Com `!inner`, qualquer schedule cujo `employee_id` aponte pra inativo é descartado pelo Postgres — defesa em profundidade caso o trigger B2 falhe ou alguém reative um órfão manualmente.
-
-**Dedup defensivo no client** (após o `map`, antes do `sort`):
-
-```ts
-const seen = new Map<string, DailyRosterRow>();
-for (const r of mapped) {
-  const cpfDigits = (r as any)._cpf ? String((r as any)._cpf).replace(/\D/g, "") : "";
-  const identity = cpfDigits.length >= 11
-    ? `cpf:${cpfDigits}`
-    : `name:${r.employee_name.trim().toUpperCase()}`;
-  const key = `${r.sector_id}::${identity}::${r.start_time ?? ""}`;
-  const prev = seen.get(key);
-  if (!prev) {
-    seen.set(key, r);
-  } else {
-    // mantém o que tem horário explícito; empate → mantém o primeiro
-    if (!prev.start_time && r.start_time) seen.set(key, r);
-    if (typeof console !== "undefined") {
-      console.warn("[useDailyRoster] duplicata defensiva descartada", { key, kept: seen.get(key)?.schedule_id, dropped: r.schedule_id });
-    }
-  }
-}
-const rows = Array.from(seen.values());
-```
-
-O `cpf` entra no `select` só para servir de chave; **não vaza no shape público** (`DailyRosterRow` continua exatamente igual). Uso um campo interno `_cpf` no objeto mapeado ou faço o cálculo da chave dentro do mesmo `map`/loop para nem expor — vou pelo loop único pra não criar campo descartável.
-
-### d) Não se aplica a B3.
-
-### e) Riscos de regressão
-
-- **PDF de controle (`scheduleDailyControlPdf`) e `IntervalosDrawer**`: ambos consomem `DailyRosterRow` por nome de campo. Shape preservado → zero impacto.
-- **Inativos legítimos no histórico**: o hook já é "operacional do dia" (controle de intervalos e folha de assinatura). Mostrar inativos numa folha de hoje não faz sentido — alinhado com o uso. Se algum dia surgir necessidade de relatório histórico com inativos, isso vai por outro hook.
-- **Performance**: `!inner` + `eq` empurra filtro pro Postgres, tende a ficar igual ou melhor. Dedup é O(n) num conjunto de no máximo ~150 schedules/dia.
-
-### f) Decisões que preciso de você
-
-- Confirmar que **inativos não devem aparecer nem para fins de "tinha escala mas saiu da empresa hoje"** na folha de intervalos. Se quiser permitir esse caso edge, troco `!inner` por `!left` mantendo o filtro só no client. Default do plano: **inner restritivo** (mais seguro).
+Objetivo: parar de criar cadastros fantasma no upload Excel. Match primário por CPF (quando a planilha tiver), fallback por nome com cascata (exato → fuzzy alto). Não-casados vão para modal de revisão; nada é criado sem decisão explícita do gestor.
 
 ---
 
-## B6 — UX do Quadro Base do Setor
+## a) Arquivos tocados (Modify) + naturezas
 
-### a) Arquivo e linhas
-
-- `src/components/escalas/ManualScheduleGrid.tsx` (linhas 2006–2064) — **Modify**.
-- Sem deletar componentes filhos. Sem tocar em `handleCellClick`/`handleSingleClickToggleOff` (só remapeio quem chama).
-
-### b) Natureza da mudança
-
-Modify localizado no bloco "Collapsible base section for CLTs not scheduled":
-
-1. Renomear título + subtítulo.
-2. Trocar `opacity-60` por `opacity-95` (legível, mas ainda visualmente subordinado ao quadro principal).
-3. Inverter handlers: single-click abre editor; folga vira ação dentro do editor (já existe lá).
-4. Toast educativo de primeiro uso, gated por `localStorage["cajupar:first_use_b6"]`.
-
-### c) Não se aplica a B6.
-
-### d) Proposta de copy + decisão sobre folga
-
-**Título atual:**
-
-> Quadro base do setor — sem escala nesta semana
-
-**Proposta (vou usar esta, salvo objeção):**
-
-> **Disponíveis no setor** — clique para escalar
-> *(funcionários do setor sem escala nesta semana)*
-
-Estrutura: linha-cabeçalho mantém ícone `Users` + Badge com count; muda só o texto. O subtítulo cinza explica a condição.
-
-**Folga: dentro do editor** (não botão dedicado).
-
-- O `EditScheduleDialog` já tem a opção "folga" como tipo de schedule.
-- Botão dedicado na linha quebraria o padrão visual da tabela (oito colunas alinhadas com o quadro principal) e duplicaria caminho.
-- Menos disruptivo: 1 clique abre editor, gestor escolhe "Escalar" ou "Folga" no mesmo lugar onde já escolhe pro quadro principal.
-
-**Toast educativo (primeira interação após o deploy):**
-
-```ts
-const KEY = "cajupar:first_use_b6";
-if (!localStorage.getItem(KEY)) {
-  toast.info("Folga agora é uma opção dentro do editor", {
-    description: "Clique no funcionário do quadro base para escalar ou marcar folga.",
-    duration: 6000,
-  });
-  localStorage.setItem(KEY, new Date().toISOString());
-}
-```
-
-Disparado dentro do novo `onClick` da célula, antes de chamar `handleCellClick`. Uso `toast` do `sonner` (já importado no arquivo — vou confirmar com grep antes; se for `useToast`, uso o que estiver lá, conforme regra da sessão).
-
-**Handlers — diff conceitual:**
-
-```tsx
-<TableCell
-  className="text-center p-1 cursor-pointer hover:bg-primary/5 transition-colors"
-  title="Clique para escalar ou marcar folga"
-  onClick={() => {
-    maybeShowFirstUseToast();
-    handleCellClick(emp, dateStr);
-  }}
->
-```
-
-Removo `onDoubleClick`, removo o `setTimeout` de 220ms, removo `cancelPendingClick`. Não toco em `clickTimerRef`/`handleSingleClickToggleOff` porque ainda são usados no quadro principal (linhas anteriores) — só desconecto deste bloco.
-
-### e) Riscos de regressão
-
-- **Atalho "1 clique = folga" some neste bloco específico.** Quadro principal (linhas dos já escalados) continua com o comportamento atual — não toco nele. Risco: gestor que aprendeu o atalho antigo no quadro base reclama. Toast educativo mitiga; se quiser, escalo a duração ou viro `toast.message` persistente. 
-- **Acessibilidade**: `cursor-pointer` + `title` já existem. Sem regressão.
-- `**opacity-95` vs `opacity-60**`: contraste melhor, fica mais perto do quadro principal. Risco baixo de confundir com "já escalado" porque a célula continua mostrando `—` em vez de horário.
-
-### f) Decisões que preciso de você
-
-1. **Copy do título**: aceita "Disponíveis no setor — clique para escalar" ou prefere outra? (Alternativa: "Funcionários do setor sem escala — clique para escalar".)
-2. **Folga dentro do editor** (default do plano) ou botão dedicado na linha? Plano segue com "dentro do editor".
-3. **Duração do toast**: 6s ok ou prefere persistente (`duration: Infinity` + `dismissible`)?
+1. `**src/lib/scheduleExcel.ts**` — Modify (parser)
+  - **L60–66 (constants)**: adicionar `CPF_HEADER_ALIASES`, `NAME_HEADER_ALIASES`, helper `normalizeCpf(v)` (strip não-dígitos, valida `length===11`).
+  - **L420–450 (header scan em `parseSingleSectorSheet`)**: ao localizar a linha de sub-header (`ENTRADA`), também varrer a linha de cabeçalho principal (`NOME / CARGO / ...`) procurando coluna CPF via aliases. Resultado: `cpfCol: number | null`. Heurística:
+    - normalizar header (NFD + UPPER + trim), aceitar `CPF`, `C.P.F`, `C P F`, `CPF/MF`, `DOCUMENTO`, `DOC`, `RG/CPF` contendo "CPF".
+    - se múltiplas colunas casarem, log `console.warn` e usar a primeira.
+  - **L499–524 (build do `nameMap`)**: além do `nameMap`, construir `cpfMap: Map<cpf11, {id,name}>` a partir de `allEmployees` (precisa do CPF; ver item 2). Manter dedup já existente para homônimos.
+  - **L545–575 (cascata de match por linha)**: nova ordem:
+  1. Se `cpfCol != null` e linha tem CPF normalizável → lookup em `cpfMap`. **Match → resolvido**. Sem fuzzy.
+  2. Senão (sem CPF na linha ou sem coluna CPF): nome normalizado exato no `nameMap`.
+  3. Senão: fuzzy via `stringSimilarity` existente (Levenshtein normalizado, já em `src/lib/fuzzyMatch.ts`), threshold **≥ 0.90**.
+    - Coletar TODOS os candidatos ≥ 0.90. Se exatamente 1 → usar. Se 2+ → **NÃO escolher**: empurrar para `unmatchedEmployees` com `ambiguous: true` e lista de candidatos (até 5, ordenados por similaridade) para o modal resolver.
+  4. Senão: `unmatchedEmployees` normal (sem candidatos).
+    Atualizar `UnmatchedEmployee`** (L45–49) para:
+    `ts
+    terface UnmatchedEmployee {
+    rowIndex: number;
+    name: string;
+    cargo: string;
+    cpf?: string | null;           // CPF normalizado se a planilha tinha
+    reason: "no_match" | "ambiguous";
+    candidates?: Array<{ id: string; name: string; similarity: number; cpf?: string | null }>;
+    `umular contadores no`ScheduleParseResult`:` matchedByCpf`,` matchedByExactName`,` matchedByFuzzy`(somar e devolver — modelar como`matchStats`).
+2. `**src/components/escalas/ScheduleExcelFlow.tsx**` — Modify (orchestrator + modal)
+  - **L70–76 props**: aceitar opcionalmente `allUnitEmployees` já enriquecido com `cpf` (ver item 3). Sem mudança de assinatura quebrando.
+  - **L131–154 `runParse**`: passar `allEmps` com CPF (já vem se o hook injetar).
+  - **L189–293 `registerUnmatchedEmployees**`: **REMOVER** o caminho de criação silenciosa por `ilike(name)` + insert. Substituir por execução APENAS das decisões coletadas do novo modal de revisão (ver item 4): `link_existing` → reusa id; `create_new` → insert com CPF (se houver na linha) + cargo; `ignore` → pula.
+    - A criação só roda se `decision === "create_new"` E o gestor confirmou explicitamente o nome/cargo/CPF no formulário do modal.
+  - **Estado novo**: `reviewModalOpen`, `reviewDecisions: Map<rowIndex, ReviewDecision>`.
+  - **Fluxo**: após parse, se `unmatchedEmployees.length > 0` → abrir `<UnmatchedReviewDialog/>` ANTES do botão "Salvar". Salvar fica desabilitado até todas as linhas terem decisão.
+  - **Toast final** (relatório): substituir toast genérico por um com breakdown (item f).
+3. **Hook fornecedor de `allUnitEmployees**` — Modify mínimo
+  - Onde `ScheduleExcelFlow` recebe `allUnitEmployees` (consumidores do componente, p.ex. `ManualScheduleGrid` ou container do editor): garantir que o select inclui `cpf`. Vou rodar grep antes de mexer; se já vem, zero mudança. Se não, adiciono apenas o campo `cpf` no select — sem mexer em hooks de listagem (`useEmployees`, `useSchedulableEmployees`) por escopo.
+  - **Grep planejado**: `rg "allUnitEmployees" src/components/escalas` para localizar 1–2 callers.
+4. `**src/components/escalas/UnmatchedReviewDialog.tsx**` — **Add** (componente novo)
+  - Reusa `Dialog`, `Table`, `Button`, `Input`, `Command` (combobox de busca) do shadcn já no projeto.
+  - Estrutura: ver item (d).
+5. `**src/components/escalas/ImportSummaryPanel.tsx**` — **Add** (componente leve)
+  - Painel persistente embaixo do modal de import com cards de contagem: processadas / CPF / exato / fuzzy / manual / ignoradas. Não bloqueante; aparece após `Salvar`.
 
 ---
 
-## Ordem de execução (após aprovação)
+## b) Biblioteca fuzzy
 
-1. Editar `useDailyRoster.ts` (B3).
-2. Editar `ManualScheduleGrid.tsx` bloco 2006–2064 (B6).
-3. Grep de validação:
-  - `rg "useDailyRoster" src` → confirmar consumidores intactos.
-  - `rg "handleSingleClickToggleOff" src/components/escalas/ManualScheduleGrid.tsx` → confirmar que continua usado no quadro principal.
-  - `rg "first_use_b6"` → só na nova chamada.
-4. Reportar arquivos tocados + saída dos greps + descrição visual da mudança do bloco base.
+**Decisão proposta: NÃO adicionar dependência nova.**
 
-## Restrições respeitadas
+- Já existe `stringSimilarity` em `src/lib/fuzzyMatch.ts` (Levenshtein normalizado). Foi a função usada no B3. Mantém consistência entre módulos.
+- Vou subir o threshold para **0.90** (hoje está 0.85) e adicionar a regra **"2+ candidatos ≥ threshold ⇒ ambíguo, vai pro modal"**. Isso resolve o caso "Matheus Xavier" vs "Matheus Vieira Xavier" com mais segurança que Jaro-Winkler isolado — Levenshtein normalizado dá ~0.79 nesse par, então cai em ambíguo/no_match e o gestor decide (que é o objetivo final).
+- Se quiser Jaro-Winkler especificamente: posso implementar inline (~30 linhas, zero dep). Marcar como decisão bloqueante (h).
 
-- Não toco em `useEmployees`, `useSchedulableEmployees`, `useD1Schedules`.
-- Não crio hook novo.
-- Não modifico schema.
-- Não commito nem faço deploy.  
+**Não instalo `fast-fuzzy`/`string-similarity` sem aprovação.**
+
+---
+
+## c) Detecção da coluna CPF (heurística)
+
+```
+CPF_HEADER_ALIASES = ["CPF","C.P.F","C P F","CPF/MF","DOCUMENTO","DOC"]
+```
+
+- Normalizo cada célula da linha de cabeçalho principal (a linha logo acima de `ENTRADA`, hoje detectada como `dayHeaderRow`/`titleRow`) com NFD+UPPER+trim+collapse-spaces.
+- Match: header normalizado === alias OU contém token "CPF".
+- Se nenhuma coluna casar → `cpfCol = null` → cai no fluxo só-nome.
+- Validação por amostragem: na primeira linha de dados, se a coluna candidata tem valor que normaliza pra 11 dígitos, confirma; se 0/N amostras → descarta e `console.warn`.
+
+Aceita formatos: `"123.456.789-01"`, `"12345678901"`, `"123 456 789 01"`, `"123.456.789-01 "`. Tudo via `replace(/\D/g,"")` + check length 11.
+
+---
+
+## d) Modal "Não-casados" (componente novo)
+
+`UnmatchedReviewDialog` (shadcn `Dialog` + `Table`):
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ Revisar funcionários não identificados (N linhas)          │
+├────────────────────────────────────────────────────────────┤
+│ Linha │ Nome planilha   │ Cargo │ CPF  │ Decisão           │
+│  12   │ Matheus Xavier  │ Garçom│ ...  │ [Vincular ▼]      │
+│       │   → sugestões:  Matheus Vieira Xavier (0.79)       │
+│       │                 Matheus Silva       (0.61)         │
+│  18   │ João Pedro      │ Cozinha│ —   │ [Criar novo ▼]    │
+│       │   → nome: [_______]  cargo: [____]  CPF: [______]  │
+│  22   │ Linha estranha  │ —     │ —   │ [Ignorar ▼]        │
+├────────────────────────────────────────────────────────────┤
+│        [Cancelar import]              [Confirmar (N/N)]    │
+└────────────────────────────────────────────────────────────┘
+```
+
+- **Coluna "Decisão"**: `DropdownMenu` com 3 opções:
+  - `Vincular a existente` → abre `Command` (busca em `allUnitEmployees` por nome/CPF). Pré-preenche com `candidates[0]` se existir.
+  - `Criar novo cadastro` → expande inputs (nome editável, cargo, CPF opcional). Validação CPF (11 dígitos se preenchido).
+  - `Ignorar esta linha` → marca como skipped.
+- Botão `Confirmar` desabilitado até todas as linhas terem decisão válida.
+- Linhas com `reason: "ambiguous"` aparecem destacadas com `AlertTriangle` (lucide).
+
+Não cria componente de busca novo: reusa `Command`/`Popover` do shadcn já em uso no projeto (vide `CnpjQuickRegisterDialog`, `UnitPartnerLinkModal`).
+
+---
+
+## e) Detecção coluna CPF (resumo)
+
+Ver (c). Heurística dupla: aliases de header + amostragem de 1ª linha de dados.
+
+---
+
+## f) Resumo final do import
+
+**Duas camadas:**
+
+1. **Toast `sonner**` imediato após salvar:
+  `"38 escalas salvas · 24 CPF · 8 nome exato · 4 fuzzy · 2 manual · 0 ignoradas"`
+2. **Painel persistente** (`ImportSummaryPanel`) renderizado dentro do `Dialog` após `isSaving=false` e enquanto o gestor não fechar o modal. Cards com `lucide-react` (CheckCircle2, UserPlus, UserX, AlertTriangle). Permite revisar antes de fechar.
+
+Não persiste em DB (escopo proíbe schema). É estado local da sessão de import.
+
+---
+
+## g) Riscos de regressão
+
+
+| Risco                                                                                    | Mitigação                                                                                                                                                                                                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fluxo atual de import quebra para planilhas SEM coluna CPF                               | `cpfCol = null` → cai no caminho atual (nome exato + fuzzy). Comportamento equivalente, só com threshold mais alto.                                                                                                  |
+| Threshold 0.85 → 0.90 manda mais coisa pro modal                                         | Esperado e desejado (zero fantasma). Gestor decide. Documentar no toast.                                                                                                                                             |
+| Multi-setor (`parseMultiSectorFile`) — múltiplas abas                                    | Mesmo parser por aba é chamado; `unmatchedEmployees` já é agregado em L867–890. Modal recebe lista unificada com `sectorName` opcional para contexto (adicionar campo `sectorHint?: string` em `UnmatchedEmployee`). |
+| `allUnitEmployees` sem CPF nos callers                                                   | Se select não trouxer CPF, `cpfMap` fica vazio e match CPF nunca acontece — degrada para comportamento atual. Não quebra.                                                                                            |
+| Componentes que importam `UnmatchedEmployee` quebram com novo campo `reason` obrigatório | Campos novos com `?` (opcionais). Compatível.                                                                                                                                                                        |
+| `registerUnmatchedEmployees` é chamado em algum outro lugar?                             | **Grep antes de mexer**: `rg "registerUnmatchedEmployees" src`. Esperado: só dentro do mesmo arquivo.                                                                                                                |
+
+
+**Fora do escopo (não toco):** `useDailyRoster`, `useEmployees`, `useSchedulableEmployees`, `useD1Schedules`, schema, RLS, hooks de listagem.
+
+---
+
+## h) Decisões bloqueantes pra você
+
+1. **Fuzzy lib**: confirmo uso do `stringSimilarity` (Levenshtein) atual com threshold 0.90 + regra de ambiguidade? Ou quer Jaro-Winkler inline (~30 linhas, sem dep)?
+2. **Threshold de auto-match fuzzy**: 0.90 ok? (acima dispara auto-match se 1 candidato; abaixo ou empate vai pro modal)
+3. **Cadastro novo via modal**: gênero default `M` e `worker_type: "clt"` (como hoje)? Ou exigir escolha no modal?
+4. **Painel resumo persistente** ou só toast? Toast já cobre, painel adiciona ~50 linhas de UI.
+
+---
+
+## Plano de execução (lote único após aprovação)
+
+1. `scheduleExcel.ts`: novos helpers + heurística header CPF + `cpfMap` + cascata + tipo `UnmatchedEmployee` estendido + `matchStats`.
+2. `UnmatchedReviewDialog.tsx`: componente novo.
+3. `ImportSummaryPanel.tsx`: componente novo (se decisão = sim no item h.4).
+4. `ScheduleExcelFlow.tsx`: substituir `registerUnmatchedEmployees`, integrar modal de revisão, toast/painel de resumo.
+5. Grep de validação: `registerUnmatchedEmployees`, `unmatchedEmployees`, `UnmatchedEmployee` — confirmar callers só dentro do escopo.
+6. Conferir que `parseMultiSectorFile` agrega o novo formato.
+
+**Não commito. Não adiciono lib. Não toco em hooks fora do escopo.**  
   
-Plano aprovado com 2 ajustes pequenos.  
-  
-DECISÕES:  
-  
-D1 — Inner restritivo: aprovado. Inativos não devem  
-aparecer na folha de intervalos.  
-  
-D2 — Copy do título: aprovar "Disponíveis no setor —  
-clique para escalar" + subtítulo "(funcionários do  
-setor sem escala nesta semana)".  
-  
-D3 — Folga dentro do editor: aprovado.  
-  
-D4 — Toast: 8 segundos + action button "Não mostrar  
-mais" que grava localStorage. Equilibra atenção  
-com não-agressividade.  
-  
-AJUSTE NO DEDUP DEFENSIVO DO B3:  
-  
-Normalizar o nome antes de virar identity_key:  
-  name.normalize('NFD')  
-      .replace(/[\u0300-\u036f]/g,'')  
-      .toUpperCase()  
-      .trim()  
-      .replace(/\s+/g,' ')  
-  
-Cobre acentuação inconsistente entre cadastros  
-("JOSÉ  DA SILVA" vs "Jose da Silva" → mesma key).  
-  
-Custo: 1 linha. Ganho: dedup mais robusto.  
-  
-Pode executar B3 + B6 em lote único agora. Reporte:  
-  • Arquivos tocados  
-  • Greps de validação que você listou  
-  • Descrição visual da mudança no Quadro Base  
-    (antes/depois do bloco)  
-  
+Plano aprovado com 1 ajuste em D3 e 1 adição.
+
+DECISÕES:
+
+D1 — Fuzzy lib: aprovado. Use stringSimilarity
+(Levenshtein) com threshold 0.90 + regra de ambiguidade
+(2+ candidatos ≥ threshold vão pro modal).
+
+D2 — Threshold 0.90: aprovado.
+
+D3 — AJUSTE: NÃO defaultar gênero=M nem worker_type=clt
+no formulário de "Criar novo". EXIGIR escolha no modal:
+  • Gênero: dropdown obrigatório (M/F/Outro)
+  • worker_type: dropdown obrigatório (CLT/Freelancer)
+Justificativa: defaults aqui criam dados sujos no banco
+(relatórios de diversidade ficam errados, muitos imports
+são pra freelancers e viraram clt no banco).
+
+D4 — Só toast, sem painel persistente. Cobre o caso de
+uso, evita 50 linhas de UI que o gestor olha por 2s.
+
+ADIÇÃO — Validação de CPF duplicado no "Criar novo":
+
+Ao gestor digitar CPF no formulário do modal, fazer
+lookup em employees:
+  • CPF existe e active=true: warning bloqueante
+    "Já existe cadastro ativo: [Nome]" + sugerir
+    botão "Vincular a esse"
+  • CPF existe e active=false: info não-bloqueante
+    "Existe cadastro inativo: [Nome]. Reativar?"
+    com botão "Reativar" (UPDATE active=true)
+  • CPF não existe: prossegue normal
+
+Custo: 1 query reativa ao input + alert. Ganho:
+fecha completamente a porta pra fantasmas. Caso Matheus
+Xavier (4 cadastros mesmo CPF) não conseguiria virar
+5º nem por descuido do gestor.
+
+Pode executar B5 em lote único.
+
+REPORTE:
+  • Arquivos tocados (criados + modificados)
+  • Greps de validação que você listou
+  • Descrição visual dos 2 componentes novos
+    (UnmatchedReviewDialog + ImportSummaryPanel se aplicável)
+  • Confirmação de que registerUnmatchedEmployees não
+    cria mais cadastro silencioso em lugar nenhum
+
 Não commitar — eu commito ao final.

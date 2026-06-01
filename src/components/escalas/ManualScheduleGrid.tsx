@@ -1186,6 +1186,7 @@ export function ManualScheduleGrid() {
                 job_title: e.job_title,
                 job_title_id: e.job_title_id,
                 worker_type: e.worker_type || "clt",
+                cpf: (e as any).cpf ?? null,
               }))}
               sectors={sectors.map((s) => ({ id: s.id, name: s.name }))}
               sectorJobTitles={sectorJobTitles.map((sjt) => ({ sector_id: sjt.sector_id, job_title_id: sjt.job_title_id }))}

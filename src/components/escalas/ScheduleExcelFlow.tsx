@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
+
 import {
   Popover,
   PopoverContent,
@@ -329,27 +329,47 @@ export function ScheduleExcelFlow({
   async function handleConfirmImport() {
     if (!parseResult) return;
 
+    // If unmatched rows exist and the gestor hasn't decided yet → open review modal and STOP.
+    if (needsReview) {
+      setReviewOpen(true);
+      return;
+    }
+
     setIsSaving(true);
 
+    // Manual decision tallies for the final toast
+    let linkedManuallyCount = 0;
+    let createdManuallyCount = 0;
+    let ignoredManuallyCount = 0;
+
     try {
-      // Step 1: Register selected unmatched employees
       let finalParseResult = parseResult;
-      if (selectedUnmatchedCount > 0 && pendingFile && targetMonday) {
-        const newEmps = await registerUnmatchedEmployees();
-        if (newEmps.length > 0) {
-          toast.success(`${newEmps.length} funcionário(s) cadastrado(s)!`);
-          // Re-parse with updated employee list
-          const allEmps = [...(allUnitEmployees || employees), ...newEmps];
-          const mondayISO = format(targetMonday, "yyyy-MM-dd");
-          const reParsed = await parseScheduleFile(pendingFile, mondayISO, allEmps);
-          finalParseResult = reParsed;
-          // Invalidate employees cache
-          qc.invalidateQueries({ queryKey: ["employees"] });
+
+      // Step 1: Apply gestor's decisions (link / create / ignore) → resolve employees
+      if (reviewDecisions && reviewDecisions.length > 0 && pendingFile && targetMonday) {
+        for (const d of reviewDecisions) {
+          if (d.action === "ignore") ignoredManuallyCount++;
+          else if (d.action === "link") linkedManuallyCount++;
+          else if (d.action === "create") createdManuallyCount++;
         }
+        const resolved = await applyReviewDecisions(reviewDecisions);
+
+        // Build synthetic aliases keyed by the planilha name so the re-parse
+        // produces entries for the previously unmatched rows.
+        const synthetics: ScheduleEmployee[] = [];
+        for (const u of parseResult.unmatchedEmployees) {
+          const emp = resolved.get(u.rowIndex);
+          if (emp) synthetics.push({ ...emp, name: u.name });
+        }
+
+        const allEmps = [...(allUnitEmployees || employees), ...synthetics];
+        const mondayISO = format(targetMonday, "yyyy-MM-dd");
+        finalParseResult = await parseScheduleFile(pendingFile, mondayISO, allEmps);
+        qc.invalidateQueries({ queryKey: ["employees"] });
       }
 
       if (finalParseResult.entries.length === 0) {
-        toast.info("Nenhum lançamento válido após o cadastro.");
+        toast.info("Nenhum lançamento válido após a revisão.");
         setIsSaving(false);
         return;
       }
@@ -577,10 +597,20 @@ export function ScheduleExcelFlow({
       closeModal();
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
 
-      const parts = [`${savedCount} importado(s)`];
-      if (ignoredCount > 0) parts.push(`${ignoredCount} já existia(m)`);
-      if (conflictResolved > 0) parts.push(`${conflictResolved} conflito(s) resolvido(s)`);
-      toast.success(parts.join(" · "));
+      const ms = finalParseResult.matchStats;
+      const descParts: string[] = [];
+      if (ms.matchedByCpf > 0) descParts.push(`${ms.matchedByCpf} por CPF`);
+      if (ms.matchedByExactName > 0) descParts.push(`${ms.matchedByExactName} por nome exato`);
+      if (ms.matchedByFuzzy > 0) descParts.push(`${ms.matchedByFuzzy} por fuzzy`);
+      if (linkedManuallyCount > 0) descParts.push(`${linkedManuallyCount} vinculadas manualmente`);
+      if (createdManuallyCount > 0) descParts.push(`${createdManuallyCount} criadas`);
+      if (ignoredManuallyCount > 0) descParts.push(`${ignoredManuallyCount} ignoradas`);
+      if (ignoredCount > 0) descParts.push(`${ignoredCount} já existia(m)`);
+      if (conflictResolved > 0) descParts.push(`${conflictResolved} conflito(s) resolvido(s)`);
+
+      toast.success(`${savedCount} escalas salvas`, {
+        description: descParts.filter(Boolean).join(" · ") || undefined,
+      });
     } catch (err: any) {
       console.error("[Excel Import] Erro inesperado:", err);
       toast.error(`Erro inesperado: ${err?.message || "erro desconhecido"}`, { duration: 8000 });
@@ -588,8 +618,7 @@ export function ScheduleExcelFlow({
     }
   }
 
-  const hasUnmatched = (parseResult?.unmatchedEmployees?.length ?? 0) > 0;
-  const canConfirm = parseResult && (parseResult.entries.length > 0 || selectedUnmatchedCount > 0);
+  const canConfirm = parseResult && (parseResult.entries.length > 0 || hasUnmatched);
 
   return (
     <>
@@ -744,76 +773,28 @@ export function ScheduleExcelFlow({
                 </div>
               </div>
 
-              {/* Unmatched employees — interactive registration */}
+              {/* Unmatched employees — summary + review CTA (real flow is in UnmatchedReviewDialog) */}
               {hasUnmatched && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                      <UserPlus className="h-4 w-4" />
-                      Funcionários não encontrados ({parseResult.unmatchedEmployees.length})
-                    </p>
-                    {unitId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-6 px-2"
-                        onClick={() => {
-                          const allSelected = unmatchedRegs.every((r) => r.selected);
-                          setUnmatchedRegs((prev) =>
-                            prev.map((r) => ({ ...r, selected: !allSelected }))
-                          );
-                        }}
-                      >
-                        {unmatchedRegs.every((r) => r.selected) ? "Desmarcar todos" : "Marcar todos"}
-                      </Button>
-                    )}
-                  </div>
-                  <ScrollArea className="max-h-[160px]">
-                    <div className="space-y-1.5">
-                      {parseResult.unmatchedEmployees.map((u, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 rounded-md border border-amber-300/30 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-xs"
-                        >
-                          {unitId && (
-                            <Checkbox
-                              checked={unmatchedRegs[i]?.selected ?? false}
-                              onCheckedChange={(checked) => {
-                                setUnmatchedRegs((prev) =>
-                                  prev.map((r, idx) =>
-                                    idx === i ? { ...r, selected: !!checked } : r
-                                  )
-                                );
-                              }}
-                              disabled={isSaving}
-                            />
-                          )}
-                          <Input
-                            value={unmatchedRegs[i]?.editedName ?? u.name}
-                            onChange={(e) => {
-                              setUnmatchedRegs((prev) =>
-                                prev.map((r, idx) =>
-                                  idx === i ? { ...r, editedName: e.target.value } : r
-                                )
-                              );
-                            }}
-                            className="h-6 text-xs flex-1 min-w-0"
-                            disabled={isSaving || !(unmatchedRegs[i]?.selected)}
-                          />
-                          {u.cargo && (
-                            <Badge variant="secondary" className="text-[10px] shrink-0">
-                              {u.cargo}
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  <p className="text-[11px] text-muted-foreground">
-                    {unitId
-                      ? `Marque para cadastrar automaticamente. ${selectedUnmatchedCount} selecionado(s).`
-                      : "Selecione uma unidade para poder cadastrar automaticamente."}
+                <div className="rounded-md border border-amber-300/40 bg-amber-50/50 dark:bg-amber-950/10 p-3 space-y-2">
+                  <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                    <UserPlus className="h-4 w-4" />
+                    {parseResult.unmatchedEmployees.length} funcionário(s) não identificado(s)
+                    {reviewDecisions ? " — decisões registradas" : ""}
                   </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {reviewDecisions
+                      ? "Suas decisões foram registradas. Clique em Confirmar para concluir."
+                      : "Antes de salvar, revise linha a linha: vincular, criar novo cadastro ou ignorar. Nenhum cadastro fantasma será criado."}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setReviewOpen(true)}
+                    disabled={isSaving}
+                  >
+                    {reviewDecisions ? "Revisar novamente" : "Revisar agora"}
+                  </Button>
                 </div>
               )}
 
@@ -860,14 +841,30 @@ export function ScheduleExcelFlow({
             {canConfirm && (
               <Button onClick={handleConfirmImport} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {selectedUnmatchedCount > 0
-                  ? `Cadastrar (${selectedUnmatchedCount}) e Importar`
+                {needsReview
+                  ? `Revisar (${parseResult?.unmatchedEmployees.length || 0}) e Importar`
                   : `Confirmar Importação (${parseResult?.entries.length || 0})`}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manual review modal — zero-ghost policy */}
+      {parseResult && unitId && (
+        <UnmatchedReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          unmatched={parseResult.unmatchedEmployees}
+          allUnitEmployees={allUnitEmployees || employees}
+          unitId={unitId}
+          onConfirm={(decisions) => {
+            setReviewDecisions(decisions);
+            setReviewOpen(false);
+          }}
+          onCancel={() => setReviewOpen(false)}
+        />
+      )}
     </>
   );
 }

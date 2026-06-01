@@ -727,8 +727,10 @@ function parse3ColSheet(
     }
   }
 
-  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees };
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees, matchStats };
 }
+
+const EMPTY_STATS: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
 
 // ─── Legacy Parser (1 col per day) ───
 

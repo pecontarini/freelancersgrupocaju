@@ -1,141 +1,214 @@
-## Diagnóstico confirmado
+# Plano Fase B — Lote B3 + B6
 
-- A escala já filtra corretamente para mostrar apenas funcionários sincronizados do Secullum: `worker_type='clt'`, `banco_id IS NOT NULL`, `secullum_id IS NOT NULL`, `aguardando_secullum=false`.
-- Em Caju Itaim existem hoje **113 CLTs sincronizados** visíveis para escala.
-- Os nomes citados anteriormente foram cadastrados manualmente como `freelancer`, sem `banco_id`, sem `secullum_id` e sem `sincronizado_em`; por isso não aparecem na escala.
-- Se esses funcionários realmente existem no Secullum, o problema mais provável não é o editor: é a reconciliação/importação do sync não estar trazendo ou não estar vinculando esses CPFs à unidade Caju Itaim.
+Premissa: B1 (remap dos 643) e B2 (trigger guardião) já rodaram via SQL fora do Lovable. Este lote é puramente frontend defensivo + UX. Sem mudanças de schema, sem deploy, sem commits.
 
-## Objetivo
+---
 
-Garantir que **somente cadastros originados do sync Secullum** apareçam no editor, e corrigir os cadastros que são do Secullum mas não aparecem sem abrir brecha para cadastro manual comum entrar na escala.
+## B3 — Hardening do `useDailyRoster`
 
-## Plano de execução
+### a) Arquivo e linhas
 
-### 1. Auditar a função de sync de funcionários Secullum
+- `src/hooks/useDailyRoster.ts` (linhas 22–79) — **Modify**.
+- Único consumidor que importa o hook: `IntervalosDrawer` e `scheduleDailyControlPdf` (via prop). Não altero a assinatura `DailyRosterRow` nem a ordem dos campos.
 
-Revisar a função de banco `sync_funcionarios_secullum(p_payload jsonb)`, que hoje:
+### b) Natureza da mudança
 
-- recebe funcionários do payload externo;
-- identifica unidade por `Empresa.Documento` comparando com `config_lojas.cnpj`;
-- grava/atualiza `employees` por conflito em `(banco_id, secullum_id)`;
-- marca funcionários válidos como:
-  - `worker_type='clt'`
-  - `banco_id=75820`
-  - `secullum_id=<Id do Secullum>`
-  - `aguardando_secullum=false`
-  - `sincronizado_em=now()`
+Modify pontual em duas partes da `queryFn`:
 
-Ponto crítico a validar: se o funcionário existe no Secullum mas vem com CNPJ diferente, CNPJ sem mapeamento, demissão preenchida, ou payload incompleto, ele não entra na unidade e nunca aparece no editor.
+1. Apertar o JOIN com `employees` para descartar inativos.
+2. Adicionar passo de dedup defensivo no array final, antes do `sort`.
 
-### 2. Criar diagnóstico seguro para CPFs/nome sem mexer em schema
+### c) Estratégia (snippet conceitual)
 
-Adicionar uma consulta/relatório de reconciliação para os CPFs manuais ativos em Caju Itaim:
-
-- listar registros manuais ativos sem `secullum_id`;
-- cruzar por CPF com qualquer registro Secullum já existente em `employees`;
-- apontar status:
-  - `ja_sincronizado_mesma_unidade`
-  - `sincronizado_outra_unidade`
-  - `manual_sem_correspondente_local`
-  - `duplicado_manual_vs_secullum`
-
-Se não houver registro Secullum correspondente na tabela `employees`, isso indica que o sync ainda não recebeu/processou esse CPF no painel, mesmo que ele exista no sistema Secullum externo.
-
-### 3. Corrigir a função de sync para reconciliar CPF manual com Secullum
-
-Atualizar `sync_funcionarios_secullum` para, antes de inserir um novo CLT sincronizado, tentar reconciliar um cadastro manual ativo da mesma unidade pelo CPF limpo.
-
-Regra proposta:
-
-- Se chegar funcionário ativo do Secullum com `CPF` válido e `unit_id` mapeado:
-  - procurar em `employees` um registro ativo na mesma unidade, mesmo CPF, sem `secullum_id`;
-  - se existir, atualizar esse registro para virar o cadastro canônico Secullum:
-    - `worker_type='clt'`
-    - `banco_id=75820`
-    - `secullum_id=<Id>`
-    - `name`, `job_title`, `phone`, `gender`, `unit_id` vindos do Secullum
-    - `aguardando_secullum=false`
-    - `sincronizado_em=now()`
-  - se não existir, manter o fluxo atual de insert/upsert por `(banco_id, secullum_id)`.
-
-Isso preserva a regra: o funcionário só passa a aparecer quando o **Secullum confirmou** `banco_id/secullum_id`.
-
-### 4. Não liberar cadastro manual na escala
-
-Não alterar `useSchedulableEmployees` para incluir freelancers ou manuais.
-
-Manter o filtro como está:
+**Filtro inner restritivo no select**: trocar o relacionamento embutido para inner + filtro `active=true`, usando a sintaxe PostgREST que o projeto já usa em outros hooks:
 
 ```ts
-active=true
-worker_type='clt'
-banco_id not null
-secullum_id not null
-aguardando_secullum is false/null
+.select(`
+  id, schedule_date, employee_id, sector_id,
+  start_time, end_time, break_duration, schedule_type,
+  shifts!schedules_shift_id_fkey ( start_time, end_time ),
+  employees!schedules_employee_id_fkey!inner (
+    id, name, job_title, worker_type, cpf, active
+  )
+`)
+.eq("employees.active", true)
 ```
 
-Isso evita bagunçar backend e impede que cadastro manual comum entre na grade.
+Com `!inner`, qualquer schedule cujo `employee_id` aponte pra inativo é descartado pelo Postgres — defesa em profundidade caso o trigger B2 falhe ou alguém reative um órfão manualmente.
 
-### 5. Ajustar UX para evitar novos cadastros manuais confundidos com Secullum
+**Dedup defensivo no client** (após o `map`, antes do `sort`):
 
-Alterar somente mensagens/fluxo visual onde necessário:
+```ts
+const seen = new Map<string, DailyRosterRow>();
+for (const r of mapped) {
+  const cpfDigits = (r as any)._cpf ? String((r as any)._cpf).replace(/\D/g, "") : "";
+  const identity = cpfDigits.length >= 11
+    ? `cpf:${cpfDigits}`
+    : `name:${r.employee_name.trim().toUpperCase()}`;
+  const key = `${r.sector_id}::${identity}::${r.start_time ?? ""}`;
+  const prev = seen.get(key);
+  if (!prev) {
+    seen.set(key, r);
+  } else {
+    // mantém o que tem horário explícito; empate → mantém o primeiro
+    if (!prev.start_time && r.start_time) seen.set(key, r);
+    if (typeof console !== "undefined") {
+      console.warn("[useDailyRoster] duplicata defensiva descartada", { key, kept: seen.get(key)?.schedule_id, dropped: r.schedule_id });
+    }
+  }
+}
+const rows = Array.from(seen.values());
+```
 
-- `TeamManagement.tsx`: deixar claro que “Equipe” lista cadastros gerais, mas a escala usa apenas CLTs sincronizados do Secullum.
-- `QuickCreateEmployeeModal.tsx`: reforçar que cadastro urgente/manual não entra na escala fixa até ser reconciliado pelo sync.
-- `SchedulableEmptyState.tsx`: manter mensagem focada em Secullum e incluir orientação para conferir se o CPF/CNPJ da unidade está chegando no sync.
+O `cpf` entra no `select` só para servir de chave; **não vaza no shape público** (`DailyRosterRow` continua exatamente igual). Uso um campo interno `_cpf` no objeto mapeado ou faço o cálculo da chave dentro do mesmo `map`/loop para nem expor — vou pelo loop único pra não criar campo descartável.
 
-Sem mudança de schema e sem liberar manual na escala.
+### d) Não se aplica a B3.
 
-### 6. Limpeza dos cadastros órfãos atuais
+### e) Riscos de regressão
 
-Após a correção da reconciliação, tratar os cadastros manuais de Caju Itaim de forma conservadora:
+- **PDF de controle (`scheduleDailyControlPdf`) e `IntervalosDrawer**`: ambos consomem `DailyRosterRow` por nome de campo. Shape preservado → zero impacto.
+- **Inativos legítimos no histórico**: o hook já é "operacional do dia" (controle de intervalos e folha de assinatura). Mostrar inativos numa folha de hoje não faz sentido — alinhado com o uso. Se algum dia surgir necessidade de relatório histórico com inativos, isso vai por outro hook.
+- **Performance**: `!inner` + `eq` empurra filtro pro Postgres, tende a ficar igual ou melhor. Dedup é O(n) num conjunto de no máximo ~150 schedules/dia.
 
-- não deletar;
-- se o sync reconciliar por CPF, eles viram CLT canônico automaticamente;
-- se não reconciliar, continuam fora da escala;
-- opcionalmente, inativar manualmente os órfãos confirmados que não existem no Secullum.
+### f) Decisões que preciso de você
 
-A inativação só deve acontecer após confirmar quais CPFs realmente não chegaram pelo sync.
+- Confirmar que **inativos não devem aparecer nem para fins de "tinha escala mas saiu da empresa hoje"** na folha de intervalos. Se quiser permitir esse caso edge, troco `!inner` por `!left` mantendo o filtro só no client. Default do plano: **inner restritivo** (mais seguro).
 
-## Arquivos/tabelas envolvidos
+---
 
-### Banco
+## B6 — UX do Quadro Base do Setor
 
-- Função: `public.sync_funcionarios_secullum(p_payload jsonb)`
-- Tabela: `public.employees`
-- Tabela de loja: `public.config_lojas`
-- Log: `public.sync_secullum_log`
+### a) Arquivo e linhas
 
-### Frontend
+- `src/components/escalas/ManualScheduleGrid.tsx` (linhas 2006–2064) — **Modify**.
+- Sem deletar componentes filhos. Sem tocar em `handleCellClick`/`handleSingleClickToggleOff` (só remapeio quem chama).
 
-- `src/hooks/useEmployees.ts`
-  - manter filtro de `useSchedulableEmployees`.
-- `src/components/escalas/TeamManagement.tsx`
-  - mensagem preventiva.
-- `src/components/escalas/QuickCreateEmployeeModal.tsx`
-  - mensagem preventiva para cadastro urgente/manual.
-- `src/components/escalas/SchedulableEmptyState.tsx`
-  - orientação de diagnóstico Secullum.
+### b) Natureza da mudança
 
-## Validação esperada
+Modify localizado no bloco "Collapsible base section for CLTs not scheduled":
 
-1. Confirmar que o editor continua usando apenas `useSchedulableEmployees`.
-2. Confirmar que `useSchedulableEmployees` continua exigindo `banco_id` e `secullum_id`.
-3. Rodar query de auditoria em Caju Itaim:
-   - total ativos;
-   - total CLT Secullum;
-   - manuais sem `secullum_id`;
-   - duplicados por CPF.
-4. Validar função de sync com payload de exemplo contendo um CPF que já existe manualmente:
-   - antes: manual não aparece;
-   - depois do sync: mesmo registro recebe `banco_id/secullum_id`, vira `clt`, aparece na escala.
-5. Verificar que nenhum freelancer/manual sem `secullum_id` aparece no editor.
+1. Renomear título + subtítulo.
+2. Trocar `opacity-60` por `opacity-95` (legível, mas ainda visualmente subordinado ao quadro principal).
+3. Inverter handlers: single-click abre editor; folga vira ação dentro do editor (já existe lá).
+4. Toast educativo de primeiro uso, gated por `localStorage["cajupar:first_use_b6"]`.
 
-## Riscos controlados
+### c) Não se aplica a B6.
 
-- Não altera RLS.
-- Não cria tabela nova.
-- Não muda regra de escala.
-- Não apaga dados.
-- Não transforma cadastro manual em escalável sem confirmação do Secullum.
-- Corrige apenas a reconciliação quando o Secullum enviar o funcionário.
+### d) Proposta de copy + decisão sobre folga
+
+**Título atual:**
+
+> Quadro base do setor — sem escala nesta semana
+
+**Proposta (vou usar esta, salvo objeção):**
+
+> **Disponíveis no setor** — clique para escalar
+> *(funcionários do setor sem escala nesta semana)*
+
+Estrutura: linha-cabeçalho mantém ícone `Users` + Badge com count; muda só o texto. O subtítulo cinza explica a condição.
+
+**Folga: dentro do editor** (não botão dedicado).
+
+- O `EditScheduleDialog` já tem a opção "folga" como tipo de schedule.
+- Botão dedicado na linha quebraria o padrão visual da tabela (oito colunas alinhadas com o quadro principal) e duplicaria caminho.
+- Menos disruptivo: 1 clique abre editor, gestor escolhe "Escalar" ou "Folga" no mesmo lugar onde já escolhe pro quadro principal.
+
+**Toast educativo (primeira interação após o deploy):**
+
+```ts
+const KEY = "cajupar:first_use_b6";
+if (!localStorage.getItem(KEY)) {
+  toast.info("Folga agora é uma opção dentro do editor", {
+    description: "Clique no funcionário do quadro base para escalar ou marcar folga.",
+    duration: 6000,
+  });
+  localStorage.setItem(KEY, new Date().toISOString());
+}
+```
+
+Disparado dentro do novo `onClick` da célula, antes de chamar `handleCellClick`. Uso `toast` do `sonner` (já importado no arquivo — vou confirmar com grep antes; se for `useToast`, uso o que estiver lá, conforme regra da sessão).
+
+**Handlers — diff conceitual:**
+
+```tsx
+<TableCell
+  className="text-center p-1 cursor-pointer hover:bg-primary/5 transition-colors"
+  title="Clique para escalar ou marcar folga"
+  onClick={() => {
+    maybeShowFirstUseToast();
+    handleCellClick(emp, dateStr);
+  }}
+>
+```
+
+Removo `onDoubleClick`, removo o `setTimeout` de 220ms, removo `cancelPendingClick`. Não toco em `clickTimerRef`/`handleSingleClickToggleOff` porque ainda são usados no quadro principal (linhas anteriores) — só desconecto deste bloco.
+
+### e) Riscos de regressão
+
+- **Atalho "1 clique = folga" some neste bloco específico.** Quadro principal (linhas dos já escalados) continua com o comportamento atual — não toco nele. Risco: gestor que aprendeu o atalho antigo no quadro base reclama. Toast educativo mitiga; se quiser, escalo a duração ou viro `toast.message` persistente. 
+- **Acessibilidade**: `cursor-pointer` + `title` já existem. Sem regressão.
+- `**opacity-95` vs `opacity-60**`: contraste melhor, fica mais perto do quadro principal. Risco baixo de confundir com "já escalado" porque a célula continua mostrando `—` em vez de horário.
+
+### f) Decisões que preciso de você
+
+1. **Copy do título**: aceita "Disponíveis no setor — clique para escalar" ou prefere outra? (Alternativa: "Funcionários do setor sem escala — clique para escalar".)
+2. **Folga dentro do editor** (default do plano) ou botão dedicado na linha? Plano segue com "dentro do editor".
+3. **Duração do toast**: 6s ok ou prefere persistente (`duration: Infinity` + `dismissible`)?
+
+---
+
+## Ordem de execução (após aprovação)
+
+1. Editar `useDailyRoster.ts` (B3).
+2. Editar `ManualScheduleGrid.tsx` bloco 2006–2064 (B6).
+3. Grep de validação:
+  - `rg "useDailyRoster" src` → confirmar consumidores intactos.
+  - `rg "handleSingleClickToggleOff" src/components/escalas/ManualScheduleGrid.tsx` → confirmar que continua usado no quadro principal.
+  - `rg "first_use_b6"` → só na nova chamada.
+4. Reportar arquivos tocados + saída dos greps + descrição visual da mudança do bloco base.
+
+## Restrições respeitadas
+
+- Não toco em `useEmployees`, `useSchedulableEmployees`, `useD1Schedules`.
+- Não crio hook novo.
+- Não modifico schema.
+- Não commito nem faço deploy.  
+  
+Plano aprovado com 2 ajustes pequenos.  
+  
+DECISÕES:  
+  
+D1 — Inner restritivo: aprovado. Inativos não devem  
+aparecer na folha de intervalos.  
+  
+D2 — Copy do título: aprovar "Disponíveis no setor —  
+clique para escalar" + subtítulo "(funcionários do  
+setor sem escala nesta semana)".  
+  
+D3 — Folga dentro do editor: aprovado.  
+  
+D4 — Toast: 8 segundos + action button "Não mostrar  
+mais" que grava localStorage. Equilibra atenção  
+com não-agressividade.  
+  
+AJUSTE NO DEDUP DEFENSIVO DO B3:  
+  
+Normalizar o nome antes de virar identity_key:  
+  name.normalize('NFD')  
+      .replace(/[\u0300-\u036f]/g,'')  
+      .toUpperCase()  
+      .trim()  
+      .replace(/\s+/g,' ')  
+  
+Cobre acentuação inconsistente entre cadastros  
+("JOSÉ  DA SILVA" vs "Jose da Silva" → mesma key).  
+  
+Custo: 1 linha. Ganho: dedup mais robusto.  
+  
+Pode executar B3 + B6 em lote único agora. Reporte:  
+  • Arquivos tocados  
+  • Greps de validação que você listou  
+  • Descrição visual da mudança no Quadro Base  
+    (antes/depois do bloco)  
+  
+Não commitar — eu commito ao final.

@@ -773,76 +773,28 @@ export function ScheduleExcelFlow({
                 </div>
               </div>
 
-              {/* Unmatched employees — interactive registration */}
+              {/* Unmatched employees — summary + review CTA (real flow is in UnmatchedReviewDialog) */}
               {hasUnmatched && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                      <UserPlus className="h-4 w-4" />
-                      Funcionários não encontrados ({parseResult.unmatchedEmployees.length})
-                    </p>
-                    {unitId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs h-6 px-2"
-                        onClick={() => {
-                          const allSelected = unmatchedRegs.every((r) => r.selected);
-                          setUnmatchedRegs((prev) =>
-                            prev.map((r) => ({ ...r, selected: !allSelected }))
-                          );
-                        }}
-                      >
-                        {unmatchedRegs.every((r) => r.selected) ? "Desmarcar todos" : "Marcar todos"}
-                      </Button>
-                    )}
-                  </div>
-                  <ScrollArea className="max-h-[160px]">
-                    <div className="space-y-1.5">
-                      {parseResult.unmatchedEmployees.map((u, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 rounded-md border border-amber-300/30 bg-amber-50/50 dark:bg-amber-950/10 p-2 text-xs"
-                        >
-                          {unitId && (
-                            <Checkbox
-                              checked={unmatchedRegs[i]?.selected ?? false}
-                              onCheckedChange={(checked) => {
-                                setUnmatchedRegs((prev) =>
-                                  prev.map((r, idx) =>
-                                    idx === i ? { ...r, selected: !!checked } : r
-                                  )
-                                );
-                              }}
-                              disabled={isSaving}
-                            />
-                          )}
-                          <Input
-                            value={unmatchedRegs[i]?.editedName ?? u.name}
-                            onChange={(e) => {
-                              setUnmatchedRegs((prev) =>
-                                prev.map((r, idx) =>
-                                  idx === i ? { ...r, editedName: e.target.value } : r
-                                )
-                              );
-                            }}
-                            className="h-6 text-xs flex-1 min-w-0"
-                            disabled={isSaving || !(unmatchedRegs[i]?.selected)}
-                          />
-                          {u.cargo && (
-                            <Badge variant="secondary" className="text-[10px] shrink-0">
-                              {u.cargo}
-                            </Badge>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                  <p className="text-[11px] text-muted-foreground">
-                    {unitId
-                      ? `Marque para cadastrar automaticamente. ${selectedUnmatchedCount} selecionado(s).`
-                      : "Selecione uma unidade para poder cadastrar automaticamente."}
+                <div className="rounded-md border border-amber-300/40 bg-amber-50/50 dark:bg-amber-950/10 p-3 space-y-2">
+                  <p className="text-sm font-medium flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                    <UserPlus className="h-4 w-4" />
+                    {parseResult.unmatchedEmployees.length} funcionário(s) não identificado(s)
+                    {reviewDecisions ? " — decisões registradas" : ""}
                   </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {reviewDecisions
+                      ? "Suas decisões foram registradas. Clique em Confirmar para concluir."
+                      : "Antes de salvar, revise linha a linha: vincular, criar novo cadastro ou ignorar. Nenhum cadastro fantasma será criado."}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => setReviewOpen(true)}
+                    disabled={isSaving}
+                  >
+                    {reviewDecisions ? "Revisar novamente" : "Revisar agora"}
+                  </Button>
                 </div>
               )}
 

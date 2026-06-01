@@ -954,6 +954,7 @@ export function parseScheduleFile(
           const allEntries: ParsedScheduleEntry[] = [];
           const allErrors: ScheduleParseError[] = [];
           const allUnmatched: UnmatchedEmployee[] = [];
+          const aggStats: MatchStats = { matchedByCpf: 0, matchedByExactName: 0, matchedByFuzzy: 0 };
           let totalWorking = 0;
           let totalOff = 0;
           let firstMonday: string | null = null;
@@ -970,13 +971,18 @@ export function parseScheduleFile(
 
             if (detect3ColFormat(rawData)) {
               const result = parse3ColSheet(rawData, targetMonday || null, metaEmployeeMap, allEmployees);
-              // Tag entries with sector_id
               for (const entry of result.entries) {
                 entry.sector_id = sectorId;
+              }
+              for (const u of result.unmatchedEmployees) {
+                u.sectorHint = sheetName;
               }
               allEntries.push(...result.entries);
               allErrors.push(...result.errors);
               allUnmatched.push(...result.unmatchedEmployees);
+              aggStats.matchedByCpf += result.matchStats.matchedByCpf;
+              aggStats.matchedByExactName += result.matchStats.matchedByExactName;
+              aggStats.matchedByFuzzy += result.matchStats.matchedByFuzzy;
               totalWorking += result.workingCount;
               totalOff += result.offCount;
               if (!firstMonday && result.originalMonday) firstMonday = result.originalMonday;
@@ -990,6 +996,7 @@ export function parseScheduleFile(
             offCount: totalOff,
             originalMonday: firstMonday,
             unmatchedEmployees: allUnmatched,
+            matchStats: aggStats,
             isMultiSector: true,
             sectorMap,
           });

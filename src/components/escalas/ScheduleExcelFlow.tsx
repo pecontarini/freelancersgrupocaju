@@ -329,27 +329,47 @@ export function ScheduleExcelFlow({
   async function handleConfirmImport() {
     if (!parseResult) return;
 
+    // If unmatched rows exist and the gestor hasn't decided yet → open review modal and STOP.
+    if (needsReview) {
+      setReviewOpen(true);
+      return;
+    }
+
     setIsSaving(true);
 
+    // Manual decision tallies for the final toast
+    let linkedManuallyCount = 0;
+    let createdManuallyCount = 0;
+    let ignoredManuallyCount = 0;
+
     try {
-      // Step 1: Register selected unmatched employees
       let finalParseResult = parseResult;
-      if (selectedUnmatchedCount > 0 && pendingFile && targetMonday) {
-        const newEmps = await registerUnmatchedEmployees();
-        if (newEmps.length > 0) {
-          toast.success(`${newEmps.length} funcionário(s) cadastrado(s)!`);
-          // Re-parse with updated employee list
-          const allEmps = [...(allUnitEmployees || employees), ...newEmps];
-          const mondayISO = format(targetMonday, "yyyy-MM-dd");
-          const reParsed = await parseScheduleFile(pendingFile, mondayISO, allEmps);
-          finalParseResult = reParsed;
-          // Invalidate employees cache
-          qc.invalidateQueries({ queryKey: ["employees"] });
+
+      // Step 1: Apply gestor's decisions (link / create / ignore) → resolve employees
+      if (reviewDecisions && reviewDecisions.length > 0 && pendingFile && targetMonday) {
+        for (const d of reviewDecisions) {
+          if (d.action === "ignore") ignoredManuallyCount++;
+          else if (d.action === "link") linkedManuallyCount++;
+          else if (d.action === "create") createdManuallyCount++;
         }
+        const resolved = await applyReviewDecisions(reviewDecisions);
+
+        // Build synthetic aliases keyed by the planilha name so the re-parse
+        // produces entries for the previously unmatched rows.
+        const synthetics: ScheduleEmployee[] = [];
+        for (const u of parseResult.unmatchedEmployees) {
+          const emp = resolved.get(u.rowIndex);
+          if (emp) synthetics.push({ ...emp, name: u.name });
+        }
+
+        const allEmps = [...(allUnitEmployees || employees), ...synthetics];
+        const mondayISO = format(targetMonday, "yyyy-MM-dd");
+        finalParseResult = await parseScheduleFile(pendingFile, mondayISO, allEmps);
+        qc.invalidateQueries({ queryKey: ["employees"] });
       }
 
       if (finalParseResult.entries.length === 0) {
-        toast.info("Nenhum lançamento válido após o cadastro.");
+        toast.info("Nenhum lançamento válido após a revisão.");
         setIsSaving(false);
         return;
       }

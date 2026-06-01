@@ -597,10 +597,20 @@ export function ScheduleExcelFlow({
       closeModal();
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
 
-      const parts = [`${savedCount} importado(s)`];
-      if (ignoredCount > 0) parts.push(`${ignoredCount} já existia(m)`);
-      if (conflictResolved > 0) parts.push(`${conflictResolved} conflito(s) resolvido(s)`);
-      toast.success(parts.join(" · "));
+      const ms = finalParseResult.matchStats;
+      const descParts: string[] = [];
+      if (ms.matchedByCpf > 0) descParts.push(`${ms.matchedByCpf} por CPF`);
+      if (ms.matchedByExactName > 0) descParts.push(`${ms.matchedByExactName} por nome exato`);
+      if (ms.matchedByFuzzy > 0) descParts.push(`${ms.matchedByFuzzy} por fuzzy`);
+      if (linkedManuallyCount > 0) descParts.push(`${linkedManuallyCount} vinculadas manualmente`);
+      if (createdManuallyCount > 0) descParts.push(`${createdManuallyCount} criadas`);
+      if (ignoredManuallyCount > 0) descParts.push(`${ignoredManuallyCount} ignoradas`);
+      if (ignoredCount > 0) descParts.push(`${ignoredCount} já existia(m)`);
+      if (conflictResolved > 0) descParts.push(`${conflictResolved} conflito(s) resolvido(s)`);
+
+      toast.success(`${savedCount} escalas salvas`, {
+        description: descParts.filter(Boolean).join(" · ") || undefined,
+      });
     } catch (err: any) {
       console.error("[Excel Import] Erro inesperado:", err);
       toast.error(`Erro inesperado: ${err?.message || "erro desconhecido"}`, { duration: 8000 });
@@ -608,8 +618,7 @@ export function ScheduleExcelFlow({
     }
   }
 
-  const hasUnmatched = (parseResult?.unmatchedEmployees?.length ?? 0) > 0;
-  const canConfirm = parseResult && (parseResult.entries.length > 0 || selectedUnmatchedCount > 0);
+  const canConfirm = parseResult && (parseResult.entries.length > 0 || hasUnmatched);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -27,7 +26,6 @@ import {
   XCircle,
   CalendarIcon,
   Info,
-  UserX,
   UserPlus,
   ChevronDown,
 } from "lucide-react";
@@ -39,9 +37,9 @@ import {
   generateScheduleTemplate,
   generateMultiSectorTemplate,
   parseScheduleFile,
+  normalizeCpf,
   type ScheduleEmployee,
   type MultiSectorParseResult,
-  type UnmatchedEmployee,
   type SectorInfo,
   type SectorJobTitleMapping,
 } from "@/lib/scheduleExcel";
@@ -53,12 +51,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  UnmatchedReviewDialog,
+  type ReviewDecision,
+} from "./UnmatchedReviewDialog";
 
-interface UnmatchedRegistration {
-  selected: boolean;
-  editedName: string;
-  cargo: string;
-}
+
 
 interface ScheduleExcelFlowProps {
   employees: ScheduleEmployee[];

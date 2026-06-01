@@ -2358,6 +2358,51 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_remap_log: {
+        Row: {
+          acao: string
+          canon_employee_id: string | null
+          created_at: string
+          fase: string
+          id: number
+          orph_cpf: string | null
+          orph_employee_id: string
+          orph_name: string | null
+          schedule_date: string | null
+          schedule_id: string
+          sector_id: string | null
+          unit_id: string | null
+        }
+        Insert: {
+          acao: string
+          canon_employee_id?: string | null
+          created_at?: string
+          fase?: string
+          id?: number
+          orph_cpf?: string | null
+          orph_employee_id: string
+          orph_name?: string | null
+          schedule_date?: string | null
+          schedule_id: string
+          sector_id?: string | null
+          unit_id?: string | null
+        }
+        Update: {
+          acao?: string
+          canon_employee_id?: string | null
+          created_at?: string
+          fase?: string
+          id?: number
+          orph_cpf?: string | null
+          orph_employee_id?: string
+          orph_name?: string | null
+          schedule_date?: string | null
+          schedule_id?: string
+          sector_id?: string | null
+          unit_id?: string | null
+        }
+        Relationships: []
+      }
       employees: {
         Row: {
           active: boolean
@@ -5838,6 +5883,8 @@ export type Database = {
         Row: {
           agreed_rate: number | null
           break_duration: number
+          cancellation_reason: string | null
+          cancelled_at: string | null
           confirmation_responded_at: string | null
           confirmation_status: string | null
           created_at: string
@@ -5858,6 +5905,8 @@ export type Database = {
         Insert: {
           agreed_rate?: number | null
           break_duration?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           confirmation_responded_at?: string | null
           confirmation_status?: string | null
           created_at?: string
@@ -5878,6 +5927,8 @@ export type Database = {
         Update: {
           agreed_rate?: number | null
           break_duration?: number
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           confirmation_responded_at?: string | null
           confirmation_status?: string | null
           created_at?: string

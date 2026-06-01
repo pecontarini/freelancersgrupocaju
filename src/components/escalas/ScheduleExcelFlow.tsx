@@ -841,14 +841,30 @@ export function ScheduleExcelFlow({
             {canConfirm && (
               <Button onClick={handleConfirmImport} disabled={isSaving}>
                 {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {selectedUnmatchedCount > 0
-                  ? `Cadastrar (${selectedUnmatchedCount}) e Importar`
+                {needsReview
+                  ? `Revisar (${parseResult?.unmatchedEmployees.length || 0}) e Importar`
                   : `Confirmar Importação (${parseResult?.entries.length || 0})`}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Manual review modal — zero-ghost policy */}
+      {parseResult && unitId && (
+        <UnmatchedReviewDialog
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+          unmatched={parseResult.unmatchedEmployees}
+          allUnitEmployees={allUnitEmployees || employees}
+          unitId={unitId}
+          onConfirm={(decisions) => {
+            setReviewDecisions(decisions);
+            setReviewOpen(false);
+          }}
+          onCancel={() => setReviewOpen(false)}
+        />
+      )}
     </>
   );
 }

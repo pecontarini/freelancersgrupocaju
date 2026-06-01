@@ -765,7 +765,7 @@ function parseLegacySheet(
   }
 
   if (dates.length === 0) {
-    return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+    return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [], matchStats: { ...EMPTY_STATS } };
   }
 
   const nameToMeta = new Map<string, (typeof metaData)[0]>();

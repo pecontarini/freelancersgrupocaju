@@ -841,7 +841,7 @@ function parseLegacySheet(
     }
   }
 
-  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [] };
+  return { entries, errors, workingCount, offCount, originalMonday, unmatchedEmployees: [], matchStats: { ...EMPTY_STATS } };
 }
 
 /** Legacy time range parser for "HH:MM - HH:MM (break)" format */

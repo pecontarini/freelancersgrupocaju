@@ -177,113 +177,112 @@ export function ScheduleExcelFlow({
     ? format(targetMonday, "dd/MM", { locale: ptBR })
     : null;
 
-  const selectedUnmatchedCount = unmatchedRegs.filter((r) => r.selected).length;
+  const unmatchedList = useMemo(
+    () => parseResult?.unmatchedEmployees || [],
+    [parseResult]
+  );
+  const hasUnmatched = unmatchedList.length > 0;
+  const needsReview = hasUnmatched && !reviewDecisions;
 
-  async function registerUnmatchedEmployees(): Promise<ScheduleEmployee[]> {
-    if (!unitId) return [];
-    const toRegister = unmatchedRegs.filter((r) => r.selected && r.editedName.trim());
-    if (toRegister.length === 0) return [];
+  /**
+   * Apply gestor's review decisions: link existing employees, create new ones (with explicit
+   * gender + worker_type), or reactivate inactive matches by CPF. Returns a map: rowIndex → employee.
+   * NO silent ghost creation. Decisions with action="ignore" are skipped entirely.
+   */
+  async function applyReviewDecisions(
+    decisions: ReviewDecision[]
+  ): Promise<Map<number, ScheduleEmployee>> {
+    const resolved = new Map<number, ScheduleEmployee>();
+    if (!unitId) return resolved;
+    const existing = allUnitEmployees || employees;
 
-    const newEmployees: ScheduleEmployee[] = [];
+    for (const d of decisions) {
+      if (d.action === "ignore") continue;
 
-    for (const reg of toRegister) {
-      const cleanName = reg.editedName.trim();
-      const cleanCargo = reg.cargo.trim();
-
-      // Defensive lookup: reuse existing active employee with the same name in this unit
-      // to avoid creating homonyms that later trigger unique_active_schedule conflicts.
-      const { data: existingEmp } = await supabase
-        .from("employees")
-        .select("id, name, job_title, worker_type")
-        .eq("unit_id", unitId)
-        .eq("active", true)
-        .ilike("name", cleanName)
-        .order("created_at", { ascending: true })
-        .limit(1);
-
-      if (existingEmp && existingEmp.length > 0) {
-        const e = existingEmp[0];
-        newEmployees.push({
-          id: e.id,
-          name: e.name,
-          job_title: e.job_title,
-          worker_type: e.worker_type,
-        });
+      if (d.action === "link" && d.linkEmployeeId) {
+        const emp = existing.find((e) => e.id === d.linkEmployeeId);
+        if (emp) {
+          resolved.set(d.rowIndex, emp);
+        } else {
+          const { data } = await supabase
+            .from("employees")
+            .select("id, name, job_title, worker_type, cpf")
+            .eq("id", d.linkEmployeeId)
+            .maybeSingle();
+          if (data) resolved.set(d.rowIndex, data as ScheduleEmployee);
+        }
         continue;
       }
 
-      let jobTitleId: string | null = null;
+      if (d.action === "create") {
+        const cleanName = (d.newName || "").trim();
+        const cleanCargo = (d.newCargo || "").trim();
+        const cleanCpf = normalizeCpf(d.newCpf);
+        if (!cleanName || !d.newGender || !d.newWorkerType) continue;
 
-      if (cleanCargo) {
-        // Try to find existing job_title for this unit
-        const { data: existing } = await supabase
-          .from("job_titles")
-          .select("id")
-          .eq("unit_id", unitId)
-          .ilike("name", cleanCargo)
-          .limit(1);
-
-        if (existing && existing.length > 0) {
-          jobTitleId = existing[0].id;
-        } else {
-          // Create new job_title
-          const { data: newJt } = await supabase
-            .from("job_titles")
-            .insert({ name: cleanCargo, unit_id: unitId })
-            .select("id")
-            .single();
-          if (newJt) jobTitleId = newJt.id;
+        // Reactivate inactive existing record (matched by CPF in the dialog)
+        if (d.reactivateEmployeeId) {
+          const { data: react, error: reactErr } = await supabase
+            .from("employees")
+            .update({ active: true, name: cleanName, job_title: cleanCargo || null })
+            .eq("id", d.reactivateEmployeeId)
+            .select("id, name, job_title, worker_type, cpf")
+            .maybeSingle();
+          if (!reactErr && react) {
+            resolved.set(d.rowIndex, react as ScheduleEmployee);
+            continue;
+          }
+          console.warn("[Excel Import] Falha ao reativar:", reactErr);
         }
-      }
 
-      const { data: newEmp, error: empErr } = await supabase
-        .from("employees")
-        .insert({
+        // Resolve / create job_title
+        let jobTitleId: string | null = null;
+        if (cleanCargo) {
+          const { data: jt } = await supabase
+            .from("job_titles")
+            .select("id")
+            .eq("unit_id", unitId)
+            .ilike("name", cleanCargo)
+            .limit(1);
+          if (jt && jt.length > 0) jobTitleId = jt[0].id;
+          else {
+            const { data: newJt } = await supabase
+              .from("job_titles")
+              .insert({ name: cleanCargo, unit_id: unitId })
+              .select("id")
+              .single();
+            if (newJt) jobTitleId = newJt.id;
+          }
+        }
+
+        const insertPayload: any = {
           name: cleanName,
           unit_id: unitId,
           job_title: cleanCargo || null,
           job_title_id: jobTitleId,
-          gender: "M",
-          worker_type: "clt" as const,
-        })
-        .select("id, name, job_title, worker_type")
-        .single();
+          gender: d.newGender,
+          worker_type: d.newWorkerType,
+        };
+        if (cleanCpf) insertPayload.cpf = cleanCpf;
 
-      if (empErr) {
-        // unique_active_employee_no_cpf race: someone else just created it → re-fetch
-        const { data: raceEmp } = await supabase
+        const { data: newEmp, error: empErr } = await supabase
           .from("employees")
-          .select("id, name, job_title, worker_type")
-          .eq("unit_id", unitId)
-          .eq("active", true)
-          .ilike("name", cleanName)
-          .order("created_at", { ascending: true })
-          .limit(1);
-        if (raceEmp && raceEmp.length > 0) {
-          newEmployees.push({
-            id: raceEmp[0].id,
-            name: raceEmp[0].name,
-            job_title: raceEmp[0].job_title,
-            worker_type: raceEmp[0].worker_type,
-          });
+          .insert(insertPayload)
+          .select("id, name, job_title, worker_type, cpf")
+          .single();
+
+        if (empErr) {
+          console.error("[Excel Import] Falha ao cadastrar:", empErr);
+          toast.error(`Erro ao cadastrar ${cleanName}: ${empErr.message}`);
           continue;
         }
-        console.error("[Excel Import] Falha ao cadastrar funcionário:", empErr);
-        continue;
-      }
-
-      if (newEmp) {
-        newEmployees.push({
-          id: newEmp.id,
-          name: newEmp.name,
-          job_title: newEmp.job_title,
-          worker_type: newEmp.worker_type,
-        });
+        if (newEmp) resolved.set(d.rowIndex, newEmp as ScheduleEmployee);
       }
     }
-
-    return newEmployees;
+    return resolved;
   }
+
+
 
   /**
    * Cancel all active schedules in the target week for this unit, then re-run the import.

@@ -9,7 +9,7 @@ import { format } from "date-fns";
  */
 
 export type PopDiarioTurno = "ALMOCO" | "JANTAR";
-export type PopDiarioStatus = "conforme" | "inconforme" | "aguardando";
+export type PopDiarioStatus = "conforme" | "inconforme" | "aguardando" | "sem_pop";
 
 export interface PopDiarioPessoa {
   employee_id: string;
@@ -17,6 +17,10 @@ export interface PopDiarioPessoa {
   phone?: string | null;
   start?: string | null;
   end?: string | null;
+  /** Hora da primeira batida do dia (HH:MM:SS) ou null. Etapa A'. */
+  punch_in?: string | null;
+  /** Minutos de atraso vs. start_time. null se não houver batida. Etapa A'. */
+  atraso_min?: number | null;
 }
 
 export interface PopDiarioRow {
@@ -25,6 +29,8 @@ export interface PopDiarioRow {
   schedule_date: string; // YYYY-MM-DD
   turno: PopDiarioTurno;
   pop_minimo: number;
+  /** true = setor sem POP cadastrado (tem escala mas não tem mínimo). Etapa A'. */
+  sem_pop: boolean;
   escalados: number;
   pop_chegou: number;
   presentes: number;

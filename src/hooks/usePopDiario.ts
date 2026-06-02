@@ -88,6 +88,7 @@ function mapRow(raw: any): PopDiarioRow {
     schedule_date: raw.schedule_date,
     turno: raw.turno,
     pop_minimo: Number(raw.pop_minimo ?? 0),
+    sem_pop: !!raw.sem_pop,
     escalados: Number(raw.escalados ?? 0),
     pop_chegou: Number(raw.pop_chegou ?? 0),
     presentes: Number(raw.presentes ?? 0),

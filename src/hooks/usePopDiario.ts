@@ -227,18 +227,24 @@ export function usePopDiario(filtros: PopDiarioFiltros): UsePopDiarioResult {
     },
   });
 
-  const rows = query.data ?? [];
+  const rows = useMemo(() => query.data ?? [], [query.data]);
 
-  const byUnit: Record<string, PopDiarioAgg> = {};
-  const byDate: Record<string, PopDiarioAgg> = {};
-  const bySectorTurno: Record<string, PopDiarioRow> = {};
-  for (const row of rows) {
-    if (!byUnit[row.unit_id]) byUnit[row.unit_id] = emptyAgg();
-    accumulate(byUnit[row.unit_id], row);
-    if (!byDate[row.schedule_date]) byDate[row.schedule_date] = emptyAgg();
-    accumulate(byDate[row.schedule_date], row);
-    bySectorTurno[`${row.sector_id}__${row.schedule_date}__${row.turno}`] = row;
-  }
+  const { byUnit, byDate, bySectorTurno } = useMemo(() => {
+    const byUnit: Record<string, PopDiarioAgg> = {};
+    const byDate: Record<string, PopDiarioAgg> = {};
+    const bySectorTurno: Record<string, PopDiarioRow> = {};
+    for (const row of rows) {
+      if (!byUnit[row.unit_id]) byUnit[row.unit_id] = emptyAgg();
+      accumulate(byUnit[row.unit_id], row);
+      if (!byDate[row.schedule_date]) byDate[row.schedule_date] = emptyAgg();
+      accumulate(byDate[row.schedule_date], row);
+      bySectorTurno[`${row.sector_id}__${row.schedule_date}__${row.turno}`] = row;
+    }
+    for (const k in byUnit) finalizeAgg(byUnit[k]);
+    for (const k in byDate) finalizeAgg(byDate[k]);
+    return { byUnit, byDate, bySectorTurno };
+  }, [rows]);
+
 
   return {
     rows,

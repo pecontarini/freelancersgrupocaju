@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek } from "date-fns";
-import { fetchAllRows } from "@/lib/fetchAllRows";
-import { jsDayToPopDay } from "@/lib/popConventions";
+import { usePopDiario } from "./usePopDiario";
 
-// POP canonical day index (0=Mon..6=Sun) -> pop_dia_semana_enum
-const POP_DAY_ENUM = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"] as const;
+/**
+ * SHIM — preserva a API legada de `usePopCompliance` mas alimenta
+ * tudo a partir de `vw_pop_diario` (Etapa B do POP Diário Unificado).
+ *
+ * Para código novo, use `usePopDiario` direto com `date: { from, to }`.
+ */
 
 export interface SectorCompliance {
   sectorId: string;
@@ -14,10 +17,10 @@ export interface SectorCompliance {
   unitName: string;
   dayOfWeek: number; // 0=Sun..6=Sat
   dateStr: string;
-  shiftType: string;
+  shiftType: string; // "almoco" | "jantar"
   scheduled: number;
   required: number;
-  diff: number; // scheduled - required, negative = gap
+  diff: number;
   status: "ok" | "warning" | "critical";
 }
 
@@ -44,216 +47,114 @@ function getWeekDates(base: Date): Date[] {
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
+function useComplianceLookups() {
+  return useQuery({
+    queryKey: ["pop-compliance-lookups"],
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const [{ data: units }, { data: sectors }] = await Promise.all([
+        supabase.from("config_lojas").select("id, nome").order("nome"),
+        supabase.from("sectors").select("id, name").order("name"),
+      ]);
+      const u = new Map<string, string>();
+      for (const r of (units as any[]) || []) u.set(r.id, r.nome);
+      const s = new Map<string, string>();
+      for (const r of (sectors as any[]) || []) s.set(r.id, r.name);
+      return { units: u, sectors: s };
+    },
+  });
+}
+
 export function usePopCompliance(
   weekBase: Date,
   filterUnitIds: string[],
-  filterShift: "almoco" | "jantar" | "both"
+  filterShift: "almoco" | "jantar" | "both",
 ) {
   const weekDays = getWeekDates(weekBase);
   const weekStart = format(weekDays[0], "yyyy-MM-dd");
   const weekEnd = format(weekDays[6], "yyyy-MM-dd");
 
+  const turnoFilter =
+    filterShift === "both" ? "TODOS" : filterShift === "almoco" ? "ALMOCO" : "JANTAR";
+
+  const pop = usePopDiario({
+    date: { from: weekStart, to: weekEnd },
+    unitId: filterUnitIds.length > 0 ? filterUnitIds : undefined,
+    turno: turnoFilter as any,
+  });
+
+  const lookups = useComplianceLookups();
+
   return useQuery<PopComplianceData>({
-    queryKey: ["pop-compliance", weekStart, filterUnitIds, filterShift],
+    queryKey: [
+      "pop-compliance-shim",
+      weekStart,
+      [...filterUnitIds].sort().join(","),
+      filterShift,
+      pop.rows.length,
+      pop.isFetching,
+      lookups.isFetching,
+    ],
+    enabled: !pop.isLoading && !lookups.isLoading && !!lookups.data,
+    staleTime: 1000 * 60 * 2,
     queryFn: async () => {
-      // Fetch all stores
-      const { data: stores, error: storesErr } = await supabase
-        .from("config_lojas")
-        .select("id, nome")
-        .order("nome");
-      if (storesErr) throw storesErr;
-
-      // Fetch all sectors
-      const { data: allSectors, error: secErr } = await supabase
-        .from("sectors")
-        .select("id, name, unit_id")
-        .order("name");
-      if (secErr) throw secErr;
-
-      // Fetch canonical POP minimum (pop_minimo_padrao) for all sectors,
-      // filtered by week vigência window.
-      // Semantics change: required is now PISO (minimo_clt + minimo_freelancer)
-      // and no longer TETO (required_count + extras_count from staffing_matrix).
-      const sectorIds = allSectors?.map((s) => s.id) || [];
-      let popData: any[] = [];
-      if (sectorIds.length > 0) {
-        const { data, error } = await supabase
-          .from("pop_minimo_padrao")
-          .select("unit_id, sector_id, dia_semana, refeicao, minimo_clt, minimo_freelancer, quantidade_minima, vigente_desde, vigente_ate")
-          .in("sector_id", sectorIds)
-          .lte("vigente_desde", weekEnd)
-          .or(`vigente_ate.is.null,vigente_ate.gte.${weekStart}`);
-        if (error) throw error;
-        popData = data || [];
-      }
-
-      // Fetch sector partnerships (shared sectors across paired stores)
-      let partnershipsData: { sector_id: string; partner_sector_id: string }[] = [];
-      if (sectorIds.length > 0) {
-        const { data: pData } = await supabase
-          .from("sector_partnerships" as any)
-          .select("sector_id, partner_sector_id");
-        partnershipsData = (pData as any[]) || [];
-      }
-      // Build bidirectional partner lookup
-      const partnerMap = new Map<string, string>();
-      for (const p of partnershipsData) {
-        partnerMap.set(p.sector_id, p.partner_sector_id);
-        partnerMap.set(p.partner_sector_id, p.sector_id);
-      }
-
-      // Fetch schedules for the week across all units
-      interface ScheduleRow {
-        id: string;
-        employee_id: string;
-        schedule_date: string;
-        sector_id: string;
-        schedule_type: string;
-        start_time: string | null;
-        end_time: string | null;
-      }
-      const schedules = await fetchAllRows<ScheduleRow>(
-        () => supabase
-          .from("schedules")
-          .select("id, employee_id, schedule_date, sector_id, schedule_type, start_time, end_time")
-          .gte("schedule_date", weekStart)
-          .lte("schedule_date", weekEnd)
-          .eq("schedule_type", "working")
-      );
-
-      // Build lookup maps
-      const storeMap = new Map((stores || []).map((s) => [s.id, s.nome]));
-      const sectorsByUnit = new Map<string, typeof allSectors>();
-      for (const sec of allSectors || []) {
-        if (!sectorsByUnit.has(sec.unit_id)) sectorsByUnit.set(sec.unit_id, []);
-        sectorsByUnit.get(sec.unit_id)!.push(sec);
-      }
-
-      // Helper: count scheduled for a sector/date/shift using POP 2h minimum overlap rule
-      const LUNCH_PEAK_W = { start: "12:00", end: "15:00" };
-      const DINNER_PEAK_W = { start: "19:00", end: "22:00" };
-      const MIN_OVERLAP = 120; // minutes
-
-      function timeToMin(t: string) {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + (m || 0);
-      }
-
-      function hasMinOverlap(startTime: string, endTime: string, windowStart: number, windowEnd: number, minMinutes: number) {
-        let s = timeToMin(startTime);
-        let e = timeToMin(endTime);
-        if (e <= s) e += 24 * 60;
-        const overlapStart = Math.max(s, windowStart);
-        const overlapEnd = Math.min(e, windowEnd);
-        return (overlapEnd - overlapStart) >= minMinutes;
-      }
-
-      function countScheduled(sectorId: string, dateStr: string, shiftType: string): number {
-        // Include partner sector schedules so shared sectors don't show false gaps
-        const partnerId = partnerMap.get(sectorId);
-        const sectorIdsToCheck = partnerId ? [sectorId, partnerId] : [sectorId];
-        const daySchedules = schedules.filter(
-          (s) => sectorIdsToCheck.includes(s.sector_id) && s.schedule_date === dateStr
-        );
-        const peak = shiftType === "almoco" ? LUNCH_PEAK_W : DINNER_PEAK_W;
-        const windowStart = timeToMin(peak.start);
-        const windowEnd = timeToMin(peak.end);
-
-        return daySchedules.filter((s) =>
-          s.start_time && s.end_time && hasMinOverlap(s.start_time, s.end_time, windowStart, windowEnd, MIN_OVERLAP)
-        ).length;
-      }
-
-      // Filter stores
-      const targetStores = filterUnitIds.length > 0
-        ? (stores || []).filter((s) => filterUnitIds.includes(s.id))
-        : (stores || []);
-
-      const shiftTypes = filterShift === "both"
-        ? ["almoco", "jantar"]
-        : [filterShift];
+      const unitsMap = lookups.data!.units;
+      const sectorsMap = lookups.data!.sectors;
 
       const allCompliance: SectorCompliance[] = [];
       const unitDaysMap = new Map<string, UnitDayStatus>();
 
-      for (const store of targetStores) {
-        const storeSectors = sectorsByUnit.get(store.id) || [];
-        for (const day of weekDays) {
-          const dateStr = format(day, "yyyy-MM-dd");
-          const dow = jsDayToPopDay(day.getDay());
-          const key = `${store.id}-${dateStr}`;
+      for (const row of pop.rows) {
+        const dow = new Date(`${row.schedule_date}T00:00:00`).getDay();
+        const shiftType = row.turno === "ALMOCO" ? "almoco" : "jantar";
+        const required = row.pop_minimo;
+        const scheduled = row.escalados;
+        const diff = scheduled - required;
+        let status: "ok" | "warning" | "critical" = "ok";
+        if (diff <= -2) status = "critical";
+        else if (diff < 0) status = "warning";
 
-          const daySectors: SectorCompliance[] = [];
+        const entry: SectorCompliance = {
+          sectorId: row.sector_id,
+          sectorName: sectorsMap.get(row.sector_id) ?? "",
+          unitId: row.unit_id,
+          unitName: unitsMap.get(row.unit_id) ?? "",
+          dayOfWeek: dow,
+          dateStr: row.schedule_date,
+          shiftType,
+          scheduled,
+          required,
+          diff,
+          status,
+        };
+        allCompliance.push(entry);
 
-          for (const sector of storeSectors) {
-            for (const shift of shiftTypes) {
-              const diaEnum = POP_DAY_ENUM[dow];
-              const refeicaoEnum = shift.toUpperCase(); // "almoco" -> "ALMOCO"
-              const popEntry = popData.find(
-                (m) =>
-                  m.sector_id === sector.id &&
-                  m.unit_id === store.id &&
-                  m.dia_semana === diaEnum &&
-                  m.refeicao === refeicaoEnum
-              );
-              // PISO: prefer generated column quantidade_minima, fallback to soma manual.
-              const required = popEntry
-                ? (popEntry.quantidade_minima ?? ((popEntry.minimo_clt ?? 0) + (popEntry.minimo_freelancer ?? 0)))
-                : 0;
-              if (required === 0) continue; // no POP defined
-
-              const scheduled = countScheduled(sector.id, dateStr, shift);
-              const diff = scheduled - required;
-              let status: "ok" | "warning" | "critical" = "ok";
-              if (diff <= -2) status = "critical";
-              else if (diff < 0) status = "warning";
-
-              const entry: SectorCompliance = {
-                sectorId: sector.id,
-                sectorName: sector.name,
-                unitId: store.id,
-                unitName: store.nome,
-                dayOfWeek: dow,
-                dateStr,
-                shiftType: shift,
-                scheduled,
-                required,
-                diff,
-                status,
-              };
-              daySectors.push(entry);
-              allCompliance.push(entry);
-            }
-          }
-
-          // Aggregate unit-day status
-          let dayStatus: "ok" | "warning" | "critical" = "ok";
-          if (daySectors.some((s) => s.status === "critical")) dayStatus = "critical";
-          else if (daySectors.some((s) => s.status === "warning")) dayStatus = "warning";
-
+        const key = `${row.unit_id}-${row.schedule_date}`;
+        if (!unitDaysMap.has(key)) {
           unitDaysMap.set(key, {
-            unitId: store.id,
-            unitName: store.nome,
-            dateStr,
+            unitId: row.unit_id,
+            unitName: unitsMap.get(row.unit_id) ?? "",
+            dateStr: row.schedule_date,
             dayOfWeek: dow,
-            status: dayStatus,
-            sectors: daySectors,
+            status: "ok",
+            sectors: [],
           });
         }
+        const day = unitDaysMap.get(key)!;
+        day.sectors.push(entry);
+        if (status === "critical") day.status = "critical";
+        else if (status === "warning" && day.status !== "critical") day.status = "warning";
       }
 
-      // Unique sector+shift combos that have POP
       const sectorKeys = new Set(allCompliance.map((c) => `${c.sectorId}-${c.shiftType}`));
       const totalSectors = sectorKeys.size;
 
-      // A sector is conforme if ALL its days are ok
       const sectorStatusMap = new Map<string, Set<string>>();
       for (const c of allCompliance) {
-        const key = `${c.sectorId}-${c.shiftType}`;
-        if (!sectorStatusMap.has(key)) sectorStatusMap.set(key, new Set());
-        sectorStatusMap.get(key)!.add(c.status);
+        const k = `${c.sectorId}-${c.shiftType}`;
+        if (!sectorStatusMap.has(k)) sectorStatusMap.set(k, new Set());
+        sectorStatusMap.get(k)!.add(c.status);
       }
-
       let conformeSectors = 0;
       let warningSectors = 0;
       let criticalSectors = 0;
@@ -263,18 +164,22 @@ export function usePopCompliance(
         else conformeSectors++;
       }
 
-      // Gap ranking: sectors with most days below POP
       const gapMap = new Map<string, { sectorName: string; unitName: string; gapDays: number }>();
       for (const c of allCompliance) {
         if (c.diff >= 0) continue;
-        const key = `${c.unitName} — ${c.sectorName} (${c.shiftType === "almoco" ? "Alm" : "Jan"})`;
-        if (!gapMap.has(key)) {
-          gapMap.set(key, { sectorName: c.sectorName, unitName: c.unitName, gapDays: 0 });
+        const k = `${c.unitName} — ${c.sectorName} (${c.shiftType === "almoco" ? "Alm" : "Jan"})`;
+        if (!gapMap.has(k)) {
+          gapMap.set(k, { sectorName: c.sectorName, unitName: c.unitName, gapDays: 0 });
         }
-        gapMap.get(key)!.gapDays++;
+        gapMap.get(k)!.gapDays++;
       }
       const sectorGapRanking = [...gapMap.entries()]
-        .map(([label, d]) => ({ sectorId: label, sectorName: d.sectorName, unitName: d.unitName, gapDays: d.gapDays }))
+        .map(([label, d]) => ({
+          sectorId: label,
+          sectorName: d.sectorName,
+          unitName: d.unitName,
+          gapDays: d.gapDays,
+        }))
         .sort((a, b) => b.gapDays - a.gapDays)
         .slice(0, 10);
 
@@ -287,6 +192,5 @@ export function usePopCompliance(
         sectorGapRanking,
       };
     },
-    staleTime: 1000 * 60 * 2,
   });
 }

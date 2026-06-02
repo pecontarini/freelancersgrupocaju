@@ -137,16 +137,21 @@ function emptyAgg(): PopDiarioAgg {
 }
 
 function accumulate(agg: PopDiarioAgg, row: PopDiarioRow) {
-  agg.pop_minimo += row.pop_minimo;
+  // Setores sem POP cadastrado não contam pra conformidade global:
+  // ignoramos pop_minimo, saldo_final e contadores de status.
+  if (!row.sem_pop) {
+    agg.pop_minimo += row.pop_minimo;
+    agg.saldo_final += row.saldo_final;
+    if (row.status === "conforme") agg.setores_conforme += 1;
+    else if (row.status === "inconforme") agg.setores_inconforme += 1;
+    else if (row.status === "aguardando") agg.setores_aguardando += 1;
+  }
+  // Volume operacional (escala/presença) entra sempre — é gente real.
   agg.escalados += row.escalados;
   agg.pop_chegou += row.pop_chegou;
   agg.presentes += row.presentes;
   agg.faltantes += row.faltantes;
   agg.extras_freelancer += row.extras_freelancer;
-  agg.saldo_final += row.saldo_final;
-  if (row.status === "conforme") agg.setores_conforme += 1;
-  else if (row.status === "inconforme") agg.setores_inconforme += 1;
-  else if (row.status === "aguardando") agg.setores_aguardando += 1;
 }
 
 export interface UsePopDiarioResult {

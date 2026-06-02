@@ -74,6 +74,9 @@ function normaliseList(raw: unknown): PopDiarioPessoa[] {
       phone: (p.phone as string | null | undefined) ?? null,
       start: (p.start as string | null | undefined) ?? null,
       end: (p.end as string | null | undefined) ?? null,
+      punch_in: (p.punch_in as string | null | undefined) ?? null,
+      atraso_min:
+        p.atraso_min == null ? null : Number(p.atraso_min),
     }))
     .filter((p) => p.employee_id);
 }

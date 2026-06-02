@@ -7955,6 +7955,7 @@ export type Database = {
           escalados: number | null
           escalados_lista: Json | null
           extras_freelancer: number | null
+          extras_lista: Json | null
           faltantes: number | null
           janela_encerrada: boolean | null
           janela_iniciada: boolean | null

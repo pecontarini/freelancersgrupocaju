@@ -9,7 +9,7 @@ import { usePopDiario } from "./usePopDiario";
  * Não criar novos consumidores deste hook. Para código novo, use `usePopDiario`.
  */
 
-export type PopStatus = "VERMELHO" | "AMARELO" | "VERDE_RESSALVA" | "VERDE_PURO";
+export type PopStatus = "VERMELHO" | "AMARELO" | "VERDE_RESSALVA" | "VERDE_PURO" | "NEUTRO";
 
 export interface PopStatusRow {
   data_referencia: string;
@@ -31,12 +31,15 @@ export interface PopStatusRow {
   status_detalhe: string | null;
 }
 
+// NEUTRO fica fora da ordem de pior status (não vira "vermelho da unidade")
 const STATUS_ORDER: PopStatus[] = ["VERMELHO", "AMARELO", "VERDE_RESSALVA", "VERDE_PURO"];
 
 export function aggregateStatus(rows: { status: PopStatus }[]): PopStatus | null {
-  if (rows.length === 0) return null;
+  // Ignora linhas NEUTRO (sem_pop) — não puxam a cor da unidade
+  const considered = rows.filter((r) => r.status !== "NEUTRO");
+  if (considered.length === 0) return null;
   let worstIdx = STATUS_ORDER.length - 1;
-  for (const r of rows) {
+  for (const r of considered) {
     const idx = STATUS_ORDER.indexOf(r.status);
     if (idx >= 0 && idx < worstIdx) worstIdx = idx;
   }
@@ -56,8 +59,9 @@ const DOW_TO_ENUM: Record<number, PopStatusRow["dia_semana"]> = {
 function deriveStatus(
   saldo: number,
   escalados: number,
-  status: "conforme" | "inconforme" | "aguardando",
+  status: "conforme" | "inconforme" | "aguardando" | "sem_pop",
 ): PopStatus {
+  if (status === "sem_pop") return "NEUTRO";
   if (status === "aguardando") return "AMARELO";
   if (escalados === 0 && saldo > 0) return "AMARELO";
   if (saldo <= -2) return "VERMELHO";

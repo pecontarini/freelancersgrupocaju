@@ -4,13 +4,11 @@ import { usePopDiario } from "./usePopDiario";
 
 /**
  * SHIM — preserva a API legada de `useQuadroDetalhado` mas alimenta
- * tudo a partir de `vw_pop_diario` (Etapa B do POP Diário Unificado).
+ * tudo a partir de `vw_pop_diario`.
  *
- * Observações:
- *  - `vw_pop_diario` não expõe hora exata da batida nem cálculo de atraso.
- *    Por isso `punch_in_ts`, `punch_in_hora` e `atraso_minutos` vêm como null,
- *    e o status nunca é "ATRASO" (somente PRESENTE / AGUARDANDO / AUSENTE).
- *  - Para código novo, use `usePopDiario` direto.
+ * Etapa A': a view passou a expor `punch_in` e `atraso_min` dentro
+ * de `escalados_lista`, então `punch_in_hora`, `punch_in_ts` e
+ * `atraso_minutos` voltam a ser populados e o status "ATRASO" funciona.
  */
 
 export type QuadroStatus = "PRESENTE" | "ATRASO" | "AGUARDANDO" | "AUSENTE";
@@ -61,6 +59,8 @@ function hhmm(t: string | null | undefined): string {
   return t.length >= 5 ? t.slice(0, 5) : t;
 }
 
+const ATRASO_THRESHOLD_MIN = 15;
+
 export function useQuadroDetalhado(data: string, unitId: string | null) {
   const pop = usePopDiario({
     date: data,
@@ -75,13 +75,24 @@ export function useQuadroDetalhado(data: string, unitId: string | null) {
 
   if (!pop.isLoading && pop.rows.length > 0) {
     for (const row of pop.rows) {
-      const presentesSet = new Set(row.presentes_lista.map((p) => p.employee_id));
+      // Indexa presentes pelo punch_in (vem da view)
+      const presentesMap = new Map<string, string | null>();
+      for (const p of row.presentes_lista) {
+        presentesMap.set(p.employee_id, p.punch_in ?? null);
+      }
       const sectorName = sectors.data?.get(row.sector_id) ?? "";
 
       for (const esc of row.escalados_lista) {
+        const isPresente = presentesMap.has(esc.employee_id);
+        const punchIn = isPresente
+          ? presentesMap.get(esc.employee_id) ?? esc.punch_in ?? null
+          : esc.punch_in ?? null;
+        const atraso = esc.atraso_min ?? null;
+
         let status: QuadroStatus;
-        if (presentesSet.has(esc.employee_id)) {
-          status = "PRESENTE";
+        if (isPresente) {
+          status =
+            atraso !== null && atraso > ATRASO_THRESHOLD_MIN ? "ATRASO" : "PRESENTE";
         } else if (!row.janela_iniciada) {
           status = "AGUARDANDO";
         } else {
@@ -102,12 +113,12 @@ export function useQuadroDetalhado(data: string, unitId: string | null) {
           effective_end_time: esc.end ?? "",
           scheduled_start_ts: `${row.schedule_date}T${esc.start ?? "00:00:00"}`,
           scheduled_end_ts: `${row.schedule_date}T${esc.end ?? "00:00:00"}`,
-          punch_in_ts: null,
-          punch_in_hora: null,
+          punch_in_ts: punchIn ? `${row.schedule_date}T${punchIn}` : null,
+          punch_in_hora: hhmm(punchIn),
           scheduled_inicio_hora: hhmm(esc.start),
           scheduled_fim_hora: hhmm(esc.end),
           status,
-          atraso_minutos: null,
+          atraso_minutos: atraso,
         });
       }
     }

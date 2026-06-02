@@ -9,7 +9,7 @@ import { format } from "date-fns";
  */
 
 export type PopDiarioTurno = "ALMOCO" | "JANTAR";
-export type PopDiarioStatus = "conforme" | "inconforme" | "aguardando";
+export type PopDiarioStatus = "conforme" | "inconforme" | "aguardando" | "sem_pop";
 
 export interface PopDiarioPessoa {
   employee_id: string;
@@ -17,6 +17,10 @@ export interface PopDiarioPessoa {
   phone?: string | null;
   start?: string | null;
   end?: string | null;
+  /** Hora da primeira batida do dia (HH:MM:SS) ou null. Etapa A'. */
+  punch_in?: string | null;
+  /** Minutos de atraso vs. start_time. null se não houver batida. Etapa A'. */
+  atraso_min?: number | null;
 }
 
 export interface PopDiarioRow {
@@ -25,6 +29,8 @@ export interface PopDiarioRow {
   schedule_date: string; // YYYY-MM-DD
   turno: PopDiarioTurno;
   pop_minimo: number;
+  /** true = setor sem POP cadastrado (tem escala mas não tem mínimo). Etapa A'. */
+  sem_pop: boolean;
   escalados: number;
   pop_chegou: number;
   presentes: number;
@@ -68,6 +74,9 @@ function normaliseList(raw: unknown): PopDiarioPessoa[] {
       phone: (p.phone as string | null | undefined) ?? null,
       start: (p.start as string | null | undefined) ?? null,
       end: (p.end as string | null | undefined) ?? null,
+      punch_in: (p.punch_in as string | null | undefined) ?? null,
+      atraso_min:
+        p.atraso_min == null ? null : Number(p.atraso_min),
     }))
     .filter((p) => p.employee_id);
 }
@@ -79,6 +88,7 @@ function mapRow(raw: any): PopDiarioRow {
     schedule_date: raw.schedule_date,
     turno: raw.turno,
     pop_minimo: Number(raw.pop_minimo ?? 0),
+    sem_pop: !!raw.sem_pop,
     escalados: Number(raw.escalados ?? 0),
     pop_chegou: Number(raw.pop_chegou ?? 0),
     presentes: Number(raw.presentes ?? 0),
@@ -127,16 +137,21 @@ function emptyAgg(): PopDiarioAgg {
 }
 
 function accumulate(agg: PopDiarioAgg, row: PopDiarioRow) {
-  agg.pop_minimo += row.pop_minimo;
+  // Setores sem POP cadastrado não contam pra conformidade global:
+  // ignoramos pop_minimo, saldo_final e contadores de status.
+  if (!row.sem_pop) {
+    agg.pop_minimo += row.pop_minimo;
+    agg.saldo_final += row.saldo_final;
+    if (row.status === "conforme") agg.setores_conforme += 1;
+    else if (row.status === "inconforme") agg.setores_inconforme += 1;
+    else if (row.status === "aguardando") agg.setores_aguardando += 1;
+  }
+  // Volume operacional (escala/presença) entra sempre — é gente real.
   agg.escalados += row.escalados;
   agg.pop_chegou += row.pop_chegou;
   agg.presentes += row.presentes;
   agg.faltantes += row.faltantes;
   agg.extras_freelancer += row.extras_freelancer;
-  agg.saldo_final += row.saldo_final;
-  if (row.status === "conforme") agg.setores_conforme += 1;
-  else if (row.status === "inconforme") agg.setores_inconforme += 1;
-  else if (row.status === "aguardando") agg.setores_aguardando += 1;
 }
 
 export interface UsePopDiarioResult {

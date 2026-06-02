@@ -7954,55 +7954,23 @@ export type Database = {
           computed_at: string | null
           escalados: number | null
           escalados_lista: Json | null
-          extras_dobra: number | null
           extras_freelancer: number | null
-          extras_lista: Json | null
           faltantes: number | null
-          faltantes_lista: Json | null
           janela_encerrada: boolean | null
           janela_iniciada: boolean | null
           pop_chegou: number | null
-          pop_chegou_lista: Json | null
           pop_minimo: number | null
           presentes: number | null
           presentes_lista: Json | null
           saldo_final: number | null
           schedule_date: string | null
           sector_id: string | null
+          sem_pop: boolean | null
           status: string | null
           turno: string | null
           unit_id: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "sectors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
+        Relationships: []
       }
       vw_pop_setores_sem_cobertura: {
         Row: {

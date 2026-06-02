@@ -9,7 +9,7 @@ import { usePopDiario } from "./usePopDiario";
  * Não criar novos consumidores deste hook. Para código novo, use `usePopDiario`.
  */
 
-export type PopStatus = "VERMELHO" | "AMARELO" | "VERDE_RESSALVA" | "VERDE_PURO";
+export type PopStatus = "VERMELHO" | "AMARELO" | "VERDE_RESSALVA" | "VERDE_PURO" | "NEUTRO";
 
 export interface PopStatusRow {
   data_referencia: string;

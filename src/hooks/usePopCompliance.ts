@@ -91,9 +91,7 @@ export function usePopCompliance(
       weekStart,
       [...filterUnitIds].sort().join(","),
       filterShift,
-      pop.rows.length,
-      pop.isFetching,
-      lookups.isFetching,
+      lookups.data ? "lk-ready" : "lk-pending",
     ],
     enabled: !pop.isLoading && !lookups.isLoading && !!lookups.data,
     staleTime: 1000 * 60 * 2,
@@ -105,6 +103,11 @@ export function usePopCompliance(
       const unitDaysMap = new Map<string, UnitDayStatus>();
 
       for (const row of pop.rows) {
+        // Setores sem POP cadastrado são neutros: não geram gap nem status
+        // (já entram na view com sem_pop=true para preservar o volume de escala,
+        // mas não devem puxar conformidade pra baixo nem pra cima).
+        if (row.status === "sem_pop") continue;
+
         const dow = new Date(`${row.schedule_date}T00:00:00`).getDay();
         const shiftType = row.turno === "ALMOCO" ? "almoco" : "jantar";
         const required = row.pop_minimo;

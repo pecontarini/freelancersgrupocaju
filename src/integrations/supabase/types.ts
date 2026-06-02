@@ -2730,6 +2730,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "extras_checkins_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "extras_checkins_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
@@ -4961,11 +4968,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pop_ajustes_manuais_sector_destino_fkey"
+            columns: ["sector_destino"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "pop_ajustes_manuais_sector_origem_fkey"
             columns: ["sector_origem"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_ajustes_manuais_sector_origem_fkey"
+            columns: ["sector_origem"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "pop_ajustes_manuais_unit_id_fkey"
@@ -5038,6 +5059,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
@@ -5103,6 +5131,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_overrides_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "pop_overrides_unit_id_fkey"
@@ -5638,11 +5673,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "schedule_attendance_remanejado_de_sector_id_fkey"
+            columns: ["remanejado_de_sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "schedule_attendance_remanejado_para_sector_id_fkey"
             columns: ["remanejado_para_sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_remanejado_para_sector_id_fkey"
+            columns: ["remanejado_para_sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedule_attendance_schedule_id_fkey"
@@ -5657,6 +5706,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_attendance_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedule_attendance_shift_id_fkey"
@@ -5807,6 +5863,13 @@ export type Database = {
             referencedRelation: "sectors"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "schedule_draft_slots_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
         ]
       }
       schedule_drafts: {
@@ -5862,6 +5925,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_drafts_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedule_drafts_unit_id_fkey"
@@ -5969,6 +6039,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "schedules_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "schedules_shift_id_fkey"
             columns: ["shift_id"]
             isOneToOne: false
@@ -6011,6 +6088,13 @@ export type Database = {
             referencedRelation: "sectors"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sector_job_titles_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
         ]
       }
       sector_partnerships: {
@@ -6044,11 +6128,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "sector_partnerships_partner_sector_id_fkey"
+            columns: ["partner_sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
             foreignKeyName: "sector_partnerships_sector_id_fkey"
             columns: ["sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sector_partnerships_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
         ]
       }
@@ -6646,6 +6744,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staffing_matrix_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
           },
         ]
       }
@@ -7843,6 +7948,85 @@ export type Database = {
           ultima_sucesso: string | null
         }
         Relationships: []
+      }
+      vw_pop_diario: {
+        Row: {
+          computed_at: string | null
+          escalados: number | null
+          escalados_lista: Json | null
+          extras_dobra: number | null
+          extras_freelancer: number | null
+          extras_lista: Json | null
+          faltantes: number | null
+          faltantes_lista: Json | null
+          janela_encerrada: boolean | null
+          janela_iniciada: boolean | null
+          pop_chegou: number | null
+          pop_chegou_lista: Json | null
+          pop_minimo: number | null
+          presentes: number | null
+          presentes_lista: Json | null
+          saldo_final: number | null
+          schedule_date: string | null
+          sector_id: string | null
+          status: string | null
+          turno: string | null
+          unit_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "vw_pop_setores_sem_cobertura"
+            referencedColumns: ["sector_id"]
+          },
+          {
+            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      vw_pop_setores_sem_cobertura: {
+        Row: {
+          sector_id: string | null
+          sector_name: string | null
+          unit_id: string | null
+          unit_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sectors_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "config_lojas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sectors_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "v_payout_jobs_to_compute"
+            referencedColumns: ["loja_id"]
+          },
+        ]
       }
     }
     Functions: {

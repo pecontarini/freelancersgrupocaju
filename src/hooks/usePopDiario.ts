@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -119,6 +120,9 @@ export interface PopDiarioAgg {
   setores_conforme: number;
   setores_inconforme: number;
   setores_aguardando: number;
+  setores_sem_pop: number;
+  /** (pop_chegou / pop_minimo) * 100 — conformidade global da unidade/dia. */
+  conformidade_pct: number;
 }
 
 function emptyAgg(): PopDiarioAgg {
@@ -133,26 +137,33 @@ function emptyAgg(): PopDiarioAgg {
     setores_conforme: 0,
     setores_inconforme: 0,
     setores_aguardando: 0,
+    setores_sem_pop: 0,
+    conformidade_pct: 0,
   };
 }
 
 function accumulate(agg: PopDiarioAgg, row: PopDiarioRow) {
-  // Setores sem POP cadastrado não contam pra conformidade global:
-  // ignoramos pop_minimo, saldo_final e contadores de status.
   if (!row.sem_pop) {
     agg.pop_minimo += row.pop_minimo;
     agg.saldo_final += row.saldo_final;
     if (row.status === "conforme") agg.setores_conforme += 1;
     else if (row.status === "inconforme") agg.setores_inconforme += 1;
     else if (row.status === "aguardando") agg.setores_aguardando += 1;
+  } else {
+    agg.setores_sem_pop += 1;
   }
-  // Volume operacional (escala/presença) entra sempre — é gente real.
   agg.escalados += row.escalados;
   agg.pop_chegou += row.pop_chegou;
   agg.presentes += row.presentes;
   agg.faltantes += row.faltantes;
   agg.extras_freelancer += row.extras_freelancer;
 }
+
+function finalizeAgg(agg: PopDiarioAgg) {
+  agg.conformidade_pct =
+    agg.pop_minimo > 0 ? Math.round((agg.pop_chegou / agg.pop_minimo) * 100) : 0;
+}
+
 
 export interface UsePopDiarioResult {
   rows: PopDiarioRow[];
@@ -217,18 +228,24 @@ export function usePopDiario(filtros: PopDiarioFiltros): UsePopDiarioResult {
     },
   });
 
-  const rows = query.data ?? [];
+  const rows = useMemo(() => query.data ?? [], [query.data]);
 
-  const byUnit: Record<string, PopDiarioAgg> = {};
-  const byDate: Record<string, PopDiarioAgg> = {};
-  const bySectorTurno: Record<string, PopDiarioRow> = {};
-  for (const row of rows) {
-    if (!byUnit[row.unit_id]) byUnit[row.unit_id] = emptyAgg();
-    accumulate(byUnit[row.unit_id], row);
-    if (!byDate[row.schedule_date]) byDate[row.schedule_date] = emptyAgg();
-    accumulate(byDate[row.schedule_date], row);
-    bySectorTurno[`${row.sector_id}__${row.schedule_date}__${row.turno}`] = row;
-  }
+  const { byUnit, byDate, bySectorTurno } = useMemo(() => {
+    const byUnit: Record<string, PopDiarioAgg> = {};
+    const byDate: Record<string, PopDiarioAgg> = {};
+    const bySectorTurno: Record<string, PopDiarioRow> = {};
+    for (const row of rows) {
+      if (!byUnit[row.unit_id]) byUnit[row.unit_id] = emptyAgg();
+      accumulate(byUnit[row.unit_id], row);
+      if (!byDate[row.schedule_date]) byDate[row.schedule_date] = emptyAgg();
+      accumulate(byDate[row.schedule_date], row);
+      bySectorTurno[`${row.sector_id}__${row.schedule_date}__${row.turno}`] = row;
+    }
+    for (const k in byUnit) finalizeAgg(byUnit[k]);
+    for (const k in byDate) finalizeAgg(byDate[k]);
+    return { byUnit, byDate, bySectorTurno };
+  }, [rows]);
+
 
   return {
     rows,

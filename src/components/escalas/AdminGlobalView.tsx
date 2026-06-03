@@ -72,23 +72,41 @@ export function AdminGlobalView({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 items-start">
-        {allLojas.map((loja) => {
-          const agg = pop.byUnit[loja.id] ?? {
-            pop_minimo: 0,
-            escalados: 0,
-            pop_chegou: 0,
-            presentes: 0,
-            faltantes: 0,
-            extras_freelancer: 0,
-            saldo_final: 0,
-            setores_conforme: 0,
-            setores_inconforme: 0,
-            setores_aguardando: 0,
-            setores_sem_pop: 0,
-            conformidade_pct: 0,
-          };
-          const sectorRows = rowsByUnit.get(loja.id) ?? [];
-          return (
+        {[...allLojas]
+          .map((loja) => {
+            const agg = pop.byUnit[loja.id] ?? {
+              pop_minimo: 0,
+              escalados: 0,
+              pop_chegou: 0,
+              presentes: 0,
+              faltantes: 0,
+              extras_freelancer: 0,
+              saldo_final: 0,
+              setores_conforme: 0,
+              setores_inconforme: 0,
+              setores_aguardando: 0,
+              setores_sem_pop: 0,
+              conformidade_pct: 0,
+            };
+            const sectorRows = rowsByUnit.get(loja.id) ?? [];
+            return { loja, agg, sectorRows };
+          })
+          .sort((a, b) => {
+            // Inactive (no POP and no scale) go last
+            const aInactive = a.agg.pop_minimo === 0 && a.sectorRows.length === 0;
+            const bInactive = b.agg.pop_minimo === 0 && b.sectorRows.length === 0;
+            if (aInactive !== bInactive) return aInactive ? 1 : -1;
+            // Units with POP: lowest conformidade first
+            if (a.agg.pop_minimo > 0 && b.agg.pop_minimo > 0) {
+              return a.agg.conformidade_pct - b.agg.conformidade_pct;
+            }
+            // Units with POP before units without POP
+            if ((a.agg.pop_minimo > 0) !== (b.agg.pop_minimo > 0)) {
+              return a.agg.pop_minimo > 0 ? -1 : 1;
+            }
+            return a.loja.nome.localeCompare(b.loja.nome);
+          })
+          .map(({ loja, agg, sectorRows }) => (
             <UnitCard
               key={loja.id}
               unitId={loja.id}
@@ -96,8 +114,7 @@ export function AdminGlobalView({
               agg={agg}
               sectorRows={sectorRows}
             />
-          );
-        })}
+          ))}
       </div>
     </div>
   );

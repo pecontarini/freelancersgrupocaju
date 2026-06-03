@@ -38,34 +38,52 @@ export function UnitCard({ unitId, unitName, agg, sectorRows }: UnitCardProps) {
   const [expanded, setExpanded] = useState(false);
   const pct = agg.conformidade_pct;
   const hasInconforme = agg.setores_inconforme > 0;
+  const hasPop = agg.pop_minimo > 0;
+  const isInactive = !hasPop && agg.escalados === 0 && sectorRows.length === 0;
 
   return (
-    <div className="rounded-xl border bg-card/70 backdrop-blur-sm p-4 transition-all hover:shadow-md">
+    <div
+      className={cn(
+        "rounded-xl border bg-card/70 backdrop-blur-sm p-4 transition-all hover:shadow-md",
+        isInactive && "opacity-60"
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <h4 className="font-semibold text-sm truncate flex-1">{unitName}</h4>
-        <Badge variant="outline" className={cn("gap-1.5", badgeColor(pct))}>
-          <span className={cn("h-2 w-2 rounded-full", bolinhaColor(pct))} />
-          {pct}%
-        </Badge>
+        {hasPop ? (
+          <Badge variant="outline" className={cn("gap-1.5", badgeColor(pct))}>
+            <span className={cn("h-2 w-2 rounded-full", bolinhaColor(pct))} />
+            {pct}%
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+            Sem POP
+          </Badge>
+        )}
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-2 text-center mb-3">
-        <KPI icon={<Target className="h-3 w-3" />} label="POP" value={agg.pop_minimo} />
+        <KPI
+          icon={<Target className="h-3 w-3" />}
+          label="POP"
+          value={hasPop ? agg.pop_minimo : "—"}
+        />
         <KPI icon={<Users className="h-3 w-3" />} label="Escalados" value={agg.escalados} />
         <KPI
           icon={<UserCheck className="h-3 w-3" />}
           label="POP Chegou"
-          value={agg.pop_chegou}
+          value={hasPop ? agg.pop_chegou : "—"}
         />
       </div>
       <div className="grid grid-cols-3 gap-2 text-center mb-3">
         <KPI
           icon={<AlertTriangle className="h-3 w-3" />}
           label="Faltam"
-          value={agg.faltantes}
-          color={agg.faltantes > 0 ? "text-red-700" : undefined}
+          value={hasPop ? agg.faltantes : "—"}
+          color={hasPop && agg.faltantes > 0 ? "text-red-700" : undefined}
         />
         <KPI
           icon={<UserPlus className="h-3 w-3" />}
@@ -75,9 +93,11 @@ export function UnitCard({ unitId, unitName, agg, sectorRows }: UnitCardProps) {
         <KPI
           icon={<Target className="h-3 w-3" />}
           label="Saldo"
-          value={agg.saldo_final}
+          value={hasPop ? agg.saldo_final : "—"}
           color={
-            agg.saldo_final < 0
+            !hasPop
+              ? undefined
+              : agg.saldo_final < 0
               ? "text-red-700"
               : agg.saldo_final > 0
               ? "text-green-700"
@@ -86,7 +106,7 @@ export function UnitCard({ unitId, unitName, agg, sectorRows }: UnitCardProps) {
         />
       </div>
 
-      <Progress value={Math.min(pct, 100)} className="h-2 mb-3" />
+      {hasPop && <Progress value={Math.min(pct, 100)} className="h-2 mb-3" />}
 
       {/* Toggle drilldown */}
       <Button

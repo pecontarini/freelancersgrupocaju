@@ -38,16 +38,30 @@ export function UnitCard({ unitId, unitName, agg, sectorRows }: UnitCardProps) {
   const [expanded, setExpanded] = useState(false);
   const pct = agg.conformidade_pct;
   const hasInconforme = agg.setores_inconforme > 0;
+  const hasPop = agg.pop_minimo > 0;
+  const isInactive = !hasPop && agg.escalados === 0 && sectorRows.length === 0;
 
   return (
-    <div className="rounded-xl border bg-card/70 backdrop-blur-sm p-4 transition-all hover:shadow-md">
+    <div
+      className={cn(
+        "rounded-xl border bg-card/70 backdrop-blur-sm p-4 transition-all hover:shadow-md",
+        isInactive && "opacity-60"
+      )}
+    >
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-3">
         <h4 className="font-semibold text-sm truncate flex-1">{unitName}</h4>
-        <Badge variant="outline" className={cn("gap-1.5", badgeColor(pct))}>
-          <span className={cn("h-2 w-2 rounded-full", bolinhaColor(pct))} />
-          {pct}%
-        </Badge>
+        {hasPop ? (
+          <Badge variant="outline" className={cn("gap-1.5", badgeColor(pct))}>
+            <span className={cn("h-2 w-2 rounded-full", bolinhaColor(pct))} />
+            {pct}%
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-muted text-muted-foreground border-border gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+            Sem POP
+          </Badge>
+        )}
       </div>
 
       {/* KPIs */}

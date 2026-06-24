@@ -89,7 +89,7 @@ export function MultiSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[220px] p-0 bg-background z-[100]" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <ScrollArea className="max-h-[300px]">
+        <ScrollArea className={cn(options.length > 8 ? "h-[280px]" : "max-h-[300px]")}>
           <div className="p-2 space-y-1">
             {options.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">

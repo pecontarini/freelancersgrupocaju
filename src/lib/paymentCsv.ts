@@ -107,6 +107,8 @@ export const buildPaymentCsv = (
 
   const cnpjFormatted = formatCnpjMask(cnpjEmpresa);
   const dataDoc = ymdToBr(startDate);
+  const today = new Date();
+  const dataHoje = `${String(today.getDate()).padStart(2, "0")}/${String(today.getMonth() + 1).padStart(2, "0")}/${today.getFullYear()}`;
   const periodLabel = `${ymdToBrShort(startDate)} A ${ymdToBrShort(endDate)}`;
 
   // Agrupa por CPF
@@ -151,7 +153,7 @@ export const buildPaymentCsv = (
       formatCpfMask(g.cpfRaw), // CNPJ Fornecedor (CPF do freelancer)
       "2", // Portador
       dataDoc, // Data Documento
-      dataDoc, // Data Vencimento
+      dataHoje, // Data Vencimento (data de geração do CSV)
       dataDoc, // Data Competência
       "0", // Valor Desconto
       "0", // Valor Multa Atraso

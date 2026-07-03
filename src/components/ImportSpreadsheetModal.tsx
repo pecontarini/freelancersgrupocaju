@@ -1,5 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Upload, Download, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Upload, Download, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Lock } from "lucide-react";
+import {
+  FREELANCER_LAUNCH_LOCKED,
+  FREELANCER_LOCK_MESSAGE,
+  FREELANCER_LOCK_SHORT,
+} from "@/lib/freelancerLock";
 
 import {
   Dialog,
@@ -270,6 +275,12 @@ export function ImportSpreadsheetModal() {
   };
 
   const handleImport = async () => {
+    if (FREELANCER_LAUNCH_LOCKED) {
+      toast.error(FREELANCER_LOCK_MESSAGE);
+      setIsImporting(false);
+      setCurrentStep("upload");
+      return;
+    }
     if (parsedEntries.length === 0) return;
     
     if (!effectiveLojaId) {

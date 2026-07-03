@@ -239,6 +239,22 @@ export function FreelancerForm() {
     });
   };
 
+  if (FREELANCER_LAUNCH_LOCKED) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled
+        title={FREELANCER_LOCK_MESSAGE}
+        onClick={() => toast.error(FREELANCER_LOCK_MESSAGE)}
+      >
+        <Lock className="h-4 w-4" />
+        {FREELANCER_LOCK_SHORT}
+      </Button>
+    );
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>

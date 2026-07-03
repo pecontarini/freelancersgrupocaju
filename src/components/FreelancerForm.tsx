@@ -2,9 +2,15 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CalendarIcon, Loader2, Plus } from "lucide-react";
+import { CalendarIcon, Loader2, Plus, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import {
+  FREELANCER_LAUNCH_LOCKED,
+  FREELANCER_LOCK_MESSAGE,
+  FREELANCER_LOCK_SHORT,
+} from "@/lib/freelancerLock";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +104,10 @@ export function FreelancerForm() {
   const formRef = useRef<HTMLDivElement>(null);
 
   const onSubmit = async (data: FormData) => {
+    if (FREELANCER_LAUNCH_LOCKED) {
+      toast.error(FREELANCER_LOCK_MESSAGE);
+      return;
+    }
     try {
       // Normaliza CPF para o padrão canônico (11 dígitos limpos) antes de salvar
       const cleanCpf = data.cpf.replace(/\D/g, "");
@@ -228,6 +238,22 @@ export function FreelancerForm() {
       return next;
     });
   };
+
+  if (FREELANCER_LAUNCH_LOCKED) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled
+        title={FREELANCER_LOCK_MESSAGE}
+        onClick={() => toast.error(FREELANCER_LOCK_MESSAGE)}
+      >
+        <Lock className="h-4 w-4" />
+        {FREELANCER_LOCK_SHORT}
+      </Button>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

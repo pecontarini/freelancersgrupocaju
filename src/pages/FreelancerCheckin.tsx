@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Camera, CheckCircle, MapPin, DollarSign, User, Loader2, ArrowLeft } from "lucide-react";
+import { Camera, CheckCircle, MapPin, DollarSign, User, Loader2, ArrowLeft, Lock } from "lucide-react";
+import { FREELANCER_LAUNCH_LOCKED, FREELANCER_LOCK_MESSAGE } from "@/lib/freelancerLock";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -332,6 +333,24 @@ export default function FreelancerCheckin() {
       setIsLoading(false);
     }
   };
+
+  if (FREELANCER_LAUNCH_LOCKED) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
+              <Lock className="h-7 w-7 text-destructive" />
+            </div>
+            <CardTitle>Check-in temporariamente bloqueado</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-2">
+            <p className="text-muted-foreground">{FREELANCER_LOCK_MESSAGE}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!unidadeId) {
     return (

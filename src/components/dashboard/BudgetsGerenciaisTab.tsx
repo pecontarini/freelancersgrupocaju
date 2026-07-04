@@ -31,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FreelancerForm } from "@/components/FreelancerForm";
+import { ExportFreelancerProfilesButton } from "@/components/ExportFreelancerProfilesButton";
 import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
 import { ExportReportButton } from "@/components/ExportReportButton";
 import { FinancialHealthCard } from "@/components/FinancialHealthCard";
@@ -485,6 +486,7 @@ export function BudgetsGerenciaisTab({
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-3">
         <FreelancerForm />
+        <ExportFreelancerProfilesButton />
         <UnifiedExpenseForm storeId={effectiveStoreId} />
       </div>
 

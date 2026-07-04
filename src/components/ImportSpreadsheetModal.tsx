@@ -466,6 +466,16 @@ export function ImportSpreadsheetModal() {
                 </div>
               )}
 
+              {effectiveLojaId && importLocked && (
+                <Alert variant="destructive">
+                  <Lock className="h-4 w-4" />
+                  <AlertTitle>Loja bloqueada</AlertTitle>
+                  <AlertDescription>{FREELANCER_LOCK_MESSAGE}</AlertDescription>
+                </Alert>
+              )}
+
+
+
               {/* Upload Area */}
               <div
                 className={`relative flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
@@ -656,7 +666,7 @@ export function ImportSpreadsheetModal() {
                 </Button>
                 <Button
                   onClick={handleProceedToMapping}
-                  disabled={parsedEntries.length === 0 || isProcessing || !effectiveLojaId}
+                  disabled={parsedEntries.length === 0 || isProcessing || !effectiveLojaId || importLocked}
                   className="gap-2"
                 >
                   {hasItemsNeedingReview ? (

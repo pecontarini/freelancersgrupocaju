@@ -1,9 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Upload, Download, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, ArrowRight, ArrowLeft, Lock } from "lucide-react";
 import {
-  FREELANCER_LAUNCH_LOCKED,
+  isFreelancerLaunchLocked,
   FREELANCER_LOCK_MESSAGE,
-  FREELANCER_LOCK_SHORT,
 } from "@/lib/freelancerLock";
 
 import {
@@ -275,7 +274,7 @@ export function ImportSpreadsheetModal() {
   };
 
   const handleImport = async () => {
-    if (FREELANCER_LAUNCH_LOCKED) {
+    if (isFreelancerLaunchLocked(effectiveLojaId)) {
       toast.error(FREELANCER_LOCK_MESSAGE);
       setIsImporting(false);
       setCurrentStep("upload");
@@ -386,20 +385,8 @@ export function ImportSpreadsheetModal() {
     ? Math.round((importProgress.current / importProgress.total) * 100)
     : 0;
 
-  if (FREELANCER_LAUNCH_LOCKED) {
-    return (
-      <Button
-        variant="outline"
-        className="gap-2"
-        disabled
-        title={FREELANCER_LOCK_MESSAGE}
-        onClick={() => toast.error(FREELANCER_LOCK_MESSAGE)}
-      >
-        <Lock className="h-4 w-4" />
-        {FREELANCER_LOCK_SHORT}
-      </Button>
-    );
-  }
+  const importLocked = isFreelancerLaunchLocked(effectiveLojaId);
+
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

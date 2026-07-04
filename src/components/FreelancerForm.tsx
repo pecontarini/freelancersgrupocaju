@@ -258,6 +258,12 @@ export function FreelancerForm() {
             Registre um pagamento de freelancer.
           </DialogDescription>
         </DialogHeader>
+        {currentLojaLocked && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{FREELANCER_LOCK_MESSAGE}</span>
+          </div>
+        )}
         <div ref={formRef}>
         <form key={formKey} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">

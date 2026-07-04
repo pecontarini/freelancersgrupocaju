@@ -7,9 +7,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import {
-  FREELANCER_LAUNCH_LOCKED,
+  isFreelancerLaunchLocked,
   FREELANCER_LOCK_MESSAGE,
-  FREELANCER_LOCK_SHORT,
 } from "@/lib/freelancerLock";
 
 import { Button } from "@/components/ui/button";
@@ -104,7 +103,7 @@ export function FreelancerForm() {
   const formRef = useRef<HTMLDivElement>(null);
 
   const onSubmit = async (data: FormData) => {
-    if (FREELANCER_LAUNCH_LOCKED) {
+    if (isFreelancerLaunchLocked(data.loja_id)) {
       toast.error(FREELANCER_LOCK_MESSAGE);
       return;
     }
@@ -239,21 +238,7 @@ export function FreelancerForm() {
     });
   };
 
-  if (FREELANCER_LAUNCH_LOCKED) {
-    return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5"
-        disabled
-        title={FREELANCER_LOCK_MESSAGE}
-        onClick={() => toast.error(FREELANCER_LOCK_MESSAGE)}
-      >
-        <Lock className="h-4 w-4" />
-        {FREELANCER_LOCK_SHORT}
-      </Button>
-    );
-  }
+  const currentLojaLocked = isFreelancerLaunchLocked(form.watch("loja_id"));
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -273,6 +258,12 @@ export function FreelancerForm() {
             Registre um pagamento de freelancer.
           </DialogDescription>
         </DialogHeader>
+        {currentLojaLocked && (
+          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{FREELANCER_LOCK_MESSAGE}</span>
+          </div>
+        )}
         <div ref={formRef}>
         <form key={formKey} onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -504,7 +495,7 @@ export function FreelancerForm() {
 
           <Button
             type="submit"
-            disabled={createEntry.isPending}
+            disabled={createEntry.isPending || currentLojaLocked}
             className="w-full sm:w-auto"
           >
             {createEntry.isPending ? (

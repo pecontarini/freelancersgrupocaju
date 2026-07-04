@@ -495,7 +495,7 @@ export function FreelancerForm() {
 
           <Button
             type="submit"
-            disabled={createEntry.isPending}
+            disabled={createEntry.isPending || currentLojaLocked}
             className="w-full sm:w-auto"
           >
             {createEntry.isPending ? (

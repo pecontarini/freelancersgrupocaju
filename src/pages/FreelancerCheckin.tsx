@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Camera, CheckCircle, MapPin, DollarSign, User, Loader2, ArrowLeft, Lock } from "lucide-react";
-import { FREELANCER_LAUNCH_LOCKED, FREELANCER_LOCK_MESSAGE } from "@/lib/freelancerLock";
+import { isFreelancerLaunchLocked, FREELANCER_LOCK_MESSAGE } from "@/lib/freelancerLock";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -334,7 +334,7 @@ export default function FreelancerCheckin() {
     }
   };
 
-  if (FREELANCER_LAUNCH_LOCKED) {
+  if (isFreelancerLaunchLocked(unidadeId)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">

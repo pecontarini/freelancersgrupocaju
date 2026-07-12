@@ -216,7 +216,7 @@ export default function Auth() {
               <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
             </div>
           </div>
-          <CardDescription className="text-base">{tenant.copy.appName}</CardDescription>
+          <CardDescription className="text-base">{BRAND_NAME}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

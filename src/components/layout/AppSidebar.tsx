@@ -1,18 +1,10 @@
-import { useState } from "react";
 // ThemeToggle moved to PortalHeader (Onda 2)
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-  Wallet,
-  
   Settings,
-  Building2,
   LogOut,
   User,
   ChevronRight,
-  ClipboardCheck,
-  
-  Activity,
-  Trophy,
   Users,
   LayoutGrid,
   Calendar,
@@ -71,18 +63,6 @@ const menuItems = [
     description: "Escalas e Presença Freelancers",
   },
   {
-    title: "QUADRO OPERACIONAL",
-    id: "quadro-operacional",
-    icon: ShieldCheck,
-    description: "Visão geral do quadro operacional por unidade",
-  },
-  {
-    title: "DIAGNÓSTICO AUDITORIA",
-    id: "diagnostico",
-    icon: ClipboardCheck,
-    description: "Análise de não conformidades",
-  },
-  {
     title: "AGENDA DO LÍDER",
     id: "agenda-lider",
     icon: Calendar,
@@ -97,33 +77,11 @@ const adminMenuItems = [
     icon: Settings,
     description: "Configurar sistema",
   },
-  {
-    title: "VISÃO REDE",
-    id: "rede",
-    icon: Building2,
-    description: "Consolidado da rede",
-  },
-];
-
-const gestaoMenuItems = [
-  {
-    title: "INDICADORES OPERACIONAIS",
-    id: "painel",
-    icon: Activity,
-    description: "Como estamos indo · NPS, CMV, KDS, Conformidade",
-  },
-  {
-    title: "REMUNERAÇÃO VARIÁVEL",
-    id: "metas-variaveis",
-    icon: Trophy,
-    description: "Quem ganha o quê · Payout mensal por meta",
-  },
 ];
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isOperator, isGerenteUnidade, isChefeSetor, unidades, profile } = useUserProfile();
-  const canSeeGestao = (isAdmin || isOperator || isGerenteUnidade) && !isChefeSetor;
+  const { isAdmin, isChefeSetor, profile } = useUserProfile();
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();

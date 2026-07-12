@@ -19,8 +19,6 @@ import ResetPassword from "./pages/ResetPassword";
 import ContagemUtensilios from "./pages/ContagemUtensilios";
 import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
-import MetasPage from "./pages/painel/Metas";
-import MetasVariaveisPage from "./pages/painel/MetasVariaveis";
 import AprovarEscala from "./pages/AprovarEscala";
 import AtualizarPix from "./pages/AtualizarPix";
 import CadastrosPendentes from "./pages/CadastrosPendentes";
@@ -69,8 +67,6 @@ function App() {
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
-                <Route path="/painel/metas" element={<ProtectedRoute><MetasPage /></ProtectedRoute>} />
-                <Route path="/painel/metas-variaveis" element={<ProtectedRoute><MetasVariaveisPage /></ProtectedRoute>} />
                 <Route path="/escalas/draft/:draftId" element={<ProtectedRoute><EscalaDraft /></ProtectedRoute>} />
                 <Route path="/perfil/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
                 <Route

@@ -9,29 +9,26 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { TenantConfig } from "@/tenants/types";
 import { getTenantBySlug, TENANT_REGISTRY } from "@/tenants/registry";
-import { resolveInitialTenantSlug } from "@/tenants/resolve";
+import {
+  resolveHost,
+  resolveInitialTenantSlug,
+  ROOT_BRAND_SLUG,
+} from "@/lib/tenantResolver";
+import { TenantNoAccessScreen } from "@/components/TenantNoAccessScreen";
 
 interface TenantContextValue {
-  /** Tenant ativo (frontend branding). */
   tenant: TenantConfig;
-  /** UUID do tenant no banco (após lookup). Pode ser null durante boot. */
   tenantId: string | null;
-  /** Todos os tenants aos quais o usuário logado tem acesso. */
   availableTenants: TenantConfig[];
-  /** Troca o tenant ativo (só faz efeito visual; RLS ainda depende do vínculo). */
   setTenantSlug: (slug: string) => void;
-  /** Helper de textos: t("welcome") → busca em copy.strings[key], fallback pro próprio key. */
   t: (key: string) => string;
-  /** Loading state do lookup inicial no banco. */
   isLoading: boolean;
+  /** True quando o slug vem do subdomínio (não pode ser trocado livremente). */
+  isHostLocked: boolean;
 }
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
-/**
- * Aplica os tokens de tema do tenant no <html data-tenant="...">.
- * Sobrescreve variáveis CSS que já existem no design system (index.css).
- */
 function applyThemeToDocument(tenant: TenantConfig) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -45,12 +42,19 @@ function applyThemeToDocument(tenant: TenantConfig) {
   }
   if (theme.radius) root.style.setProperty("--radius", theme.radius);
 
-  // Título da aba
   if (tenant.copy.browserTitle) {
     document.title = tenant.copy.browserTitle;
   }
+  if (tenant.copy.metaDescription) {
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "description";
+      document.head.appendChild(meta);
+    }
+    meta.content = tenant.copy.metaDescription;
+  }
 
-  // Favicon (se fornecido)
   if (tenant.faviconUrl) {
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
@@ -62,10 +66,6 @@ function applyThemeToDocument(tenant: TenantConfig) {
   }
 }
 
-/**
- * Aplica branding vindo do banco em cima do config estático.
- * Campos do banco (theme/copy/logos) sobrescrevem os do TS quando presentes.
- */
 function mergeTenantWithDbRow(base: TenantConfig, row: any): TenantConfig {
   if (!row) return base;
   const dbTheme = row.theme && typeof row.theme === "object" ? row.theme : {};
@@ -102,44 +102,53 @@ function mergeTenantWithDbRow(base: TenantConfig, row: any): TenantConfig {
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
+  const hostInfo = useMemo(() => resolveHost(), []);
+  const isHostLocked = !hostInfo.isDev && !!hostInfo.hostSlug && hostInfo.hostSlug !== ROOT_BRAND_SLUG;
+
   const [slug, setSlug] = useState<string>(() => resolveInitialTenantSlug());
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [availableSlugs, setAvailableSlugs] = useState<string[]>([]);
   const [dbTenants, setDbTenants] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   const tenant = useMemo(() => {
     const base = getTenantBySlug(slug);
     return mergeTenantWithDbRow(base, dbTenants[slug]);
   }, [slug, dbTenants]);
 
-  // Aplica tema sempre que o tenant muda
   useEffect(() => {
     applyThemeToDocument(tenant);
   }, [tenant]);
 
-  // Carrega branding público (sem auth) e reconcilia com vínculos do usuário
+  // 1. Boot: carrega branding do slug atual via RPC público (sem auth)
   useEffect(() => {
     let cancelled = false;
-
-    async function loadPublicBranding() {
-      const { data, error } = await supabase
-        .from("tenants")
-        .select("id, slug, nome, theme, copy, logo_url, logo_dark_url, logo_symbol_url, favicon_url, primary_color")
-        .eq("ativo", true);
+    (async () => {
+      const { data, error } = await supabase.rpc("get_tenant_branding", { _slug: slug });
       if (cancelled || error || !data) return;
-      const map: Record<string, any> = {};
-      for (const row of data) map[row.slug] = row;
-      setDbTenants(map);
-    }
+      setDbTenants((prev) => ({ ...prev, [slug]: data }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  // 2. Após login: valida vínculos e reconcilia
+  useEffect(() => {
+    let cancelled = false;
 
     async function loadUserTenants() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
+      if (cancelled) return;
+      setIsAuthenticated(!!session);
+
       if (!session) {
-        if (!cancelled) setIsLoading(false);
+        setIsLoading(false);
         return;
       }
 
@@ -150,7 +159,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return;
 
-      if (error || !data || data.length === 0) {
+      if (error || !data) {
         setIsLoading(false);
         return;
       }
@@ -160,22 +169,44 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         .filter((s: string | undefined): s is string => Boolean(s));
       setAvailableSlugs(slugs);
 
-      const currentBelongs = slugs.includes(slug);
-      const effectiveSlug = currentBelongs ? slug : slugs[0];
-      if (effectiveSlug !== slug) setSlug(effectiveSlug);
+      // Se o host trava o tenant (subdomínio real), o usuário PRECISA ter acesso a ele
+      if (isHostLocked) {
+        if (slugs.includes(slug)) {
+          const row = data.find((r: any) => r.tenants?.slug === slug);
+          setTenantId(row?.tenant_id ?? null);
+          setAccessDenied(false);
+        } else {
+          setAccessDenied(true);
+        }
+      } else {
+        // No root/dev: usa o default do usuário
+        if (slugs.length > 0 && !slugs.includes(slug)) {
+          const first = slugs[0];
+          setSlug(first);
+          const row = data.find((r: any) => r.tenants?.slug === first);
+          setTenantId(row?.tenant_id ?? null);
+        } else if (slugs.includes(slug)) {
+          const row = data.find((r: any) => r.tenants?.slug === slug);
+          setTenantId(row?.tenant_id ?? null);
+        }
+      }
 
-      const matchingRow = data.find(
-        (row: any) => row.tenants?.slug === effectiveSlug,
-      );
-      setTenantId(matchingRow?.tenant_id ?? null);
+      // Pré-carrega branding de todos os tenants do usuário para o seletor
+      for (const s of slugs) {
+        if (!dbTenants[s]) {
+          const { data: b } = await supabase.rpc("get_tenant_branding", { _slug: s });
+          if (b && !cancelled) {
+            setDbTenants((prev) => ({ ...prev, [s]: b }));
+          }
+        }
+      }
+
       setIsLoading(false);
     }
 
-    loadPublicBranding();
     loadUserTenants();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      loadPublicBranding();
       loadUserTenants();
     });
 
@@ -184,9 +215,10 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       authListener?.subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isHostLocked]);
 
   const setTenantSlug = (nextSlug: string) => {
+    if (isHostLocked) return; // travado pelo subdomínio
     if (!TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
     setSlug(nextSlug);
     try {
@@ -201,7 +233,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const availableTenants = useMemo(
     () =>
       availableSlugs.map((s) => {
-        const base = TENANT_REGISTRY[s] ?? TENANT_REGISTRY._default;
+        const base = getTenantBySlug(s);
         return mergeTenantWithDbRow(base, dbTenants[s]);
       }),
     [availableSlugs, dbTenants],
@@ -214,7 +246,20 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     setTenantSlug,
     t,
     isLoading,
+    isHostLocked,
   };
+
+  // Gate: usuário logado tentando acessar subdomínio ao qual não tem vínculo
+  if (accessDenied && isAuthenticated) {
+    return (
+      <TenantContext.Provider value={value}>
+        <TenantNoAccessScreen
+          availableSlugs={availableSlugs}
+          currentHostSlug={slug}
+        />
+      </TenantContext.Provider>
+    );
+  }
 
   return (
     <TenantContext.Provider value={value}>{children}</TenantContext.Provider>

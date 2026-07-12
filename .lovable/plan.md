@@ -1,68 +1,109 @@
-# Caminho 2 — Self-service de novas empresas
+# Plano: 2board White-Label por Subdomínio
 
-Objetivo: permitir que um `super_admin` crie novas empresas (tenants), defina marca (nome, cores, logo) e vincule usuários — sem editar código nem migrar.
+## Visão geral
 
-## 1. Banco (migração única)
+O produto passa a se chamar **2board** (marca guarda-chuva). Cada empresa cliente terá seu próprio subdomínio (ex: `cajupar.2board.app`, `empresaX.2board.app`). Ao acessar o subdomínio, o sistema identifica o tenant **antes do login** e aplica tema, logo, nome e favicon da empresa. O login e todas as views passam a ser 100% personalizadas por empresa.
 
-**Alterar `public.tenants`**:
-- Adicionar `theme JSONB` (primary/accent/primaryStrong em HSL)
-- Adicionar `copy JSONB` (appName, tagline, browserTitle, metaDescription, terms, strings)
-- Adicionar `logo_url TEXT`, `logo_dark_url TEXT`, `logo_symbol_url TEXT`, `favicon_url TEXT`
-- Backfill do `caju` com os valores atuais de `src/tenants/caju/index.ts`
+Um subdomínio raiz (`app.2board.app` ou `2board.app`) mostra a landing/marca 2board neutra.
 
-**Bucket de storage `tenant-assets`** (público, para logos/favicons):
-- Policies: SELECT público; INSERT/UPDATE/DELETE só `super_admin`
+## Arquitetura
 
-**RPCs (SECURITY DEFINER, exigem `super_admin`)**:
-- `admin_create_tenant(slug, name, theme, copy, logos)` → cria tenant
-- `admin_update_tenant(id, patch)` → atualiza campos
-- `admin_link_user_to_tenant(user_email, tenant_id, is_default)` → busca user por email em `auth.users` e cria `user_tenants`
-- `admin_unlink_user(user_id, tenant_id)`
-- `admin_list_tenants()` → lista tenants + contagem de usuários
-- `admin_list_tenant_users(tenant_id)` → lista membros
+```text
+┌─────────────────────────────────────────────────────┐
+│  Usuário digita: cajupar.2board.app                 │
+└────────────────────┬────────────────────────────────┘
+                     ↓
+       ┌─────────────────────────────┐
+       │  TenantResolver (bootstrap) │
+       │  Lê window.location.host    │
+       │  Extrai subdomínio "cajupar"│
+       └────────────┬────────────────┘
+                    ↓
+       ┌─────────────────────────────┐
+       │  Query: tenants.slug=cajupar│
+       │  Retorna: theme, copy,      │
+       │  logos, favicon, nome       │
+       └────────────┬────────────────┘
+                    ↓
+       ┌─────────────────────────────┐
+       │  Aplica CSS vars + <title>  │
+       │  + <link rel=icon> ANTES    │
+       │  de renderizar login        │
+       └────────────┬────────────────┘
+                    ↓
+       Login com cara da CajuPAR
+                    ↓
+       Após auth: view da empresa
+```
 
-Todas com `if not is_super_admin(auth.uid()) then raise exception 'forbidden'`.
+## Etapas de implementação
 
-## 2. Frontend — carregar tenants do banco
+### 1. Marca 2board (guarda-chuva)
+- Definir tenant "root" (slug `2board`) para o domínio raiz `2board.app` / `app.2board.app`.
+- Este tenant hospeda a landing pública, cadastro/demonstração, e é o fallback quando o subdomínio não bate com nenhuma empresa.
+- Criar identidade visual mínima 2board (paleta neutra, logo texto simples) — pode ser refinada depois.
 
-- `TenantContext` passa a buscar tenants ativos da tabela `tenants` no boot (fallback pro `TENANT_REGISTRY` estático quando offline/sem sessão).
-- Merge: se existir no banco, usa branding do banco; senão, usa o TS file. Assim `caju` continua funcionando mesmo sem migração aplicada.
-- `applyThemeToDocument` já suporta os campos — só passar do banco.
+### 2. Tenant Resolver por subdomínio
+- Criar `src/lib/tenantResolver.ts`:
+  - Lê `window.location.hostname`.
+  - Extrai o primeiro segmento (`cajupar` de `cajupar.2board.app`).
+  - Tratamento especial para: `localhost`, `*.lovable.app` (preview), IPs → usa tenant default (`2board` ou último tenant do usuário via localStorage).
+- Substituir a lógica atual do `TenantContext` que decide tenant por localStorage/user_tenants para usar o resolver como fonte primária.
 
-## 3. Painel `/admin/tenants` (super_admin)
+### 3. Query pública de branding
+- Criar RPC `public.get_tenant_branding(slug text)` que retorna apenas os campos públicos (nome, theme, copy, logos, favicon) — **sem exigir auth**, pois roda antes do login.
+- Adicionar policy pública de SELECT em `tenants` restrita a colunas de branding via RPC security-definer.
 
-Nova rota protegida por `super_admin`. Componentes:
+### 4. Aplicação de tema pré-login
+- Refatorar `TenantContext` para:
+  - Fase 1 (síncrono no bootstrap): aplicar CSS vars, `<title>`, favicon dinâmico via `<link>` injetado em `<head>`.
+  - Fase 2 (após auth): validar que o usuário tem acesso ao tenant do subdomínio; se não, redirecionar para `app.2board.app` com aviso.
 
-- **`TenantsListPage`** — grid de cards com nome, slug, cor, nº usuários, botões Editar / Gerenciar usuários.
-- **`TenantFormDialog`** — criar/editar:
-  - slug (readonly no edit), nome, tagline, browserTitle, metaDescription
-  - color pickers (primary/accent) → converte pra HSL
-  - upload de logo (light/dark/symbol) e favicon via storage `tenant-assets`
-  - preview ao vivo do header/botão com os tokens
-- **`TenantMembersDialog`** — listar membros, adicionar por email, marcar default, remover.
+### 5. Guard de acesso ao tenant
+- Se um usuário logado tenta acessar `empresaX.2board.app` mas só tem `user_tenants` para `cajupar`, mostrar tela de "Sem acesso a esta empresa" com link para o subdomínio correto.
 
-Entrada no menu: item "Empresas" só visível para `super_admin` (via `useUserRole`).
+### 6. Painel super_admin (já existe)
+- Ajustar `/admin/tenants` para exibir o subdomínio esperado de cada tenant (`{slug}.2board.app`) e link para acessar.
 
-## 4. Onboarding manual (fallback)
-
-Documentar em `docs/multi-tenant.md` como criar o 1º `super_admin` via SQL (uma vez), depois todo o resto é self-service.
+### 7. Publicação e DNS (ação do usuário)
+- Publicar o projeto no Lovable → gera URL `.lovable.app`.
+- Comprar/configurar domínio `2board.app` (ou usar um que você já tenha).
+- Configurar **DNS wildcard**: `*.2board.app` → Lovable (registro A `185.158.133.1` + TXT de verificação).
+- Adicionar no Lovable os domínios: `2board.app`, `app.2board.app`, `cajupar.2board.app` (e cada nova empresa).
 
 ## Detalhes técnicos
 
-- `theme` JSONB shape: `{ primary: "20 74% 48%", accent: "...", primaryStrong: "..." }`
-- Uploads em `tenant-assets/{tenant_slug}/logo-light.png` etc.
-- `TENANT_REGISTRY` vira só o `_default` + `caju` como seeds; novos tenants **não precisam** de arquivo TS.
-- `getTenantBySlug` passa a consultar cache em memória populado pelo `TenantProvider` a partir do banco.
+### Novos arquivos
+- `src/lib/tenantResolver.ts` — extrai slug do hostname.
+- `src/components/TenantNoAccessScreen.tsx` — tela quando user não tem acesso ao tenant do subdomínio.
 
-## Ordem de execução
+### Arquivos modificados
+- `src/contexts/TenantContext.tsx` — passa a usar tenantResolver + aplica branding no bootstrap síncrono.
+- `index.html` — remove título hardcoded, deixa o TenantContext preencher dinamicamente.
+- `src/pages/admin/Tenants.tsx` — exibe URL prevista de cada tenant.
 
-1. Migração (colunas + bucket + RPCs + backfill caju)
-2. Refactor `TenantContext` para carregar do banco
-3. Rota `/admin/tenants` + componentes + item no sidebar
-4. Typecheck + smoke test manual (criar tenant fake, trocar via TenantSwitcher)
+### Migração SQL
+- RPC `get_tenant_branding(slug)` security-definer que retorna JSON público (nome, theme, copy, logos, favicon).
+- Backfill: garantir que existe um tenant com slug `2board` (root/marca guarda-chuva).
 
-## Riscos
+### Não muda
+- `user_tenants`, `user_roles`, RLS por tenant — tudo continua igual.
+- Todas as views/dashboards existentes continuam funcionando dentro de cada tenant.
+- Nomes de tabelas, edge functions, hooks — nada quebra.
 
-- Se o backfill do `caju` falhar, o app fica sem branding → mitigado pelo fallback TS.
-- Uploads de logo podem falhar em CDN → validar extensão/tamanho no front.
-- Emails de usuários que não existem em `auth.users` no link → retornar erro claro no dialog.
+## O que você precisa fazer depois do código pronto
+
+1. **Publicar o projeto** (botão Publish) → gera `.lovable.app`.
+2. **Comprar o domínio `2board.app`** (posso ajudar via Lovable Domains) ou usar um seu.
+3. **Configurar DNS wildcard** `*.2board.app` no registrador.
+4. **Adicionar os subdomínios no Lovable** (um por empresa que for entrar).
+
+Depois disso, criar uma empresa nova = criar o tenant no painel `/admin/tenants` + adicionar o subdomínio no Lovable. Sem tocar em código.
+
+## Fora do escopo desta etapa
+
+- Landing page de marketing do 2board (fica para depois).
+- Auto-provisionamento de subdomínio via API (Lovable ainda exige adicionar domínio manualmente pelo dashboard).
+- Fluxo de auto-cadastro de novas empresas pelo próprio site (por enquanto criação é manual pelo super_admin).
+
+Posso seguir com a implementação?

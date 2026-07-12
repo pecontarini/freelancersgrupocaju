@@ -524,7 +524,7 @@ function TenantMembersDialog({
 
   const generateLinkFor = async (memberEmail: string) => {
     const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
-      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id },
+      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id, redirect_to: `${window.location.origin}/reset-password` },
     });
     if (error) return toast.error(error.message);
     const d = data as any;

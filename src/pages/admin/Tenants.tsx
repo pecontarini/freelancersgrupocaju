@@ -347,6 +347,53 @@ export default function AdminTenants() {
               />
             </div>
 
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Logo + cores por IA
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Envie a logo e a IA sugere as cores da marca automaticamente.
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleLogoFileSelected(e.target.files?.[0] ?? null)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={aiBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {aiBusy ? "Analisando..." : "Enviar logo"}
+                </Button>
+              </div>
+              {logoPreview && (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="h-16 w-16 rounded bg-background border flex items-center justify-center overflow-hidden">
+                    <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <div className="flex-1 grid grid-cols-3 gap-2">
+                    {(["primary", "primaryStrong", "accent"] as const).map((k) => (
+                      <div key={k} className="text-center">
+                        <div className="h-6 rounded border" style={{ background: `hsl(${form[k]})` }} />
+                        <p className="text-[10px] mt-1 text-muted-foreground">{k}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-2">Cores (HSL sem "hsl()")</p>
               <div className="grid grid-cols-3 gap-3">

@@ -217,22 +217,13 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   Utensílios
                 </Button>
                 {isAdmin && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-12 rounded-2xl"
-                      onClick={() => onTabChange("configuracoes")}
-                    >
-                      Configurações
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-12 rounded-2xl"
-                      onClick={() => onTabChange("rede")}
-                    >
-                      Visão Rede
-                    </Button>
-                  </>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start h-12 rounded-2xl"
+                    onClick={() => onTabChange("configuracoes")}
+                  >
+                    Configurações
+                  </Button>
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Tema</span>

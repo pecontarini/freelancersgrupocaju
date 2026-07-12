@@ -181,6 +181,16 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                  {isSuperAdmin && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="EMPRESAS" className="group transition-all duration-200">
+                        <Link to="/admin/tenants">
+                          <Building2 className="h-4 w-4 transition-colors group-hover:text-primary" />
+                          <span className="font-medium">EMPRESAS</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

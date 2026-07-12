@@ -7,12 +7,14 @@ export interface UserProfileData {
   profile: UserProfile | null;
   roles: AppRole[];
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isOperator: boolean;
   isGerenteUnidade: boolean;
   isChefeSetor: boolean;
   isEmployee: boolean;
   unidades: ConfigOption[];
 }
+
 
 export function useUserProfile() {
   const { user } = useAuth();

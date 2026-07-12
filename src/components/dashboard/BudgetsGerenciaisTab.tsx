@@ -34,8 +34,6 @@ import { FreelancerForm } from "@/components/FreelancerForm";
 import { ExportFreelancerProfilesButton } from "@/components/ExportFreelancerProfilesButton";
 import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
 import { ExportReportButton } from "@/components/ExportReportButton";
-import { FinancialHealthCard } from "@/components/FinancialHealthCard";
-import { CostEvolutionChart } from "@/components/CostEvolutionChart";
 import { FreelancerFilters, FreelancerFiltersState } from "@/components/FreelancerFilters";
 import { FreelancerEntry } from "@/types/freelancer";
 import { MaintenanceEntry } from "@/types/maintenance";
@@ -490,21 +488,8 @@ export function BudgetsGerenciaisTab({
         <UnifiedExpenseForm storeId={effectiveStoreId} />
       </div>
 
-      {/* Financial Health Card + Cost Evolution Chart */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <FinancialHealthCard
-          freelancerEntries={filteredFreelancers}
-          maintenanceEntries={filteredMaintenance}
-          operationalExpenses={filteredExpenses}
-          selectedUnidadeId={effectiveStoreId}
-        />
-        <CostEvolutionChart
-          freelancerEntries={filteredFreelancers}
-          maintenanceEntries={filteredMaintenance}
-          operationalExpenses={filteredExpenses}
-          selectedUnidadeId={effectiveStoreId}
-        />
-      </div>
+
+
 
       {/* Freelancers List - Shows filtered data + checkin entries */}
       <Card className="rounded-2xl shadow-card">

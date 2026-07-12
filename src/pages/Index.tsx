@@ -9,18 +9,13 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
-import { RedFlagBanner } from "@/components/metas/RedFlagBanner";
+
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { AuditDiagnosticDashboard } from "@/components/dashboard/AuditDiagnosticDashboard";
-
 import { ConfiguracoesTabWrapper } from "@/components/dashboard/ConfiguracoesTab";
-import { RedeTab } from "@/components/dashboard/RedeTab";
 
-import { OperationalDashboard } from "@/components/escalas/OperationalDashboard";
 import { UtensiliosTab } from "@/components/utensilios";
-// PainelMetasTab removido — Painel de Indicadores agora vive em /painel/metas
 import { TeamReadinessCard } from "@/components/escalas/TeamReadinessCard";
 import { AgendaLiderTab } from "@/components/agenda-lider/AgendaLiderTab";
 import { UnitariosGerentesTab } from "@/components/dashboard/UnitariosGerentesTab";
@@ -42,29 +37,13 @@ const tabConfig: Record<string, { title: string; subtitle: string }> = {
     title: "Gestão de Pessoas",
     subtitle: "Escalas e presença de freelancers",
   },
-  "quadro-operacional": {
-    title: "Quadro Operacional",
-    subtitle: "Visão geral do quadro operacional por unidade e setor",
-  },
-  diagnostico: {
-    title: "Diagnóstico de Auditoria",
-    subtitle: "Análise de não conformidades e plano de ação",
-  },
   configuracoes: {
     title: "Configurações",
     subtitle: "Gerenciar sistema e usuários",
   },
-  rede: {
-    title: "Visão Rede",
-    subtitle: "Consolidado de todas as unidades",
-  },
   utensilios: {
     title: "Utensílios",
     subtitle: "Controle de utensílios, contagem e budget mensal",
-  },
-  painel: {
-    title: "Painel de Indicadores",
-    subtitle: "Resultados e indicadores operacionais da rede",
   },
   "agenda-lider": {
     title: "Agenda do Líder",
@@ -109,26 +88,10 @@ const Index = () => {
         navigate("/agenda");
         return;
       }
-      if (tab === "painel") {
-        navigate("/painel/metas");
-        return;
-      }
-      if (tab === "metas-variaveis") {
-        navigate("/painel/metas-variaveis");
-        return;
-      }
       setActiveTab(tab);
     },
     [navigate]
   );
-
-  // If user lands here with ?tab=painel (legacy entry), redirect to /painel/metas
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("tab") === "painel" || activeTab === "painel") {
-      navigate("/painel/metas", { replace: true });
-    }
-  }, [activeTab, navigate]);
 
   // Set default tab for chefe_setor
   useEffect(() => {
@@ -240,23 +203,10 @@ const Index = () => {
         );
       case "gestao-pessoas":
         return <GestaoPessoasTab selectedUnidadeId={selectedUnidadeId} />;
-      case "quadro-operacional":
-        return <OperationalDashboard />;
-      case "diagnostico":
-        return (
-          <AuditDiagnosticDashboard
-            selectedUnidadeId={selectedUnidadeId}
-            isAdmin={isAdmin}
-          />
-        );
       case "utensilios":
         return <UtensiliosTab />;
       case "configuracoes":
         return isAdmin ? <ConfiguracoesTabWrapper /> : null;
-      case "rede":
-        return isAdmin ? <RedeTab /> : null;
-      case "painel":
-        return null; // redirect handled by useEffect → /painel/metas
       case "agenda-lider":
         return <AgendaLiderTab />;
       default:
@@ -274,7 +224,6 @@ const Index = () => {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
         >
           <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
-          <RedFlagBanner />
           <div className="px-3 py-3">
             <PortalHeader
               title={currentTabConfig.title}
@@ -296,7 +245,6 @@ const Index = () => {
       <div className="flex min-h-screen w-full">
         <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         <SidebarInset>
-          <RedFlagBanner />
           <PortalHeader
             title={currentTabConfig.title}
             subtitle={currentTabConfig.subtitle}

@@ -1,15 +1,12 @@
 import {
-  ClipboardCheck,
   User,
   Menu,
   Package,
   Sun,
   Moon,
   Calendar,
-  BarChart2,
   LayoutGrid,
   Users,
-  ShieldCheck,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 import { cn } from "@/lib/utils";
@@ -36,9 +33,8 @@ interface BottomNavigationProps {
 const navItems = [
   { id: "unitarios-gerentes", label: "Unitários", icon: LayoutGrid },
   { id: "gestao-pessoas", label: "Pessoas", icon: Users },
-  { id: "diagnostico", label: "Auditoria", icon: ClipboardCheck },
   { id: "agenda-lider", label: "Agenda", icon: Calendar },
-  { id: "painel", label: "Painel", icon: BarChart2 },
+  { id: "utensilios", label: "Utensílios", icon: Package },
 ];
 
 export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationProps) {
@@ -89,14 +85,6 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                 <Button
                   variant="ghost"
                   className="w-full justify-start"
-                  onClick={() => onTabChange("quadro-operacional")}
-                >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
-                  Quadro Operacional
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
                   onClick={() => onTabChange("agenda-lider")}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
@@ -111,22 +99,13 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   Utensílios
                 </Button>
                 {isAdmin && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onTabChange("configuracoes")}
-                    >
-                      Configurações
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start"
-                      onClick={() => onTabChange("rede")}
-                    >
-                      Visão Rede
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => onTabChange("configuracoes")}
+                  >
+                    Configurações
+                  </Button>
                 )}
               </div>
               <div className="border-t pt-4 flex items-center justify-between">
@@ -238,22 +217,13 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
                   Utensílios
                 </Button>
                 {isAdmin && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-12 rounded-2xl"
-                      onClick={() => onTabChange("configuracoes")}
-                    >
-                      Configurações
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start h-12 rounded-2xl"
-                      onClick={() => onTabChange("rede")}
-                    >
-                      Visão Rede
-                    </Button>
-                  </>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start h-12 rounded-2xl"
+                    onClick={() => onTabChange("configuracoes")}
+                  >
+                    Configurações
+                  </Button>
                 )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Tema</span>

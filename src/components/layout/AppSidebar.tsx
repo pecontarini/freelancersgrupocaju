@@ -1,18 +1,10 @@
-import { useState } from "react";
 // ThemeToggle moved to PortalHeader (Onda 2)
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-  Wallet,
-  
   Settings,
-  Building2,
   LogOut,
   User,
   ChevronRight,
-  ClipboardCheck,
-  
-  Activity,
-  Trophy,
   Users,
   LayoutGrid,
   Calendar,
@@ -71,18 +63,6 @@ const menuItems = [
     description: "Escalas e Presença Freelancers",
   },
   {
-    title: "QUADRO OPERACIONAL",
-    id: "quadro-operacional",
-    icon: ShieldCheck,
-    description: "Visão geral do quadro operacional por unidade",
-  },
-  {
-    title: "DIAGNÓSTICO AUDITORIA",
-    id: "diagnostico",
-    icon: ClipboardCheck,
-    description: "Análise de não conformidades",
-  },
-  {
     title: "AGENDA DO LÍDER",
     id: "agenda-lider",
     icon: Calendar,
@@ -97,33 +77,11 @@ const adminMenuItems = [
     icon: Settings,
     description: "Configurar sistema",
   },
-  {
-    title: "VISÃO REDE",
-    id: "rede",
-    icon: Building2,
-    description: "Consolidado da rede",
-  },
-];
-
-const gestaoMenuItems = [
-  {
-    title: "INDICADORES OPERACIONAIS",
-    id: "painel",
-    icon: Activity,
-    description: "Como estamos indo · NPS, CMV, KDS, Conformidade",
-  },
-  {
-    title: "REMUNERAÇÃO VARIÁVEL",
-    id: "metas-variaveis",
-    icon: Trophy,
-    description: "Quem ganha o quê · Payout mensal por meta",
-  },
 ];
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isOperator, isGerenteUnidade, isChefeSetor, unidades, profile } = useUserProfile();
-  const canSeeGestao = (isAdmin || isOperator || isGerenteUnidade) && !isChefeSetor;
+  const { isAdmin, isChefeSetor, profile } = useUserProfile();
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();
@@ -197,33 +155,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {canSeeGestao && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel className="uppercase text-xs tracking-wider">
-                Gestão
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {gestaoMenuItems.map((item) => (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        onClick={() => handleTabClick(item.id)}
-                        isActive={activeTab === item.id}
-                        tooltip={item.title}
-                        className="group transition-all duration-200"
-                      >
-                        <item.icon className="h-4 w-4 transition-colors group-hover:text-primary" />
-                        <span className="font-medium">{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
+
+
 
         {isAdmin && (
           <>

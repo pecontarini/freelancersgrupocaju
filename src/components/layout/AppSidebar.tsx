@@ -82,7 +82,7 @@ const adminMenuItems = [
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isChefeSetor, profile } = useUserProfile();
+  const { isAdmin, isSuperAdmin, isChefeSetor, profile } = useUserProfile();
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();

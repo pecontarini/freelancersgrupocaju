@@ -6586,6 +6586,7 @@ export type Database = {
         }[]
       }
       get_sync_batidas_cursor: { Args: never; Returns: Json }
+      get_tenant_branding: { Args: { _slug: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -6627,6 +6628,13 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_public_tenant_slugs: {
+        Args: never
+        Returns: {
+          nome: string
+          slug: string
+        }[]
+      }
       lookup_freelancer_by_cpf: {
         Args: { p_cpf: string }
         Returns: {

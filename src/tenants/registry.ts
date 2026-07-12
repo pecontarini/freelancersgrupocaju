@@ -1,22 +1,32 @@
 import type { TenantConfig } from "./types";
 import { cajuTenant } from "./caju";
 import { defaultTenant } from "./_default";
+import { twoboardTenant } from "./_2board";
 
 /**
  * Registro central de tenants disponíveis no build.
  *
- * Para adicionar uma nova empresa:
- * 1. Crie `src/tenants/<slug>/index.ts` exportando um `TenantConfig`.
- * 2. Importe e adicione ao mapa abaixo.
- * 3. Crie a linha em `public.tenants` no banco (via migração ou insert).
- * 4. Aponte o subdomínio (ex: <slug>.seudominio.com) para o app.
+ * Estes são apenas FALLBACKS estáticos. O branding real (tema, logo, textos)
+ * vem do banco via RPC `get_tenant_branding`. O registry aqui serve para:
+ * - Tipos e chaves de UI internas
+ * - Boot inicial antes da resposta do banco (evita flash)
+ * - Marca guarda-chuva 2board
  */
 export const TENANT_REGISTRY: Record<string, TenantConfig> = {
   caju: cajuTenant,
+  "2board": twoboardTenant,
   _default: defaultTenant,
 };
 
 export function getTenantBySlug(slug: string | null | undefined): TenantConfig {
-  if (!slug) return defaultTenant;
-  return TENANT_REGISTRY[slug] ?? defaultTenant;
+  if (!slug) return TENANT_REGISTRY["2board"] ?? defaultTenant;
+  return TENANT_REGISTRY[slug] ?? {
+    ...defaultTenant,
+    slug,
+    copy: {
+      ...defaultTenant.copy,
+      appName: slug,
+      browserTitle: slug,
+    },
+  };
 }

@@ -479,6 +479,7 @@ function TenantMembersDialog({
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [linkDialog, setLinkDialog] = useState<{ email: string; link: string; kind: "invite" | "recovery" } | null>(null);
 
   const load = async () => {
     if (!tenant) return;
@@ -510,22 +511,28 @@ function TenantMembersDialog({
     if (error) return toast.error(error.message);
     const d = data as any;
     if (d?.error) return toast.error(d.error);
-    if (d?.invite_link && !d?.email_sent) {
-      try {
-        await navigator.clipboard.writeText(d.invite_link);
-        toast.success("Usuário criado. Link de convite copiado — envie manualmente.", { duration: 8000 });
-      } catch {
-        toast.success("Usuário criado. Link: " + d.invite_link, { duration: 15000 });
-      }
-    } else if (d?.invited) {
-      toast.success("Convite enviado por e-mail e usuário vinculado");
-    } else {
-      toast.success("Usuário vinculado");
+    toast.success(d?.invited ? "Usuário criado e vinculado" : "Usuário vinculado");
+    if (d?.invite_link) {
+      setLinkDialog({ email: email.trim(), link: d.invite_link, kind: d.link_kind ?? "invite" });
     }
     setEmail("");
     setFullName("");
     setIsDefault(false);
     load();
+  };
+
+  const generateLinkFor = async (memberEmail: string) => {
+    const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
+      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id },
+    });
+    if (error) return toast.error(error.message);
+    const d = data as any;
+    if (d?.error) return toast.error(d.error);
+    if (d?.invite_link) {
+      setLinkDialog({ email: memberEmail, link: d.invite_link, kind: d.link_kind ?? "recovery" });
+    } else {
+      toast.error("Não foi possível gerar o link");
+    }
   };
 
   const removeMember = async (userId: string) => {

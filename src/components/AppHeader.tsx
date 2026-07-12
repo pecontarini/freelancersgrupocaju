@@ -1,7 +1,7 @@
-import { DollarSign, LogOut, User } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
+import { useBrandLogo, BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,19 +12,17 @@ import {
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
-  const { tenant } = useTenant();
+  const { src: brandLogo, alt: brandAlt } = useBrandLogo();
 
   return (
     <header className="glass-header sticky top-0 z-50 border-b-0">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
-            <DollarSign className="h-5 w-5 text-primary" />
-          </div>
+          <img src={brandLogo} alt={brandAlt} className="h-8 w-auto object-contain" />
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">{tenant.copy.appName}</h1>
+            <h1 className="text-lg font-semibold tracking-tight">{BRAND_NAME}</h1>
             <p className="text-xs text-muted-foreground/70">
-              {tenant.copy.tagline ?? "Gestão de Pagamentos"}
+              {BRAND_TAGLINE}
             </p>
           </div>
         </div>

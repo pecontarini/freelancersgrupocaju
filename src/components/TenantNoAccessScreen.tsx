@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 import { AlertCircle, LogOut, ExternalLink } from "lucide-react";
-import { useTenant } from "@/contexts/TenantContext";
+import { useBrandLogo, BRAND_NAME } from "@/lib/brand";
 
 interface Props {
   /** Slugs de tenants aos quais o usuário TEM acesso. */
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export function TenantNoAccessScreen({ availableSlugs, currentHostSlug }: Props) {
-  const { tenant } = useTenant();
+  const { src: brandLogo, alt: brandAlt } = useBrandLogo();
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -23,6 +23,9 @@ export function TenantNoAccessScreen({ availableSlugs, currentHostSlug }: Props)
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
       <Card className="max-w-md w-full p-8 space-y-6">
+        <div className="flex justify-center">
+          <img src={brandLogo} alt={brandAlt} className="h-10 w-auto object-contain" />
+        </div>
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
             <AlertCircle className="h-6 w-6 text-destructive" />
@@ -30,7 +33,7 @@ export function TenantNoAccessScreen({ availableSlugs, currentHostSlug }: Props)
           <div>
             <h1 className="text-xl font-bold">Sem acesso a esta empresa</h1>
             <p className="text-sm text-muted-foreground">
-              Seu usuário não está vinculado a <strong>{tenant.copy.appName}</strong>.
+              Seu usuário não está vinculado a esta empresa em <strong>{BRAND_NAME}</strong>.
             </p>
           </div>
         </div>

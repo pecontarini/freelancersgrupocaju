@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
 
 interface AuroraBackgroundProps {
-  /** When true, paints a deep dark base behind the orbs (used by splash). */
+  /** Quando true, pinta uma base escura atrás dos orbs (usado no splash). */
   dark?: boolean;
   className?: string;
 }
 
 /**
- * Cinematic aurora background — slow-drifting blurred orbs in CajuPAR coral/amber.
- * Inspired by MoneyMQ motion language. Pure CSS, no deps.
+ * Fundo aurora neutro — orbs em tons de branco/cinza que derivam lentamente.
+ * Sem cores de destaque: se alinha à identidade 2Sell (P&B).
  */
 export function AuroraBackground({ dark = false, className }: AuroraBackgroundProps) {
   return (
@@ -24,12 +24,12 @@ export function AuroraBackground({ dark = false, className }: AuroraBackgroundPr
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(ellipse at center, hsl(20 25% 9%) 0%, hsl(20 30% 5%) 70%, hsl(20 35% 3%) 100%)",
+              "radial-gradient(ellipse at center, hsl(0 0% 8%) 0%, hsl(0 0% 4%) 70%, hsl(0 0% 2%) 100%)",
           }}
         />
       )}
 
-      {/* Orb 1 — coral primary */}
+      {/* Orb 1 — branco suave */}
       <div
         className="absolute rounded-full will-change-transform"
         style={{
@@ -38,14 +38,14 @@ export function AuroraBackground({ dark = false, className }: AuroraBackgroundPr
           top: "-20%",
           left: "-15%",
           background:
-            "radial-gradient(circle, hsl(14 75% 50% / 0.55) 0%, transparent 65%)",
+            "radial-gradient(circle, hsl(0 0% 100% / 0.14) 0%, transparent 65%)",
           filter: "blur(120px)",
           animation: "aurora-drift-1 22s ease-in-out infinite alternate",
           opacity: dark ? 0.9 : 0.35,
         }}
       />
 
-      {/* Orb 2 — warm amber */}
+      {/* Orb 2 — cinza claro */}
       <div
         className="absolute rounded-full will-change-transform"
         style={{
@@ -54,14 +54,14 @@ export function AuroraBackground({ dark = false, className }: AuroraBackgroundPr
           top: "10%",
           right: "-15%",
           background:
-            "radial-gradient(circle, hsl(28 85% 55% / 0.45) 0%, transparent 65%)",
+            "radial-gradient(circle, hsl(0 0% 100% / 0.10) 0%, transparent 65%)",
           filter: "blur(110px)",
           animation: "aurora-drift-2 26s ease-in-out infinite alternate",
           opacity: dark ? 0.85 : 0.3,
         }}
       />
 
-      {/* Orb 3 — deep terracotta */}
+      {/* Orb 3 — grafite */}
       <div
         className="absolute rounded-full will-change-transform"
         style={{
@@ -70,14 +70,14 @@ export function AuroraBackground({ dark = false, className }: AuroraBackgroundPr
           bottom: "-20%",
           left: "20%",
           background:
-            "radial-gradient(circle, hsl(8 70% 42% / 0.5) 0%, transparent 65%)",
+            "radial-gradient(circle, hsl(0 0% 100% / 0.08) 0%, transparent 65%)",
           filter: "blur(130px)",
           animation: "aurora-drift-3 28s ease-in-out infinite alternate",
           opacity: dark ? 0.85 : 0.28,
         }}
       />
 
-      {/* Orb 4 — subtle highlight */}
+      {/* Orb 4 — highlight sutil */}
       <div
         className="absolute rounded-full will-change-transform"
         style={{
@@ -86,14 +86,14 @@ export function AuroraBackground({ dark = false, className }: AuroraBackgroundPr
           bottom: "10%",
           right: "10%",
           background:
-            "radial-gradient(circle, hsl(40 90% 65% / 0.35) 0%, transparent 65%)",
+            "radial-gradient(circle, hsl(0 0% 100% / 0.12) 0%, transparent 65%)",
           filter: "blur(90px)",
           animation: "aurora-drift-4 20s ease-in-out infinite alternate",
           opacity: dark ? 0.7 : 0.22,
         }}
       />
 
-      {/* Subtle grain */}
+      {/* Grão sutil */}
       <div
         className="absolute inset-0 opacity-[0.04] mix-blend-overlay"
         style={{

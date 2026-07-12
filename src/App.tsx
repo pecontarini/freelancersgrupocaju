@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { TenantProvider } from "@/contexts/TenantContext";
 import { UnidadeProvider } from "@/contexts/UnidadeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -37,8 +38,9 @@ function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <BrowserRouter>
           <AuthProvider>
-            <UnidadeProvider>
-              <TooltipProvider>
+            <TenantProvider>
+              <UnidadeProvider>
+                <TooltipProvider>
                 <CJAppBackground />
                 <Toaster />
                 <Sonner />
@@ -82,8 +84,9 @@ function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
               </PageTransition>
-              </TooltipProvider>
-            </UnidadeProvider>
+                </TooltipProvider>
+              </UnidadeProvider>
+            </TenantProvider>
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

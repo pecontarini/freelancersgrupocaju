@@ -1,51 +1,102 @@
-## Mudanças propostas
+# Plano: White-label Multi-tenant (Fase Estrutural)
 
-### 1. CSV de pagamento — Data de Vencimento = data de geração
+## Objetivo
+Transformar o app atual (hoje amarrado ao Grupo Caju) numa base **multi-marca**, onde cada empresa (tenant) tem seu próprio logo, cores, nome e termos de negócio, com **dados 100% isolados**. Esta fase prepara o terreno: extrai todo o branding para uma camada de tema e cria a estrutura de tenant no banco — sem ainda migrar as unidades existentes nem exigir uma segunda empresa cadastrada.
 
-**Arquivo:** `src/lib/paymentCsv.ts`
-
-Hoje, em `buildPaymentCsv`, os três campos de data (`Data Documento`, `Data Vencimento`, `Data Competência`) recebem o mesmo valor: `ymdToBr(startDate)` (data inicial do período do filtro).
-
-Mudança:
-- Adicionar uma constante `dataHoje` calculada no momento da geração:
-  ```ts
-  const today = new Date();
-  const dataHoje = `${String(today.getDate()).padStart(2,"0")}/${String(today.getMonth()+1).padStart(2,"0")}/${today.getFullYear()}`;
-  ```
-- Substituir apenas o campo **Data Vencimento** por `dataHoje`.
-- **Data Documento** e **Data Competência** continuam usando `dataDoc` (data inicial do período), pois representam a competência do serviço, não o vencimento.
-
-Resultado: toda vez que o CSV for gerado, o vencimento sairá com a data do dia da geração — independente do período filtrado.
+O Grupo Caju continua funcionando exatamente como hoje durante toda a fase.
 
 ---
 
-### 2. Filtro de Cargo (Funções) — habilitar scroll completo
+## O que muda na prática
 
-**Arquivo:** `src/components/ui/multi-select.tsx`
+### 1. Camada de tema por tenant (frontend)
+Um único arquivo por empresa define tudo que é "cara" da marca:
 
-Hoje o popover usa:
-```tsx
-<ScrollArea className="max-h-[300px]">
+```text
+src/tenants/
+  caju/
+    theme.ts        → cores (tokens HSL), nome, logo, favicon
+    copy.ts         → textos: "loja" vs "unidade" vs "filial", nomes de setores, etc.
+    logo.svg        → asset da marca
+  _default/         → fallback
 ```
 
-O Radix `ScrollArea` precisa de altura definida no Viewport para a barra de rolagem renderizar corretamente. Com `max-h` apenas, em muitas situações o conteúdo cresce além de 300px sem ativar scroll, ou a barra fica oculta e o usuário não consegue ver/scrollar todas as opções de cargo (quando a lista tem >10 itens).
+- Cores viram tokens CSS aplicados via `:root[data-tenant="caju"] { --primary: ... }` no `index.css`, respeitando o design system existente (não hardcoda cor em componente).
+- Nome do app, título da aba, favicon e logo passam a ler de `useTenant()`.
+- Textos de negócio (ex.: "Unidade" no header, rótulos de setores) passam por um helper `t("unidade")` que resolve pelo `copy.ts` do tenant ativo.
 
-Mudança:
-- Trocar `<ScrollArea className="max-h-[300px]">` por um wrapper com altura explícita quando há overflow, ex.:
-  ```tsx
-  <ScrollArea className="h-[280px]">
-  ```
-  ou condicionar: `className={cn(options.length > 8 ? "h-[280px]" : "max-h-[300px]")}`.
-- Garantir que o `PopoverContent` não corte a barra (já tem `p-0`, ok).
-- Não mexer no estilo do trigger nem no comportamento de seleção/multi-select.
+### 2. Resolução do tenant ativo
+Como você quer isolamento total, o caminho recomendado é **um domínio por marca**:
+- `caju.seudominio.com` → tenant `caju`
+- `empresa2.seudominio.com` → tenant `empresa2`
 
-Resultado: o dropdown de Funções (cargo) passa a rolar e exibir todas as opções, mesmo com listas longas.
+O tenant é resolvido no boot da app pelo subdomínio (com fallback via `VITE_TENANT` para dev). Login e dados ficam automaticamente escopados.
+
+### 3. Isolamento de dados no banco
+Adiciona `tenant_id` como coluna em todas as tabelas de negócio e uma tabela `tenants`:
+
+```text
+tenants (id, slug, nome, ativo)
+user_tenants (user_id, tenant_id, role)   ← quem pertence a qual empresa
+```
+
+- Cria função `current_tenant_id()` (SECURITY DEFINER) que retorna o tenant do usuário logado.
+- **RLS reescrita**: toda policy passa a exigir `tenant_id = current_tenant_id()` **além** das regras atuais por unidade/role.
+- Migração inicial cria o tenant `caju` e faz backfill: todos os registros existentes recebem `tenant_id = <caju>`. Zero perda de dado, zero mudança visível para os usuários atuais.
+- Trigger de `BEFORE INSERT` preenche `tenant_id` automaticamente a partir do usuário, para não quebrar formulários existentes.
+
+### 4. Admin global (você)
+Uma role `super_admin` numa tabela separada permite que você veja/administre todos os tenants. Um seletor de tenant aparece **só** para essa role no header. Operadores normais nunca veem outro tenant.
+
+### 5. O que **não** muda nesta fase
+- Nenhuma tela é redesenhada.
+- Nenhum fluxo de negócio muda.
+- `useUnidade()`, RLS por unidade, permissões atuais — tudo continua funcionando por cima da nova camada de tenant.
+- Nenhum dado é movido de projeto: continua tudo neste mesmo backend.
 
 ---
 
-### 3. Validação
+## Etapas de entrega
 
-- Gerar um CSV manualmente em qualquer período e abrir no Excel: confirmar que a coluna `Data Vencimento` mostra a data de hoje e as colunas `Data Documento`/`Data Competência` mostram a data inicial do filtro.
-- Abrir o filtro de Funções com a lista cheia (>10 cargos) e validar que a rolagem funciona até o último item.
+**Etapa 1 · Fundação (esta primeira leva de trabalho)**
+1. Criar `tenants`, `user_tenants`, função `current_tenant_id()`, role `super_admin`.
+2. Migração: adicionar `tenant_id` em todas as tabelas de negócio, popular com o tenant `caju`, criar índice `(tenant_id, ...)` onde já existe índice principal.
+3. Atualizar RLS de todas as tabelas para incluir a checagem de tenant.
+4. Trigger de auto-preenchimento de `tenant_id` em INSERT.
 
-Sem alterações em SQL, hooks, ou outros componentes.
+**Etapa 2 · Camada de tema no frontend**
+5. Criar `src/tenants/` com `caju/` como tenant de referência, extrair logo, nome, cores e termos que hoje estão hardcoded (ex.: "CajuPAR", "Caju Limão", "Portal da Liderança") para `theme.ts` / `copy.ts`.
+6. Criar `TenantProvider` + `useTenant()` + helper `t()` para textos.
+7. Aplicar tokens CSS do tenant no `<html data-tenant="...">` e trocar referências diretas a logos/nomes pelos hooks.
+
+**Etapa 3 · Resolução por subdomínio + admin global**
+8. Resolver tenant por subdomínio (com fallback `VITE_TENANT` em dev).
+9. Adicionar seletor de tenant no header apenas para `super_admin`.
+10. Criar tenant `_default` (esqueleto) para servir de template ao cadastrar novas empresas.
+
+**Etapa 4 · Onboarding de nova empresa (quando quiser)**
+Cadastrar uma nova empresa vira: (a) linha em `tenants`, (b) pasta `src/tenants/<slug>/` com logo/cores/textos, (c) apontar o subdomínio. Sem tocar em código de negócio.
+
+---
+
+## Detalhes técnicos (para referência)
+
+- **Tokens de cor**: mantêm o formato HSL do `index.css` atual; cada tenant sobrescreve `--primary`, `--accent`, `--cj-accent`, etc. dentro de um seletor `[data-tenant="..."]`. Nada de `text-white`/`bg-[#...]` — segue a regra do design system.
+- **RLS**: policies existentes ganham um `AND tenant_id = public.current_tenant_id()`. Onde há função `SECURITY DEFINER` (ex.: `has_role`), incluir `tenant_id` no filtro.
+- **Backfill**: transação única, `UPDATE ... SET tenant_id = '<caju-uuid>' WHERE tenant_id IS NULL`, seguido de `ALTER COLUMN tenant_id SET NOT NULL`.
+- **Edge functions**: as que usam `service_role` precisam receber `tenant_id` explicitamente (via JWT do chamador ou parâmetro) e filtrar por ele. Auditar uma a uma na Etapa 1.
+- **Storage**: buckets viram `tenant-scoped` por prefixo de path (`{tenant_slug}/...`) e as policies do bucket passam a checar o prefixo.
+- **Assets/logos**: logos por tenant vão para Lovable Assets (CDN), referenciados via `.asset.json`.
+
+---
+
+## Riscos e mitigações
+
+- **RLS mal migrada trava o app**: cada tabela é migrada + testada em staging/preview antes de aplicar. Rollback pronto.
+- **Edge functions que ignoram tenant**: auditoria completa na Etapa 1 antes de habilitar segundo tenant.
+- **Custo de manter dois tenants no mesmo banco**: baixo agora; se um cliente exigir banco separado no futuro, a arquitetura permite "promover" um tenant para outro projeto Lovable copiando o código como está.
+
+---
+
+## Confirmação antes de começar
+Se aprovar, começo pela **Etapa 1 (fundação no banco)**: criar `tenants`, `user_tenants`, `current_tenant_id()`, adicionar `tenant_id` em todas as tabelas com backfill para `caju` e reescrever as RLS. Nada visível muda nesta etapa — é a base para tudo o resto.

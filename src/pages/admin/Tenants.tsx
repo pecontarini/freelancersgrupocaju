@@ -505,7 +505,6 @@ function TenantMembersDialog({
         tenant_id: tenant.id,
         is_default: isDefault,
         full_name: fullName.trim() || undefined,
-        redirect_to: `${window.location.origin}/reset-password`,
       },
     });
     setInviting(false);
@@ -524,7 +523,7 @@ function TenantMembersDialog({
 
   const generateLinkFor = async (memberEmail: string) => {
     const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
-      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id, redirect_to: `${window.location.origin}/reset-password` },
+      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id },
     });
     if (error) return toast.error(error.message);
     const d = data as any;

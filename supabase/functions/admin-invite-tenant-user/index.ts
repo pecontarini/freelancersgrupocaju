@@ -74,8 +74,8 @@ Deno.serve(async (req) => {
     let linkKind: "invite" | "recovery" | null = null;
     let emailSent = false;
 
-    const origin = req.headers.get("origin") ?? "";
-    const redirectTo = redirectToBody || (origin ? `${origin}/reset-password` : undefined);
+    // Se redirect_to não vier no body, deixamos undefined para o Supabase usar o Site URL padrão do projeto (allow-list já aceita).
+    const redirectTo = redirectToBody || undefined;
 
     if (!targetUserId) {
       if (linkOnly) return json({ error: "usuário não encontrado" }, 404);

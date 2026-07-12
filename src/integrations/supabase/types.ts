@@ -293,133 +293,6 @@ export type Database = {
         }
         Relationships: []
       }
-      action_plan_comments: {
-        Row: {
-          action_plan_id: string
-          created_at: string
-          id: string
-          message: string
-          tenant_id: string
-          user_id: string
-        }
-        Insert: {
-          action_plan_id: string
-          created_at?: string
-          id?: string
-          message: string
-          tenant_id?: string
-          user_id: string
-        }
-        Update: {
-          action_plan_id?: string
-          created_at?: string
-          id?: string
-          message?: string
-          tenant_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "action_plan_comments_action_plan_id_fkey"
-            columns: ["action_plan_id"]
-            isOneToOne: false
-            referencedRelation: "action_plans"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "action_plan_comments_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      action_plans: {
-        Row: {
-          acao_preventiva: string | null
-          causa_raiz: string | null
-          created_at: string
-          created_by: string | null
-          deadline_at: string
-          evidencia_url: string | null
-          id: string
-          loja_id: string
-          medida_tomada: string | null
-          pain_tag: string
-          referencia_mes: string
-          resolved_at: string | null
-          resolved_by: string | null
-          status: Database["public"]["Enums"]["action_plan_status"]
-          tenant_id: string
-          updated_at: string
-          validated_at: string | null
-          validated_by: string | null
-        }
-        Insert: {
-          acao_preventiva?: string | null
-          causa_raiz?: string | null
-          created_at?: string
-          created_by?: string | null
-          deadline_at?: string
-          evidencia_url?: string | null
-          id?: string
-          loja_id: string
-          medida_tomada?: string | null
-          pain_tag: string
-          referencia_mes: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: Database["public"]["Enums"]["action_plan_status"]
-          tenant_id?: string
-          updated_at?: string
-          validated_at?: string | null
-          validated_by?: string | null
-        }
-        Update: {
-          acao_preventiva?: string | null
-          causa_raiz?: string | null
-          created_at?: string
-          created_by?: string | null
-          deadline_at?: string
-          evidencia_url?: string | null
-          id?: string
-          loja_id?: string
-          medida_tomada?: string | null
-          pain_tag?: string
-          referencia_mes?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: Database["public"]["Enums"]["action_plan_status"]
-          tenant_id?: string
-          updated_at?: string
-          validated_at?: string | null
-          validated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "action_plans_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "action_plans_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "action_plans_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       agenda_eventos: {
         Row: {
           categoria: string
@@ -529,382 +402,6 @@ export type Database = {
           },
         ]
       }
-      audit_alerts: {
-        Row: {
-          alert_type: string
-          created_at: string
-          description: string
-          id: string
-          is_read: boolean
-          loja_id: string
-          reference_id: string | null
-          severity: string
-          tenant_id: string
-          title: string
-        }
-        Insert: {
-          alert_type: string
-          created_at?: string
-          description: string
-          id?: string
-          is_read?: boolean
-          loja_id: string
-          reference_id?: string | null
-          severity: string
-          tenant_id?: string
-          title: string
-        }
-        Update: {
-          alert_type?: string
-          created_at?: string
-          description?: string
-          id?: string
-          is_read?: boolean
-          loja_id?: string
-          reference_id?: string | null
-          severity?: string
-          tenant_id?: string
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_alerts_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_alerts_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "audit_alerts_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      audit_sector_scores: {
-        Row: {
-          audit_date: string
-          audit_id: string
-          checklist_type: string
-          created_at: string
-          earned_points: number | null
-          id: string
-          item_count: number | null
-          loja_id: string
-          month_year: string
-          score: number
-          sector_code: string
-          tenant_id: string
-          total_points: number | null
-          updated_at: string
-        }
-        Insert: {
-          audit_date: string
-          audit_id: string
-          checklist_type: string
-          created_at?: string
-          earned_points?: number | null
-          id?: string
-          item_count?: number | null
-          loja_id: string
-          month_year: string
-          score?: number
-          sector_code: string
-          tenant_id?: string
-          total_points?: number | null
-          updated_at?: string
-        }
-        Update: {
-          audit_date?: string
-          audit_id?: string
-          checklist_type?: string
-          created_at?: string
-          earned_points?: number | null
-          id?: string
-          item_count?: number | null
-          loja_id?: string
-          month_year?: string
-          score?: number
-          sector_code?: string
-          tenant_id?: string
-          total_points?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_sector_scores_audit_id_fkey"
-            columns: ["audit_id"]
-            isOneToOne: false
-            referencedRelation: "supervision_audits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_sector_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_sector_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "audit_sector_scores_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      audit_upload_logs: {
-        Row: {
-          audit_id: string | null
-          created_at: string
-          failure_count: number | null
-          global_score: number | null
-          id: string
-          loja_id: string
-          tenant_id: string
-          uploaded_by: string
-          uploader_name: string | null
-          uploader_role: string | null
-          viewed_by_admin: boolean | null
-        }
-        Insert: {
-          audit_id?: string | null
-          created_at?: string
-          failure_count?: number | null
-          global_score?: number | null
-          id?: string
-          loja_id: string
-          tenant_id?: string
-          uploaded_by: string
-          uploader_name?: string | null
-          uploader_role?: string | null
-          viewed_by_admin?: boolean | null
-        }
-        Update: {
-          audit_id?: string | null
-          created_at?: string
-          failure_count?: number | null
-          global_score?: number | null
-          id?: string
-          loja_id?: string
-          tenant_id?: string
-          uploaded_by?: string
-          uploader_name?: string | null
-          uploader_role?: string | null
-          viewed_by_admin?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_upload_logs_audit_id_fkey"
-            columns: ["audit_id"]
-            isOneToOne: false
-            referencedRelation: "supervision_audits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_upload_logs_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "audit_upload_logs_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "audit_upload_logs_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      avaliacoes: {
-        Row: {
-          cargo_id: string
-          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
-          created_at: string
-          fonte: Database["public"]["Enums"]["origem_dado"]
-          id: string
-          loja_id: string
-          metadata: Json | null
-          referencia_mes: string
-          score_percentual: number
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          cargo_id: string
-          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
-          created_at?: string
-          fonte?: Database["public"]["Enums"]["origem_dado"]
-          id?: string
-          loja_id: string
-          metadata?: Json | null
-          referencia_mes: string
-          score_percentual?: number
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          cargo_id?: string
-          codigo_meta?: Database["public"]["Enums"]["codigo_meta"]
-          created_at?: string
-          fonte?: Database["public"]["Enums"]["origem_dado"]
-          id?: string
-          loja_id?: string
-          metadata?: Json | null
-          referencia_mes?: string
-          score_percentual?: number
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "avaliacoes_cargo_id_fkey"
-            columns: ["cargo_id"]
-            isOneToOne: false
-            referencedRelation: "cargos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "avaliacoes_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "avaliacoes_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "avaliacoes_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bonus_config: {
-        Row: {
-          base_bonus_value: number
-          created_at: string
-          id: string
-          loja_id: string | null
-          month_year: string
-          position_type: Database["public"]["Enums"]["position_type"]
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          base_bonus_value?: number
-          created_at?: string
-          id?: string
-          loja_id?: string | null
-          month_year: string
-          position_type: Database["public"]["Enums"]["position_type"]
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          base_bonus_value?: number
-          created_at?: string
-          id?: string
-          loja_id?: string | null
-          month_year?: string
-          position_type?: Database["public"]["Enums"]["position_type"]
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bonus_config_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bonus_config_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "bonus_config_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      bonus_rules: {
-        Row: {
-          created_at: string
-          id: string
-          percentage: number
-          position_type: Database["public"]["Enums"]["position_type"]
-          tenant_id: string
-          tier: Database["public"]["Enums"]["bonus_tier"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          percentage?: number
-          position_type: Database["public"]["Enums"]["position_type"]
-          tenant_id?: string
-          tier: Database["public"]["Enums"]["bonus_tier"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          percentage?: number
-          position_type?: Database["public"]["Enums"]["position_type"]
-          tenant_id?: string
-          tier?: Database["public"]["Enums"]["bonus_tier"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bonus_rules_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       bulk_import_logs: {
         Row: {
           arquivo_nome: string | null
@@ -965,13 +462,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bulk_import_logs_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1064,13 +554,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cargo_aliases_pendentes_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -1167,13 +650,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "checkin_approvals_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "checkin_approvals_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1263,13 +739,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "checkin_budget_entries_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "checkin_budget_entries_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1321,89 +790,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "checkin_stations_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "checkin_stations_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      checklist_corrections: {
-        Row: {
-          corrected_at: string
-          corrected_by_name: string
-          correction_note: string | null
-          correction_photo_url: string
-          created_at: string
-          id: string
-          loja_id: string
-          response_id: string
-          response_item_id: string
-          tenant_id: string
-        }
-        Insert: {
-          corrected_at?: string
-          corrected_by_name: string
-          correction_note?: string | null
-          correction_photo_url: string
-          created_at?: string
-          id?: string
-          loja_id: string
-          response_id: string
-          response_item_id: string
-          tenant_id?: string
-        }
-        Update: {
-          corrected_at?: string
-          corrected_by_name?: string
-          correction_note?: string | null
-          correction_photo_url?: string
-          created_at?: string
-          id?: string
-          loja_id?: string
-          response_id?: string
-          response_item_id?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "checklist_corrections_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_corrections_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "checklist_corrections_response_id_fkey"
-            columns: ["response_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_responses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_corrections_response_item_id_fkey"
-            columns: ["response_item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_response_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_corrections_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1528,13 +915,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "checklist_responses_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "checklist_responses_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -1588,13 +968,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "checklist_sector_links_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "checklist_sector_links_template_id_fkey"
@@ -1719,13 +1092,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "checklist_templates_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "checklist_templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1845,13 +1211,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cmv_contagens_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "cmv_contagens_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1937,13 +1296,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cmv_inventory_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "cmv_inventory_tenant_id_fkey"
@@ -2057,13 +1409,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cmv_movements_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "cmv_movements_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2164,13 +1509,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cmv_pending_sales_items_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "cmv_pending_sales_items_tenant_id_fkey"
@@ -2591,13 +1929,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "daily_budgets_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       daily_sales: {
@@ -2648,13 +1979,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "daily_sales_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2728,13 +2052,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "daily_stock_positions_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -2939,13 +2256,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "employees_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       escala_aprovacao_links: {
@@ -3054,13 +2364,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "escala_minima_unidade_id_fkey"
-            columns: ["unidade_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       escala_template: {
@@ -3123,13 +2426,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "escala_template_unidade_id_fkey"
-            columns: ["unidade_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3236,13 +2532,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "extras_checkins_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "extras_checkins_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3255,13 +2544,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "extras_checkins_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3373,13 +2655,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "freelancer_checkins_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "freelancer_checkins_schedule_id_fkey"
             columns: ["schedule_id"]
             isOneToOne: false
@@ -3461,13 +2736,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "freelancer_entries_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "freelancer_entries_schedule_id_fkey"
@@ -3659,13 +2927,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "holding_freelancer_forecast_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       holding_freelancer_rates: {
@@ -3725,13 +2986,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "holding_freelancer_rates_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3804,13 +3058,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "holding_staffing_config_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -3945,53 +3192,6 @@ export type Database = {
           },
         ]
       }
-      indicadores_snapshots: {
-        Row: {
-          arquivo_nome: string | null
-          created_at: string
-          dados: Json
-          id: string
-          linhas_importadas: number | null
-          meta_key: string
-          referencia_label: string
-          referencia_mes: string
-          tenant_id: string
-          uploaded_by: string | null
-        }
-        Insert: {
-          arquivo_nome?: string | null
-          created_at?: string
-          dados: Json
-          id?: string
-          linhas_importadas?: number | null
-          meta_key: string
-          referencia_label: string
-          referencia_mes: string
-          tenant_id?: string
-          uploaded_by?: string | null
-        }
-        Update: {
-          arquivo_nome?: string | null
-          created_at?: string
-          dados?: Json
-          id?: string
-          linhas_importadas?: number | null
-          meta_key?: string
-          referencia_label?: string
-          referencia_mes?: string
-          tenant_id?: string
-          uploaded_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "indicadores_snapshots_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       inventario_items: {
         Row: {
           created_at: string
@@ -4099,13 +3299,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "inventarios_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "inventarios_setor_id_fkey"
             columns: ["setor_id"]
             isOneToOne: false
@@ -4182,13 +3375,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "inventory_transactions_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -4300,245 +3486,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "job_titles_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      leadership_calculation_log: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          error_message: string | null
-          id: string
-          loja_id: string | null
-          month_year: string | null
-          positions_updated: number | null
-          started_at: string
-          status: string
-          stores_updated: number | null
-          tenant_id: string
-          trigger_audit_id: string | null
-          trigger_type: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          loja_id?: string | null
-          month_year?: string | null
-          positions_updated?: number | null
-          started_at?: string
-          status?: string
-          stores_updated?: number | null
-          tenant_id?: string
-          trigger_audit_id?: string | null
-          trigger_type: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          loja_id?: string | null
-          month_year?: string | null
-          positions_updated?: number | null
-          started_at?: string
-          status?: string
-          stores_updated?: number | null
-          tenant_id?: string
-          trigger_audit_id?: string | null
-          trigger_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "leadership_calculation_log_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leadership_calculation_log_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "leadership_calculation_log_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leadership_calculation_log_trigger_audit_id_fkey"
-            columns: ["trigger_audit_id"]
-            isOneToOne: false
-            referencedRelation: "supervision_audits"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      leadership_performance_scores: {
-        Row: {
-          breakdown: Json | null
-          calculated_at: string
-          created_at: string
-          final_score: number | null
-          id: string
-          loja_id: string
-          month_year: string
-          needs_review: boolean | null
-          position_code: string
-          review_reasons: Json | null
-          tenant_id: string
-          tier: string | null
-          total_audits: number | null
-          updated_at: string
-        }
-        Insert: {
-          breakdown?: Json | null
-          calculated_at?: string
-          created_at?: string
-          final_score?: number | null
-          id?: string
-          loja_id: string
-          month_year: string
-          needs_review?: boolean | null
-          position_code: string
-          review_reasons?: Json | null
-          tenant_id?: string
-          tier?: string | null
-          total_audits?: number | null
-          updated_at?: string
-        }
-        Update: {
-          breakdown?: Json | null
-          calculated_at?: string
-          created_at?: string
-          final_score?: number | null
-          id?: string
-          loja_id?: string
-          month_year?: string
-          needs_review?: boolean | null
-          position_code?: string
-          review_reasons?: Json | null
-          tenant_id?: string
-          tier?: string | null
-          total_audits?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "leadership_performance_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leadership_performance_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "leadership_performance_scores_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      leadership_store_scores: {
-        Row: {
-          back_failures: number | null
-          back_score: number | null
-          back_tier: string | null
-          calculated_at: string
-          created_at: string
-          front_failures: number | null
-          front_score: number | null
-          front_tier: string | null
-          general_score: number | null
-          general_tier: string | null
-          id: string
-          loja_id: string
-          month_year: string
-          tenant_id: string
-          total_audits: number | null
-          total_failures: number | null
-          updated_at: string
-        }
-        Insert: {
-          back_failures?: number | null
-          back_score?: number | null
-          back_tier?: string | null
-          calculated_at?: string
-          created_at?: string
-          front_failures?: number | null
-          front_score?: number | null
-          front_tier?: string | null
-          general_score?: number | null
-          general_tier?: string | null
-          id?: string
-          loja_id: string
-          month_year: string
-          tenant_id?: string
-          total_audits?: number | null
-          total_failures?: number | null
-          updated_at?: string
-        }
-        Update: {
-          back_failures?: number | null
-          back_score?: number | null
-          back_tier?: string | null
-          calculated_at?: string
-          created_at?: string
-          front_failures?: number | null
-          front_score?: number | null
-          front_tier?: string | null
-          general_score?: number | null
-          general_tier?: string | null
-          id?: string
-          loja_id?: string
-          month_year?: string
-          tenant_id?: string
-          total_audits?: number | null
-          total_failures?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "leadership_store_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leadership_store_scores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "leadership_store_scores_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
         ]
       }
       maintenance_budgets: {
@@ -4573,13 +3520,6 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "maintenance_budgets_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: true
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "maintenance_budgets_tenant_id_fkey"
@@ -4651,156 +3591,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "maintenance_entries_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "maintenance_entries_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      metas_cargo: {
-        Row: {
-          ativo: boolean
-          cargo_id: string
-          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
-          created_at: string
-          id: string
-          origem_dado: Database["public"]["Enums"]["origem_dado"]
-          peso: number
-          tenant_id: string
-          teto_valor: number
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean
-          cargo_id: string
-          codigo_meta: Database["public"]["Enums"]["codigo_meta"]
-          created_at?: string
-          id?: string
-          origem_dado?: Database["public"]["Enums"]["origem_dado"]
-          peso?: number
-          tenant_id?: string
-          teto_valor?: number
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean
-          cargo_id?: string
-          codigo_meta?: Database["public"]["Enums"]["codigo_meta"]
-          created_at?: string
-          id?: string
-          origem_dado?: Database["public"]["Enums"]["origem_dado"]
-          peso?: number
-          tenant_id?: string
-          teto_valor?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "metas_cargo_cargo_id_fkey"
-            columns: ["cargo_id"]
-            isOneToOne: false
-            referencedRelation: "cargos"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "metas_cargo_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      metas_snapshot: {
-        Row: {
-          cmv_carnes: number | null
-          cmv_carnes_anterior: number | null
-          cmv_salmao: number | null
-          cmv_salmao_anterior: number | null
-          conformidade: number | null
-          conformidade_anterior: number | null
-          created_at: string
-          id: string
-          kds: number | null
-          kds_anterior: number | null
-          loja_codigo: string
-          loja_id: string | null
-          mes_ref: string
-          nps: number | null
-          nps_anterior: number | null
-          observacoes: string | null
-          red_flag: boolean
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          cmv_carnes?: number | null
-          cmv_carnes_anterior?: number | null
-          cmv_salmao?: number | null
-          cmv_salmao_anterior?: number | null
-          conformidade?: number | null
-          conformidade_anterior?: number | null
-          created_at?: string
-          id?: string
-          kds?: number | null
-          kds_anterior?: number | null
-          loja_codigo: string
-          loja_id?: string | null
-          mes_ref: string
-          nps?: number | null
-          nps_anterior?: number | null
-          observacoes?: string | null
-          red_flag?: boolean
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          cmv_carnes?: number | null
-          cmv_carnes_anterior?: number | null
-          cmv_salmao?: number | null
-          cmv_salmao_anterior?: number | null
-          conformidade?: number | null
-          conformidade_anterior?: number | null
-          created_at?: string
-          id?: string
-          kds?: number | null
-          kds_anterior?: number | null
-          loja_codigo?: string
-          loja_id?: string | null
-          mes_ref?: string
-          nps?: number | null
-          nps_anterior?: number | null
-          observacoes?: string | null
-          red_flag?: boolean
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "metas_snapshot_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "metas_snapshot_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "metas_snapshot_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5099,13 +3890,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "missoes_unidade_id_fkey"
-            columns: ["unidade_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       movimentacoes_estoque: {
@@ -5155,13 +3939,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "movimentacoes_estoque_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "movimentacoes_estoque_setor_destino_id_fkey"
@@ -5239,13 +4016,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "n8n_webhook_endpoints_loja_id_default_fkey"
-            columns: ["loja_id_default"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "n8n_webhook_endpoints_tenant_id_fkey"
@@ -5374,44 +4144,6 @@ export type Database = {
           },
         ]
       }
-      nps_targets: {
-        Row: {
-          created_at: string
-          id: string
-          min_efficiency: number
-          sector_type: Database["public"]["Enums"]["sector_type"]
-          tenant_id: string
-          tier: Database["public"]["Enums"]["bonus_tier"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          min_efficiency: number
-          sector_type: Database["public"]["Enums"]["sector_type"]
-          tenant_id?: string
-          tier: Database["public"]["Enums"]["bonus_tier"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          min_efficiency?: number
-          sector_type?: Database["public"]["Enums"]["sector_type"]
-          tenant_id?: string
-          tier?: Database["public"]["Enums"]["bonus_tier"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "nps_targets_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       operational_expenses: {
         Row: {
           category: string
@@ -5455,284 +4187,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "operational_expenses_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "operational_expenses_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_indicator_sources: {
-        Row: {
-          brand_filter: string | null
-          cargo: string | null
-          created_at: string
-          id: number
-          indicador: string
-          is_active: boolean
-          notes: string | null
-          parser_fn: string
-          source_meta_key: string
-          tenant_id: string
-        }
-        Insert: {
-          brand_filter?: string | null
-          cargo?: string | null
-          created_at?: string
-          id?: number
-          indicador: string
-          is_active?: boolean
-          notes?: string | null
-          parser_fn: string
-          source_meta_key: string
-          tenant_id?: string
-        }
-        Update: {
-          brand_filter?: string | null
-          cargo?: string | null
-          created_at?: string
-          id?: number
-          indicador?: string
-          is_active?: boolean
-          notes?: string | null
-          parser_fn?: string
-          source_meta_key?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_indicator_sources_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_orphan_records: {
-        Row: {
-          detected_at: string
-          id: number
-          raw_loja_identifier: string
-          raw_payload: Json | null
-          resolution_notes: string | null
-          resolved: boolean
-          resolved_at: string | null
-          resolved_by: string | null
-          source_meta_key: string
-          tenant_id: string
-        }
-        Insert: {
-          detected_at?: string
-          id?: number
-          raw_loja_identifier: string
-          raw_payload?: Json | null
-          resolution_notes?: string | null
-          resolved?: boolean
-          resolved_at?: string | null
-          resolved_by?: string | null
-          source_meta_key: string
-          tenant_id?: string
-        }
-        Update: {
-          detected_at?: string
-          id?: number
-          raw_loja_identifier?: string
-          raw_payload?: Json | null
-          resolution_notes?: string | null
-          resolved?: boolean
-          resolved_at?: string | null
-          resolved_by?: string | null
-          source_meta_key?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_orphan_records_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_results_monthly: {
-        Row: {
-          breakpoint_atingido: number | null
-          breakpoint_descricao: string | null
-          cargo: string
-          computed_at: string
-          computed_by: string
-          id: number
-          indicador: string
-          loja_id: string
-          mes_ref: string
-          override_reason: string | null
-          override_user_id: string | null
-          payout_brl: number
-          resultado_valor: number | null
-          run_id: string | null
-          source_meta_key: string | null
-          source_origin: string
-          tenant_id: string
-        }
-        Insert: {
-          breakpoint_atingido?: number | null
-          breakpoint_descricao?: string | null
-          cargo: string
-          computed_at?: string
-          computed_by?: string
-          id?: number
-          indicador: string
-          loja_id: string
-          mes_ref: string
-          override_reason?: string | null
-          override_user_id?: string | null
-          payout_brl?: number
-          resultado_valor?: number | null
-          run_id?: string | null
-          source_meta_key?: string | null
-          source_origin: string
-          tenant_id?: string
-        }
-        Update: {
-          breakpoint_atingido?: number | null
-          breakpoint_descricao?: string | null
-          cargo?: string
-          computed_at?: string
-          computed_by?: string
-          id?: number
-          indicador?: string
-          loja_id?: string
-          mes_ref?: string
-          override_reason?: string | null
-          override_user_id?: string | null
-          payout_brl?: number
-          resultado_valor?: number | null
-          run_id?: string | null
-          source_meta_key?: string | null
-          source_origin?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_results_monthly_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payout_results_monthly_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "payout_results_monthly_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_role_target: {
-        Row: {
-          cargo: string
-          id: number
-          remuneracao_total_brl: number
-          source: string | null
-          tenant_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          cargo: string
-          id?: number
-          remuneracao_total_brl: number
-          source?: string | null
-          tenant_id?: string
-          updated_at?: string | null
-        }
-        Update: {
-          cargo?: string
-          id?: number
-          remuneracao_total_brl?: number
-          source?: string | null
-          tenant_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_role_target_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payout_rules: {
-        Row: {
-          breakpoint: number
-          cargo: string
-          created_at: string
-          descricao: string
-          direcao: string
-          id: number
-          indicador: string
-          is_active: boolean
-          payout_brl: number
-          source: string
-          tenant_id: string
-          updated_at: string
-          valid_from: string
-          valid_to: string | null
-        }
-        Insert: {
-          breakpoint: number
-          cargo: string
-          created_at?: string
-          descricao: string
-          direcao: string
-          id?: number
-          indicador: string
-          is_active?: boolean
-          payout_brl: number
-          source?: string
-          tenant_id?: string
-          updated_at?: string
-          valid_from?: string
-          valid_to?: string | null
-        }
-        Update: {
-          breakpoint?: number
-          cargo?: string
-          created_at?: string
-          descricao?: string
-          direcao?: string
-          id?: number
-          indicador?: string
-          is_active?: boolean
-          payout_brl?: number
-          source?: string
-          tenant_id?: string
-          updated_at?: string
-          valid_from?: string
-          valid_to?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_rules_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -5794,531 +4249,6 @@ export type Database = {
           },
         ]
       }
-      planos_acao: {
-        Row: {
-          comentario_id: string | null
-          created_by: string | null
-          data_criacao: string | null
-          id: string
-          responsavel: string | null
-          status: string | null
-          tenant_id: string
-          texto_acao: string
-        }
-        Insert: {
-          comentario_id?: string | null
-          created_by?: string | null
-          data_criacao?: string | null
-          id?: string
-          responsavel?: string | null
-          status?: string | null
-          tenant_id?: string
-          texto_acao: string
-        }
-        Update: {
-          comentario_id?: string | null
-          created_by?: string | null
-          data_criacao?: string | null
-          id?: string
-          responsavel?: string | null
-          status?: string | null
-          tenant_id?: string
-          texto_acao?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "planos_acao_comentario_id_fkey"
-            columns: ["comentario_id"]
-            isOneToOne: false
-            referencedRelation: "reclamacoes_comentarios"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "planos_acao_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pop_ajustes_manuais: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          data: string
-          employee_id: string | null
-          id: string
-          justificativa: string
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_destino: string | null
-          sector_origem: string | null
-          tenant_id: string
-          tipo: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
-          unit_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          data: string
-          employee_id?: string | null
-          id?: string
-          justificativa: string
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_destino?: string | null
-          sector_origem?: string | null
-          tenant_id?: string
-          tipo: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
-          unit_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          data?: string
-          employee_id?: string | null
-          id?: string
-          justificativa?: string
-          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_destino?: string | null
-          sector_origem?: string | null
-          tenant_id?: string
-          tipo?: Database["public"]["Enums"]["pop_ajuste_tipo_enum"]
-          unit_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_ajustes_manuais_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_sector_destino_fkey"
-            columns: ["sector_destino"]
-            isOneToOne: false
-            referencedRelation: "sectors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_sector_destino_fkey"
-            columns: ["sector_destino"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_sector_origem_fkey"
-            columns: ["sector_origem"]
-            isOneToOne: false
-            referencedRelation: "sectors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_sector_origem_fkey"
-            columns: ["sector_origem"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_ajustes_manuais_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      pop_minimo_padrao: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
-          id: string
-          minimo_clt: number
-          minimo_freelancer: number
-          quantidade_minima: number | null
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id: string
-          tenant_id: string
-          unit_id: string
-          versao_documento: string
-          vigente_ate: string | null
-          vigente_desde: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          dia_semana: Database["public"]["Enums"]["pop_dia_semana_enum"]
-          id?: string
-          minimo_clt?: number
-          minimo_freelancer?: number
-          quantidade_minima?: number | null
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id: string
-          tenant_id?: string
-          unit_id: string
-          versao_documento: string
-          vigente_ate?: string | null
-          vigente_desde: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          dia_semana?: Database["public"]["Enums"]["pop_dia_semana_enum"]
-          id?: string
-          minimo_clt?: number
-          minimo_freelancer?: number
-          quantidade_minima?: number | null
-          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id?: string
-          tenant_id?: string
-          unit_id?: string
-          versao_documento?: string
-          vigente_ate?: string | null
-          vigente_desde?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "sectors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_minimo_padrao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      pop_overrides: {
-        Row: {
-          aprovado_por: string
-          comunicado_ao_conselho: boolean
-          created_at: string
-          created_by: string | null
-          data: string
-          id: string
-          motivo: string
-          quantidade_minima: number
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id: string
-          tenant_id: string
-          unit_id: string
-          updated_at: string
-        }
-        Insert: {
-          aprovado_por: string
-          comunicado_ao_conselho?: boolean
-          created_at?: string
-          created_by?: string | null
-          data: string
-          id?: string
-          motivo: string
-          quantidade_minima: number
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id: string
-          tenant_id?: string
-          unit_id: string
-          updated_at?: string
-        }
-        Update: {
-          aprovado_por?: string
-          comunicado_ao_conselho?: boolean
-          created_at?: string
-          created_by?: string | null
-          data?: string
-          id?: string
-          motivo?: string
-          quantidade_minima?: number
-          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
-          sector_id?: string
-          tenant_id?: string
-          unit_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_overrides_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "sectors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_overrides_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
-            foreignKeyName: "pop_overrides_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_overrides_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_overrides_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      pop_reconciliacao_log: {
-        Row: {
-          duracao_ms: number | null
-          erro: string | null
-          executado_em: string
-          funcionarios_distintos_resolvidos: number
-          id: string
-          qtd_orfas_antes: number
-          qtd_orfas_depois: number
-          qtd_reconciliadas: number
-          tenant_id: string
-        }
-        Insert: {
-          duracao_ms?: number | null
-          erro?: string | null
-          executado_em?: string
-          funcionarios_distintos_resolvidos?: number
-          id?: string
-          qtd_orfas_antes?: number
-          qtd_orfas_depois?: number
-          qtd_reconciliadas?: number
-          tenant_id?: string
-        }
-        Update: {
-          duracao_ms?: number | null
-          erro?: string | null
-          executado_em?: string
-          funcionarios_distintos_resolvidos?: number
-          id?: string
-          qtd_orfas_antes?: number
-          qtd_orfas_depois?: number
-          qtd_reconciliadas?: number
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_reconciliacao_log_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pop_relatorios_enviados: {
-        Row: {
-          data: string
-          enviado_em: string
-          erro: string | null
-          evolution_message_id: string | null
-          id: string
-          mensagem: string
-          payload_json: Json | null
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          status_envio: Database["public"]["Enums"]["pop_status_envio_enum"]
-          tenant_id: string
-          tentativa: number
-          unit_id: string
-        }
-        Insert: {
-          data: string
-          enviado_em?: string
-          erro?: string | null
-          evolution_message_id?: string | null
-          id?: string
-          mensagem: string
-          payload_json?: Json | null
-          refeicao: Database["public"]["Enums"]["pop_refeicao_enum"]
-          status_envio?: Database["public"]["Enums"]["pop_status_envio_enum"]
-          tenant_id?: string
-          tentativa?: number
-          unit_id: string
-        }
-        Update: {
-          data?: string
-          enviado_em?: string
-          erro?: string | null
-          evolution_message_id?: string | null
-          id?: string
-          mensagem?: string
-          payload_json?: Json | null
-          refeicao?: Database["public"]["Enums"]["pop_refeicao_enum"]
-          status_envio?: Database["public"]["Enums"]["pop_status_envio_enum"]
-          tenant_id?: string
-          tentativa?: number
-          unit_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_relatorios_enviados_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_relatorios_enviados_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pop_relatorios_enviados_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      pop_unidades_agregadas: {
-        Row: {
-          observacao: string | null
-          tenant_id: string
-          unit_id_agregada: string
-          unit_id_principal: string
-        }
-        Insert: {
-          observacao?: string | null
-          tenant_id?: string
-          unit_id_agregada: string
-          unit_id_principal: string
-        }
-        Update: {
-          observacao?: string | null
-          tenant_id?: string
-          unit_id_agregada?: string
-          unit_id_principal?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pop_unidades_agregadas_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pracas_plano_chao: {
-        Row: {
-          created_at: string
-          dia_semana: string
-          id: string
-          nome_praca: string
-          qtd_necessaria: number
-          setor: string
-          tenant_id: string
-          turno: string
-          unit_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          dia_semana: string
-          id?: string
-          nome_praca: string
-          qtd_necessaria?: number
-          setor: string
-          tenant_id?: string
-          turno: string
-          unit_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          dia_semana?: string
-          id?: string
-          nome_praca?: string
-          qtd_necessaria?: number
-          setor?: string
-          tenant_id?: string
-          turno?: string
-          unit_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pracas_plano_chao_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pracas_plano_chao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pracas_plano_chao_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -6356,302 +4286,6 @@ export type Database = {
             columns: ["unidade_id"]
             isOneToOne: false
             referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profiles_unidade_id_fkey"
-            columns: ["unidade_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      reclamacoes: {
-        Row: {
-          anexo_url: string | null
-          created_at: string
-          created_by: string | null
-          data_reclamacao: string
-          fonte: string
-          id: string
-          is_grave: boolean | null
-          loja_id: string
-          nota_reclamacao: number
-          palavras_chave: Json | null
-          referencia_mes: string
-          resumo_ia: string | null
-          temas: Json | null
-          tenant_id: string
-          texto_original: string | null
-          tipo_operacao: string
-          updated_at: string
-        }
-        Insert: {
-          anexo_url?: string | null
-          created_at?: string
-          created_by?: string | null
-          data_reclamacao?: string
-          fonte: string
-          id?: string
-          is_grave?: boolean | null
-          loja_id: string
-          nota_reclamacao: number
-          palavras_chave?: Json | null
-          referencia_mes: string
-          resumo_ia?: string | null
-          temas?: Json | null
-          tenant_id?: string
-          texto_original?: string | null
-          tipo_operacao: string
-          updated_at?: string
-        }
-        Update: {
-          anexo_url?: string | null
-          created_at?: string
-          created_by?: string | null
-          data_reclamacao?: string
-          fonte?: string
-          id?: string
-          is_grave?: boolean | null
-          loja_id?: string
-          nota_reclamacao?: number
-          palavras_chave?: Json | null
-          referencia_mes?: string
-          resumo_ia?: string | null
-          temas?: Json | null
-          tenant_id?: string
-          texto_original?: string | null
-          tipo_operacao?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reclamacoes_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      reclamacoes_comentarios: {
-        Row: {
-          action_plan_id: string | null
-          autor: string | null
-          canal: string | null
-          comentario: string
-          created_at: string
-          data_comentario: string | null
-          id: string
-          loja_codigo: string | null
-          loja_id: string | null
-          nota: number | null
-          source_hash: string
-          source_id: string | null
-          status: string
-          tags: string[]
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          action_plan_id?: string | null
-          autor?: string | null
-          canal?: string | null
-          comentario: string
-          created_at?: string
-          data_comentario?: string | null
-          id?: string
-          loja_codigo?: string | null
-          loja_id?: string | null
-          nota?: number | null
-          source_hash: string
-          source_id?: string | null
-          status?: string
-          tags?: string[]
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          action_plan_id?: string | null
-          autor?: string | null
-          canal?: string | null
-          comentario?: string
-          created_at?: string
-          data_comentario?: string | null
-          id?: string
-          loja_codigo?: string | null
-          loja_id?: string | null
-          nota?: number | null
-          source_hash?: string
-          source_id?: string | null
-          status?: string
-          tags?: string[]
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reclamacoes_comentarios_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "sheets_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_comentarios_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["sheets_source_id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_comentarios_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      reclamacoes_config: {
-        Row: {
-          classificador_ai: boolean
-          enabled: boolean
-          id: string
-          singleton: boolean
-          source_id: string | null
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          classificador_ai?: boolean
-          enabled?: boolean
-          id?: string
-          singleton?: boolean
-          source_id?: string | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          classificador_ai?: boolean
-          enabled?: boolean
-          id?: string
-          singleton?: boolean
-          source_id?: string | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reclamacoes_config_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "sheets_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_config_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["sheets_source_id"]
-          },
-          {
-            foreignKeyName: "reclamacoes_config_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      salmon_efficiency_daily: {
-        Row: {
-          consumption_kg: number | null
-          created_at: string
-          final_stock_kg: number
-          id: number
-          initial_stock_kg: number
-          loja_id: string
-          ratio_kg_per_1k: number | null
-          revenue_brl: number
-          semaphore: string | null
-          source: string
-          source_row_hash: string | null
-          tenant_id: string
-          transaction_date: string
-          transfer_kg: number
-          updated_at: string
-        }
-        Insert: {
-          consumption_kg?: number | null
-          created_at?: string
-          final_stock_kg: number
-          id?: number
-          initial_stock_kg: number
-          loja_id: string
-          ratio_kg_per_1k?: number | null
-          revenue_brl: number
-          semaphore?: string | null
-          source?: string
-          source_row_hash?: string | null
-          tenant_id?: string
-          transaction_date: string
-          transfer_kg: number
-          updated_at?: string
-        }
-        Update: {
-          consumption_kg?: number | null
-          created_at?: string
-          final_stock_kg?: number
-          id?: number
-          initial_stock_kg?: number
-          loja_id?: string
-          ratio_kg_per_1k?: number | null
-          revenue_brl?: number
-          semaphore?: string | null
-          source?: string
-          source_row_hash?: string | null
-          tenant_id?: string
-          transaction_date?: string
-          transfer_kg?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "salmon_efficiency_daily_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -6721,25 +4355,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "schedule_attendance_remanejado_de_sector_id_fkey"
-            columns: ["remanejado_de_sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "schedule_attendance_remanejado_para_sector_id_fkey"
             columns: ["remanejado_para_sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedule_attendance_remanejado_para_sector_id_fkey"
-            columns: ["remanejado_para_sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedule_attendance_schedule_id_fkey"
@@ -6754,13 +4374,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedule_attendance_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedule_attendance_shift_id_fkey"
@@ -6932,13 +4545,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "schedule_draft_slots_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "schedule_draft_slots_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -7005,13 +4611,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "schedule_drafts_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "schedule_drafts_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -7024,13 +4623,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedule_drafts_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -7113,25 +4705,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "schedules_praca_id_fkey"
-            columns: ["praca_id"]
-            isOneToOne: false
-            referencedRelation: "pracas_plano_chao"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "schedules_sector_id_fkey"
             columns: ["sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "schedules_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "schedules_shift_id_fkey"
@@ -7187,13 +4765,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sector_job_titles_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "sector_job_titles_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -7236,25 +4807,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sector_partnerships_partner_sector_id_fkey"
-            columns: ["partner_sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "sector_partnerships_sector_id_fkey"
             columns: ["sector_id"]
             isOneToOne: false
             referencedRelation: "sectors"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sector_partnerships_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
           },
           {
             foreignKeyName: "sector_partnerships_tenant_id_fkey"
@@ -7301,13 +4858,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sectors_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -7358,13 +4908,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "semanas_cmv_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "semanas_cmv_tenant_id_fkey"
@@ -7428,13 +4971,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "setor_items_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "setor_items_setor_id_fkey"
             columns: ["setor_id"]
             isOneToOne: false
@@ -7485,13 +5021,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "setores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "setores_tenant_id_fkey"
@@ -7552,13 +5081,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sheets_blocks_snapshot_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["sheets_source_id"]
           },
           {
             foreignKeyName: "sheets_blocks_snapshot_tenant_id_fkey"
@@ -7698,25 +5220,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "sheets_staging_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "sheets_staging_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sheets_sources"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sheets_staging_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["sheets_source_id"]
           },
           {
             foreignKeyName: "sheets_staging_sync_id_fkey"
@@ -7829,13 +5337,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sincronizacoes_sheets_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "sincronizacoes_sheets_tenant_id_fkey"
@@ -7966,13 +5467,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "staffing_matrix_sector_id_fkey"
-            columns: ["sector_id"]
-            isOneToOne: false
-            referencedRelation: "vw_pop_setores_sem_cobertura"
-            referencedColumns: ["sector_id"]
-          },
-          {
             foreignKeyName: "staffing_matrix_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -8036,295 +5530,7 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "store_budgets_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "store_budgets_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      store_performance: {
-        Row: {
-          created_at: string
-          faturamento: number
-          id: string
-          loja_id: string
-          month_year: string
-          nps_score: number | null
-          num_reclamacoes: number
-          supervisao_score: number
-          tempo_comanda_avg: number | null
-          tempo_prato_avg: number | null
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          faturamento?: number
-          id?: string
-          loja_id: string
-          month_year: string
-          nps_score?: number | null
-          num_reclamacoes?: number
-          supervisao_score?: number
-          tempo_comanda_avg?: number | null
-          tempo_prato_avg?: number | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          faturamento?: number
-          id?: string
-          loja_id?: string
-          month_year?: string
-          nps_score?: number | null
-          num_reclamacoes?: number
-          supervisao_score?: number
-          tempo_comanda_avg?: number | null
-          tempo_prato_avg?: number | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "store_performance_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "store_performance_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "store_performance_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      store_performance_entries: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          entry_date: string
-          faturamento_delivery: number
-          faturamento_salao: number
-          id: string
-          loja_id: string
-          notes: string | null
-          reclamacoes_ifood: number
-          reclamacoes_salao: number
-          tenant_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          entry_date?: string
-          faturamento_delivery?: number
-          faturamento_salao?: number
-          id?: string
-          loja_id: string
-          notes?: string | null
-          reclamacoes_ifood?: number
-          reclamacoes_salao?: number
-          tenant_id?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          entry_date?: string
-          faturamento_delivery?: number
-          faturamento_salao?: number
-          id?: string
-          loja_id?: string
-          notes?: string | null
-          reclamacoes_ifood?: number
-          reclamacoes_salao?: number
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "store_performance_entries_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "store_performance_entries_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "store_performance_entries_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      supervision_audits: {
-        Row: {
-          audit_date: string
-          created_at: string
-          created_by: string | null
-          global_score: number
-          id: string
-          loja_id: string
-          pdf_url: string | null
-          processed_at: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          audit_date: string
-          created_at?: string
-          created_by?: string | null
-          global_score?: number
-          id?: string
-          loja_id: string
-          pdf_url?: string | null
-          processed_at?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          audit_date?: string
-          created_at?: string
-          created_by?: string | null
-          global_score?: number
-          id?: string
-          loja_id?: string
-          pdf_url?: string | null
-          processed_at?: string
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supervision_audits_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervision_audits_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "supervision_audits_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      supervision_failures: {
-        Row: {
-          audit_id: string
-          category: string | null
-          created_at: string
-          detalhes_falha: string | null
-          id: string
-          is_recurring: boolean
-          item_name: string
-          loja_id: string
-          resolution_photo_url: string | null
-          resolved_at: string | null
-          resolved_by: string | null
-          status: string
-          tenant_id: string
-          updated_at: string
-          url_foto_evidencia: string | null
-          validated_at: string | null
-          validated_by: string | null
-        }
-        Insert: {
-          audit_id: string
-          category?: string | null
-          created_at?: string
-          detalhes_falha?: string | null
-          id?: string
-          is_recurring?: boolean
-          item_name: string
-          loja_id: string
-          resolution_photo_url?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string
-          tenant_id?: string
-          updated_at?: string
-          url_foto_evidencia?: string | null
-          validated_at?: string | null
-          validated_by?: string | null
-        }
-        Update: {
-          audit_id?: string
-          category?: string | null
-          created_at?: string
-          detalhes_falha?: string | null
-          id?: string
-          is_recurring?: boolean
-          item_name?: string
-          loja_id?: string
-          resolution_photo_url?: string | null
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string
-          tenant_id?: string
-          updated_at?: string
-          url_foto_evidencia?: string | null
-          validated_at?: string | null
-          validated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supervision_failures_audit_id_fkey"
-            columns: ["audit_id"]
-            isOneToOne: false
-            referencedRelation: "supervision_audits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervision_failures_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervision_failures_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
-            foreignKeyName: "supervision_failures_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -8480,13 +5686,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "time_punches_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       turno_config: {
@@ -8574,13 +5773,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "turno_config_unidade_id_fkey"
-            columns: ["unidade_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       unit_partnerships: {
@@ -8617,13 +5809,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "unit_partnerships_partner_unit_id_fkey"
-            columns: ["partner_unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "unit_partnerships_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -8636,13 +5821,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "unit_partnerships_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -8691,13 +5869,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "unit_secullum_mapping_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
         ]
       }
@@ -8818,13 +5989,6 @@ export type Database = {
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_stores_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
         ]
       }
       user_tenants: {
@@ -8899,13 +6063,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "utensilios_config_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "utensilios_config_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -8961,13 +6118,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "utensilios_contagens_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "utensilios_contagens_tenant_id_fkey"
@@ -9041,13 +6191,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "utensilios_items_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-          {
             foreignKeyName: "utensilios_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -9113,13 +6256,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "config_lojas"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "utensilios_pedidos_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
           },
           {
             foreignKeyName: "utensilios_pedidos_tenant_id_fkey"
@@ -9230,146 +6366,6 @@ export type Database = {
         }
         Relationships: []
       }
-      v_payout_consolidated: {
-        Row: {
-          brand: string | null
-          cargo: string | null
-          detalhamento: Json | null
-          loja_code: string | null
-          loja_id: string | null
-          loja_nome: string | null
-          mes_ref: string | null
-          metas_atingidas: number | null
-          metas_total: number | null
-          metas_zeradas: number | null
-          payout_total_brl: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payout_results_monthly_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payout_results_monthly_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      v_payout_jobs_to_compute: {
-        Row: {
-          brand: string | null
-          cargo: string | null
-          indicador: string | null
-          loja_code: string | null
-          loja_id: string | null
-          loja_nome: string | null
-          mes_ref: string | null
-          parser_fn: string | null
-          sheets_source_id: string | null
-          source_meta_key: string | null
-          source_status: string | null
-        }
-        Relationships: []
-      }
-      v_salmon_daily: {
-        Row: {
-          consumption_kg: number | null
-          created_at: string | null
-          final_stock_kg: number | null
-          id: number | null
-          initial_stock_kg: number | null
-          loja_id: string | null
-          ratio_kg_per_1k: number | null
-          revenue_brl: number | null
-          semaphore: string | null
-          source: string | null
-          transaction_date: string | null
-          transfer_kg: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          consumption_kg?: number | null
-          created_at?: string | null
-          final_stock_kg?: number | null
-          id?: number | null
-          initial_stock_kg?: number | null
-          loja_id?: string | null
-          ratio_kg_per_1k?: number | null
-          revenue_brl?: never
-          semaphore?: string | null
-          source?: string | null
-          transaction_date?: string | null
-          transfer_kg?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          consumption_kg?: number | null
-          created_at?: string | null
-          final_stock_kg?: number | null
-          id?: number | null
-          initial_stock_kg?: number | null
-          loja_id?: string | null
-          ratio_kg_per_1k?: number | null
-          revenue_brl?: never
-          semaphore?: string | null
-          source?: string | null
-          transaction_date?: string | null
-          transfer_kg?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
-      v_salmon_monthly_summary: {
-        Row: {
-          consumption_total_kg: number | null
-          dias_amarelo: number | null
-          dias_registrados: number | null
-          dias_verde: number | null
-          dias_vermelho: number | null
-          loja_id: string | null
-          month_ref: string | null
-          ratio_avg: number | null
-          ratio_best: number | null
-          ratio_worst: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "salmon_efficiency_daily_loja_id_fkey"
-            columns: ["loja_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
-      }
       v_sync_secullum_health: {
         Row: {
           batidas_24h: number | null
@@ -9391,54 +6387,6 @@ export type Database = {
           ultima_sucesso: string | null
         }
         Relationships: []
-      }
-      vw_pop_diario: {
-        Row: {
-          computed_at: string | null
-          escalados: number | null
-          escalados_lista: Json | null
-          extras_freelancer: number | null
-          extras_lista: Json | null
-          faltantes: number | null
-          janela_encerrada: boolean | null
-          janela_iniciada: boolean | null
-          pop_chegou: number | null
-          pop_minimo: number | null
-          presentes: number | null
-          presentes_lista: Json | null
-          saldo_final: number | null
-          schedule_date: string | null
-          sector_id: string | null
-          sem_pop: boolean | null
-          status: string | null
-          turno: string | null
-          unit_id: string | null
-        }
-        Relationships: []
-      }
-      vw_pop_setores_sem_cobertura: {
-        Row: {
-          sector_id: string | null
-          sector_name: string | null
-          unit_id: string | null
-          unit_name: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sectors_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "config_lojas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sectors_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "v_payout_jobs_to_compute"
-            referencedColumns: ["loja_id"]
-          },
-        ]
       }
     }
     Functions: {

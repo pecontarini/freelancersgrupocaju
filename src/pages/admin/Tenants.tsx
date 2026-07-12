@@ -475,8 +475,10 @@ function TenantMembersDialog({
 }) {
   const [members, setMembers] = useState<TenantMember[]>([]);
   const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState("");
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   const load = async () => {
     if (!tenant) return;
@@ -495,14 +497,21 @@ function TenantMembersDialog({
 
   const addMember = async () => {
     if (!tenant || !email.trim()) return;
-    const { error } = await supabase.rpc("admin_link_user_to_tenant", {
-      _email: email.trim(),
-      _tenant_id: tenant.id,
-      _is_default: isDefault,
+    setInviting(true);
+    const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
+      body: {
+        email: email.trim(),
+        tenant_id: tenant.id,
+        is_default: isDefault,
+        full_name: fullName.trim() || undefined,
+      },
     });
+    setInviting(false);
     if (error) return toast.error(error.message);
-    toast.success("Usuário vinculado");
+    if ((data as any)?.error) return toast.error((data as any).error);
+    toast.success((data as any)?.invited ? "Convite enviado por e-mail e usuário vinculado" : "Usuário vinculado");
     setEmail("");
+    setFullName("");
     setIsDefault(false);
     load();
   };
@@ -526,7 +535,12 @@ function TenantMembersDialog({
         </DialogHeader>
 
         <div className="space-y-2 border-b pb-4">
-          <Label>Vincular usuário existente (por email)</Label>
+          <Label>Vincular ou convidar usuário</Label>
+          <Input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Nome completo (opcional, usado no convite)"
+          />
           <div className="flex gap-2">
             <Input
               value={email}
@@ -534,8 +548,13 @@ function TenantMembersDialog({
               placeholder="usuario@empresa.com"
               type="email"
             />
-            <Button onClick={addMember}>Vincular</Button>
+            <Button onClick={addMember} disabled={inviting}>
+              {inviting ? "Enviando..." : "Vincular"}
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Se o e-mail já tiver conta, ele é vinculado direto. Se não, enviamos um convite por e-mail para criar a senha e acessar a empresa.
+          </p>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

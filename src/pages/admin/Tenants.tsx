@@ -604,6 +604,15 @@ function TenantMembersDialog({
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={() => generateLinkFor(m.email)}
+                  className="h-8 w-8"
+                  title="Gerar link de acesso/redefinir senha"
+                >
+                  <Link2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeMember(m.user_id)}
                   className="h-8 w-8"
                 >
@@ -613,6 +622,41 @@ function TenantMembersDialog({
             ))
           )}
         </div>
+
+        {linkDialog && (
+          <Dialog open={!!linkDialog} onOpenChange={(o) => !o && setLinkDialog(null)}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {linkDialog.kind === "invite" ? "Link de convite" : "Link para definir/redefinir senha"}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Envie este link para <strong>{linkDialog.email}</strong>. Ao abrir, a pessoa define a senha e entra na empresa.
+                </p>
+                <div className="flex gap-2">
+                  <Input readOnly value={linkDialog.link} onFocus={(e) => e.currentTarget.select()} />
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(linkDialog.link);
+                        toast.success("Link copiado");
+                      } catch {
+                        toast.error("Copie manualmente");
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O link expira em ~1 hora. Se expirar, clique no ícone de link ao lado do usuário para gerar um novo.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );

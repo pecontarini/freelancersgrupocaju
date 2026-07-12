@@ -85,6 +85,7 @@ export function PortalHeader({
           </div>
         )}
 
+        <TenantSwitcher />
         <ThemeToggle />
       </div>
     </header>

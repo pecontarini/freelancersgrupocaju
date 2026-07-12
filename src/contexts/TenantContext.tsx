@@ -29,18 +29,30 @@ interface TenantContextValue {
 
 const TenantContext = createContext<TenantContextValue | undefined>(undefined);
 
+/** Slugs da plataforma-mãe (2Sell). Estes NUNCA recebem cor de tenant. */
+const PLATFORM_SLUGS = new Set(["2board", "2sell", "_default"]);
+const TENANT_COLOR_VARS = ["--primary", "--primary-strong", "--accent", "--ring"] as const;
+
 function applyThemeToDocument(tenant: TenantConfig) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.setAttribute("data-tenant", tenant.slug);
 
-  // Nota: cores do tenant (primary/accent/etc) são IGNORADAS de propósito —
-  // a plataforma tem identidade visual fixa (2Sell, P&B). Só aplicamos radius.
   const { theme } = tenant;
   if (theme.radius) root.style.setProperty("--radius", theme.radius);
 
-  // Título e meta description sempre 2Sell (não sobrescrever).
-  // Favicon também é fixo — vem de index.html.
+  // Aplicação LEVE de cores do tenant: só accent (primary/ring). Base permanece 2Sell P&B.
+  // Plataforma-mãe (2Sell/2board) e _default nunca são tingidos.
+  const isPlatform = PLATFORM_SLUGS.has(tenant.slug);
+  // Limpa qualquer override anterior antes de aplicar o novo.
+  for (const v of TENANT_COLOR_VARS) root.style.removeProperty(v);
+
+  if (!isPlatform && theme.primary) {
+    root.style.setProperty("--primary", theme.primary);
+    root.style.setProperty("--ring", theme.primary);
+    if (theme.primaryStrong) root.style.setProperty("--primary-strong", theme.primaryStrong);
+    if (theme.accent) root.style.setProperty("--accent", theme.accent);
+  }
 }
 
 function mergeTenantWithDbRow(base: TenantConfig, row: any): TenantConfig {

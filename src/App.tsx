@@ -70,6 +70,7 @@ function App() {
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
                 <Route path="/escalas/draft/:draftId" element={<ProtectedRoute><EscalaDraft /></ProtectedRoute>} />
                 <Route path="/perfil/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
+                <Route path="/admin/tenants" element={<ProtectedRoute><AdminTenants /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

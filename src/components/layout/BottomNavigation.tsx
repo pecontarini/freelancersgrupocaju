@@ -21,9 +21,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "next-themes";
-import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
-import cajuparLogoLight from "@/assets/cajupar-logo-light.png";
-import { useTenant } from "@/contexts/TenantContext";
+import { useBrandLogo } from "@/lib/brand";
 
 interface BottomNavigationProps {
   activeTab: string;

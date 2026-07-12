@@ -107,7 +107,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                 />
               </div>
               <span className="text-xs text-muted-foreground">
-                {tenant.copy.appName}
+                {BRAND_NAME}
               </span>
             </>
           )}

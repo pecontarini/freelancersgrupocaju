@@ -41,6 +41,17 @@ export interface TenantCopy {
   strings?: Record<string, string>;
 }
 
+export interface TenantLogos {
+  /** Logo horizontal para fundo claro. */
+  light?: string;
+  /** Logo horizontal para fundo escuro. */
+  dark?: string;
+  /** Símbolo compacto (quadrado) para sidebar colapsada / favicons. */
+  symbol?: string;
+  /** Logo genérico (fallback quando light/dark não são fornecidos). */
+  main?: string;
+}
+
 export interface TenantConfig {
   /** Slug único no banco (ex: "caju"). Deve casar com `tenants.slug`. */
   slug: string;
@@ -48,8 +59,10 @@ export interface TenantConfig {
   id?: string;
   theme: TenantTheme;
   copy: TenantCopy;
-  /** URL do logo (via Lovable Assets ou path público). */
+  /** URL do logo (via Lovable Assets ou path público). Legado — prefira `logos`. */
   logoUrl?: string;
+  /** Logos por contexto (light/dark/símbolo). Todos opcionais. */
+  logos?: TenantLogos;
   /** Favicon (opcional; se ausente usa o global). */
   faviconUrl?: string;
 }

@@ -27,6 +27,7 @@ interface NCItem {
 }
 
 export default function ChecklistCorrections() {
+  const { src: brandLogo } = useBrandLogo();
   const { responseId, accessToken } = useParams<{ responseId: string; accessToken: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -192,7 +193,7 @@ export default function ChecklistCorrections() {
       {/* Header */}
       <div className="bg-card border-b px-4 py-4">
         <div className="max-w-lg mx-auto flex flex-col items-center gap-2">
-          <img src={logoImg} alt="Logo" className="h-12 object-contain" />
+          <img src={brandLogo} alt="Logo" className="h-12 object-contain" />
           <h1 className="text-lg font-bold text-center">Correções de Não Conformidades</h1>
           <p className="text-sm text-muted-foreground text-center">
             {sectorDisplayName} — {lojaName}

@@ -224,7 +224,6 @@ const Index = () => {
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 88px)" }}
         >
           <BottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
-          <RedFlagBanner />
           <div className="px-3 py-3">
             <PortalHeader
               title={currentTabConfig.title}
@@ -246,7 +245,6 @@ const Index = () => {
       <div className="flex min-h-screen w-full">
         <AppSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         <SidebarInset>
-          <RedFlagBanner />
           <PortalHeader
             title={currentTabConfig.title}
             subtitle={currentTabConfig.subtitle}

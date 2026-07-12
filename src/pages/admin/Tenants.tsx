@@ -17,8 +17,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
+import { buildTenantUrl } from "@/lib/tenantResolver";
 
 interface TenantRow {
   id: string;
@@ -183,9 +184,16 @@ export default function AdminTenants() {
           {tenants.map((t) => (
             <Card key={t.id} className="p-4 space-y-3">
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold">{t.nome}</h3>
-                  <p className="text-xs text-muted-foreground">/{t.slug}</p>
+                <div className="min-w-0">
+                  <h3 className="font-semibold truncate">{t.nome}</h3>
+                  <a
+                    href={buildTenantUrl(t.slug)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    {t.slug}.2board.app <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
                 {!t.ativo && <Badge variant="secondary">Inativo</Badge>}
               </div>

@@ -175,6 +175,7 @@ export default function AdminTenants() {
       favicon_url: t.favicon_url ?? "",
       ativo: t.ativo,
     });
+    setLogoPreview(t.logo_url ?? null);
     setEditing(t);
     setCreating(false);
   };

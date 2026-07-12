@@ -8386,6 +8386,7 @@ export type Database = {
         | "employee"
         | "aprovador_cadastro_urgente"
         | "dp_auditor"
+        | "super_admin"
       bonus_tier: "ouro" | "prata" | "bronze" | "aceitavel"
       categoria_cargo: "gerencia" | "chefia"
       codigo_meta:
@@ -8583,6 +8584,7 @@ export const Constants = {
         "employee",
         "aprovador_cadastro_urgente",
         "dp_auditor",
+        "super_admin",
       ],
       bonus_tier: ["ouro", "prata", "bronze", "aceitavel"],
       categoria_cargo: ["gerencia", "chefia"],

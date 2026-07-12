@@ -7,12 +7,14 @@ export interface UserProfileData {
   profile: UserProfile | null;
   roles: AppRole[];
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isOperator: boolean;
   isGerenteUnidade: boolean;
   isChefeSetor: boolean;
   isEmployee: boolean;
   unidades: ConfigOption[];
 }
+
 
 export function useUserProfile() {
   const { user } = useAuth();
@@ -25,12 +27,14 @@ export function useUserProfile() {
           profile: null,
           roles: [],
           isAdmin: false,
+          isSuperAdmin: false,
           isOperator: false,
           isGerenteUnidade: false,
           isChefeSetor: false,
           isEmployee: false,
           unidades: [],
         };
+
       }
 
       // Fetch profile
@@ -58,6 +62,7 @@ export function useUserProfile() {
 
       const roles = (rolesData?.map((r) => r.role) || []) as AppRole[];
       const isAdmin = roles.includes("admin");
+      const isSuperAdmin = roles.includes("super_admin");
       const isOperator = roles.includes("operator");
       const isGerenteUnidade = roles.includes("gerente_unidade");
       const isChefeSetor = roles.includes("chefe_setor");
@@ -86,6 +91,7 @@ export function useUserProfile() {
         profile: profileData as UserProfile | null,
         roles,
         isAdmin,
+        isSuperAdmin,
         isOperator,
         isGerenteUnidade,
         isChefeSetor,
@@ -101,6 +107,7 @@ export function useUserProfile() {
     profile: data?.profile || null,
     roles: data?.roles || [],
     isAdmin: data?.isAdmin || false,
+    isSuperAdmin: data?.isSuperAdmin || false,
     isOperator: data?.isOperator || false,
     // Backwards compatibility alias
     isPartner: data?.isOperator || false,

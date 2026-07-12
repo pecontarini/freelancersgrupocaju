@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Calendar,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 
@@ -81,7 +82,7 @@ const adminMenuItems = [
 
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { isAdmin, isChefeSetor, profile } = useUserProfile();
+  const { isAdmin, isSuperAdmin, isChefeSetor, profile } = useUserProfile();
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
   const { tenant } = useTenant();
@@ -180,6 +181,16 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                  {isSuperAdmin && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild tooltip="EMPRESAS" className="group transition-all duration-200">
+                        <Link to="/admin/tenants">
+                          <Building2 className="h-4 w-4 transition-colors group-hover:text-primary" />
+                          <span className="font-medium">EMPRESAS</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

@@ -24,6 +24,7 @@ import AtualizarPix from "./pages/AtualizarPix";
 import CadastrosPendentes from "./pages/CadastrosPendentes";
 import EscalaDraft from "./pages/escalas/EscalaDraft";
 import Seguranca from "./pages/perfil/Seguranca";
+import AdminTenants from "./pages/admin/Tenants";
 import { PageTransition } from "@/components/motion";
 import { VersionUpdateBanner } from "@/components/VersionUpdateBanner";
 import { CJAppBackground } from "@/components/ui/cj-app-background";
@@ -69,6 +70,7 @@ function App() {
                 <Route path="/agenda" element={<ProtectedRoute><Agenda /></ProtectedRoute>} />
                 <Route path="/escalas/draft/:draftId" element={<ProtectedRoute><EscalaDraft /></ProtectedRoute>} />
                 <Route path="/perfil/seguranca" element={<ProtectedRoute><Seguranca /></ProtectedRoute>} />
+                <Route path="/admin/tenants" element={<ProtectedRoute><AdminTenants /></ProtectedRoute>} />
                 <Route
                   path="/"
                   element={

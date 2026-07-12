@@ -38,18 +38,25 @@ Deno.serve(async (req) => {
     const tenantId = String(body.tenant_id ?? "");
     const isDefault = Boolean(body.is_default ?? false);
     const fullName = body.full_name ? String(body.full_name) : undefined;
+    const linkOnly = Boolean(body.link_only ?? false);
 
-    if (!email || !tenantId) {
-      return json({ error: "email e tenant_id são obrigatórios" }, 400);
+    if (!email) {
+      return json({ error: "email é obrigatório" }, 400);
+    }
+    if (!linkOnly && !tenantId) {
+      return json({ error: "tenant_id é obrigatório" }, 400);
     }
 
-    // Buscar tenant para redirectTo
-    const { data: tenant } = await admin
-      .from("tenants")
-      .select("slug, nome")
-      .eq("id", tenantId)
-      .maybeSingle();
-    if (!tenant) return json({ error: "empresa não encontrada" }, 404);
+    let tenant: { slug: string; nome: string } | null = null;
+    if (tenantId) {
+      const { data } = await admin
+        .from("tenants")
+        .select("slug, nome")
+        .eq("id", tenantId)
+        .maybeSingle();
+      if (!data) return json({ error: "empresa não encontrada" }, 404);
+      tenant = data as any;
+    }
 
     // Tentar localizar usuário existente
     let targetUserId: string | null = null;
@@ -63,13 +70,15 @@ Deno.serve(async (req) => {
 
     let invited = false;
     let inviteLink: string | null = null;
+    let linkKind: "invite" | "recovery" | null = null;
     let emailSent = false;
 
     const origin = req.headers.get("origin") ?? "";
     const redirectTo = origin ? `${origin}/auth` : undefined;
 
     if (!targetUserId) {
-      // 1) Cria o usuário direto (sem depender de SMTP)
+      if (linkOnly) return json({ error: "usuário não encontrado" }, 404);
+      // Cria o usuário direto (sem depender de SMTP)
       const { data: created, error: createErr } = await admin.auth.admin.createUser({
         email,
         email_confirm: false,
@@ -80,19 +89,24 @@ Deno.serve(async (req) => {
       }
       targetUserId = created.user.id;
       invited = true;
+    }
 
-      // 2) Gera link de convite (não envia e-mail — devolvemos p/ admin compartilhar)
-      const { data: linkData, error: linkGenErr } = await admin.auth.admin.generateLink({
-        type: "invite",
-        email,
-        options: { redirectTo },
-      });
-      if (!linkGenErr) {
-        inviteLink = linkData?.properties?.action_link ?? null;
-      }
+    // Gera SEMPRE um link para o admin compartilhar
+    // - usuário novo/sem senha: type=invite
+    // - usuário já existente: type=recovery (permite redefinir/definir senha)
+    const useInvite = invited || !existing?.last_sign_in_at;
+    linkKind = useInvite ? "invite" : "recovery";
+    const { data: linkData, error: linkGenErr } = await admin.auth.admin.generateLink({
+      type: useInvite ? "invite" : "recovery",
+      email,
+      options: { redirectTo },
+    });
+    if (!linkGenErr) {
+      inviteLink = linkData?.properties?.action_link ?? null;
+    }
 
-      // 3) Tentativa best-effort de disparar e-mail via inviteUserByEmail
-      // (se SMTP estourou rate limit, ignoramos silenciosamente — o link acima cobre)
+    // Best-effort: dispara e-mail via inviteUserByEmail apenas em criação
+    if (invited) {
       const { error: mailErr } = await admin.auth.admin.inviteUserByEmail(email, {
         redirectTo,
         data: fullName ? { full_name: fullName } : undefined,
@@ -100,20 +114,28 @@ Deno.serve(async (req) => {
       emailSent = !mailErr;
     }
 
-    // Vincular ao tenant
-    if (isDefault) {
-      await admin.from("user_tenants").update({ is_default: false }).eq("user_id", targetUserId);
+    // Vincular ao tenant (a não ser que seja link_only)
+    if (!linkOnly && tenantId) {
+      if (isDefault) {
+        await admin.from("user_tenants").update({ is_default: false }).eq("user_id", targetUserId);
+      }
+      const { error: linkErr } = await admin
+        .from("user_tenants")
+        .upsert(
+          { user_id: targetUserId, tenant_id: tenantId, is_default: isDefault },
+          { onConflict: "user_id,tenant_id" }
+        );
+      if (linkErr) return json({ error: linkErr.message }, 500);
     }
 
-    const { error: linkErr } = await admin
-      .from("user_tenants")
-      .upsert(
-        { user_id: targetUserId, tenant_id: tenantId, is_default: isDefault },
-        { onConflict: "user_id,tenant_id" }
-      );
-    if (linkErr) return json({ error: linkErr.message }, 500);
-
-    return json({ ok: true, user_id: targetUserId, invited, invite_link: inviteLink, email_sent: emailSent });
+    return json({
+      ok: true,
+      user_id: targetUserId,
+      invited,
+      invite_link: inviteLink,
+      link_kind: linkKind,
+      email_sent: emailSent,
+    });
   } catch (e: any) {
     return json({ error: e?.message ?? "erro inesperado" }, 500);
   }

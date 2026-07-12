@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2 } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 
@@ -479,6 +479,7 @@ function TenantMembersDialog({
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [linkDialog, setLinkDialog] = useState<{ email: string; link: string; kind: "invite" | "recovery" } | null>(null);
 
   const load = async () => {
     if (!tenant) return;
@@ -510,22 +511,28 @@ function TenantMembersDialog({
     if (error) return toast.error(error.message);
     const d = data as any;
     if (d?.error) return toast.error(d.error);
-    if (d?.invite_link && !d?.email_sent) {
-      try {
-        await navigator.clipboard.writeText(d.invite_link);
-        toast.success("Usuário criado. Link de convite copiado — envie manualmente.", { duration: 8000 });
-      } catch {
-        toast.success("Usuário criado. Link: " + d.invite_link, { duration: 15000 });
-      }
-    } else if (d?.invited) {
-      toast.success("Convite enviado por e-mail e usuário vinculado");
-    } else {
-      toast.success("Usuário vinculado");
+    toast.success(d?.invited ? "Usuário criado e vinculado" : "Usuário vinculado");
+    if (d?.invite_link) {
+      setLinkDialog({ email: email.trim(), link: d.invite_link, kind: d.link_kind ?? "invite" });
     }
     setEmail("");
     setFullName("");
     setIsDefault(false);
     load();
+  };
+
+  const generateLinkFor = async (memberEmail: string) => {
+    const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
+      body: { email: memberEmail, link_only: true, tenant_id: tenant?.id },
+    });
+    if (error) return toast.error(error.message);
+    const d = data as any;
+    if (d?.error) return toast.error(d.error);
+    if (d?.invite_link) {
+      setLinkDialog({ email: memberEmail, link: d.invite_link, kind: d.link_kind ?? "recovery" });
+    } else {
+      toast.error("Não foi possível gerar o link");
+    }
   };
 
   const removeMember = async (userId: string) => {
@@ -597,6 +604,15 @@ function TenantMembersDialog({
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={() => generateLinkFor(m.email)}
+                  className="h-8 w-8"
+                  title="Gerar link de acesso/redefinir senha"
+                >
+                  <Link2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeMember(m.user_id)}
                   className="h-8 w-8"
                 >
@@ -606,6 +622,41 @@ function TenantMembersDialog({
             ))
           )}
         </div>
+
+        {linkDialog && (
+          <Dialog open={!!linkDialog} onOpenChange={(o) => !o && setLinkDialog(null)}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {linkDialog.kind === "invite" ? "Link de convite" : "Link para definir/redefinir senha"}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Envie este link para <strong>{linkDialog.email}</strong>. Ao abrir, a pessoa define a senha e entra na empresa.
+                </p>
+                <div className="flex gap-2">
+                  <Input readOnly value={linkDialog.link} onFocus={(e) => e.currentTarget.select()} />
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(linkDialog.link);
+                        toast.success("Link copiado");
+                      } catch {
+                        toast.error("Copie manualmente");
+                      }
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  O link expira em ~1 hora. Se expirar, clique no ícone de link ao lado do usuário para gerar um novo.
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );

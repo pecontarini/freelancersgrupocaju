@@ -107,6 +107,7 @@ export function useUserProfile() {
     profile: data?.profile || null,
     roles: data?.roles || [],
     isAdmin: data?.isAdmin || false,
+    isSuperAdmin: data?.isSuperAdmin || false,
     isOperator: data?.isOperator || false,
     // Backwards compatibility alias
     isPartner: data?.isOperator || false,

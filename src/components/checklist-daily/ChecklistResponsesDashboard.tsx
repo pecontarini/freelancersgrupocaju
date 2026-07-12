@@ -138,24 +138,13 @@ export function ChecklistResponsesDashboard({ lojaId }: ChecklistResponsesDashbo
     setExpandedResponse(responseId);
     setLoadingItems(true);
 
-    const [itemsRes, correctionsRes] = await Promise.all([
-      supabase
-        .from("checklist_response_items")
-        .select("*, checklist_template_items(item_text, weight)")
-        .eq("response_id", responseId),
-      supabase
-        .from("checklist_corrections")
-        .select("*")
-        .eq("response_id", responseId),
-    ]);
+    const itemsRes = await supabase
+      .from("checklist_response_items")
+      .select("*, checklist_template_items(item_text, weight)")
+      .eq("response_id", responseId);
 
     setResponseItems(itemsRes.data || []);
-
-    const corrMap: Record<string, any> = {};
-    (correctionsRes.data || []).forEach((c: any) => {
-      corrMap[c.response_item_id] = c;
-    });
-    setCorrections(corrMap);
+    setCorrections({});
     setLoadingItems(false);
   }
 

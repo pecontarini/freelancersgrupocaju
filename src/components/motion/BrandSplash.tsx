@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AuroraBackground } from "./AuroraBackground";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
-import { useTenant } from "@/contexts/TenantContext";
+import { BRAND_LOGO_DARK, BRAND_NAME } from "@/lib/brand";
 
 interface BrandSplashProps {
   /** "full" = full-screen splash, "inline" = fits its container. */
@@ -12,8 +11,8 @@ interface BrandSplashProps {
 }
 
 /**
- * Cinematic brand splash — dark aurora field with a "breathing" CajuPAR mark.
- * Used as primary loading state across the portal.
+ * Splash cinematográfico neutro — aurora escura com a marca 2Sell "respirando".
+ * Sempre em fundo escuro, então usamos a logo variante dark (branca).
  */
 export function BrandSplash({
   variant = "full",
@@ -21,10 +20,6 @@ export function BrandSplash({
   className,
 }: BrandSplashProps) {
   const isFull = variant === "full";
-  const { tenant } = useTenant();
-  const splashLogo =
-    tenant.logos?.symbol ?? tenant.logos?.main ?? tenant.logoUrl ?? LOGO_BASE64;
-  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
 
   return (
     <div
@@ -41,13 +36,13 @@ export function BrandSplash({
 
       {/* Center stack */}
       <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
-        {/* Glow halo behind mark */}
+        {/* Halo neutro atrás da marca */}
         <div className="relative">
           <div
             className="absolute inset-0 -z-10 rounded-full"
             style={{
               background:
-                "radial-gradient(circle, hsl(14 80% 55% / 0.45) 0%, transparent 70%)",
+                "radial-gradient(circle, hsl(0 0% 100% / 0.25) 0%, transparent 70%)",
               filter: "blur(40px)",
               transform: "scale(2.2)",
               animation: "splash-glow 4s ease-in-out infinite",
@@ -61,11 +56,11 @@ export function BrandSplash({
             }}
           >
             <img
-              src={splashLogo}
-              alt={brandAlt}
+              src={BRAND_LOGO_DARK}
+              alt={BRAND_NAME}
               className={cn(
-                "select-none object-contain drop-shadow-[0_8px_32px_rgba(208,89,55,0.45)]",
-                isFull ? "h-24 w-24 md:h-32 md:w-32" : "h-16 w-16"
+                "select-none object-contain drop-shadow-[0_8px_32px_rgba(255,255,255,0.15)]",
+                isFull ? "h-24 md:h-32 w-auto" : "h-16 w-auto"
               )}
               draggable={false}
             />
@@ -85,7 +80,7 @@ export function BrandSplash({
           </p>
         )}
 
-        {/* Thin progress shimmer */}
+        {/* Shimmer neutro */}
         <div
           className="mt-2 h-[2px] w-40 overflow-hidden rounded-full bg-white/10"
           style={{
@@ -97,7 +92,7 @@ export function BrandSplash({
             className="h-full w-1/3 rounded-full"
             style={{
               background:
-                "linear-gradient(90deg, transparent, hsl(14 80% 60%), transparent)",
+                "linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.8), transparent)",
               animation: "splash-shimmer 1.6s ease-in-out infinite",
             }}
           />

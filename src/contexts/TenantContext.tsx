@@ -34,36 +34,13 @@ function applyThemeToDocument(tenant: TenantConfig) {
   const root = document.documentElement;
   root.setAttribute("data-tenant", tenant.slug);
 
+  // Nota: cores do tenant (primary/accent/etc) são IGNORADAS de propósito —
+  // a plataforma tem identidade visual fixa (2Sell, P&B). Só aplicamos radius.
   const { theme } = tenant;
-  if (theme.primary) root.style.setProperty("--primary", theme.primary);
-  if (theme.accent) root.style.setProperty("--accent", theme.accent);
-  if (theme.primaryStrong) {
-    root.style.setProperty("--cj-accent-strong", `hsl(${theme.primaryStrong})`);
-  }
   if (theme.radius) root.style.setProperty("--radius", theme.radius);
 
-  if (tenant.copy.browserTitle) {
-    document.title = tenant.copy.browserTitle;
-  }
-  if (tenant.copy.metaDescription) {
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.name = "description";
-      document.head.appendChild(meta);
-    }
-    meta.content = tenant.copy.metaDescription;
-  }
-
-  if (tenant.faviconUrl) {
-    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "icon";
-      document.head.appendChild(link);
-    }
-    link.href = tenant.faviconUrl;
-  }
+  // Título e meta description sempre 2Sell (não sobrescrever).
+  // Favicon também é fixo — vem de index.html.
 }
 
 function mergeTenantWithDbRow(base: TenantConfig, row: any): TenantConfig {

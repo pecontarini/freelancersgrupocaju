@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { SECTOR_POSITION_MAP, type AuditSector } from "@/lib/sectorPositionMapping";
-import logoImg from "@/assets/logo.png";
+import { useBrandLogo } from "@/lib/brand";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PDF_COLORS, PDF_LAYOUT, addPageFooter, addContinuationHeader } from "@/lib/pdf/grupoCajuPdfTheme";
@@ -42,6 +42,7 @@ type SubmitResult = {
 };
 
 export default function DailyChecklist() {
+  const { src: brandLogo } = useBrandLogo();
   const { accessToken } = useParams<{ accessToken: string }>();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -429,7 +430,7 @@ export default function DailyChecklist() {
     const scoreColor = submitResult.total_score >= 90 ? "text-green-600" : submitResult.total_score >= 70 ? "text-yellow-600" : "text-red-600";
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center gap-6">
-        <img src={logoImg} alt="Logo" className="h-16 object-contain" />
+        <img src={brandLogo} alt="Logo" className="h-16 object-contain" />
         <CheckCircle2 className="h-20 w-20 text-green-600" />
         <h1 className="text-2xl font-bold">Checklist Enviado!</h1>
         <div className={`text-5xl font-bold ${scoreColor}`}>
@@ -485,7 +486,7 @@ export default function DailyChecklist() {
   if (alreadySubmitted) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-6 text-center gap-6">
-        <img src={logoImg} alt="Logo" className="h-16 object-contain" />
+        <img src={brandLogo} alt="Logo" className="h-16 object-contain" />
         <CheckCircle2 className="h-16 w-16 text-green-600" />
         <h1 className="text-xl font-bold">Checklist já aplicado hoje</h1>
         {existingScore !== null && (
@@ -503,7 +504,7 @@ export default function DailyChecklist() {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <img src={logoImg} alt="Logo" className="h-10 object-contain" />
+          <img src={brandLogo} alt="Logo" className="h-10 object-contain" />
           <div>
             <h1 className="text-lg font-bold uppercase">Checklist Diário — {sectorDisplayName}</h1>
             <p className="text-xs text-muted-foreground">

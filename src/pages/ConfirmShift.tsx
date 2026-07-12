@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, CheckCircle2, XCircle, Clock, MapPin, User, AlertTriangle, PartyPopper } from "lucide-react";
-import cajuparLogo from "@/assets/logo.png";
+import { useBrandLogo } from "@/lib/brand";
 
 interface ScheduleInfo {
   id: string;
@@ -71,6 +71,7 @@ function formatDateLabel(dateStr: string): string {
 }
 
 export default function ConfirmShift() {
+  const { src: brandLogo } = useBrandLogo();
   const { scheduleId } = useParams<{ scheduleId: string }>();
   const [searchParams] = useSearchParams();
   const action = searchParams.get("action");
@@ -179,7 +180,7 @@ export default function ConfirmShift() {
 
   const shell = (children: React.ReactNode) => (
     <div className="min-h-screen bg-muted flex flex-col items-center px-4 py-6">
-      <img src={cajuparLogo} alt="CajuPAR" className="h-10 mb-6" />
+      <img src={brandLogo} alt="CajuPAR" className="h-10 mb-6" />
       {children}
     </div>
   );

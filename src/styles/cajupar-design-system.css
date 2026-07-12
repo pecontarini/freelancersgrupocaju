@@ -40,7 +40,7 @@
 
   /* Blobs (fundo) */
   --cj-blob-1: radial-gradient(circle, #FF8A4C 0%, transparent 70%);
-  --cj-blob-2: radial-gradient(circle, #E05C1A 0%, transparent 70%);
+  --cj-blob-2: radial-gradient(circle, #111111 0%, transparent 70%);
   --cj-blob-1-opacity: 0.18;
   --cj-blob-2-opacity: 0.14;
 }

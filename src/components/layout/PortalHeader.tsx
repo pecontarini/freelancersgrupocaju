@@ -1,6 +1,7 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UnidadeSelector } from "@/components/UnidadeSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { TenantSwitcher } from "@/components/TenantSwitcher";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -36,8 +37,10 @@ export function PortalHeader({
               <p className="cj-header__subtitle text-xs">{subtitle}</p>
             )}
           </div>
-          <ThemeToggle />
-        </div>
+          <div className="flex items-center gap-2">
+            <TenantSwitcher />
+            <ThemeToggle />
+          </div>
 
         {showUnidadeSelector && (
           <UnidadeSelector

@@ -7097,6 +7097,39 @@ export type Database = {
         }
         Relationships: []
       }
+      tenants: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          logo_url: string | null
+          nome: string
+          primary_color: string | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          nome: string
+          primary_color?: string | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          nome?: string
+          primary_color?: string | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       time_punches: {
         Row: {
           banco_id: number
@@ -7463,6 +7496,38 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_payout_jobs_to_compute"
             referencedColumns: ["loja_id"]
+          },
+        ]
+      }
+      user_tenants: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_tenants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -8075,6 +8140,7 @@ export type Database = {
         }
         Returns: Json
       }
+      current_tenant_id: { Args: never; Returns: string }
       find_employee_by_secullum_id: {
         Args: { p_secullum_id: number }
         Returns: {
@@ -8153,6 +8219,7 @@ export type Database = {
         Args: { _missao_id: string; _user_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       lookup_freelancer_by_cpf: {
         Args: { p_cpf: string }
         Returns: {
@@ -8344,6 +8411,10 @@ export type Database = {
       }
       user_has_access_to_loja: {
         Args: { _loja_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_tenant: {
+        Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
       validate_payouts: {

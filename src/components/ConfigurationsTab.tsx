@@ -1,8 +1,7 @@
-import { Store, Briefcase, Users, Building2, Award, Settings2 } from "lucide-react";
+import { Store, Briefcase, Users, Building2, Settings2 } from "lucide-react";
 import { ConfigSection } from "@/components/ConfigSection";
 import { ClearEntriesModal } from "@/components/ClearEntriesModal";
 import { BudgetConfigSection as OperationalBudgetSection } from "@/components/OperationalBudgetConfigSection";
-import { CargosConfigSection } from "@/components/CargosConfigSection";
 import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -64,15 +63,8 @@ export function ConfigurationsTab() {
         </ConfigGroup>
       )}
 
-      {/* GRUPO 2 — CARGOS */}
-      {showCargosBonus && (
-        <ConfigGroup
-          icon={<Award className="h-4 w-4 text-primary" />}
-          title="Cargos"
-        >
-          <CargosConfigSection />
-        </ConfigGroup>
-      )}
+
+
 
       {/* GRUPO 4 — CADASTROS BÁSICOS */}
       <ConfigGroup

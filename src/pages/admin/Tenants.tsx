@@ -69,6 +69,71 @@ export default function AdminTenants() {
   const [creating, setCreating] = useState(false);
   const [membersOf, setMembersOf] = useState<TenantRow | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleLogoFileSelected = async (file: File | null) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|svg\+xml|webp)$/.test(file.type)) {
+      toast.error("Formato inválido. Use PNG, JPG, SVG ou WebP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Arquivo muito grande (máx 5MB).");
+      return;
+    }
+
+    setAiBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setLogoPreview(dataUrl);
+
+      // 1) Sobe pro Storage (bucket privado tenant-logos)
+      const slugPart = (form.slug || "novo").replace(/[^a-z0-9-]/g, "") || "novo";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${slugPart}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("tenant-logos")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+
+      // URL assinada de longa duração (10 anos)
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("tenant-logos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signErr) throw signErr;
+
+      // 2) IA extrai as cores
+      const { data: colors, error: fnErr } = await supabase.functions.invoke(
+        "extract-brand-colors",
+        { body: { imageDataUrl: dataUrl } },
+      );
+      if (fnErr) throw fnErr;
+
+      setForm((prev) => ({
+        ...prev,
+        logo_url: signed?.signedUrl ?? prev.logo_url,
+        primary: colors?.primary ?? prev.primary,
+        primaryStrong: colors?.primaryStrong ?? prev.primaryStrong,
+        accent: colors?.accent ?? prev.accent,
+      }));
+      toast.success("Logo enviada e cores extraídas pela IA");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Falha: " + (err?.message ?? String(err)));
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);

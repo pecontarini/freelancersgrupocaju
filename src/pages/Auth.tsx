@@ -8,7 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 import cajuparLogo from "@/assets/logo.png";
+import logoLightAsset from "@/assets/2board-logo-light.png.asset.json";
+import logoDarkAsset from "@/assets/2board-logo-dark.png.asset.json";
 import { useTenant } from "@/contexts/TenantContext";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,7 +19,11 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Auth() {
   const navigate = useNavigate();
   const { tenant } = useTenant();
-  const brandLogo = tenant.logos?.main ?? tenant.logoUrl ?? cajuparLogo;
+  const { resolvedTheme } = useTheme();
+  const is2board = tenant.slug === "2board";
+  const brandLogo = is2board
+    ? (resolvedTheme === "dark" ? logoDarkAsset.url : logoLightAsset.url)
+    : (tenant.logos?.main ?? tenant.logoUrl ?? cajuparLogo);
   const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");

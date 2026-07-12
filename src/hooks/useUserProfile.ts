@@ -91,6 +91,7 @@ export function useUserProfile() {
         profile: profileData as UserProfile | null,
         roles,
         isAdmin,
+        isSuperAdmin,
         isOperator,
         isGerenteUnidade,
         isChefeSetor,

@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Calendar,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
 

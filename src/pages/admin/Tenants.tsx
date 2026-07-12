@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2 } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 

@@ -153,6 +153,7 @@ export default function AdminTenants() {
 
   const openCreate = () => {
     setForm(emptyForm);
+    setLogoPreview(null);
     setEditing(null);
     setCreating(true);
   };

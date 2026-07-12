@@ -223,7 +223,7 @@
   /* ─── SUMMARY CARD (hero card) ─── */
   .summary-card {
     @apply relative overflow-hidden;
-    background: linear-gradient(135deg, hsl(14, 70%, 48%), hsl(8, 75%, 38%));
+    background: linear-gradient(135deg, hsl(0, 0%, 10%), hsl(0, 0%, 20%));
     box-shadow: var(--shadow-primary);
     border-radius: calc(var(--radius) + 4px);
   }
@@ -274,7 +274,7 @@
   /* Text gradient */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(14, 70%, 48%), hsl(8, 75%, 38%));
+    background-image: linear-gradient(135deg, hsl(0, 0%, 10%), hsl(0, 0%, 20%));
   }
 
   /* Número grande — display style Apple */
@@ -684,18 +684,18 @@
   .vision-glass-icon:hover {
     transform: translateY(-1px) scale(1.04);
     box-shadow:
-      0 6px 18px rgba(208, 89, 55, 0.20),
+      0 6px 18px rgba(0, 0, 0, 0.20),
       inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
   .vision-glass-icon[data-active="true"] {
     background: linear-gradient(
       135deg,
-      hsl(14 80% 55% / 0.30) 0%,
-      hsl(14 80% 50% / 0.22) 100%
+      hsl(0 0% 100% / 0.20) 0%,
+      hsl(0 0% 100% / 0.12) 100%
     );
-    border-color: hsl(14 80% 60% / 0.55);
+    border-color: hsl(0 0% 100% / 0.35);
     box-shadow:
-      0 6px 20px hsl(14 80% 55% / 0.35),
+      0 6px 20px hsl(0 0% 0% / 0.25),
       inset 0 1px 0 rgba(255, 255, 255, 0.65);
   }
 
@@ -708,7 +708,7 @@
     border-radius: 12px;
     box-shadow:
       0 8px 24px rgba(0, 0, 0, 0.35),
-      0 0 0 1px rgba(208, 89, 55, 0.10),
+      0 0 0 1px rgba(0, 0, 0, 0.10),
       inset 0 1px 0 rgba(255, 255, 255, 0.10);
     color: white;
   }
@@ -804,12 +804,12 @@
   .vision-dock-item[data-active="true"] {
     background: linear-gradient(
       135deg,
-      hsl(14 80% 55% / 0.28) 0%,
-      hsl(14 80% 50% / 0.18) 100%
+      hsl(0 0% 100% / 0.18) 0%,
+      hsl(0 0% 100% / 0.10) 100%
     );
     color: hsl(var(--primary));
     box-shadow:
-      0 6px 20px hsl(14 80% 55% / 0.40),
+      0 6px 20px hsl(0 0% 0% / 0.30),
       inset 0 1px 0 rgba(255, 255, 255, 0.55);
   }
 

@@ -48,6 +48,8 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "next-themes";
 import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
 import cajuparLogoLight from "@/assets/e532899c-a0de-44cf-aabb-b3978367f3d7.png";
+import cajuparSymbolFallback from "@/assets/cajupar-symbol.png";
+import { useTenant } from "@/contexts/TenantContext";
 import cajuparSymbol from "@/assets/cajupar-symbol.png";
 
 interface AppSidebarProps {
@@ -124,7 +126,12 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const canSeeGestao = (isAdmin || isOperator || isGerenteUnidade) && !isChefeSetor;
   const { state } = useSidebar();
   const { resolvedTheme } = useTheme();
-  const logoSrc = resolvedTheme === "dark" ? cajuparLogoLight : cajuparLogoDark;
+  const { tenant } = useTenant();
+  const tenantLogoDark = tenant.logos?.dark ?? cajuparLogoDark;
+  const tenantLogoLight = tenant.logos?.light ?? cajuparLogoLight;
+  const tenantSymbol = tenant.logos?.symbol ?? cajuparSymbolFallback;
+  const logoSrc = resolvedTheme === "dark" ? tenantLogoLight : tenantLogoDark;
+  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
@@ -139,19 +146,19 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
         <div className="flex flex-col items-center justify-center gap-2">
           {isCollapsed ? (
             <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
-              <img src={cajuparSymbol} alt="CajuPAR" className="h-8 w-8 object-contain" />
+              <img src={tenantSymbol} alt={brandAlt} className="h-8 w-8 object-contain" />
             </div>
           ) : (
             <>
               <div className="w-full overflow-hidden rounded-xl">
                 <img
                   src={logoSrc}
-                  alt="CajuPAR"
+                  alt={brandAlt}
                   className="h-auto w-full object-contain"
                 />
               </div>
               <span className="text-xs text-muted-foreground">
-                Portal da Liderança
+                {tenant.copy.appName}
               </span>
             </>
           )}

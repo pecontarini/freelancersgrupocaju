@@ -9,11 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Mail, Lock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import cajuparLogo from "@/assets/logo.png";
+import { useTenant } from "@/contexts/TenantContext";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Auth() {
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const brandLogo = tenant.logos?.main ?? tenant.logoUrl ?? cajuparLogo;
+  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,7 +114,7 @@ export default function Auth() {
           <CardHeader className="text-center space-y-4 pb-2">
             <div className="flex justify-center">
               <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-                <img src={cajuparLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
+                <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
               </div>
             </div>
             <CardDescription className="text-base">Recuperação de Senha</CardDescription>
@@ -212,10 +216,10 @@ export default function Auth() {
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
             <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-              <img src={cajuparLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
+              <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
             </div>
           </div>
-          <CardDescription className="text-base">Portal da Liderança</CardDescription>
+          <CardDescription className="text-base">{tenant.copy.appName}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login" className="w-full">

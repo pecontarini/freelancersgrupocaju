@@ -1,4 +1,8 @@
 import type { TenantConfig } from "../types";
+import logoLight from "@/assets/cajupar-logo-light.png";
+import logoDark from "@/assets/cajupar-logo-dark.png";
+import logoSymbol from "@/assets/cajupar-symbol.png";
+import logoMain from "@/assets/logo.png";
 
 /**
  * Grupo Caju — tenant de referência.
@@ -29,5 +33,12 @@ export const cajuTenant: TenantConfig = {
       welcome: "Bem-vindo ao Portal da Liderança",
     },
   },
-  logoUrl: undefined, // usa o logo atual do projeto até migrarmos para asset por tenant
+  logoUrl: logoMain,
+  logos: {
+    light: logoLight,
+    dark: logoDark,
+    symbol: logoSymbol,
+    main: logoMain,
+  },
+  faviconUrl: "/favicon-cajupar.png",
 };

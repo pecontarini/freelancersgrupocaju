@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
     const isDefault = Boolean(body.is_default ?? false);
     const fullName = body.full_name ? String(body.full_name) : undefined;
     const linkOnly = Boolean(body.link_only ?? false);
+    const redirectToBody = body.redirect_to ? String(body.redirect_to) : "";
 
     if (!email) {
       return json({ error: "email é obrigatório" }, 400);

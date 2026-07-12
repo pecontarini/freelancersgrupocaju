@@ -508,8 +508,20 @@ function TenantMembersDialog({
     });
     setInviting(false);
     if (error) return toast.error(error.message);
-    if ((data as any)?.error) return toast.error((data as any).error);
-    toast.success((data as any)?.invited ? "Convite enviado por e-mail e usuário vinculado" : "Usuário vinculado");
+    const d = data as any;
+    if (d?.error) return toast.error(d.error);
+    if (d?.invite_link && !d?.email_sent) {
+      try {
+        await navigator.clipboard.writeText(d.invite_link);
+        toast.success("Usuário criado. Link de convite copiado — envie manualmente.", { duration: 8000 });
+      } catch {
+        toast.success("Usuário criado. Link: " + d.invite_link, { duration: 15000 });
+      }
+    } else if (d?.invited) {
+      toast.success("Convite enviado por e-mail e usuário vinculado");
+    } else {
+      toast.success("Usuário vinculado");
+    }
     setEmail("");
     setFullName("");
     setIsDefault(false);

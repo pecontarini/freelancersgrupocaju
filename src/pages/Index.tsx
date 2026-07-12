@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { PortalHeader } from "@/components/layout/PortalHeader";
-import { RedFlagBanner } from "@/components/metas/RedFlagBanner";
+
 import { BottomNavigation } from "@/components/layout/BottomNavigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 

@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { AuroraBackground } from "./AuroraBackground";
 import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface BrandSplashProps {
   /** "full" = full-screen splash, "inline" = fits its container. */
@@ -20,6 +21,10 @@ export function BrandSplash({
   className,
 }: BrandSplashProps) {
   const isFull = variant === "full";
+  const { tenant } = useTenant();
+  const splashLogo =
+    tenant.logos?.symbol ?? tenant.logos?.main ?? tenant.logoUrl ?? LOGO_BASE64;
+  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
 
   return (
     <div
@@ -56,8 +61,8 @@ export function BrandSplash({
             }}
           >
             <img
-              src={LOGO_BASE64}
-              alt="CajuPAR"
+              src={splashLogo}
+              alt={brandAlt}
               className={cn(
                 "select-none object-contain drop-shadow-[0_8px_32px_rgba(208,89,55,0.45)]",
                 isFull ? "h-24 w-24 md:h-32 md:w-32" : "h-16 w-16"

@@ -26,6 +26,7 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { useTheme } from "next-themes";
 import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
 import cajuparLogoLight from "@/assets/cajupar-logo-light.png";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface BottomNavigationProps {
   activeTab: string;
@@ -44,6 +45,10 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
   const { signOut } = useAuth();
   const { isAdmin, isChefeSetor, profile } = useUserProfile();
   const { theme, setTheme } = useTheme();
+  const { tenant } = useTenant();
+  const brandLogoDark = tenant.logos?.dark ?? cajuparLogoDark;
+  const brandLogoLight = tenant.logos?.light ?? cajuparLogoLight;
+  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
 
@@ -57,8 +62,8 @@ export function BottomNavigation({ activeTab, onTabChange }: BottomNavigationPro
       <header className="vision-glass-header fixed top-0 left-0 right-0 z-50 flex h-14 items-center justify-between px-4 md:hidden">
         <div className="flex items-center gap-2 min-w-0">
           <img
-            src={theme === "dark" ? cajuparLogoLight : cajuparLogoDark}
-            alt="CajuPAR"
+            src={theme === "dark" ? brandLogoLight : brandLogoDark}
+            alt={brandAlt}
             className="h-8 w-auto"
           />
         </div>

@@ -1,5 +1,6 @@
 import { DollarSign, LogOut, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,6 +12,7 @@ import {
 
 export function AppHeader() {
   const { user, signOut } = useAuth();
+  const { tenant } = useTenant();
 
   return (
     <header className="glass-header sticky top-0 z-50 border-b-0">
@@ -20,8 +22,10 @@ export function AppHeader() {
             <DollarSign className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">FreelancerPay</h1>
-            <p className="text-xs text-muted-foreground/70">Gestão de Pagamentos</p>
+            <h1 className="text-lg font-semibold tracking-tight">{tenant.copy.appName}</h1>
+            <p className="text-xs text-muted-foreground/70">
+              {tenant.copy.tagline ?? "Gestão de Pagamentos"}
+            </p>
           </div>
         </div>
 

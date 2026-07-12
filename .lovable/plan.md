@@ -1,64 +1,68 @@
+# Caminho 2 — Self-service de novas empresas
 
-# Remoção de módulos + Simplificação do app
+Objetivo: permitir que um `super_admin` crie novas empresas (tenants), defina marca (nome, cores, logo) e vincule usuários — sem editar código nem migrar.
 
-## O que fica
+## 1. Banco (migração única)
 
-- **Unitários, Budgets e Inventário** — tab `unitarios-gerentes` + `utensilios`
-- **Gestão de Pessoas** — tab `gestao-pessoas` (escalas, freelancers, presença)
-- **Agenda do Líder** — tab `agenda-lider` e rota `/agenda`
-- **Configurações** — tab `configuracoes`
+**Alterar `public.tenants`**:
+- Adicionar `theme JSONB` (primary/accent/primaryStrong em HSL)
+- Adicionar `copy JSONB` (appName, tagline, browserTitle, metaDescription, terms, strings)
+- Adicionar `logo_url TEXT`, `logo_dark_url TEXT`, `logo_symbol_url TEXT`, `favicon_url TEXT`
+- Backfill do `caju` com os valores atuais de `src/tenants/caju/index.ts`
 
-## O que sai (totalmente removido)
+**Bucket de storage `tenant-assets`** (público, para logos/favicons):
+- Policies: SELECT público; INSERT/UPDATE/DELETE só `super_admin`
 
-| Módulo | Tab / Rota | Componentes principais |
-|---|---|---|
-| Quadro Operacional | `quadro-operacional` | `OperationalDashboard` |
-| Diagnóstico de Auditoria | `diagnostico` | `AuditDiagnosticDashboard`, `audit-diagnostic/`, `audit/` |
-| Indicadores Operacionais | `/painel/metas` | `pages/painel/Metas.tsx`, `painel-metas/`, `indicadores/`, `metas/` |
-| Remuneração Variável | `/painel/metas-variaveis` | `pages/painel/MetasVariaveis.tsx`, `leadership/`, `BonusCalculatorCard` |
-| Visão Rede | `rede` | `RedeTab`, `ExecutiveNetworkDashboard`, `NetworkSummary`, `HoldingCentralTab` |
+**RPCs (SECURITY DEFINER, exigem `super_admin`)**:
+- `admin_create_tenant(slug, name, theme, copy, logos)` → cria tenant
+- `admin_update_tenant(id, patch)` → atualiza campos
+- `admin_link_user_to_tenant(user_email, tenant_id, is_default)` → busca user por email em `auth.users` e cria `user_tenants`
+- `admin_unlink_user(user_id, tenant_id)`
+- `admin_list_tenants()` → lista tenants + contagem de usuários
+- `admin_list_tenant_users(tenant_id)` → lista membros
 
-## Etapas de execução
+Todas com `if not is_super_admin(auth.uid()) then raise exception 'forbidden'`.
 
-### Etapa 1 · Frontend — remoção de acessos e páginas
-- Editar `src/pages/Index.tsx`: remover imports, entradas de `tabConfig`, cases do switch e navegações (`painel`, `metas-variaveis`).
-- Editar `src/App.tsx`: remover rotas `/painel/metas` e `/painel/metas-variaveis` (mantendo apenas `/agenda`, `/checkin`, etc.).
-- Editar `src/components/layout/AppSidebar.tsx` e `BottomNavigation.tsx`: remover itens de menu dos módulos deletados.
-- Excluir arquivos/pastas de página e componente correspondentes.
+## 2. Frontend — carregar tenants do banco
 
-### Etapa 2 · Frontend — hooks, libs e assets órfãos
-Remover apenas o que ficar sem uso após a Etapa 1:
-- Hooks: `useAuditScores`, `useAuditSectorScores`, `useSupervisionAudits`, `useConformidadeData`, `useMetasHistorico`, `useMetasSnapshot`, `useIndicadoresSnapshot`, `usePayoutSnapshot`, `useLeadershipPerformance`, `useBonusRules`, `useAllSalesItems` (se só usado por rede), etc.
-- Libs: `src/lib/audit/`, `src/lib/leadershipPdfGenerator.ts`, `src/lib/metasUtils.ts`, `src/lib/pdf/leadershipOccurrenceCard.ts`.
-- Componentes soltos: `AuditReportButton`, `LeadershipRadar`, `MyPerformanceCard`, `WinsAlertsFeed`, `PerformanceEntriesList`, `PerformanceEntryForm`, `RankingsTab`, `UnitSummaryGrid`, `ComplianceHeatmap`, `SectorResponsibilityBadges`, `PendingValidationsList`, `AdminCXDashboard`, `CXHistoryArchive`, `CXPerformancePDF`, `ForecastingCard`.
+- `TenantContext` passa a buscar tenants ativos da tabela `tenants` no boot (fallback pro `TENANT_REGISTRY` estático quando offline/sem sessão).
+- Merge: se existir no banco, usa branding do banco; senão, usa o TS file. Assim `caju` continua funcionando mesmo sem migração aplicada.
+- `applyThemeToDocument` já suporta os campos — só passar do banco.
 
-**Validação**: `tsgo` (typecheck) precisa passar antes de seguir para a Etapa 3.
+## 3. Painel `/admin/tenants` (super_admin)
 
-### Etapa 3 · Banco — drop de tabelas dos módulos removidos
-Uma migração única com `DROP TABLE ... CASCADE` para as tabelas dos módulos removidos:
+Nova rota protegida por `super_admin`. Componentes:
 
-- **Auditoria**: `audit_alerts`, `audit_sector_scores`, `audit_upload_logs`, `supervision_audits`, `supervision_failures`, `checklist_corrections`
-- **Indicadores/Metas**: `indicadores_snapshots`, `metas_snapshot`, `metas_cargo`, `nps_targets`
-- **Remuneração variável**: `payout_indicator_sources`, `payout_orphan_records`, `payout_results_monthly`, `payout_role_target`, `payout_rules`, `bonus_config`, `bonus_rules`, `leadership_calculation_log`, `leadership_performance_scores`, `leadership_store_scores`, `store_performance`, `store_performance_entries`
-- **Quadro operacional / rede**: `pop_ajustes_manuais`, `pop_minimo_padrao`, `pop_overrides`, `pop_reconciliacao_log`, `pop_relatorios_enviados`, `pop_unidades_agregadas`, `pracas_plano_chao`, `staffing_matrix`, `escala_minima` (se só usados aqui)
+- **`TenantsListPage`** — grid de cards com nome, slug, cor, nº usuários, botões Editar / Gerenciar usuários.
+- **`TenantFormDialog`** — criar/editar:
+  - slug (readonly no edit), nome, tagline, browserTitle, metaDescription
+  - color pickers (primary/accent) → converte pra HSL
+  - upload de logo (light/dark/symbol) e favicon via storage `tenant-assets`
+  - preview ao vivo do header/botão com os tokens
+- **`TenantMembersDialog`** — listar membros, adicionar por email, marcar default, remover.
 
-Também dropar edge functions ligadas (`calculate-leadership-performance`, `analyze-audit-patterns`, `generate-audit-alerts`, `scan-storage-fix-scores`, `submit-checklist-correction`, `plano-acao-ia` se estritamente do diagnóstico).
+Entrada no menu: item "Empresas" só visível para `super_admin` (via `useUserRole`).
 
-**Nota importante**: tabelas compartilhadas com módulos que ficam (ex: `action_plans` é usado tanto pelo Diagnóstico quanto pela Agenda do Líder) **não são dropadas** — apenas as views/UI de auditoria são removidas.
+## 4. Onboarding manual (fallback)
 
-### Etapa 4 · Sidebar dinâmica por tenant (para o futuro)
-Adicionar em `TenantConfig` uma propriedade `enabledModules: string[]` — hoje o Caju terá apenas os 4 módulos que sobraram, e novas empresas herdam o mesmo conjunto por padrão. Isso deixa a arquitetura pronta para reativar módulos por marca caso necessário.
+Documentar em `docs/multi-tenant.md` como criar o 1º `super_admin` via SQL (uma vez), depois todo o resto é self-service.
 
 ## Detalhes técnicos
 
-- Ordem obrigatória: **frontend primeiro, banco depois**. Dropar tabelas antes de remover o código causaria erros de runtime na hora atual.
-- Cada `DROP TABLE` usa `CASCADE` para remover FKs, policies, triggers e índices dependentes.
-- `tsgo --noEmit` roda ao final da Etapa 2 para garantir zero referências penduradas.
-- Após a Etapa 3, o linter Supabase é reexecutado; warnings pré-existentes de views SECURITY DEFINER ligadas às tabelas removidas devem sumir.
+- `theme` JSONB shape: `{ primary: "20 74% 48%", accent: "...", primaryStrong: "..." }`
+- Uploads em `tenant-assets/{tenant_slug}/logo-light.png` etc.
+- `TENANT_REGISTRY` vira só o `_default` + `caju` como seeds; novos tenants **não precisam** de arquivo TS.
+- `getTenantBySlug` passa a consultar cache em memória populado pelo `TenantProvider` a partir do banco.
 
-## Riscos e ressalvas
+## Ordem de execução
 
-- **Perda de dados histórica**: dados de auditoria, indicadores e remuneração variável do Caju **serão apagados permanentemente**. Se quiser exportar um snapshot antes, faça agora.
-- **`action_plans`, `planos_acao`, `missoes`**: são usados pela Agenda do Líder — **ficam**. Se algum campo era exclusivo do Diagnóstico, ele fica sem uso mas não incomoda.
-- **`useCMV` / CMV**: fica (parte de Unitários Gerentes).
-- **`checklist_*`**: ficam (usados pelo self-checklist diário, que é parte de Gestão de Pessoas). `checklist_corrections` sai porque era vinculado ao fluxo de correção do Diagnóstico.
+1. Migração (colunas + bucket + RPCs + backfill caju)
+2. Refactor `TenantContext` para carregar do banco
+3. Rota `/admin/tenants` + componentes + item no sidebar
+4. Typecheck + smoke test manual (criar tenant fake, trocar via TenantSwitcher)
+
+## Riscos
+
+- Se o backfill do `caju` falhar, o app fica sem branding → mitigado pelo fallback TS.
+- Uploads de logo podem falhar em CDN → validar extensão/tamanho no front.
+- Emails de usuários que não existem em `auth.users` no link → retornar erro claro no dialog.

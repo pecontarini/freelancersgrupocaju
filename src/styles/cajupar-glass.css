@@ -6,25 +6,25 @@
 .cj-scope {
   /* light defaults */
   --cj-glass-bg: rgba(255, 255, 255, 0.58);
-  --cj-glass-border: rgba(255, 200, 150, 0.45);
+  --cj-glass-border: rgba(255, 255, 255, 0.45);
   --cj-glass-highlight: rgba(255, 255, 255, 0.85);
-  --cj-glass-shadow: 0 10px 36px rgba(224, 92, 26, 0.08);
+  --cj-glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.08);
   --cj-glass-blur: blur(28px) saturate(180%);
 
-  --cj-orange: #E05C1A;
-  --cj-orange-light: #FF7A30;
-  --cj-amber: #FFB84D;
+  --cj-orange: #111111;
+  --cj-orange-light: #333333;
+  --cj-amber: #666666;
 
-  --cj-bg-base: linear-gradient(135deg, #fff8f0 0%, #fff1e3 50%, #ffe8d4 100%);
-  --cj-blob-1: #ffcfa3;
-  --cj-blob-2: #ffb088;
-  --cj-blob-3: #ffd9a5;
+  --cj-bg-base: linear-gradient(135deg, #fafafa 0%, #f5f5f5 50%, #ececec 100%);
+  --cj-blob-1: #e5e5e5;
+  --cj-blob-2: #d4d4d4;
+  --cj-blob-3: #e5e5e5;
   --cj-blob-opacity-1: 0.7;
   --cj-blob-opacity-2: 0.6;
   --cj-blob-opacity-3: 0.6;
 
-  --cj-text: rgba(50, 25, 10, 0.92);
-  --cj-text-dim: rgba(50, 25, 10, 0.65);
+  --cj-text: rgba(15, 15, 15, 0.92);
+  --cj-text-dim: rgba(15, 15, 15, 0.65);
 
   --cj-good: #16a34a;
   --cj-warn: #d97706;
@@ -34,21 +34,21 @@
 }
 
 .dark .cj-scope {
-  --cj-glass-bg: rgba(255, 200, 150, 0.06);
-  --cj-glass-border: rgba(255, 200, 150, 0.16);
-  --cj-glass-highlight: rgba(255, 220, 180, 0.22);
-  --cj-glass-shadow: 0 10px 36px rgba(20, 8, 0, 0.22);
+  --cj-glass-bg: rgba(255, 255, 255, 0.06);
+  --cj-glass-border: rgba(255, 255, 255, 0.16);
+  --cj-glass-highlight: rgba(255, 255, 255, 0.22);
+  --cj-glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.22);
 
-  --cj-bg-base: linear-gradient(135deg, #050505 0%, #0d0907 50%, #060503 100%);
-  --cj-blob-1: #E05C1A;
-  --cj-blob-2: #FF7A30;
-  --cj-blob-3: #FFB84D;
+  --cj-bg-base: linear-gradient(135deg, #050505 0%, #0a0a0a 50%, #030303 100%);
+  --cj-blob-1: #111111;
+  --cj-blob-2: #333333;
+  --cj-blob-3: #666666;
   --cj-blob-opacity-1: 0.38;
   --cj-blob-opacity-2: 0.35;
   --cj-blob-opacity-3: 0.32;
 
-  --cj-text: rgba(255, 245, 235, 0.95);
-  --cj-text-dim: rgba(255, 245, 235, 0.65);
+  --cj-text: rgba(245, 245, 245, 0.95);
+  --cj-text-dim: rgba(245, 245, 245, 0.65);
 
   --cj-good: #86efac;
   --cj-warn: #fbbf24;
@@ -110,20 +110,20 @@
 }
 .cj-scope .cj-glass-hover:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 180, 120, 0.4);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 .cj-scope .cj-glass-highlight {
-  background: linear-gradient(135deg, rgba(224, 92, 26, 0.12), var(--cj-glass-bg));
-  border-color: rgba(224, 92, 26, 0.35);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.12), var(--cj-glass-bg));
+  border-color: rgba(0, 0, 0, 0.35);
 }
 .cj-scope .cj-glass-warn {
-  border-color: rgba(224, 92, 26, 0.55);
+  border-color: rgba(0, 0, 0, 0.55);
 }
 
 @supports not (backdrop-filter: blur(1px)) {
   .cj-scope .cj-glass,
   .cj-scope .glass-card {
-    background: rgba(20, 12, 6, 0.72);
+    background: rgba(15, 15, 15, 0.72);
   }
 }
 
@@ -142,9 +142,9 @@
   color: var(--cj-text-dim);
 }
 .cj-scope [role="tab"][data-state="active"] {
-  background: linear-gradient(135deg, rgba(224, 92, 26, 0.85), rgba(255, 122, 48, 0.75));
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.75));
   color: #fff;
-  box-shadow: 0 4px 14px rgba(224, 92, 26, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- Buttons (glass) ---- */

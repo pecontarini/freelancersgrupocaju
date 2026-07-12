@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     let emailSent = false;
 
     const origin = req.headers.get("origin") ?? "";
-    const redirectTo = origin ? `${origin}/auth` : undefined;
+    const redirectTo = redirectToBody || (origin ? `${origin}/reset-password` : undefined);
 
     if (!targetUserId) {
       if (linkOnly) return json({ error: "usuário não encontrado" }, 404);

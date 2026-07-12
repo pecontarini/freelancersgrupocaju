@@ -1,109 +1,74 @@
-# Plano: 2board White-Label por Subdomínio
+# Rebrand global: Caju → 2Sell (paleta preto/branco)
 
-## Visão geral
+Objetivo: eliminar a logo do Caju e os tons de laranja/coral de **todas** as áreas do app (plataforma e painéis de tenants) e usar sempre a logo da **2Sell**, com estética neutra P&B.
 
-O produto passa a se chamar **2board** (marca guarda-chuva). Cada empresa cliente terá seu próprio subdomínio (ex: `cajupar.2board.app`, `empresaX.2board.app`). Ao acessar o subdomínio, o sistema identifica o tenant **antes do login** e aplica tema, logo, nome e favicon da empresa. O login e todas as views passam a ser 100% personalizadas por empresa.
+## 1. Upload das logos 2Sell (Lovable Assets)
 
-Um subdomínio raiz (`app.2board.app` ou `2board.app`) mostra a landing/marca 2board neutra.
+Duas variantes já enviadas pelo usuário:
+- `Logo-2ELL-IA-Consulting-1-2_png-2.png` (preta sobre branco) → **2sell-logo-light.png** (usada no tema light)
+- `Logo-2ELL-IA-Consulting-1-_png-2.png` (branca sobre preto) → **2sell-logo-dark.png** (usada no tema dark)
 
-## Arquitetura
+Também gerar/derivar um **símbolo** (a letra "2" isolada) como `2sell-symbol.png` para splash/favicon; se não for viável recortar, usar a logo completa mesmo.
 
-```text
-┌─────────────────────────────────────────────────────┐
-│  Usuário digita: cajupar.2board.app                 │
-└────────────────────┬────────────────────────────────┘
-                     ↓
-       ┌─────────────────────────────┐
-       │  TenantResolver (bootstrap) │
-       │  Lê window.location.host    │
-       │  Extrai subdomínio "cajupar"│
-       └────────────┬────────────────┘
-                    ↓
-       ┌─────────────────────────────┐
-       │  Query: tenants.slug=cajupar│
-       │  Retorna: theme, copy,      │
-       │  logos, favicon, nome       │
-       └────────────┬────────────────┘
-                    ↓
-       ┌─────────────────────────────┐
-       │  Aplica CSS vars + <title>  │
-       │  + <link rel=icon> ANTES    │
-       │  de renderizar login        │
-       └────────────┬────────────────┘
-                    ↓
-       Login com cara da CajuPAR
-                    ↓
-       Após auth: view da empresa
-```
+## 2. Ponto único de verdade da marca
 
-## Etapas de implementação
+Criar `src/lib/brand.ts` exportando as URLs das logos 2Sell + helper `useBrandLogo()` que devolve light/dark conforme o tema atual (`next-themes` → `resolvedTheme`).
 
-### 1. Marca 2board (guarda-chuva)
-- Definir tenant "root" (slug `2board`) para o domínio raiz `2board.app` / `app.2board.app`.
-- Este tenant hospeda a landing pública, cadastro/demonstração, e é o fallback quando o subdomínio não bate com nenhuma empresa.
-- Criar identidade visual mínima 2board (paleta neutra, logo texto simples) — pode ser refinada depois.
+Todo componente que hoje importa `@/assets/logo.png`, `cajuparLogoLight`, `cajuparLogoDark` ou usa `tenant.logos.*` para exibir marca passa a usar esse helper. **A logo do tenant não é mais renderizada** — a marca fixa é 2Sell em todo o app.
 
-### 2. Tenant Resolver por subdomínio
-- Criar `src/lib/tenantResolver.ts`:
-  - Lê `window.location.hostname`.
-  - Extrai o primeiro segmento (`cajupar` de `cajupar.2board.app`).
-  - Tratamento especial para: `localhost`, `*.lovable.app` (preview), IPs → usa tenant default (`2board` ou último tenant do usuário via localStorage).
-- Substituir a lógica atual do `TenantContext` que decide tenant por localStorage/user_tenants para usar o resolver como fonte primária.
+## 3. Componentes a ajustar
 
-### 3. Query pública de branding
-- Criar RPC `public.get_tenant_branding(slug text)` que retorna apenas os campos públicos (nome, theme, copy, logos, favicon) — **sem exigir auth**, pois roda antes do login.
-- Adicionar policy pública de SELECT em `tenants` restrita a colunas de branding via RPC security-definer.
+| Área | Arquivo | Mudança |
+|---|---|---|
+| Login | `src/pages/Auth.tsx` | Remove lógica `is2board`/`tenant.logos` → sempre 2Sell por tema |
+| Reset senha | `src/pages/ResetPassword.tsx` | Substitui `cajuparLogo` por 2Sell |
+| Confirmar turno | `src/pages/ConfirmShift.tsx` | idem |
+| Checklist diário | `src/pages/DailyChecklist.tsx` | idem |
+| Correções checklist | `src/pages/ChecklistCorrections.tsx` | idem |
+| Sidebar | `src/components/layout/AppSidebar.tsx` | Remove fallbacks Caju, ignora `tenant.logos`, usa 2Sell |
+| Bottom nav mobile | `src/components/layout/BottomNavigation.tsx` | idem |
+| Header portal | `src/components/layout/PortalHeader.tsx` | verificar/atualizar se exibir logo |
+| App header | `src/components/AppHeader.tsx` | idem |
+| Splash carregando | `src/components/motion/BrandSplash.tsx` | Usa símbolo 2Sell + glow neutro (branco/cinza) |
+| Aurora background | `src/components/motion/AuroraBackground.tsx` | Orbs coral/âmbar → tons grafite/branco translúcido |
+| App background | `src/components/ui/cj-app-background.tsx` | Neutraliza gradientes coral |
+| Tela sem acesso | `src/components/TenantNoAccessScreen.tsx` | Logo 2Sell |
+| Admin tenants | `src/pages/admin/Tenants.tsx` | Marca 2Sell no cabeçalho |
+| PDFs (relatórios, escala, checklist, manutenção) | `src/lib/pdf/*`, `src/lib/scheduleMasterPdf.ts`, `src/lib/scheduleDailyControlPdf.ts`, `src/components/MaintenanceExportButton.tsx`, `MaintenanceSingleExportButton.tsx`, `ExportReportButton.tsx` | Trocar `LOGO_BASE64` / tema Caju por asset 2Sell e paleta P&B |
+| Logo base64 | `src/lib/logoBase64.ts` | Regenerar como 2Sell (base64 para PDFs) |
+| Tema PDF | `src/lib/pdf/grupoCajuPdfTheme.ts` | Cores viram preto/cinza; renomear ficará como refactor futuro |
 
-### 4. Aplicação de tema pré-login
-- Refatorar `TenantContext` para:
-  - Fase 1 (síncrono no bootstrap): aplicar CSS vars, `<title>`, favicon dinâmico via `<link>` injetado em `<head>`.
-  - Fase 2 (após auth): validar que o usuário tem acesso ao tenant do subdomínio; se não, redirecionar para `app.2board.app` com aviso.
+## 4. Tokens de cor e CSS
 
-### 5. Guard de acesso ao tenant
-- Se um usuário logado tenta acessar `empresaX.2board.app` mas só tem `user_tenants` para `cajupar`, mostrar tela de "Sem acesso a esta empresa" com link para o subdomínio correto.
+- **`src/index.css`**: remover/neutralizar `--primary`, `--accent`, `--cj-accent-strong` que hoje são coral. Ficam em escalas de cinza (ex.: `--primary: 0 0% 10%` no light, `0 0% 95%` no dark). `--ring`, `--sidebar-primary` etc. seguem o mesmo caminho.
+- **`src/styles/cajupar-glass.css`**: `--cj-orange` e `--cj-orange-light` viram tons neutros (grafite/branco).
+- **`src/styles/cajupar-design-system.css`**: qualquer coral hardcoded → neutro.
+- **`tailwind.config.ts`**: revisar tokens custom que referenciam coral.
+- **Tenants no banco**: o `TenantContext` deixa de aplicar `theme.primary`/`primaryStrong`/`accent` vindos do DB (ou aplicamos sempre a paleta 2Sell, ignorando o que vier). Preserva `data-tenant` só para segmentação, sem impacto visual.
 
-### 6. Painel super_admin (já existe)
-- Ajustar `/admin/tenants` para exibir o subdomínio esperado de cada tenant (`{slug}.2board.app`) e link para acessar.
+## 5. Splash / Aurora neutros
 
-### 7. Publicação e DNS (ação do usuário)
-- Publicar o projeto no Lovable → gera URL `.lovable.app`.
-- Comprar/configurar domínio `2board.app` (ou usar um que você já tenha).
-- Configurar **DNS wildcard**: `*.2board.app` → Lovable (registro A `185.158.133.1` + TXT de verificação).
-- Adicionar no Lovable os domínios: `2board.app`, `app.2board.app`, `cajupar.2board.app` (e cada nova empresa).
+- `AuroraBackground`: 4 orbs em `hsl(0 0% 100% / 0.08–0.15)` sobre base `hsl(0 0% 4%)` (dark) e cinza claro (light). Sem coral/âmbar.
+- `BrandSplash`: halo do logo em `hsl(0 0% 100% / 0.25)`, shimmer branco, drop-shadow neutro. Texto "Carregando seu portal…" mantém.
+
+## 6. `index.html` e favicon
+
+- `<title>` e `<meta description>`: "2Sell — …" (já está 2board; ajustar para 2Sell).
+- Favicon: apontar para símbolo 2Sell (asset novo).
+- Remover qualquer referência remanescente a Caju/coral em meta tags/theme-color.
+
+## 7. Tenants no banco (branding)
+
+Não é preciso migração destrutiva. O `TenantContext` passa a **ignorar** `logo_url`, `logo_dark_url`, `logo_symbol_url`, `theme.primary` etc. no que diz respeito à renderização — mantém `slug`, `id`, `copy.appName` (nome da empresa aparece como texto, ex.: no seletor de tenants) e resolução de acesso. Nada muda no schema.
+
+## 8. Validação
+
+- Playwright headless em `/auth`, `/` (após login mock), `/admin/tenants`, `/reset-password`, `/checklist-diario`, tela de erro sem acesso. Screenshots em light e dark para confirmar ausência total de coral e presença da 2Sell.
+- Grep final por `cajupar`, `caju`, `#D05937`, `#E05C1A`, `orange`, `coral`, `terracotta` em `src/` — remanescentes só em comentários/nomes de classes utilitárias já reescritas.
 
 ## Detalhes técnicos
 
-### Novos arquivos
-- `src/lib/tenantResolver.ts` — extrai slug do hostname.
-- `src/components/TenantNoAccessScreen.tsx` — tela quando user não tem acesso ao tenant do subdomínio.
-
-### Arquivos modificados
-- `src/contexts/TenantContext.tsx` — passa a usar tenantResolver + aplica branding no bootstrap síncrono.
-- `index.html` — remove título hardcoded, deixa o TenantContext preencher dinamicamente.
-- `src/pages/admin/Tenants.tsx` — exibe URL prevista de cada tenant.
-
-### Migração SQL
-- RPC `get_tenant_branding(slug)` security-definer que retorna JSON público (nome, theme, copy, logos, favicon).
-- Backfill: garantir que existe um tenant com slug `2board` (root/marca guarda-chuva).
-
-### Não muda
-- `user_tenants`, `user_roles`, RLS por tenant — tudo continua igual.
-- Todas as views/dashboards existentes continuam funcionando dentro de cada tenant.
-- Nomes de tabelas, edge functions, hooks — nada quebra.
-
-## O que você precisa fazer depois do código pronto
-
-1. **Publicar o projeto** (botão Publish) → gera `.lovable.app`.
-2. **Comprar o domínio `2board.app`** (posso ajudar via Lovable Domains) ou usar um seu.
-3. **Configurar DNS wildcard** `*.2board.app` no registrador.
-4. **Adicionar os subdomínios no Lovable** (um por empresa que for entrar).
-
-Depois disso, criar uma empresa nova = criar o tenant no painel `/admin/tenants` + adicionar o subdomínio no Lovable. Sem tocar em código.
-
-## Fora do escopo desta etapa
-
-- Landing page de marketing do 2board (fica para depois).
-- Auto-provisionamento de subdomínio via API (Lovable ainda exige adicionar domínio manualmente pelo dashboard).
-- Fluxo de auto-cadastro de novas empresas pelo próprio site (por enquanto criação é manual pelo super_admin).
-
-Posso seguir com a implementação?
+- `useBrandLogo()` retorna `{ full: string; symbol: string; alt: string }` com base em `resolvedTheme`.
+- PDFs: converter novo PNG 2Sell para base64 (script único) e atualizar `logoBase64.ts`.
+- Nomes de arquivos/classes com prefixo `cajupar-`/`cj-` são mantidos para minimizar churn — só o **conteúdo** (cores/valores) é neutralizado. Renomeações ficam como tech debt em `TECH_DEBT.md`.
+- Nenhuma alteração de rota, RLS, edge function ou schema.

@@ -62,6 +62,7 @@ export function useUserProfile() {
 
       const roles = (rolesData?.map((r) => r.role) || []) as AppRole[];
       const isAdmin = roles.includes("admin");
+      const isSuperAdmin = roles.includes("super_admin");
       const isOperator = roles.includes("operator");
       const isGerenteUnidade = roles.includes("gerente_unidade");
       const isChefeSetor = roles.includes("chefe_setor");

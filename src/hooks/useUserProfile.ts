@@ -27,12 +27,14 @@ export function useUserProfile() {
           profile: null,
           roles: [],
           isAdmin: false,
+          isSuperAdmin: false,
           isOperator: false,
           isGerenteUnidade: false,
           isChefeSetor: false,
           isEmployee: false,
           unidades: [],
         };
+
       }
 
       // Fetch profile

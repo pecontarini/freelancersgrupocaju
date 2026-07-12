@@ -62,20 +62,42 @@ Deno.serve(async (req) => {
     if (existing) targetUserId = existing.id;
 
     let invited = false;
+    let inviteLink: string | null = null;
+    let emailSent = false;
+
+    const origin = req.headers.get("origin") ?? "";
+    const redirectTo = origin ? `${origin}/auth` : undefined;
 
     if (!targetUserId) {
-      const origin = req.headers.get("origin") ?? "";
-      const redirectTo = origin ? `${origin}/auth` : undefined;
+      // 1) Cria o usuário direto (sem depender de SMTP)
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email,
+        email_confirm: false,
+        user_metadata: fullName ? { full_name: fullName } : undefined,
+      });
+      if (createErr || !created.user) {
+        return json({ error: createErr?.message ?? "falha ao criar usuário" }, 500);
+      }
+      targetUserId = created.user.id;
+      invited = true;
 
-      const { data: invRes, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+      // 2) Gera link de convite (não envia e-mail — devolvemos p/ admin compartilhar)
+      const { data: linkData, error: linkGenErr } = await admin.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: { redirectTo },
+      });
+      if (!linkGenErr) {
+        inviteLink = linkData?.properties?.action_link ?? null;
+      }
+
+      // 3) Tentativa best-effort de disparar e-mail via inviteUserByEmail
+      // (se SMTP estourou rate limit, ignoramos silenciosamente — o link acima cobre)
+      const { error: mailErr } = await admin.auth.admin.inviteUserByEmail(email, {
         redirectTo,
         data: fullName ? { full_name: fullName } : undefined,
       });
-      if (invErr || !invRes.user) {
-        return json({ error: invErr?.message ?? "falha ao convidar usuário" }, 500);
-      }
-      targetUserId = invRes.user.id;
-      invited = true;
+      emailSent = !mailErr;
     }
 
     // Vincular ao tenant
@@ -91,7 +113,7 @@ Deno.serve(async (req) => {
       );
     if (linkErr) return json({ error: linkErr.message }, 500);
 
-    return json({ ok: true, user_id: targetUserId, invited });
+    return json({ ok: true, user_id: targetUserId, invited, invite_link: inviteLink, email_sent: emailSent });
   } catch (e: any) {
     return json({ error: e?.message ?? "erro inesperado" }, 500);
   }

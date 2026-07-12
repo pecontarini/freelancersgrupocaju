@@ -41,6 +41,8 @@ export function PortalHeader({
             <TenantSwitcher />
             <ThemeToggle />
           </div>
+        </div>
+
 
         {showUnidadeSelector && (
           <UnidadeSelector

@@ -36,8 +36,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-import { useBrandLogo } from "@/lib/brand";
-import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import { useBrandLogo, BRAND_NAME } from "@/lib/brand";
 
 interface AppSidebarProps {
   activeTab: string;
@@ -78,13 +79,8 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
   const { isAdmin, isSuperAdmin, isChefeSetor, profile } = useUserProfile();
   const { state } = useSidebar();
-  const { resolvedTheme } = useTheme();
-  const { tenant } = useTenant();
-  const tenantLogoDark = tenant.logos?.dark ?? cajuparLogoDark;
-  const tenantLogoLight = tenant.logos?.light ?? cajuparLogoLight;
-  const tenantSymbol = tenant.logos?.symbol ?? cajuparSymbolFallback;
-  const logoSrc = resolvedTheme === "dark" ? tenantLogoLight : tenantLogoDark;
-  const brandAlt = tenant.copy.tagline ?? tenant.copy.appName;
+  const { src: logoSrc, alt: brandAlt } = useBrandLogo();
+  const tenantSymbol = logoSrc;
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
   const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);

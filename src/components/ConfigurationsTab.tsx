@@ -1,10 +1,8 @@
-import { Store, Briefcase, Users, Plug, Building2, Award, Settings2 } from "lucide-react";
+import { Store, Briefcase, Users, Building2, Award, Settings2 } from "lucide-react";
 import { ConfigSection } from "@/components/ConfigSection";
 import { ClearEntriesModal } from "@/components/ClearEntriesModal";
 import { BudgetConfigSection as OperationalBudgetSection } from "@/components/OperationalBudgetConfigSection";
-import { BonusConfigSection } from "@/components/BonusConfigSection";
 import { CargosConfigSection } from "@/components/CargosConfigSection";
-import { MetaSheetsLinker } from "@/components/sheets/MetaSheetsLinker";
 import { UnitPartnershipsSection } from "@/components/UnitPartnershipsSection";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import {
@@ -55,17 +53,7 @@ export function ConfigurationsTab() {
         {isAdmin && <ClearEntriesModal />}
       </div>
 
-      {/* GRUPO 1 — INTEGRAÇÕES */}
-      {showIntegracoes && (
-        <ConfigGroup
-          icon={<Plug className="h-4 w-4 text-primary" />}
-          title="Integrações"
-        >
-          <MetaSheetsLinker />
-        </ConfigGroup>
-      )}
-
-      {/* GRUPO 2 — OPERAÇÃO & FINANCEIRO */}
+      {/* GRUPO 1 — OPERAÇÃO & FINANCEIRO */}
       {showOperacao && (
         <ConfigGroup
           icon={<Building2 className="h-4 w-4 text-primary" />}
@@ -76,14 +64,13 @@ export function ConfigurationsTab() {
         </ConfigGroup>
       )}
 
-      {/* GRUPO 3 — CARGOS & BÔNUS */}
+      {/* GRUPO 2 — CARGOS */}
       {showCargosBonus && (
         <ConfigGroup
           icon={<Award className="h-4 w-4 text-primary" />}
-          title="Cargos & Bônus"
+          title="Cargos"
         >
           <CargosConfigSection />
-          <BonusConfigSection />
         </ConfigGroup>
       )}
 

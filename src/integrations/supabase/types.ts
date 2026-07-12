@@ -5594,32 +5594,47 @@ export type Database = {
       tenants: {
         Row: {
           ativo: boolean
+          copy: Json
           created_at: string
+          favicon_url: string | null
           id: string
+          logo_dark_url: string | null
+          logo_symbol_url: string | null
           logo_url: string | null
           nome: string
           primary_color: string | null
           slug: string
+          theme: Json
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          copy?: Json
           created_at?: string
+          favicon_url?: string | null
           id?: string
+          logo_dark_url?: string | null
+          logo_symbol_url?: string | null
           logo_url?: string | null
           nome: string
           primary_color?: string | null
           slug: string
+          theme?: Json
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          copy?: Json
           created_at?: string
+          favicon_url?: string | null
           id?: string
+          logo_dark_url?: string | null
+          logo_symbol_url?: string | null
           logo_url?: string | null
           nome?: string
           primary_color?: string | null
           slug?: string
+          theme?: Json
           updated_at?: string
         }
         Relationships: []
@@ -6390,6 +6405,72 @@ export type Database = {
       }
     }
     Functions: {
+      admin_create_tenant: {
+        Args: {
+          _copy?: Json
+          _favicon_url?: string
+          _logo_dark_url?: string
+          _logo_symbol_url?: string
+          _logo_url?: string
+          _nome: string
+          _primary_color?: string
+          _slug: string
+          _theme?: Json
+        }
+        Returns: string
+      }
+      admin_link_user_to_tenant: {
+        Args: { _email: string; _is_default?: boolean; _tenant_id: string }
+        Returns: string
+      }
+      admin_list_tenant_users: {
+        Args: { _tenant_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          is_default: boolean
+          linked_at: string
+          user_id: string
+        }[]
+      }
+      admin_list_tenants: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          copy: Json
+          created_at: string
+          favicon_url: string
+          id: string
+          logo_dark_url: string
+          logo_symbol_url: string
+          logo_url: string
+          nome: string
+          primary_color: string
+          slug: string
+          theme: Json
+          updated_at: string
+          user_count: number
+        }[]
+      }
+      admin_unlink_user_from_tenant: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: undefined
+      }
+      admin_update_tenant: {
+        Args: {
+          _ativo?: boolean
+          _copy?: Json
+          _favicon_url?: string
+          _id: string
+          _logo_dark_url?: string
+          _logo_symbol_url?: string
+          _logo_url?: string
+          _nome?: string
+          _primary_color?: string
+          _theme?: Json
+        }
+        Returns: undefined
+      }
       build_daily_stock_snapshot: {
         Args: { p_date: string; p_unit_id: string }
         Returns: undefined

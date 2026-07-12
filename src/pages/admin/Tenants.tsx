@@ -505,6 +505,7 @@ function TenantMembersDialog({
         tenant_id: tenant.id,
         is_default: isDefault,
         full_name: fullName.trim() || undefined,
+        redirect_to: `${window.location.origin}/reset-password`,
       },
     });
     setInviting(false);

@@ -36,14 +36,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
-import { useAuth } from "@/contexts/AuthContext";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import { useTheme } from "next-themes";
-import cajuparLogoDark from "@/assets/cajupar-logo-dark.png";
-import cajuparLogoLight from "@/assets/e532899c-a0de-44cf-aabb-b3978367f3d7.png";
-import cajuparSymbolFallback from "@/assets/cajupar-symbol.png";
+import { useBrandLogo } from "@/lib/brand";
 import { useTenant } from "@/contexts/TenantContext";
-import cajuparSymbol from "@/assets/cajupar-symbol.png";
 
 interface AppSidebarProps {
   activeTab: string;

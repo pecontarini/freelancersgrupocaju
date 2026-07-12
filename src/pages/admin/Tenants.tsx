@@ -83,7 +83,8 @@ export default function AdminTenants() {
   }, [isSuperAdmin]);
 
   if (profileLoading) return <BrandSplash variant="full" message="Carregando..." />;
-  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  // Guarda de rota já validou super_admin via <AdminRoute>. Fallback defensivo:
+  if (!isSuperAdmin) return null;
 
   const openCreate = () => {
     setForm(emptyForm);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2 } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 
@@ -69,6 +69,71 @@ export default function AdminTenants() {
   const [creating, setCreating] = useState(false);
   const [membersOf, setMembersOf] = useState<TenantRow | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleLogoFileSelected = async (file: File | null) => {
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|svg\+xml|webp)$/.test(file.type)) {
+      toast.error("Formato inválido. Use PNG, JPG, SVG ou WebP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Arquivo muito grande (máx 5MB).");
+      return;
+    }
+
+    setAiBusy(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setLogoPreview(dataUrl);
+
+      // 1) Sobe pro Storage (bucket privado tenant-logos)
+      const slugPart = (form.slug || "novo").replace(/[^a-z0-9-]/g, "") || "novo";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${slugPart}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("tenant-logos")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+
+      // URL assinada de longa duração (10 anos)
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("tenant-logos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signErr) throw signErr;
+
+      // 2) IA extrai as cores
+      const { data: colors, error: fnErr } = await supabase.functions.invoke(
+        "extract-brand-colors",
+        { body: { imageDataUrl: dataUrl } },
+      );
+      if (fnErr) throw fnErr;
+
+      setForm((prev) => ({
+        ...prev,
+        logo_url: signed?.signedUrl ?? prev.logo_url,
+        primary: colors?.primary ?? prev.primary,
+        primaryStrong: colors?.primaryStrong ?? prev.primaryStrong,
+        accent: colors?.accent ?? prev.accent,
+      }));
+      toast.success("Logo enviada e cores extraídas pela IA");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Falha: " + (err?.message ?? String(err)));
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -88,6 +153,7 @@ export default function AdminTenants() {
 
   const openCreate = () => {
     setForm(emptyForm);
+    setLogoPreview(null);
     setEditing(null);
     setCreating(true);
   };
@@ -109,6 +175,7 @@ export default function AdminTenants() {
       favicon_url: t.favicon_url ?? "",
       ativo: t.ativo,
     });
+    setLogoPreview(t.logo_url ?? null);
     setEditing(t);
     setCreating(false);
   };
@@ -278,6 +345,53 @@ export default function AdminTenants() {
                 onChange={(e) => setForm({ ...form, metaDescription: e.target.value })}
                 rows={2}
               />
+            </div>
+
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Logo + cores por IA
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Envie a logo e a IA sugere as cores da marca automaticamente.
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleLogoFileSelected(e.target.files?.[0] ?? null)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={aiBusy}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="gap-2"
+                >
+                  {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  {aiBusy ? "Analisando..." : "Enviar logo"}
+                </Button>
+              </div>
+              {logoPreview && (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                  <div className="h-16 w-16 rounded bg-background border flex items-center justify-center overflow-hidden">
+                    <img src={logoPreview} alt="Preview" className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <div className="flex-1 grid grid-cols-3 gap-2">
+                    {(["primary", "primaryStrong", "accent"] as const).map((k) => (
+                      <div key={k} className="text-center">
+                        <div className="h-6 rounded border" style={{ background: `hsl(${form[k]})` }} />
+                        <p className="text-[10px] mt-1 text-muted-foreground">{k}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-4">

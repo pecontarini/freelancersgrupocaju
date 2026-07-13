@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 
 export interface CheckinBudgetEntry {
   id: string;
@@ -20,12 +21,15 @@ export interface CheckinBudgetEntry {
 }
 
 export function useCheckinBudgetEntries(lojaId?: string | null, monthYear?: string) {
+  const { tenantId } = useTenant();
   const query = useQuery({
-    queryKey: ["checkin-budget-entries", lojaId, monthYear],
+    queryKey: ["checkin-budget-entries", tenantId, lojaId, monthYear],
     queryFn: async () => {
+      if (!tenantId) return [];
       let q = supabase
         .from("checkin_budget_entries")
         .select("*")
+        .eq("tenant_id", tenantId)
         .order("data_servico", { ascending: false });
 
       if (lojaId) q = q.eq("loja_id", lojaId);

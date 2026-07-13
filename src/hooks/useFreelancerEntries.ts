@@ -3,17 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { FreelancerEntry, FreelancerFormData } from "@/types/freelancer";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { useTenant } from "@/contexts/TenantContext";
 
 export function useFreelancerEntries() {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
 
   const { data: entries = [], isLoading, error } = useQuery({
-    queryKey: ["freelancer-entries"],
+    queryKey: ["freelancer-entries", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       return fetchAllRows<FreelancerEntry>(
         () => supabase
           .from("freelancer_entries")
           .select("*")
+          .eq("tenant_id", tenantId)
           .order("data_pop", { ascending: false })
       );
     },
@@ -25,6 +29,9 @@ export function useFreelancerEntries() {
       
       if (!user) {
         throw new Error("Usuário não autenticado");
+      }
+      if (!tenantId) {
+        throw new Error("Empresa ativa não encontrada.");
       }
 
       // Padrão canônico: CPF sempre limpo (apenas dígitos) em todas as tabelas
@@ -44,6 +51,7 @@ export function useFreelancerEntries() {
           chave_pix: formData.chave_pix,
           created_by: user.id,
           loja_id: formData.loja_id,
+          tenant_id: tenantId,
         })
         .select()
         .single();
@@ -59,6 +67,7 @@ export function useFreelancerEntries() {
               cpf: cleanCpf,
               nome_completo: formData.nome_completo,
               chave_pix: formData.chave_pix,
+              tenant_id: tenantId,
             },
             { onConflict: "cpf", ignoreDuplicates: false }
           );
@@ -70,7 +79,7 @@ export function useFreelancerEntries() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["freelancer-entries", tenantId] });
       toast.success("Lançamento salvo com sucesso!");
     },
     onError: (error) => {
@@ -85,6 +94,7 @@ export function useFreelancerEntries() {
         .from("freelancer_entries")
         .update(updates)
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .select()
         .single();
 
@@ -92,7 +102,7 @@ export function useFreelancerEntries() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["freelancer-entries", tenantId] });
       toast.success("Lançamento atualizado com sucesso!");
     },
     onError: (error) => {
@@ -106,7 +116,8 @@ export function useFreelancerEntries() {
       const { error } = await supabase
         .from("freelancer_entries")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
       
       if (error) {
         if (error.code === "42501" || error.message.includes("policy")) {
@@ -116,10 +127,10 @@ export function useFreelancerEntries() {
       }
     },
     onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: ["freelancer-entries"] });
-      const previousEntries = queryClient.getQueryData<FreelancerEntry[]>(["freelancer-entries"]);
+      await queryClient.cancelQueries({ queryKey: ["freelancer-entries", tenantId] });
+      const previousEntries = queryClient.getQueryData<FreelancerEntry[]>(["freelancer-entries", tenantId]);
       queryClient.setQueryData<FreelancerEntry[]>(
-        ["freelancer-entries"],
+        ["freelancer-entries", tenantId],
         (old) => old?.filter((entry) => entry.id !== id) ?? []
       );
       return { previousEntries };
@@ -129,13 +140,13 @@ export function useFreelancerEntries() {
     },
     onError: (error, id, context) => {
       if (context?.previousEntries) {
-        queryClient.setQueryData(["freelancer-entries"], context.previousEntries);
+        queryClient.setQueryData(["freelancer-entries", tenantId], context.previousEntries);
       }
       console.error("Error deleting entry:", error);
       toast.error(error instanceof Error ? error.message : "Erro ao excluir lançamento.");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["freelancer-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["freelancer-entries", tenantId] });
     },
   });
 

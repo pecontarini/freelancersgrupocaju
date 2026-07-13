@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { useTenant } from "@/contexts/TenantContext";
 
 export interface StoreBudget {
   id: string;
@@ -22,15 +23,18 @@ export interface StoreBudget {
 export function useStoreBudgets() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
 
   // Fetch all store budgets
   const { data: budgets = [], isLoading } = useQuery({
-    queryKey: ["store_budgets"],
+    queryKey: ["store_budgets", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       return fetchAllRows<StoreBudget>(
         () => supabase
           .from("store_budgets")
           .select("*")
+          .eq("tenant_id", tenantId)
           .order("month_year", { ascending: false })
       );
     },
@@ -68,10 +72,11 @@ export function useStoreBudgets() {
       utensils_budget: number;
       apoio_venda_budget: number;
     }) => {
+      if (!tenantId) throw new Error("Empresa ativa não encontrada.");
       const { data, error } = await supabase
         .from("store_budgets")
         .upsert(
-          { store_id, month_year, freelancer_budget, maintenance_budget, uniforms_budget, cleaning_budget, utensils_budget, apoio_venda_budget },
+          { store_id, month_year, freelancer_budget, maintenance_budget, uniforms_budget, cleaning_budget, utensils_budget, apoio_venda_budget, tenant_id: tenantId },
           { onConflict: "store_id,month_year" }
         )
         .select()
@@ -81,8 +86,8 @@ export function useStoreBudgets() {
       return data;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["store_budgets"] });
-      await queryClient.refetchQueries({ queryKey: ["store_budgets"] });
+      await queryClient.invalidateQueries({ queryKey: ["store_budgets", tenantId] });
+      await queryClient.refetchQueries({ queryKey: ["store_budgets", tenantId] });
       toast({
         title: "✅ Budget salvo",
         description: "O orçamento foi salvo com sucesso.",
@@ -105,12 +110,13 @@ export function useStoreBudgets() {
       const { error } = await supabase
         .from("store_budgets")
         .delete()
-        .eq("id", budgetId);
+        .eq("id", budgetId)
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["store_budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["store_budgets", tenantId] });
       toast({
         title: "Budget removido",
         description: "O orçamento foi removido com sucesso.",

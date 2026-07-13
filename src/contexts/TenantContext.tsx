@@ -97,6 +97,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [slug, setSlug] = useState<string>(() => resolveInitialTenantSlug());
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [availableSlugs, setAvailableSlugs] = useState<string[]>([]);
+  const [availableTenantIds, setAvailableTenantIds] = useState<Record<string, string>>({});
   const [dbTenants, setDbTenants] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -144,6 +145,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from("user_tenants")
         .select("tenant_id, is_default, tenants!inner(slug, id)")
+        .eq("user_id", session.user.id)
         .order("is_default", { ascending: false });
 
       if (cancelled) return;
@@ -153,16 +155,22 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const slugs = data
-        .map((row: any) => row.tenants?.slug)
-        .filter((s: string | undefined): s is string => Boolean(s));
+      const tenantRows = data.reduce((acc: Record<string, any>, row: any) => {
+        const rowSlug = row.tenants?.slug;
+        if (rowSlug && !acc[rowSlug]) acc[rowSlug] = row;
+        return acc;
+      }, {});
+      const slugs = Object.keys(tenantRows);
+      const tenantIds = Object.fromEntries(
+        Object.entries(tenantRows).map(([rowSlug, row]: [string, any]) => [rowSlug, row.tenant_id]),
+      );
       setAvailableSlugs(slugs);
+      setAvailableTenantIds(tenantIds);
 
       // Se o host trava o tenant (subdomínio real), o usuário PRECISA ter acesso a ele
       if (isHostLocked) {
         if (slugs.includes(slug)) {
-          const row = data.find((r: any) => r.tenants?.slug === slug);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[slug] ?? null);
           setAccessDenied(false);
         } else {
           setAccessDenied(true);
@@ -172,11 +180,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         if (slugs.length > 0 && !slugs.includes(slug)) {
           const first = slugs[0];
           setSlug(first);
-          const row = data.find((r: any) => r.tenants?.slug === first);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[first] ?? null);
         } else if (slugs.includes(slug)) {
-          const row = data.find((r: any) => r.tenants?.slug === slug);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[slug] ?? null);
         }
       }
 
@@ -210,6 +216,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (isHostLocked) return; // travado pelo subdomínio
     if (!TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
     setSlug(nextSlug);
+    setTenantId(availableTenantIds[nextSlug] ?? null);
     try {
       window.localStorage.setItem("tenant_slug", nextSlug);
     } catch {

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useTenant } from "@/contexts/TenantContext";
 
 export interface ConfigOption {
   id: string;
@@ -12,14 +13,17 @@ type ConfigTable = "config_lojas" | "config_funcoes" | "config_gerencias";
 
 function useConfigTable(table: ConfigTable) {
   const queryClient = useQueryClient();
-  const queryKey = [table];
+  const { tenantId } = useTenant();
+  const queryKey = [table, tenantId];
 
   const { data: options = [], isLoading } = useQuery({
     queryKey,
     queryFn: async () => {
+      if (!tenantId) return [];
       const { data, error } = await supabase
         .from(table)
         .select("*")
+        .eq("tenant_id", tenantId)
         .order("nome", { ascending: true });
       
       if (error) throw error;
@@ -29,9 +33,10 @@ function useConfigTable(table: ConfigTable) {
 
   const addOption = useMutation({
     mutationFn: async (nome: string) => {
+      if (!tenantId) throw new Error("Empresa ativa não encontrada.");
       const { data, error } = await supabase
         .from(table)
-        .insert({ nome: nome.trim() })
+        .insert({ nome: nome.trim(), tenant_id: tenantId })
         .select()
         .single();
       

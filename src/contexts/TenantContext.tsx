@@ -97,6 +97,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [slug, setSlug] = useState<string>(() => resolveInitialTenantSlug());
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [availableSlugs, setAvailableSlugs] = useState<string[]>([]);
+  const [availableTenantIds, setAvailableTenantIds] = useState<Record<string, string>>({});
   const [dbTenants, setDbTenants] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -141,10 +142,23 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_tenants")
-        .select("tenant_id, is_default, tenants!inner(slug, id)")
-        .order("is_default", { ascending: false });
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+      const isSuperAdmin = rolesData?.some((row: any) => row.role === "super_admin") ?? false;
+
+      const { data, error } = isSuperAdmin
+        ? await supabase
+            .from("tenants")
+            .select("id, slug")
+            .eq("ativo", true)
+            .order("created_at", { ascending: true })
+        : await supabase
+            .from("user_tenants")
+            .select("tenant_id, is_default, tenants!inner(slug, id)")
+            .eq("user_id", session.user.id)
+            .order("is_default", { ascending: false });
 
       if (cancelled) return;
 
@@ -153,16 +167,25 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const slugs = data
-        .map((row: any) => row.tenants?.slug)
-        .filter((s: string | undefined): s is string => Boolean(s));
+      const tenantRows = data.reduce((acc: Record<string, { tenant_id: string }>, row: any) => {
+        const rowSlug = isSuperAdmin ? row.slug : row.tenants?.slug;
+        const rowTenantId = isSuperAdmin ? row.id : row.tenant_id;
+        if (rowSlug && rowTenantId && !acc[rowSlug]) {
+          acc[rowSlug] = { tenant_id: rowTenantId };
+        }
+        return acc;
+      }, {});
+      const slugs = Object.keys(tenantRows);
+      const tenantIds = Object.fromEntries(
+        Object.entries(tenantRows).map(([rowSlug, row]: [string, any]) => [rowSlug, row.tenant_id]),
+      );
       setAvailableSlugs(slugs);
+      setAvailableTenantIds(tenantIds);
 
       // Se o host trava o tenant (subdomínio real), o usuário PRECISA ter acesso a ele
       if (isHostLocked) {
         if (slugs.includes(slug)) {
-          const row = data.find((r: any) => r.tenants?.slug === slug);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[slug] ?? null);
           setAccessDenied(false);
         } else {
           setAccessDenied(true);
@@ -172,11 +195,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         if (slugs.length > 0 && !slugs.includes(slug)) {
           const first = slugs[0];
           setSlug(first);
-          const row = data.find((r: any) => r.tenants?.slug === first);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[first] ?? null);
         } else if (slugs.includes(slug)) {
-          const row = data.find((r: any) => r.tenants?.slug === slug);
-          setTenantId(row?.tenant_id ?? null);
+          setTenantId(tenantIds[slug] ?? null);
         }
       }
 
@@ -208,8 +229,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const setTenantSlug = (nextSlug: string) => {
     if (isHostLocked) return; // travado pelo subdomínio
-    if (!TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
+    if (!availableSlugs.includes(nextSlug) && !TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
     setSlug(nextSlug);
+    setTenantId(availableTenantIds[nextSlug] ?? null);
     try {
       window.localStorage.setItem("tenant_slug", nextSlug);
     } catch {

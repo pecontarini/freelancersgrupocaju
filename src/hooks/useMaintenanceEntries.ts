@@ -4,18 +4,22 @@ import { MaintenanceEntry, MaintenanceFormData, MaintenanceBudget } from "@/type
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { useTenant } from "@/contexts/TenantContext";
 
 export function useMaintenanceEntries() {
   const { user } = useAuth();
+  const { tenantId } = useTenant();
   const queryClient = useQueryClient();
 
   const { data: entries = [], isLoading: isLoadingEntries } = useQuery({
-    queryKey: ["maintenance-entries"],
+    queryKey: ["maintenance-entries", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       return fetchAllRows<MaintenanceEntry>(
         () => supabase
           .from("maintenance_entries")
           .select("*")
+          .eq("tenant_id", tenantId)
           .order("data_servico", { ascending: false })
       );
     },
@@ -23,11 +27,13 @@ export function useMaintenanceEntries() {
   });
 
   const { data: budgets = [], isLoading: isLoadingBudgets } = useQuery({
-    queryKey: ["maintenance-budgets"],
+    queryKey: ["maintenance-budgets", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       const { data, error } = await supabase
         .from("maintenance_budgets")
-        .select("*");
+        .select("*")
+        .eq("tenant_id", tenantId);
 
       if (error) {
         console.error("Error fetching maintenance budgets:", error);
@@ -41,6 +47,7 @@ export function useMaintenanceEntries() {
 
   const addEntryMutation = useMutation({
     mutationFn: async (formData: MaintenanceFormData) => {
+      if (!tenantId) throw new Error("Empresa ativa não encontrada.");
       const { data, error } = await supabase
         .from("maintenance_entries")
         .insert({
@@ -56,6 +63,7 @@ export function useMaintenanceEntries() {
           cpf_cnpj: formData.cpf_cnpj || null,
           chave_pix: formData.chave_pix || null,
           created_by: user?.id,
+          tenant_id: tenantId,
         })
         .select()
         .single();
@@ -64,7 +72,7 @@ export function useMaintenanceEntries() {
       return data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-entries", tenantId] });
       toast.success("Manutenção cadastrada com sucesso!", {
         description: `${data.fornecedor} - R$ ${data.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
         duration: 5000,
@@ -84,6 +92,7 @@ export function useMaintenanceEntries() {
         .from("maintenance_entries")
         .update(updates)
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .select()
         .single();
 
@@ -91,7 +100,7 @@ export function useMaintenanceEntries() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-entries", tenantId] });
       toast.success("Manutenção atualizada com sucesso!");
     },
     onError: (error: Error) => {
@@ -105,12 +114,13 @@ export function useMaintenanceEntries() {
       const { error } = await supabase
         .from("maintenance_entries")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["maintenance-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-entries", tenantId] });
       toast.success("Registro excluído com sucesso!");
     },
     onError: (error) => {
@@ -121,28 +131,31 @@ export function useMaintenanceEntries() {
 
   const updateBudgetMutation = useMutation({
     mutationFn: async ({ lojaId, budget }: { lojaId: string; budget: number }) => {
+      if (!tenantId) throw new Error("Empresa ativa não encontrada.");
       // Try to update first
       const { data: existing } = await supabase
         .from("maintenance_budgets")
         .select("id")
         .eq("loja_id", lojaId)
+        .eq("tenant_id", tenantId)
         .maybeSingle();
 
       if (existing) {
         const { error } = await supabase
           .from("maintenance_budgets")
           .update({ budget_mensal: budget })
-          .eq("loja_id", lojaId);
+          .eq("loja_id", lojaId)
+          .eq("tenant_id", tenantId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("maintenance_budgets")
-          .insert({ loja_id: lojaId, budget_mensal: budget });
+          .insert({ loja_id: lojaId, budget_mensal: budget, tenant_id: tenantId });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["maintenance-budgets"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-budgets", tenantId] });
       toast.success("Budget atualizado com sucesso!");
     },
     onError: (error) => {

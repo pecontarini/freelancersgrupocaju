@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchAllRows } from "@/lib/fetchAllRows";
+import { useTenant } from "@/contexts/TenantContext";
 
 export type OperationalCategory = "uniformes" | "limpeza" | "apoio" | "utensilios" | "apoio_venda" | "outros";
 
@@ -20,16 +21,19 @@ export interface OperationalExpense {
 export function useOperationalExpenses() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { tenantId } = useTenant();
   const queryClient = useQueryClient();
 
   // Fetch all operational expenses
   const { data: expenses = [], isLoading } = useQuery({
-    queryKey: ["operational_expenses"],
+    queryKey: ["operational_expenses", tenantId],
     queryFn: async () => {
+      if (!tenantId) return [];
       return fetchAllRows<OperationalExpense>(
         () => supabase
           .from("operational_expenses")
           .select("*")
+          .eq("tenant_id", tenantId)
           .order("data_despesa", { ascending: false })
       );
     },
@@ -50,6 +54,7 @@ export function useOperationalExpenses() {
       data_despesa: string;
       descricao?: string;
     }) => {
+      if (!tenantId) throw new Error("Empresa ativa não encontrada.");
       const { data, error } = await supabase
         .from("operational_expenses")
         .insert({
@@ -59,6 +64,7 @@ export function useOperationalExpenses() {
           data_despesa,
           descricao: descricao || null,
           created_by: user?.id || null,
+          tenant_id: tenantId,
         })
         .select()
         .single();
@@ -67,7 +73,7 @@ export function useOperationalExpenses() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operational_expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["operational_expenses", tenantId] });
       toast({
         title: "Despesa registrada",
         description: "O custo operacional foi registrado com sucesso.",
@@ -90,6 +96,7 @@ export function useOperationalExpenses() {
         .from("operational_expenses")
         .update(updates)
         .eq("id", id)
+        .eq("tenant_id", tenantId)
         .select()
         .single();
 
@@ -97,7 +104,7 @@ export function useOperationalExpenses() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operational_expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["operational_expenses", tenantId] });
       toast({
         title: "Despesa atualizada",
         description: "O registro foi atualizado com sucesso.",
@@ -119,12 +126,13 @@ export function useOperationalExpenses() {
       const { error } = await supabase
         .from("operational_expenses")
         .delete()
-        .eq("id", expenseId);
+        .eq("id", expenseId)
+        .eq("tenant_id", tenantId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["operational_expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["operational_expenses", tenantId] });
       toast({
         title: "Despesa removida",
         description: "O registro foi removido com sucesso.",

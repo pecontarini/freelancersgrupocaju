@@ -80,15 +80,26 @@ export function resolveHost(hostname?: string): ResolvedHost {
 /**
  * Slug inicial no bootstrap. Prioridade:
  * 1. Env var VITE_TENANT (build/dev override)
- * 2. Subdomínio do hostname
- * 3. localStorage.tenant_slug (fallback dev/preview)
- * 4. "2board" (marca guarda-chuva)
+ * 2. Query param `?tenant=slug` (link direto para apresentação/preview)
+ * 3. Subdomínio do hostname
+ * 4. localStorage.tenant_slug (fallback dev/preview)
+ * 5. "2board" (marca guarda-chuva)
  */
 export function resolveInitialTenantSlug(): string {
   const envSlug = import.meta.env.VITE_TENANT as string | undefined;
   if (envSlug) return envSlug;
 
   if (typeof window === "undefined") return ROOT_BRAND_SLUG;
+
+  const queryTenant = new URLSearchParams(window.location.search).get("tenant");
+  if (queryTenant) {
+    try {
+      window.localStorage.setItem("tenant_slug", queryTenant);
+    } catch {
+      // ignore
+    }
+    return queryTenant;
+  }
 
   const { hostSlug, isDev } = resolveHost();
   if (hostSlug) return hostSlug;

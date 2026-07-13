@@ -142,11 +142,23 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data, error } = await supabase
-        .from("user_tenants")
-        .select("tenant_id, is_default, tenants!inner(slug, id)")
-        .eq("user_id", session.user.id)
-        .order("is_default", { ascending: false });
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", session.user.id);
+      const isSuperAdmin = rolesData?.some((row: any) => row.role === "super_admin") ?? false;
+
+      const { data, error } = isSuperAdmin
+        ? await supabase
+            .from("tenants")
+            .select("id, slug")
+            .eq("ativo", true)
+            .order("created_at", { ascending: true })
+        : await supabase
+            .from("user_tenants")
+            .select("tenant_id, is_default, tenants!inner(slug, id)")
+            .eq("user_id", session.user.id)
+            .order("is_default", { ascending: false });
 
       if (cancelled) return;
 
@@ -155,9 +167,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const tenantRows = data.reduce((acc: Record<string, any>, row: any) => {
-        const rowSlug = row.tenants?.slug;
-        if (rowSlug && !acc[rowSlug]) acc[rowSlug] = row;
+      const tenantRows = data.reduce((acc: Record<string, { tenant_id: string }>, row: any) => {
+        const rowSlug = isSuperAdmin ? row.slug : row.tenants?.slug;
+        const rowTenantId = isSuperAdmin ? row.id : row.tenant_id;
+        if (rowSlug && rowTenantId && !acc[rowSlug]) {
+          acc[rowSlug] = { tenant_id: rowTenantId };
+        }
         return acc;
       }, {});
       const slugs = Object.keys(tenantRows);
@@ -214,7 +229,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const setTenantSlug = (nextSlug: string) => {
     if (isHostLocked) return; // travado pelo subdomínio
-    if (!TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
+    if (!availableSlugs.includes(nextSlug) && !TENANT_REGISTRY[nextSlug] && !dbTenants[nextSlug]) return;
     setSlug(nextSlug);
     setTenantId(availableTenantIds[nextSlug] ?? null);
     try {

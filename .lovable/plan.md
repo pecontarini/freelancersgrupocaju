@@ -1,74 +1,67 @@
-# Rebrand global: Caju → 2Sell (paleta preto/branco)
+# Plano: Documentação UI/UX para Aula com IA (NotebookLM)
 
-Objetivo: eliminar a logo do Caju e os tons de laranja/coral de **todas** as áreas do app (plataforma e painéis de tenants) e usar sempre a logo da **2Sell**, com estética neutra P&B.
+## Objetivo
+Produzir um pacote de arquivos `.md` em `/mnt/documents/ui-ux-aula/` descrevendo, tela por tela, **layout visual, componentes, fluxos de usuário, microinterações e usabilidade** da plataforma Board (2Sell / CajuPAR / Stutz). O material será otimizado para ingestão em **NotebookLM, Google Veo, Sora, HeyGen, Synthesia** ou similares — com narração pronta e roteiro visual por cena.
 
-## 1. Upload das logos 2Sell (Lovable Assets)
+## Estrutura de entrega
 
-Duas variantes já enviadas pelo usuário:
-- `Logo-2ELL-IA-Consulting-1-2_png-2.png` (preta sobre branco) → **2sell-logo-light.png** (usada no tema light)
-- `Logo-2ELL-IA-Consulting-1-_png-2.png` (branca sobre preto) → **2sell-logo-dark.png** (usada no tema dark)
+```text
+/mnt/documents/ui-ux-aula/
+├── 00_INDICE.md                  ← Mapa completo + ordem sugerida de gravação
+├── 01_visao_geral.md             ← O que é o Board, personas, multi-tenant, marca
+├── 02_design_system.md           ← Liquid Glass, cores, tipografia, ícones, tokens
+├── 03_login_e_onboarding.md      ← /auth, reset senha, tenant resolver
+├── 04_layout_shell.md            ← Sidebar, PortalHeader, BottomNav mobile, UnidadeSelector
+├── 05_unitarios_gerentes.md      ← Budgets, CMV Unitário, TeamReadinessCard
+├── 06_gestao_pessoas.md          ← Escalas, Freelancers, Check-in, Aprovações
+├── 07_agenda_lider.md            ← Chat IA, Missões, Planos de ação
+├── 08_utensilios.md              ← Contagem, Budget, Matriz, PDF IA, Galeria
+├── 09_cmv.md                     ← Semanas, Contagens, Vendas, Desvio
+├── 10_estoque.md                 ← Catálogo, Movimentação, Inventários
+├── 11_checklist_diario.md        ← POP, correções, closed-loop
+├── 12_manutencao_operacional.md  ← Formulários, NF/Boleto, PIX
+├── 13_configuracoes_admin.md     ← Tenants, Usuários, Roles, Sheets sync
+├── 14_paginas_publicas.md        ← Contagem pública, Check-in estação, Confirm shift
+├── 15_fluxos_end_to_end.md       ← 6-8 jornadas completas narradas
+└── 16_roteiros_video.md          ← Cenas prontas por tela: narração + ação + tempo
+```
 
-Também gerar/derivar um **símbolo** (a letra "2" isolada) como `2sell-symbol.png` para splash/favicon; se não for viável recortar, usar a logo completa mesmo.
+## Conteúdo padrão por tela
 
-## 2. Ponto único de verdade da marca
+Cada arquivo de tela seguirá **o mesmo template**, para a IA de vídeo conseguir extrair beats consistentes:
 
-Criar `src/lib/brand.ts` exportando as URLs das logos 2Sell + helper `useBrandLogo()` que devolve light/dark conforme o tema atual (`next-themes` → `resolvedTheme`).
+1. **Identidade da tela** — rota, quem acessa (role), tenant, mobile/desktop
+2. **Anatomia visual** — descrição do layout em regiões (header, hero, cards, tabelas, footer/actions) com posicionamento e hierarquia
+3. **Componentes-chave** — nome do componente shadcn/custom, o que exibe, estados (loading, vazio, erro, sucesso)
+4. **Interações** — cliques, hovers, drags, atalhos, feedback háptico, toasts
+5. **Fluxo de dados** — de onde vem (hook/tabela), pra onde vai
+6. **Usabilidade** — decisões de UX (por que está assim), pontos de atenção, acessibilidade
+7. **Narração sugerida (30–60s)** — parágrafo pronto para TTS, tom didático PT-BR
+8. **Roteiro visual** — lista de cenas com timestamp, ação de câmera/cursor, elemento a destacar
 
-Todo componente que hoje importa `@/assets/logo.png`, `cajuparLogoLight`, `cajuparLogoDark` ou usa `tenant.logos.*` para exibir marca passa a usar esse helper. **A logo do tenant não é mais renderizada** — a marca fixa é 2Sell em todo o app.
+## Como será construído
 
-## 3. Componentes a ajustar
+- **Varredura sistemática** de `src/pages/`, `src/components/dashboard/`, `escalas/`, `utensilios/`, `cmv/`, `checkin/`, `checklist-daily/`, `agenda-lider/`, `estoque/`, `layout/`, `admin/`
+- **Screenshots de referência** — capturar cada tela principal via Playwright em desktop (1280×1800) e mobile (390×844) com sessão autenticada de super admin, salvos em `/mnt/documents/ui-ux-aula/screenshots/` e **referenciados nos .md** para a IA ancorar o vídeo no visual real
+- **Reaproveitar** `docs/app-guide-notebooklm.md`, `Claude.md`, `PROJECT_STATE.md`, `ROADMAP.md` como fontes secundárias
+- **Índice mestre (`00_INDICE.md`)** com ordem pedagógica sugerida (do macro → micro) e duração estimada por módulo (total ~45–60 min de vídeo)
+- **Roteiros (`16_roteiros_video.md`)** já formatados em blocos `SCENE / VISUAL / VOICEOVER / DURATION` — formato que NotebookLM, Veo e HeyGen digerem bem
 
-| Área | Arquivo | Mudança |
-|---|---|---|
-| Login | `src/pages/Auth.tsx` | Remove lógica `is2board`/`tenant.logos` → sempre 2Sell por tema |
-| Reset senha | `src/pages/ResetPassword.tsx` | Substitui `cajuparLogo` por 2Sell |
-| Confirmar turno | `src/pages/ConfirmShift.tsx` | idem |
-| Checklist diário | `src/pages/DailyChecklist.tsx` | idem |
-| Correções checklist | `src/pages/ChecklistCorrections.tsx` | idem |
-| Sidebar | `src/components/layout/AppSidebar.tsx` | Remove fallbacks Caju, ignora `tenant.logos`, usa 2Sell |
-| Bottom nav mobile | `src/components/layout/BottomNavigation.tsx` | idem |
-| Header portal | `src/components/layout/PortalHeader.tsx` | verificar/atualizar se exibir logo |
-| App header | `src/components/AppHeader.tsx` | idem |
-| Splash carregando | `src/components/motion/BrandSplash.tsx` | Usa símbolo 2Sell + glow neutro (branco/cinza) |
-| Aurora background | `src/components/motion/AuroraBackground.tsx` | Orbs coral/âmbar → tons grafite/branco translúcido |
-| App background | `src/components/ui/cj-app-background.tsx` | Neutraliza gradientes coral |
-| Tela sem acesso | `src/components/TenantNoAccessScreen.tsx` | Logo 2Sell |
-| Admin tenants | `src/pages/admin/Tenants.tsx` | Marca 2Sell no cabeçalho |
-| PDFs (relatórios, escala, checklist, manutenção) | `src/lib/pdf/*`, `src/lib/scheduleMasterPdf.ts`, `src/lib/scheduleDailyControlPdf.ts`, `src/components/MaintenanceExportButton.tsx`, `MaintenanceSingleExportButton.tsx`, `ExportReportButton.tsx` | Trocar `LOGO_BASE64` / tema Caju por asset 2Sell e paleta P&B |
-| Logo base64 | `src/lib/logoBase64.ts` | Regenerar como 2Sell (base64 para PDFs) |
-| Tema PDF | `src/lib/pdf/grupoCajuPdfTheme.ts` | Cores viram preto/cinza; renomear ficará como refactor futuro |
+## Entregável final
 
-## 4. Tokens de cor e CSS
+Um `.zip` (ou pasta) em `/mnt/documents/ui-ux-aula/` com **~16 arquivos .md + screenshots**, pronto para você:
+1. Arrastar para o NotebookLM como fontes → gerar áudio-aula
+2. Colar os roteiros no Veo/Sora/HeyGen → gerar vídeos por módulo
+3. Editar/reordenar como quiser
 
-- **`src/index.css`**: remover/neutralizar `--primary`, `--accent`, `--cj-accent-strong` que hoje são coral. Ficam em escalas de cinza (ex.: `--primary: 0 0% 10%` no light, `0 0% 95%` no dark). `--ring`, `--sidebar-primary` etc. seguem o mesmo caminho.
-- **`src/styles/cajupar-glass.css`**: `--cj-orange` e `--cj-orange-light` viram tons neutros (grafite/branco).
-- **`src/styles/cajupar-design-system.css`**: qualquer coral hardcoded → neutro.
-- **`tailwind.config.ts`**: revisar tokens custom que referenciam coral.
-- **Tenants no banco**: o `TenantContext` deixa de aplicar `theme.primary`/`primaryStrong`/`accent` vindos do DB (ou aplicamos sempre a paleta 2Sell, ignorando o que vier). Preserva `data-tenant` só para segmentação, sem impacto visual.
+## Escopo — o que **não** entra
+- Não vou gravar vídeo nem gerar áudio aqui (você usará as IAs externas)
+- Não vou refatorar UI existente (é documentação, não redesign)
+- Módulos muito nichados (ex: sync Google Sheets interno) entram resumidos, sem template completo
 
-## 5. Splash / Aurora neutros
+## Perguntas antes de executar
+1. **Idioma da narração**: PT-BR (padrão) ou bilíngue PT/EN?
+2. **Perspectiva**: aula para **usuário final** (gerente/operador aprendendo a usar) ou **comercial/investidor** (mostrando a plataforma como produto)? Muda o tom da narração.
+3. **Screenshots**: capturo com dados reais (super admin vendo Caju) ou prefere dados anonimizados/genéricos?
 
-- `AuroraBackground`: 4 orbs em `hsl(0 0% 100% / 0.08–0.15)` sobre base `hsl(0 0% 4%)` (dark) e cinza claro (light). Sem coral/âmbar.
-- `BrandSplash`: halo do logo em `hsl(0 0% 100% / 0.25)`, shimmer branco, drop-shadow neutro. Texto "Carregando seu portal…" mantém.
-
-## 6. `index.html` e favicon
-
-- `<title>` e `<meta description>`: "2Sell — …" (já está 2board; ajustar para 2Sell).
-- Favicon: apontar para símbolo 2Sell (asset novo).
-- Remover qualquer referência remanescente a Caju/coral em meta tags/theme-color.
-
-## 7. Tenants no banco (branding)
-
-Não é preciso migração destrutiva. O `TenantContext` passa a **ignorar** `logo_url`, `logo_dark_url`, `logo_symbol_url`, `theme.primary` etc. no que diz respeito à renderização — mantém `slug`, `id`, `copy.appName` (nome da empresa aparece como texto, ex.: no seletor de tenants) e resolução de acesso. Nada muda no schema.
-
-## 8. Validação
-
-- Playwright headless em `/auth`, `/` (após login mock), `/admin/tenants`, `/reset-password`, `/checklist-diario`, tela de erro sem acesso. Screenshots em light e dark para confirmar ausência total de coral e presença da 2Sell.
-- Grep final por `cajupar`, `caju`, `#D05937`, `#E05C1A`, `orange`, `coral`, `terracotta` em `src/` — remanescentes só em comentários/nomes de classes utilitárias já reescritas.
-
-## Detalhes técnicos
-
-- `useBrandLogo()` retorna `{ full: string; symbol: string; alt: string }` com base em `resolvedTheme`.
-- PDFs: converter novo PNG 2Sell para base64 (script único) e atualizar `logoBase64.ts`.
-- Nomes de arquivos/classes com prefixo `cajupar-`/`cj-` são mantidos para minimizar churn — só o **conteúdo** (cores/valores) é neutralizado. Renomeações ficam como tech debt em `TECH_DEBT.md`.
-- Nenhuma alteração de rota, RLS, edge function ou schema.
+Se preferir, aprove com "seguir" e eu assumo: **PT-BR, tom usuário final, screenshots com dados Caju reais**.

@@ -84,12 +84,13 @@ export function FreelancerForm() {
       loja: "",
       loja_id: "",
       nome_completo: "",
-      funcao: "",
       gerencia: "",
-      data_pop: "", // String vazia como default
+      data_pop: "",
       cpf: "",
       chave_pix: "",
       valor: 0,
+      substitui: "",
+      motivo: "",
     },
   });
 

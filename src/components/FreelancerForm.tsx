@@ -47,7 +47,7 @@ const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
   loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
-  gerencia: z.string().min(1, "Gerência é obrigatória"),
+  gerencia: z.string().optional().nullable(),
   data_pop: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
   cpf: z.string().refine((val) => isValidCPF(val), "CPF inválido"),
@@ -115,7 +115,7 @@ export function FreelancerForm() {
       await createEntry.mutateAsync({
         loja: data.loja,
         nome_completo: data.nome_completo,
-        gerencia: data.gerencia,
+        gerencia: data.gerencia || null,
         data_pop: data.data_pop,
         valor: data.valor,
         cpf: cleanCpf.length === 11 ? cleanCpf : data.cpf,
@@ -189,13 +189,6 @@ export function FreelancerForm() {
       }
     }
 
-    if (unified.gerencia) {
-      const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
-      if (gerenciaExists) {
-        form.setValue("gerencia", unified.gerencia);
-        filledFields.add("gerencia");
-      }
-    }
 
     setAutoFilledFields(filledFields);
   }, [lookupUnifiedByCpf, form, funcoes, gerencias]);

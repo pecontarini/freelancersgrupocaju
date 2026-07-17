@@ -115,13 +115,14 @@ export function FreelancerForm() {
       await createEntry.mutateAsync({
         loja: data.loja,
         nome_completo: data.nome_completo,
-        funcao: data.funcao,
         gerencia: data.gerencia,
         data_pop: data.data_pop,
         valor: data.valor,
         cpf: cleanCpf.length === 11 ? cleanCpf : data.cpf,
         chave_pix: data.chave_pix,
         loja_id: data.loja_id,
+        substitui: data.substitui,
+        motivo: data.motivo,
       });
 
       // Salvar loja selecionada antes do reset

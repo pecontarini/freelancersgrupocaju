@@ -324,36 +324,35 @@ export function FreelancerForm() {
               )}
             </div>
 
-            {/* Função */}
+            {/* Quem substitui */}
             <div className="space-y-2">
-              <Label htmlFor="funcao">Função</Label>
-              <Select 
-                onValueChange={(val) => {
-                  form.setValue("funcao", val);
-                  handleFieldChange("funcao");
-                }} 
-                disabled={isLoadingFuncoes}
-                value={form.watch("funcao") || undefined}
-              >
-                <SelectTrigger className={cn(
-                  "input-focus-ring",
-                  autoFilledFields.has("funcao") && "border-green-500 bg-green-50 dark:bg-green-950/20"
-                )}>
-                  <SelectValue placeholder={isLoadingFuncoes ? "Carregando..." : "Selecione a função"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {funcoes.map((funcao) => (
-                    <SelectItem key={funcao.id} value={funcao.nome}>
-                      {funcao.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {autoFilledFields.has("funcao") && (
-                <p className="text-xs text-green-600">Última função — pode alterar se necessário</p>
+              <Label htmlFor="substitui">Quem o freelancer substitui?</Label>
+              <Input
+                id="substitui"
+                placeholder="Nome do colaborador substituído"
+                className="input-focus-ring"
+                {...form.register("substitui", {
+                  onChange: () => handleFieldChange("substitui"),
+                })}
+              />
+              {form.formState.errors.substitui && (
+                <p className="text-sm text-destructive">{form.formState.errors.substitui.message}</p>
               )}
-              {form.formState.errors.funcao && (
-                <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
+            </div>
+
+            {/* Motivo */}
+            <div className="space-y-2">
+              <Label htmlFor="motivo">Qual o motivo do freelancer?</Label>
+              <Input
+                id="motivo"
+                placeholder="Ex.: Folga, atestado, demanda extra"
+                className="input-focus-ring"
+                {...form.register("motivo", {
+                  onChange: () => handleFieldChange("motivo"),
+                })}
+              />
+              {form.formState.errors.motivo && (
+                <p className="text-sm text-destructive">{form.formState.errors.motivo.message}</p>
               )}
             </div>
 

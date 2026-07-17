@@ -201,16 +201,28 @@ export function ExportReportButton({
       // Group entries by function for summary
       const funcaoSummary: Record<string, { total: number; count: number }> = {};
       entries.forEach((entry) => {
-        if (!funcaoSummary[entry.funcao]) {
-          funcaoSummary[entry.funcao] = { total: 0, count: 0 };
+        const key = entry.funcao || "SEM FUNÇÃO";
+        if (!funcaoSummary[key]) {
+          funcaoSummary[key] = { total: 0, count: 0 };
         }
-        funcaoSummary[entry.funcao].total += entry.valor;
-        funcaoSummary[entry.funcao].count += 1;
+        funcaoSummary[key].total += entry.valor;
+        funcaoSummary[key].count += 1;
+      });
+
+      // Group by motivo & substitui for recurrence summary
+      const motivoSummary: Record<string, number> = {};
+      const substituiSummary: Record<string, number> = {};
+      entries.forEach((entry) => {
+        const motivo = (entry.motivo || "").trim();
+        if (motivo) motivoSummary[motivo] = (motivoSummary[motivo] || 0) + 1;
+        const sub = (entry.substitui || "").trim();
+        if (sub) substituiSummary[sub] = (substituiSummary[sub] || 0) + 1;
       });
 
       // Calculate totals
       const totalGeral = entries.reduce((sum, e) => sum + e.valor, 0);
       const totalColaboradores = new Set(entries.map((e) => e.cpf)).size;
+
 
       // Get unique store/unidade - use most common if multiple OR use customTitle
       const lojaCounts: Record<string, number> = {};

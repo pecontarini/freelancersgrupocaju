@@ -78,9 +78,12 @@ export function BudgetsGerenciaisTab({
     searchTerm: "",
     lojaId: selectedUnidadeId,
     funcoes: [],
+    motivos: [],
+    substituis: [],
     dateStart: null,
     dateEnd: null,
   });
+
   const [maintenanceReportOpen, setMaintenanceReportOpen] = useState(false);
 
   // Effective store ID from filters or prop

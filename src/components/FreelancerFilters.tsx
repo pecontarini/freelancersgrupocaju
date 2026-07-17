@@ -38,9 +38,12 @@ export interface FreelancerFiltersState {
   searchTerm: string;
   lojaId: string | null;
   funcoes: string[];
+  motivos: string[];
+  substituis: string[];
   dateStart: Date | null;
   dateEnd: Date | null;
 }
+
 
 interface FreelancerFiltersProps {
   filters: FreelancerFiltersState;

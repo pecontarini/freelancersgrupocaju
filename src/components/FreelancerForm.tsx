@@ -181,11 +181,11 @@ export function FreelancerForm() {
       filledFields.add("chave_pix");
     }
 
-    if (unified.funcao) {
-      const funcaoExists = funcoes.some(f => f.nome === unified.funcao);
-      if (funcaoExists) {
-        form.setValue("funcao", unified.funcao);
-        filledFields.add("funcao");
+    if (unified.gerencia) {
+      const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
+      if (gerenciaExists) {
+        form.setValue("gerencia", unified.gerencia);
+        filledFields.add("gerencia");
       }
     }
 

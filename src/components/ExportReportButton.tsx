@@ -292,14 +292,16 @@ export function ExportReportButton({
 
       // Calculate pagination
       const headerHeight = 48;
-      const entryHeight = 26;
+      const entryHeight = 34;
       const entriesPerPage = Math.floor((pageHeight - headerHeight - margin) / entryHeight);
       const totalDataPages = Math.ceil(entries.length / entriesPerPage);
       
       // Check if summary fits on last data page
       const entriesOnLastPage = entries.length % entriesPerPage || entriesPerPage;
       const spaceUsedOnLastPage = headerHeight + entriesOnLastPage * entryHeight;
-      const summaryHeight = 60 + Object.keys(funcaoSummary).length * 6;
+      const recorrenciaHeight =
+        (Object.keys(motivoSummary).length + Object.keys(substituiSummary).length) * 5 + 30;
+      const summaryHeight = 60 + Object.keys(funcaoSummary).length * 6 + recorrenciaHeight;
       const summaryFitsOnLastPage = spaceUsedOnLastPage + summaryHeight < pageHeight - margin;
       
       const totalPages = summaryFitsOnLastPage ? totalDataPages : totalDataPages + 1;
@@ -351,12 +353,18 @@ export function ExportReportButton({
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
-        doc.text(`Função: ${entry.funcao}`, margin + 18, yPos + 14);
+        doc.text(`Função: ${entry.funcao || "-"}`, margin + 18, yPos + 14);
         doc.text(`Data: ${formatDate(entry.data_pop)}`, margin + 80, yPos + 14);
 
         // CPF and PIX
         doc.text(`CPF: ${entry.cpf}`, margin + 18, yPos + 20);
         doc.text(`PIX: ${entry.chave_pix}`, margin + 80, yPos + 20);
+
+        // Substitui and Motivo
+        const substituiText = `Substitui: ${entry.substitui || "-"}`;
+        const motivoText = `Motivo: ${entry.motivo || "-"}`;
+        doc.text(doc.splitTextToSize(substituiText, 55)[0], margin + 18, yPos + 26);
+        doc.text(doc.splitTextToSize(motivoText, 90)[0], margin + 80, yPos + 26);
 
         // Value (highlighted)
         doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
@@ -377,6 +385,7 @@ export function ExportReportButton({
 
         yPos += entryHeight;
       });
+
 
       // Add summary section
       // Check if we need a new page for summary

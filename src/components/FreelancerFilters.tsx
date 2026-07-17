@@ -202,6 +202,36 @@ export function FreelancerFilters({
         />
       </div>
 
+      {/* Motivos Multi-Select */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Motivos {filters.motivos.length > 0 && (
+            <Badge variant="secondary" className="ml-2">{filters.motivos.length}</Badge>
+          )}
+        </label>
+        <MultiSelect
+          options={allMotivos}
+          selected={filters.motivos}
+          onChange={handleMotivosChange}
+          placeholder="Todos os Motivos"
+        />
+      </div>
+
+      {/* Substitui Multi-Select */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Substitui {filters.substituis.length > 0 && (
+            <Badge variant="secondary" className="ml-2">{filters.substituis.length}</Badge>
+          )}
+        </label>
+        <MultiSelect
+          options={allSubstituis}
+          selected={filters.substituis}
+          onChange={handleSubstituisChange}
+          placeholder="Todos os Substituídos"
+        />
+      </div>
+
       {/* Date Range */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-muted-foreground">Período</label>

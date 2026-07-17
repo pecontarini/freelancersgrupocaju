@@ -3,7 +3,7 @@ export interface FreelancerEntry {
   loja: string;
   nome_completo: string;
   funcao: string | null;
-  gerencia: string;
+  gerencia: string | null;
   data_pop: string;
   valor: number;
   cpf: string;
@@ -21,7 +21,7 @@ export interface FreelancerFormData {
   loja: string;
   nome_completo: string;
   funcao?: string;
-  gerencia: string;
+  gerencia?: string | null;
   data_pop: string; // String no formato YYYY-MM-DD
   valor: number;
   cpf: string;

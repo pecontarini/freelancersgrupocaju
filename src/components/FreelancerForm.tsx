@@ -47,12 +47,13 @@ const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
   loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
-  funcao: z.string().min(1, "Função é obrigatória"),
   gerencia: z.string().min(1, "Gerência é obrigatória"),
-  data_pop: z.string().min(1, "Data é obrigatória"), // String no formato YYYY-MM-DD
+  data_pop: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
   cpf: z.string().refine((val) => isValidCPF(val), "CPF inválido"),
   chave_pix: z.string().min(1, "Chave PIX é obrigatória"),
+  substitui: z.string().trim().min(2, "Informe quem o freelancer substitui"),
+  motivo: z.string().trim().min(2, "Informe o motivo do freelancer"),
 });
 
 type FormData = z.infer<typeof formSchema>;

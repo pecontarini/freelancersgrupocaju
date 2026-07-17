@@ -440,6 +440,67 @@ export function ExportReportButton({
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
+      // Recorrência de Motivos e Substituídos
+      const ensureSpace = (needed: number) => {
+        if (yPos + needed > pageHeight - margin) {
+          doc.addPage();
+          addBackground();
+          addHeader(currentPage + 1, totalPages + 1);
+          currentPage++;
+          yPos = headerHeight;
+        }
+      };
+
+      const motivosSorted = Object.entries(motivoSummary).sort((a, b) => b[1] - a[1]);
+      const substituiSorted = Object.entries(substituiSummary).sort((a, b) => b[1] - a[1]);
+
+      if (motivosSorted.length > 0) {
+        ensureSpace(12 + motivosSorted.length * 5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("Motivos mais recorrentes:", margin, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        motivosSorted.forEach(([motivo, count]) => {
+          doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
+          const label = doc.splitTextToSize(`• ${motivo}`, contentWidth - 60)[0];
+          doc.text(label, margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${count} ocorrência${count > 1 ? "s" : ""}`, pageWidth - margin - 5, yPos, { align: "right" });
+          yPos += 5;
+        });
+        yPos += 3;
+      }
+
+      if (substituiSorted.length > 0) {
+        ensureSpace(12 + substituiSorted.length * 5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("Coberturas mais recorrentes (Substitui):", margin, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        substituiSorted.forEach(([nome, count]) => {
+          doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
+          const label = doc.splitTextToSize(`• ${nome}`, contentWidth - 60)[0];
+          doc.text(label, margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${count} ocorrência${count > 1 ? "s" : ""}`, pageWidth - margin - 5, yPos, { align: "right" });
+          yPos += 5;
+        });
+        yPos += 3;
+      }
+
+      // Divider line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 8;
+
+
       // Total count
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);

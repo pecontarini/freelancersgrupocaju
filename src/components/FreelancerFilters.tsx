@@ -58,7 +58,7 @@ export function FreelancerFilters({
 }: FreelancerFiltersProps) {
   const { options: lojas } = useConfigLojas();
   const { options: funcoes } = useConfigFuncoes();
-  const { uniqueFuncoes: entryFuncoes } = useFreelancerEntries();
+  const { uniqueFuncoes: entryFuncoes, uniqueMotivos, uniqueSubstituis } = useFreelancerEntries();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
   const isMobile = useIsMobile();
 
@@ -74,10 +74,21 @@ export function FreelancerFilters({
     return merged.map((name) => ({ value: name, label: name }));
   }, [funcoes, entryFuncoes]);
 
+  const allMotivos = useMemo(
+    () => uniqueMotivos.map((m) => ({ value: m, label: m })),
+    [uniqueMotivos],
+  );
+  const allSubstituis = useMemo(
+    () => uniqueSubstituis.map((s) => ({ value: s, label: s })),
+    [uniqueSubstituis],
+  );
+
   const activeFiltersCount = [
     filters.searchTerm,
     filters.lojaId,
     filters.funcoes.length > 0,
+    filters.motivos.length > 0,
+    filters.substituis.length > 0,
     filters.dateStart,
     filters.dateEnd,
   ].filter(Boolean).length;
@@ -87,6 +98,8 @@ export function FreelancerFilters({
       searchTerm: "",
       lojaId: null,
       funcoes: [],
+      motivos: [],
+      substituis: [],
       dateStart: null,
       dateEnd: null,
     });
@@ -105,6 +118,15 @@ export function FreelancerFilters({
       funcoes: selected,
     });
   };
+
+  const handleMotivosChange = (selected: string[]) => {
+    onFiltersChange({ ...filters, motivos: selected });
+  };
+
+  const handleSubstituisChange = (selected: string[]) => {
+    onFiltersChange({ ...filters, substituis: selected });
+  };
+
 
   // Handle date range selection
   const handleDateRangeSelect = (range: DateRange | undefined) => {

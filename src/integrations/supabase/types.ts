@@ -2685,7 +2685,7 @@ export type Database = {
           created_by: string | null
           data_pop: string
           funcao: string | null
-          gerencia: string
+          gerencia: string | null
           id: string
           loja: string
           loja_id: string | null
@@ -2704,7 +2704,7 @@ export type Database = {
           created_by?: string | null
           data_pop: string
           funcao?: string | null
-          gerencia: string
+          gerencia?: string | null
           id?: string
           loja: string
           loja_id?: string | null
@@ -2723,7 +2723,7 @@ export type Database = {
           created_by?: string | null
           data_pop?: string
           funcao?: string | null
-          gerencia?: string
+          gerencia?: string | null
           id?: string
           loja?: string
           loja_id?: string | null

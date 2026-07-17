@@ -1,0 +1,1 @@
+ALTER TABLE public.freelancer_entries ALTER COLUMN gerencia DROP NOT NULL;

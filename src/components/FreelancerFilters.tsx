@@ -447,6 +447,27 @@ export function FreelancerFilters({
           />
         </div>
 
+        {/* Motivos Multi-Select */}
+        <div className="w-[200px]">
+          <MultiSelect
+            options={allMotivos}
+            selected={filters.motivos}
+            onChange={handleMotivosChange}
+            placeholder="Todos os Motivos"
+          />
+        </div>
+
+        {/* Substitui Multi-Select */}
+        <div className="w-[200px]">
+          <MultiSelect
+            options={allSubstituis}
+            selected={filters.substituis}
+            onChange={handleSubstituisChange}
+            placeholder="Todos Substituídos"
+          />
+        </div>
+
+
         {/* Date Range Picker */}
         <Popover>
           <PopoverTrigger asChild>

@@ -2,12 +2,14 @@ export interface FreelancerEntry {
   id: string;
   loja: string;
   nome_completo: string;
-  funcao: string;
+  funcao: string | null;
   gerencia: string;
   data_pop: string;
   valor: number;
   cpf: string;
   chave_pix: string;
+  substitui: string | null;
+  motivo: string | null;
   created_at: string;
   created_by: string | null;
   loja_id: string | null;
@@ -18,13 +20,15 @@ export interface FreelancerEntry {
 export interface FreelancerFormData {
   loja: string;
   nome_completo: string;
-  funcao: string;
+  funcao?: string;
   gerencia: string;
   data_pop: string; // String no formato YYYY-MM-DD
   valor: number;
   cpf: string;
   chave_pix: string;
   loja_id: string;
+  substitui: string;
+  motivo: string;
 }
 
 export interface FilterState {

@@ -47,12 +47,13 @@ const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
   loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
-  funcao: z.string().min(1, "Função é obrigatória"),
   gerencia: z.string().min(1, "Gerência é obrigatória"),
-  data_pop: z.string().min(1, "Data é obrigatória"), // String no formato YYYY-MM-DD
+  data_pop: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
   cpf: z.string().refine((val) => isValidCPF(val), "CPF inválido"),
   chave_pix: z.string().min(1, "Chave PIX é obrigatória"),
+  substitui: z.string().trim().min(2, "Informe quem o freelancer substitui"),
+  motivo: z.string().trim().min(2, "Informe o motivo do freelancer"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -83,12 +84,13 @@ export function FreelancerForm() {
       loja: "",
       loja_id: "",
       nome_completo: "",
-      funcao: "",
       gerencia: "",
-      data_pop: "", // String vazia como default
+      data_pop: "",
       cpf: "",
       chave_pix: "",
       valor: 0,
+      substitui: "",
+      motivo: "",
     },
   });
 
@@ -113,13 +115,14 @@ export function FreelancerForm() {
       await createEntry.mutateAsync({
         loja: data.loja,
         nome_completo: data.nome_completo,
-        funcao: data.funcao,
         gerencia: data.gerencia,
         data_pop: data.data_pop,
         valor: data.valor,
         cpf: cleanCpf.length === 11 ? cleanCpf : data.cpf,
         chave_pix: data.chave_pix,
         loja_id: data.loja_id,
+        substitui: data.substitui,
+        motivo: data.motivo,
       });
 
       // Salvar loja selecionada antes do reset
@@ -178,11 +181,11 @@ export function FreelancerForm() {
       filledFields.add("chave_pix");
     }
 
-    if (unified.funcao) {
-      const funcaoExists = funcoes.some(f => f.nome === unified.funcao);
-      if (funcaoExists) {
-        form.setValue("funcao", unified.funcao);
-        filledFields.add("funcao");
+    if (unified.gerencia) {
+      const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
+      if (gerenciaExists) {
+        form.setValue("gerencia", unified.gerencia);
+        filledFields.add("gerencia");
       }
     }
 
@@ -321,36 +324,35 @@ export function FreelancerForm() {
               )}
             </div>
 
-            {/* Função */}
+            {/* Quem substitui */}
             <div className="space-y-2">
-              <Label htmlFor="funcao">Função</Label>
-              <Select 
-                onValueChange={(val) => {
-                  form.setValue("funcao", val);
-                  handleFieldChange("funcao");
-                }} 
-                disabled={isLoadingFuncoes}
-                value={form.watch("funcao") || undefined}
-              >
-                <SelectTrigger className={cn(
-                  "input-focus-ring",
-                  autoFilledFields.has("funcao") && "border-green-500 bg-green-50 dark:bg-green-950/20"
-                )}>
-                  <SelectValue placeholder={isLoadingFuncoes ? "Carregando..." : "Selecione a função"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {funcoes.map((funcao) => (
-                    <SelectItem key={funcao.id} value={funcao.nome}>
-                      {funcao.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {autoFilledFields.has("funcao") && (
-                <p className="text-xs text-green-600">Última função — pode alterar se necessário</p>
+              <Label htmlFor="substitui">Quem o freelancer substitui?</Label>
+              <Input
+                id="substitui"
+                placeholder="Nome do colaborador substituído"
+                className="input-focus-ring"
+                {...form.register("substitui", {
+                  onChange: () => handleFieldChange("substitui"),
+                })}
+              />
+              {form.formState.errors.substitui && (
+                <p className="text-sm text-destructive">{form.formState.errors.substitui.message}</p>
               )}
-              {form.formState.errors.funcao && (
-                <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
+            </div>
+
+            {/* Motivo */}
+            <div className="space-y-2">
+              <Label htmlFor="motivo">Qual o motivo do freelancer?</Label>
+              <Input
+                id="motivo"
+                placeholder="Ex.: Folga, atestado, demanda extra"
+                className="input-focus-ring"
+                {...form.register("motivo", {
+                  onChange: () => handleFieldChange("motivo"),
+                })}
+              />
+              {form.formState.errors.motivo && (
+                <p className="text-sm text-destructive">{form.formState.errors.motivo.message}</p>
               )}
             </div>
 

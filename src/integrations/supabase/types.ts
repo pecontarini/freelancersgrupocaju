@@ -2684,14 +2684,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           data_pop: string
-          funcao: string
+          funcao: string | null
           gerencia: string
           id: string
           loja: string
           loja_id: string | null
+          motivo: string | null
           nome_completo: string
           origem: string
           schedule_id: string | null
+          substitui: string | null
           tenant_id: string
           valor: number
         }
@@ -2701,14 +2703,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_pop: string
-          funcao: string
+          funcao?: string | null
           gerencia: string
           id?: string
           loja: string
           loja_id?: string | null
+          motivo?: string | null
           nome_completo: string
           origem?: string
           schedule_id?: string | null
+          substitui?: string | null
           tenant_id?: string
           valor: number
         }
@@ -2718,14 +2722,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data_pop?: string
-          funcao?: string
+          funcao?: string | null
           gerencia?: string
           id?: string
           loja?: string
           loja_id?: string | null
+          motivo?: string | null
           nome_completo?: string
           origem?: string
           schedule_id?: string | null
+          substitui?: string | null
           tenant_id?: string
           valor?: number
         }

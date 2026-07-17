@@ -43,7 +43,7 @@ export function useFreelancerEntries() {
         .insert({
           loja: formData.loja,
           nome_completo: formData.nome_completo,
-          funcao: formData.funcao,
+          funcao: formData.funcao ?? null,
           gerencia: formData.gerencia,
           data_pop: formData.data_pop, // Já é string YYYY-MM-DD
           valor: formData.valor,
@@ -52,6 +52,8 @@ export function useFreelancerEntries() {
           created_by: user.id,
           loja_id: formData.loja_id,
           tenant_id: tenantId,
+          substitui: formData.substitui,
+          motivo: formData.motivo,
         })
         .select()
         .single();

@@ -5,7 +5,7 @@
 // (formulário manual, importação de planilha, check-in via QR) ficam
 // bloqueados — EXCETO para as lojas listadas em
 // FREELANCER_LAUNCH_ALLOWED_LOJA_IDS, que continuam liberadas.
-export const FREELANCER_LAUNCH_LOCKED = true;
+export const FREELANCER_LAUNCH_LOCKED = false;
 
 // Lojas liberadas mesmo com a trava global ativa (loja_id de config_lojas).
 // Adicione/remova UUIDs aqui para liberar novas unidades pontualmente.

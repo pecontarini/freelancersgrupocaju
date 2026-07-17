@@ -158,12 +158,15 @@ export function BudgetsGerenciaisTab({
         const searchLower = filters.searchTerm.toLowerCase();
         if (!entry.nome_completo.toLowerCase().includes(searchLower)) return false;
       }
-      if (filters.funcoes.length > 0 && !filters.funcoes.includes(entry.funcao)) return false;
+      if (filters.funcoes.length > 0 && !filters.funcoes.includes(entry.funcao || "")) return false;
+      if (filters.motivos.length > 0 && !filters.motivos.includes(entry.motivo || "")) return false;
+      if (filters.substituis.length > 0 && !filters.substituis.includes(entry.substitui || "")) return false;
       const date = parseISO(entry.data_pop);
       if (!isWithinInterval(date, { start, end })) return false;
       return true;
     });
-  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcoes, effectiveDateRange]);
+  }, [freelancerEntries, effectiveStoreId, filters.searchTerm, filters.funcoes, filters.motivos, filters.substituis, effectiveDateRange]);
+
 
   const filteredMaintenance = useMemo(() => {
     const { start, end } = effectiveDateRange;

@@ -327,12 +327,14 @@ export function normalizeForDatabase(value: string): string {
 
 export function exportToExcel(entries: FreelancerEntry[], filename: string): void {
   // Prepare data with formatted columns - using timezone-safe date formatting
-  const exportData = entries.map((entry) => ({
+  const exportData: Array<Record<string, string | number>> = entries.map((entry) => ({
     Data: formatDateFromString(entry.data_pop),
     Loja: entry.loja,
     "Nome Completo": entry.nome_completo,
-    Função: entry.funcao,
-    Gerência: entry.gerencia,
+    Função: entry.funcao ?? "",
+    Gerência: entry.gerencia ?? "",
+    Substitui: entry.substitui ?? "",
+    Motivo: entry.motivo ?? "",
     CPF: entry.cpf,
     "Chave PIX": entry.chave_pix,
     Valor: entry.valor,
@@ -348,6 +350,8 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     "Nome Completo": "",
     Função: "",
     Gerência: "",
+    Substitui: "",
+    Motivo: "",
     CPF: "",
     "Chave PIX": "TOTAL GERAL:",
     Valor: totalValue,
@@ -362,52 +366,70 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     { wch: 28 }, // Nome Completo
     { wch: 15 }, // Função
     { wch: 15 }, // Gerência
+    { wch: 22 }, // Substitui
+    { wch: 28 }, // Motivo
     { wch: 15 }, // CPF
     { wch: 28 }, // Chave PIX
     { wch: 14 }, // Valor
   ];
 
-  // Apply header styling (bold + background color)
-  const headerCells = ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1"];
-  headerCells.forEach((cell) => {
-    if (worksheet[cell]) {
-      worksheet[cell].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "4F46E5" } },
-        alignment: { horizontal: "center" },
-      };
-    }
-  });
-
-  // Format currency column (Valor - column H)
+  // Enable Excel AutoFilter on the header row (allows filtering by Motivo/Substitui/etc.)
   const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+  const lastCol = XLSX.utils.encode_col(range.e.c);
+  worksheet["!autofilter"] = { ref: `A1:${lastCol}1` };
+
+  // Format currency column (Valor - last column, index 9)
+  const valorColIdx = 9;
   for (let row = 1; row <= range.e.r; row++) {
-    const cellRef = XLSX.utils.encode_cell({ r: row, c: 7 }); // Column H (Valor)
+    const cellRef = XLSX.utils.encode_cell({ r: row, c: valorColIdx });
     if (worksheet[cellRef] && typeof worksheet[cellRef].v === "number") {
       worksheet[cellRef].z = '"R$"#,##0.00';
     }
   }
 
-  // Style total row (last row)
-  const lastRow = range.e.r;
-  const totalLabelCell = XLSX.utils.encode_cell({ r: lastRow, c: 6 }); // Column G
-  const totalValueCell = XLSX.utils.encode_cell({ r: lastRow, c: 7 }); // Column H
-  
-  if (worksheet[totalLabelCell]) {
-    worksheet[totalLabelCell].s = {
-      font: { bold: true },
-      alignment: { horizontal: "right" },
-    };
-  }
-  if (worksheet[totalValueCell]) {
-    worksheet[totalValueCell].s = {
-      font: { bold: true },
-    };
-    worksheet[totalValueCell].z = '"R$"#,##0.00';
+  // Build "Recorrência" sheet - top motivos and substituídos
+  const countBy = (getter: (e: FreelancerEntry) => string | null | undefined) => {
+    const map = new Map<string, { count: number; total: number }>();
+    entries.forEach((e) => {
+      const key = (getter(e) || "").trim();
+      if (!key) return;
+      const cur = map.get(key) || { count: 0, total: 0 };
+      cur.count += 1;
+      cur.total += e.valor || 0;
+      map.set(key, cur);
+    });
+    return Array.from(map.entries())
+      .map(([k, v]) => ({ nome: k, ocorrencias: v.count, total: v.total }))
+      .sort((a, b) => b.ocorrencias - a.ocorrencias);
+  };
+
+  const motivosStats = countBy((e) => e.motivo);
+  const substituiStats = countBy((e) => e.substitui);
+
+  const recorrenciaRows: Array<Record<string, string | number>> = [];
+  recorrenciaRows.push({ Categoria: "MOTIVOS MAIS RECORRENTES", Nome: "", Ocorrências: "", "Valor Total": "" });
+  motivosStats.forEach((m) =>
+    recorrenciaRows.push({ Categoria: "Motivo", Nome: m.nome, Ocorrências: m.ocorrencias, "Valor Total": m.total }),
+  );
+  recorrenciaRows.push({ Categoria: "", Nome: "", Ocorrências: "", "Valor Total": "" });
+  recorrenciaRows.push({ Categoria: "COBERTURAS MAIS RECORRENTES (SUBSTITUI)", Nome: "", Ocorrências: "", "Valor Total": "" });
+  substituiStats.forEach((s) =>
+    recorrenciaRows.push({ Categoria: "Substitui", Nome: s.nome, Ocorrências: s.ocorrencias, "Valor Total": s.total }),
+  );
+
+  const recorrenciaSheet = XLSX.utils.json_to_sheet(recorrenciaRows);
+  recorrenciaSheet["!cols"] = [{ wch: 40 }, { wch: 30 }, { wch: 14 }, { wch: 16 }];
+  const recRange = XLSX.utils.decode_range(recorrenciaSheet["!ref"] || "A1");
+  for (let row = 1; row <= recRange.e.r; row++) {
+    const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 });
+    if (recorrenciaSheet[cellRef] && typeof recorrenciaSheet[cellRef].v === "number") {
+      recorrenciaSheet[cellRef].z = '"R$"#,##0.00';
+    }
   }
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
-  
+  XLSX.utils.book_append_sheet(workbook, recorrenciaSheet, "Recorrência");
+
   downloadWorkbook(workbook, `${filename}.xlsx`);
 }

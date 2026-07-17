@@ -153,9 +153,11 @@ export function useFreelancerEntries() {
   });
 
   // Get unique values for filters
-  const uniqueFuncoes = [...new Set(entries.map((e) => e.funcao))].sort();
-  const uniqueGerencias = [...new Set(entries.map((e) => e.gerencia))].sort();
-  const uniqueLojas = [...new Set(entries.map((e) => e.loja))].sort();
+  const uniqueFuncoes = [...new Set(entries.map((e) => e.funcao).filter(Boolean) as string[])].sort();
+  const uniqueGerencias = [...new Set(entries.map((e) => e.gerencia).filter(Boolean) as string[])].sort();
+  const uniqueLojas = [...new Set(entries.map((e) => e.loja).filter(Boolean) as string[])].sort();
+  const uniqueMotivos = [...new Set(entries.map((e) => e.motivo).filter(Boolean) as string[])].sort();
+  const uniqueSubstituis = [...new Set(entries.map((e) => e.substitui).filter(Boolean) as string[])].sort();
 
   return {
     entries,
@@ -167,5 +169,7 @@ export function useFreelancerEntries() {
     uniqueFuncoes,
     uniqueGerencias,
     uniqueLojas,
+    uniqueMotivos,
+    uniqueSubstituis,
   };
 }

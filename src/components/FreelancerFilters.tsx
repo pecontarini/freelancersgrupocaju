@@ -38,9 +38,12 @@ export interface FreelancerFiltersState {
   searchTerm: string;
   lojaId: string | null;
   funcoes: string[];
+  motivos: string[];
+  substituis: string[];
   dateStart: Date | null;
   dateEnd: Date | null;
 }
+
 
 interface FreelancerFiltersProps {
   filters: FreelancerFiltersState;
@@ -55,7 +58,7 @@ export function FreelancerFilters({
 }: FreelancerFiltersProps) {
   const { options: lojas } = useConfigLojas();
   const { options: funcoes } = useConfigFuncoes();
-  const { uniqueFuncoes: entryFuncoes } = useFreelancerEntries();
+  const { uniqueFuncoes: entryFuncoes, uniqueMotivos, uniqueSubstituis } = useFreelancerEntries();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
   const isMobile = useIsMobile();
 
@@ -71,10 +74,21 @@ export function FreelancerFilters({
     return merged.map((name) => ({ value: name, label: name }));
   }, [funcoes, entryFuncoes]);
 
+  const allMotivos = useMemo(
+    () => uniqueMotivos.map((m) => ({ value: m, label: m })),
+    [uniqueMotivos],
+  );
+  const allSubstituis = useMemo(
+    () => uniqueSubstituis.map((s) => ({ value: s, label: s })),
+    [uniqueSubstituis],
+  );
+
   const activeFiltersCount = [
     filters.searchTerm,
     filters.lojaId,
     filters.funcoes.length > 0,
+    filters.motivos.length > 0,
+    filters.substituis.length > 0,
     filters.dateStart,
     filters.dateEnd,
   ].filter(Boolean).length;
@@ -84,6 +98,8 @@ export function FreelancerFilters({
       searchTerm: "",
       lojaId: null,
       funcoes: [],
+      motivos: [],
+      substituis: [],
       dateStart: null,
       dateEnd: null,
     });
@@ -102,6 +118,15 @@ export function FreelancerFilters({
       funcoes: selected,
     });
   };
+
+  const handleMotivosChange = (selected: string[]) => {
+    onFiltersChange({ ...filters, motivos: selected });
+  };
+
+  const handleSubstituisChange = (selected: string[]) => {
+    onFiltersChange({ ...filters, substituis: selected });
+  };
+
 
   // Handle date range selection
   const handleDateRangeSelect = (range: DateRange | undefined) => {
@@ -174,6 +199,36 @@ export function FreelancerFilters({
           selected={filters.funcoes}
           onChange={handleFuncoesChange}
           placeholder="Todas as Funções"
+        />
+      </div>
+
+      {/* Motivos Multi-Select */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Motivos {filters.motivos.length > 0 && (
+            <Badge variant="secondary" className="ml-2">{filters.motivos.length}</Badge>
+          )}
+        </label>
+        <MultiSelect
+          options={allMotivos}
+          selected={filters.motivos}
+          onChange={handleMotivosChange}
+          placeholder="Todos os Motivos"
+        />
+      </div>
+
+      {/* Substitui Multi-Select */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-muted-foreground">
+          Substitui {filters.substituis.length > 0 && (
+            <Badge variant="secondary" className="ml-2">{filters.substituis.length}</Badge>
+          )}
+        </label>
+        <MultiSelect
+          options={allSubstituis}
+          selected={filters.substituis}
+          onChange={handleSubstituisChange}
+          placeholder="Todos os Substituídos"
         />
       </div>
 
@@ -391,6 +446,27 @@ export function FreelancerFilters({
             placeholder="Todas as Funções"
           />
         </div>
+
+        {/* Motivos Multi-Select */}
+        <div className="w-[200px]">
+          <MultiSelect
+            options={allMotivos}
+            selected={filters.motivos}
+            onChange={handleMotivosChange}
+            placeholder="Todos os Motivos"
+          />
+        </div>
+
+        {/* Substitui Multi-Select */}
+        <div className="w-[200px]">
+          <MultiSelect
+            options={allSubstituis}
+            selected={filters.substituis}
+            onChange={handleSubstituisChange}
+            placeholder="Todos Substituídos"
+          />
+        </div>
+
 
         {/* Date Range Picker */}
         <Popover>

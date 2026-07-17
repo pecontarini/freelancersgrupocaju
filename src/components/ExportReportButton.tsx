@@ -201,16 +201,28 @@ export function ExportReportButton({
       // Group entries by function for summary
       const funcaoSummary: Record<string, { total: number; count: number }> = {};
       entries.forEach((entry) => {
-        if (!funcaoSummary[entry.funcao]) {
-          funcaoSummary[entry.funcao] = { total: 0, count: 0 };
+        const key = entry.funcao || "SEM FUNÇÃO";
+        if (!funcaoSummary[key]) {
+          funcaoSummary[key] = { total: 0, count: 0 };
         }
-        funcaoSummary[entry.funcao].total += entry.valor;
-        funcaoSummary[entry.funcao].count += 1;
+        funcaoSummary[key].total += entry.valor;
+        funcaoSummary[key].count += 1;
+      });
+
+      // Group by motivo & substitui for recurrence summary
+      const motivoSummary: Record<string, number> = {};
+      const substituiSummary: Record<string, number> = {};
+      entries.forEach((entry) => {
+        const motivo = (entry.motivo || "").trim();
+        if (motivo) motivoSummary[motivo] = (motivoSummary[motivo] || 0) + 1;
+        const sub = (entry.substitui || "").trim();
+        if (sub) substituiSummary[sub] = (substituiSummary[sub] || 0) + 1;
       });
 
       // Calculate totals
       const totalGeral = entries.reduce((sum, e) => sum + e.valor, 0);
       const totalColaboradores = new Set(entries.map((e) => e.cpf)).size;
+
 
       // Get unique store/unidade - use most common if multiple OR use customTitle
       const lojaCounts: Record<string, number> = {};
@@ -280,14 +292,16 @@ export function ExportReportButton({
 
       // Calculate pagination
       const headerHeight = 48;
-      const entryHeight = 26;
+      const entryHeight = 34;
       const entriesPerPage = Math.floor((pageHeight - headerHeight - margin) / entryHeight);
       const totalDataPages = Math.ceil(entries.length / entriesPerPage);
       
       // Check if summary fits on last data page
       const entriesOnLastPage = entries.length % entriesPerPage || entriesPerPage;
       const spaceUsedOnLastPage = headerHeight + entriesOnLastPage * entryHeight;
-      const summaryHeight = 60 + Object.keys(funcaoSummary).length * 6;
+      const recorrenciaHeight =
+        (Object.keys(motivoSummary).length + Object.keys(substituiSummary).length) * 5 + 30;
+      const summaryHeight = 60 + Object.keys(funcaoSummary).length * 6 + recorrenciaHeight;
       const summaryFitsOnLastPage = spaceUsedOnLastPage + summaryHeight < pageHeight - margin;
       
       const totalPages = summaryFitsOnLastPage ? totalDataPages : totalDataPages + 1;
@@ -339,12 +353,18 @@ export function ExportReportButton({
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
-        doc.text(`Função: ${entry.funcao}`, margin + 18, yPos + 14);
+        doc.text(`Função: ${entry.funcao || "-"}`, margin + 18, yPos + 14);
         doc.text(`Data: ${formatDate(entry.data_pop)}`, margin + 80, yPos + 14);
 
         // CPF and PIX
         doc.text(`CPF: ${entry.cpf}`, margin + 18, yPos + 20);
         doc.text(`PIX: ${entry.chave_pix}`, margin + 80, yPos + 20);
+
+        // Substitui and Motivo
+        const substituiText = `Substitui: ${entry.substitui || "-"}`;
+        const motivoText = `Motivo: ${entry.motivo || "-"}`;
+        doc.text(doc.splitTextToSize(substituiText, 55)[0], margin + 18, yPos + 26);
+        doc.text(doc.splitTextToSize(motivoText, 90)[0], margin + 80, yPos + 26);
 
         // Value (highlighted)
         doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
@@ -365,6 +385,7 @@ export function ExportReportButton({
 
         yPos += entryHeight;
       });
+
 
       // Add summary section
       // Check if we need a new page for summary
@@ -418,6 +439,67 @@ export function ExportReportButton({
       doc.setLineWidth(0.3);
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
+
+      // Recorrência de Motivos e Substituídos
+      const ensureSpace = (needed: number) => {
+        if (yPos + needed > pageHeight - margin) {
+          doc.addPage();
+          addBackground();
+          addHeader(currentPage + 1, totalPages + 1);
+          currentPage++;
+          yPos = headerHeight;
+        }
+      };
+
+      const motivosSorted = Object.entries(motivoSummary).sort((a, b) => b[1] - a[1]);
+      const substituiSorted = Object.entries(substituiSummary).sort((a, b) => b[1] - a[1]);
+
+      if (motivosSorted.length > 0) {
+        ensureSpace(12 + motivosSorted.length * 5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("Motivos mais recorrentes:", margin, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        motivosSorted.forEach(([motivo, count]) => {
+          doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
+          const label = doc.splitTextToSize(`• ${motivo}`, contentWidth - 60)[0];
+          doc.text(label, margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${count} ocorrência${count > 1 ? "s" : ""}`, pageWidth - margin - 5, yPos, { align: "right" });
+          yPos += 5;
+        });
+        yPos += 3;
+      }
+
+      if (substituiSorted.length > 0) {
+        ensureSpace(12 + substituiSorted.length * 5);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("Coberturas mais recorrentes (Substitui):", margin, yPos);
+        yPos += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        substituiSorted.forEach(([nome, count]) => {
+          doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
+          const label = doc.splitTextToSize(`• ${nome}`, contentWidth - 60)[0];
+          doc.text(label, margin + 5, yPos);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${count} ocorrência${count > 1 ? "s" : ""}`, pageWidth - margin - 5, yPos, { align: "right" });
+          yPos += 5;
+        });
+        yPos += 3;
+      }
+
+      // Divider line
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 8;
+
 
       // Total count
       doc.setFont("helvetica", "normal");

@@ -351,7 +351,7 @@ export function FreelancerForm() {
 
             {/* Gerência */}
             <div className="space-y-2">
-              <Label htmlFor="gerencia">Gerência</Label>
+              <Label htmlFor="gerencia">Gerência (opcional)</Label>
               <Select 
                 onValueChange={(val) => {
                   form.setValue("gerencia", val);

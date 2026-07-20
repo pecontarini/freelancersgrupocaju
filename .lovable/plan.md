@@ -1,67 +1,55 @@
-# Plano: Documentação UI/UX para Aula com IA (NotebookLM)
-
 ## Objetivo
-Produzir um pacote de arquivos `.md` em `/mnt/documents/ui-ux-aula/` descrevendo, tela por tela, **layout visual, componentes, fluxos de usuário, microinterações e usabilidade** da plataforma Board (2Sell / CajuPAR / Stutz). O material será otimizado para ingestão em **NotebookLM, Google Veo, Sora, HeyGen, Synthesia** ou similares — com narração pronta e roteiro visual por cena.
+Nenhum PDF/Excel gerado por um usuário Stutz pode conter a palavra "CajuPAR"/"Grupo Caju" ou a logo do Caju. Mesmo para outros tenants (2Sell, futuros), o output deve refletir a marca correta. Caju continua vendo Caju.
 
-## Estrutura de entrega
+## Diagnóstico
+Achei referências hardcoded em:
 
-```text
-/mnt/documents/ui-ux-aula/
-├── 00_INDICE.md                  ← Mapa completo + ordem sugerida de gravação
-├── 01_visao_geral.md             ← O que é o Board, personas, multi-tenant, marca
-├── 02_design_system.md           ← Liquid Glass, cores, tipografia, ícones, tokens
-├── 03_login_e_onboarding.md      ← /auth, reset senha, tenant resolver
-├── 04_layout_shell.md            ← Sidebar, PortalHeader, BottomNav mobile, UnidadeSelector
-├── 05_unitarios_gerentes.md      ← Budgets, CMV Unitário, TeamReadinessCard
-├── 06_gestao_pessoas.md          ← Escalas, Freelancers, Check-in, Aprovações
-├── 07_agenda_lider.md            ← Chat IA, Missões, Planos de ação
-├── 08_utensilios.md              ← Contagem, Budget, Matriz, PDF IA, Galeria
-├── 09_cmv.md                     ← Semanas, Contagens, Vendas, Desvio
-├── 10_estoque.md                 ← Catálogo, Movimentação, Inventários
-├── 11_checklist_diario.md        ← POP, correções, closed-loop
-├── 12_manutencao_operacional.md  ← Formulários, NF/Boleto, PIX
-├── 13_configuracoes_admin.md     ← Tenants, Usuários, Roles, Sheets sync
-├── 14_paginas_publicas.md        ← Contagem pública, Check-in estação, Confirm shift
-├── 15_fluxos_end_to_end.md       ← 6-8 jornadas completas narradas
-└── 16_roteiros_video.md          ← Cenas prontas por tela: narração + ação + tempo
-```
+**PDFs (usam `LOGO_BASE64` = logo Caju e strings "CAJUPAR"/"CajuPAR"):**
+- `src/lib/logoBase64.ts` — logo Caju embutida em base64
+- `src/lib/pdf/grupoCajuPdfTheme.ts` — footer "Documento de uso interno • CajuPAR", "CajuPAR • Auditoria Operacional", "sistema de gestão de qualidade do CajuPAR"
+- `src/lib/pdf/checklistPdfHelpers.ts` — footer "Documento de uso interno • CajuPAR"
+- `src/lib/pdf/pdfImageUtils.ts` — comentário/uso
+- `src/lib/scheduleMasterPdf.ts` — "CajuPAR — Escala Operacional", "Documento de uso interno • CajuPAR"
+- `src/lib/scheduleDailyControlPdf.ts` — "CajuPAR — Folha de Controle de Intervalos"
+- `src/components/ExportReportButton.tsx` — header PDF "CAJUPAR - {loja}"
+- `src/components/MaintenanceExportButton.tsx` — header "CAJUPAR - {loja}" + footer "Sistema CajuPAR"
+- `src/components/MaintenanceSingleExportButton.tsx` — footer "Sistema CajuPAR"
 
-## Conteúdo padrão por tela
+**Templates WhatsApp / edge functions (fora do escopo desta rodada, mas listados para transparência):** `messageTemplates.ts`, `generate-magic-pix-link`, prompts de IA. Estes rodam server-side ou são strings de negócio Caju-específicas — mantidos como estão salvo pedido explícito.
 
-Cada arquivo de tela seguirá **o mesmo template**, para a IA de vídeo conseguir extrair beats consistentes:
+## Estratégia
 
-1. **Identidade da tela** — rota, quem acessa (role), tenant, mobile/desktop
-2. **Anatomia visual** — descrição do layout em regiões (header, hero, cards, tabelas, footer/actions) com posicionamento e hierarquia
-3. **Componentes-chave** — nome do componente shadcn/custom, o que exibe, estados (loading, vazio, erro, sucesso)
-4. **Interações** — cliques, hovers, drags, atalhos, feedback háptico, toasts
-5. **Fluxo de dados** — de onde vem (hook/tabela), pra onde vai
-6. **Usabilidade** — decisões de UX (por que está assim), pontos de atenção, acessibilidade
-7. **Narração sugerida (30–60s)** — parágrafo pronto para TTS, tom didático PT-BR
-8. **Roteiro visual** — lista de cenas com timestamp, ação de câmera/cursor, elemento a destacar
+### 1. Novo helper de branding para exports (`src/lib/pdf/exportBranding.ts`)
+- Função `getExportBranding()` que lê `document.documentElement.getAttribute("data-tenant")` (já setado pelo `TenantContext`) e retorna:
+  - `name`: nome curto para header ("STUTZ", "CAJUPAR", "2SELL")
+  - `fullName`: nome longo para footer ("Stutz", "Grupo CajuPAR", "2Sell")
+  - `logoDataUrl`: base64 pronto para jsPDF (Caju continua usando `LOGO_BASE64` atual; Stutz usa novo asset base64; fallback = null → não desenha logo)
+  - `footerLine`: "Documento de uso interno • {fullName}"
+- Registry interno por slug. `caju` → dados atuais. `stutz` → nome Stutz + logo Stutz. Fallback (outros tenants) → usa `appName` do registry + sem logo (ou logo default 2Sell).
 
-## Como será construído
+### 2. Logo Stutz em base64
+- Converter `user-uploads://stutz_s-tagline4.png` (versão preta, funciona em fundo branco do PDF) para base64 e salvar em `src/lib/brandLogos/stutzLogoBase64.ts`.
+- Manter `src/lib/logoBase64.ts` (Caju) inalterado — apenas deixa de ser importada diretamente.
 
-- **Varredura sistemática** de `src/pages/`, `src/components/dashboard/`, `escalas/`, `utensilios/`, `cmv/`, `checkin/`, `checklist-daily/`, `agenda-lider/`, `estoque/`, `layout/`, `admin/`
-- **Screenshots de referência** — capturar cada tela principal via Playwright em desktop (1280×1800) e mobile (390×844) com sessão autenticada de super admin, salvos em `/mnt/documents/ui-ux-aula/screenshots/` e **referenciados nos .md** para a IA ancorar o vídeo no visual real
-- **Reaproveitar** `docs/app-guide-notebooklm.md`, `Claude.md`, `PROJECT_STATE.md`, `ROADMAP.md` como fontes secundárias
-- **Índice mestre (`00_INDICE.md`)** com ordem pedagógica sugerida (do macro → micro) e duração estimada por módulo (total ~45–60 min de vídeo)
-- **Roteiros (`16_roteiros_video.md`)** já formatados em blocos `SCENE / VISUAL / VOICEOVER / DURATION` — formato que NotebookLM, Veo e HeyGen digerem bem
+### 3. Refatorar cada arquivo de export
+Substituir imports diretos de `LOGO_BASE64` e strings hardcoded por chamada a `getExportBranding()`:
 
-## Entregável final
+- `grupoCajuPdfTheme.ts`, `checklistPdfHelpers.ts`, `pdfImageUtils.ts`, `scheduleMasterPdf.ts`, `scheduleDailyControlPdf.ts`:
+  - Trocar `LOGO_BASE64` por `branding.logoDataUrl` (skip `addImage` se null).
+  - Trocar literais "CajuPAR"/"CAJUPAR" por `branding.fullName` / `branding.name`.
+- `ExportReportButton.tsx`, `MaintenanceExportButton.tsx`, `MaintenanceSingleExportButton.tsx`:
+  - Chamar `getExportBranding()` no início do handler; usar em header/footer.
+  - Comentário "Brand colors (CajuPAR)" atualizado para "Brand colors (tenant)".
 
-Um `.zip` (ou pasta) em `/mnt/documents/ui-ux-aula/` com **~16 arquivos .md + screenshots**, pronto para você:
-1. Arrastar para o NotebookLM como fontes → gerar áudio-aula
-2. Colar os roteiros no Veo/Sora/HeyGen → gerar vídeos por módulo
-3. Editar/reordenar como quiser
+Nota: os arquivos PDF do `pdf/` são módulos puros (sem hooks). Ler o tenant via `document.documentElement.dataset.tenant` é seguro porque a geração de PDF sempre parte de uma ação do usuário no browser, com o `TenantContext` já montado (o próprio `applyThemeToDocument` seta esse atributo).
 
-## Escopo — o que **não** entra
-- Não vou gravar vídeo nem gerar áudio aqui (você usará as IAs externas)
-- Não vou refatorar UI existente (é documentação, não redesign)
-- Módulos muito nichados (ex: sync Google Sheets interno) entram resumidos, sem template completo
+### 4. Validação
+- Build (typecheck automático).
+- Visual: gerar 1 PDF autenticado como Stutz e conferir header/footer/logo — nenhuma menção a Caju.
+- Regressão Caju: gerar mesmo PDF autenticado como Caju — continua idêntico ao atual.
 
-## Perguntas antes de executar
-1. **Idioma da narração**: PT-BR (padrão) ou bilíngue PT/EN?
-2. **Perspectiva**: aula para **usuário final** (gerente/operador aprendendo a usar) ou **comercial/investidor** (mostrando a plataforma como produto)? Muda o tom da narração.
-3. **Screenshots**: capturo com dados reais (super admin vendo Caju) ou prefere dados anonimizados/genéricos?
+## Fora de escopo (avisar o usuário)
+- Templates de WhatsApp/PIX em `messageTemplates.ts` e edge functions (`generate-magic-pix-link`, `send-shift-reminders`, prompts de IA `plano-acao-ia`, `agenda-lider-chat`, `cmv-ai-assistant`, `analyze-audit-patterns`, `pop-wizard-chat`) — hoje são específicos Caju. Se quiser tornar multi-tenant também, é um segundo bloco (precisa ler `tenant_id` no server e escolher template).
+- URLs `freelancersgrupocaju.lovable.app` em edge functions — Caju-específicas, fora deste escopo de "output visual".
 
-Se preferir, aprove com "seguir" e eu assumo: **PT-BR, tom usuário final, screenshots com dados Caju reais**.
+Confirma esse recorte (PDFs + Excel do frontend agora, WhatsApp/edge functions depois)?

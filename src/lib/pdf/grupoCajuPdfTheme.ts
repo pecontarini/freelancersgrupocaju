@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 
 /**
  * CAJUPAR - INSTITUTIONAL PDF THEME
@@ -126,10 +126,13 @@ export function addExecutiveCover(doc: jsPDF, params: CoverPageParams): void {
   const margin = PDF_LAYOUT.margin;
 
   // Logo centered at top
-  try {
-    doc.addImage(LOGO_BASE64, "JPEG", centerX - 20, 25, 40, 28);
-  } catch {
-    // Fallback
+  const branding = getExportBranding();
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, centerX - 20, 25, 40, 28);
+    } catch {
+      // Fallback
+    }
   }
 
   // Institutional line under logo
@@ -272,7 +275,7 @@ export function addExecutiveCover(doc: jsPDF, params: CoverPageParams): void {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 30, { align: "center" });
+  doc.text(`Documento de uso interno • ${branding.fullName}`, centerX, pageHeight - 30, { align: "center" });
 }
 
 /**
@@ -421,10 +424,13 @@ export function addContinuationHeader(doc: jsPDF, section?: string): number {
   let y = margin;
 
   // Logo small
-  try {
-    doc.addImage(LOGO_BASE64, "JPEG", margin, y - 5, 22, 15);
-  } catch {
-    // Fallback
+  const branding = getExportBranding();
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, margin, y - 5, 22, 15);
+    } catch {
+      // Fallback
+    }
   }
 
   // Section indicator
@@ -547,10 +553,11 @@ export function addSignaturePage(doc: jsPDF): void {
   doc.text("Data: ____/____/________", rightBoxX + boxWidth / 2, boxY + 46, { align: "center" });
 
   // Footer note
+  const branding = getExportBranding();
   doc.setFont("helvetica", "italic");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Este documento faz parte do sistema de gestão de qualidade do CajuPAR", centerX, pageHeight - 35, { align: "center" });
+  doc.text(`Este documento faz parte do sistema de gestão de qualidade da ${branding.fullName}`, centerX, pageHeight - 35, { align: "center" });
 }
 
 /**
@@ -575,7 +582,9 @@ export function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number): 
   doc.text(format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }), margin, pageHeight - 7);
 
   // Center: Brand
-  doc.text("CajuPAR • Auditoria Operacional", pageWidth / 2, pageHeight - 7, { align: "center" });
+  const branding = getExportBranding();
+  doc.text(`${branding.fullName} • Auditoria Operacional`, pageWidth / 2, pageHeight - 7, { align: "center" });
+
 
   // Right: Pagination
   doc.text(`${pageNum}/${totalPages}`, pageWidth - margin, pageHeight - 7, { align: "right" });

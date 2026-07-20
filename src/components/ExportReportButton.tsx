@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { exportToExcel } from "@/lib/excelUtils";
 import { FreelancerEntry } from "@/types/freelancer";
 import { formatCurrency, formatDate } from "@/lib/formatters";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 import {
   buildPaymentCsv,
   downloadCsvBytes,
@@ -33,7 +33,7 @@ interface ExportReportButtonProps {
   dateRange?: { start: string | null; end: string | null };
 }
 
-// Colors for PDF styling - Using CajuPAR brand colors (Coral/Terracotta: HSL 14, 70%, 48%)
+// Colors for PDF styling (tenant-agnostic accents: Coral/Terracotta)
 // Converted to RGB: hsl(14, 70%, 48%) ≈ rgb(208, 89, 55)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta brand color
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
@@ -258,17 +258,20 @@ export function ExportReportButton({
         doc.rect(0, 0, pageWidth, 45, "F");
         
         // Add logo - Draw it at the left
-        try {
-          doc.addImage(LOGO_BASE64, "JPEG", margin, 8, 30, 25);
-        } catch (error) {
-          console.error("Error adding logo:", error);
+        const branding = getExportBranding();
+        if (branding.logoDataUrl) {
+          try {
+            doc.addImage(branding.logoDataUrl, branding.logoFormat, margin, 8, 30, 25);
+          } catch (error) {
+            console.error("Error adding logo:", error);
+          }
         }
 
         // Title next to logo
         doc.setTextColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(16);
-        doc.text(`CAJUPAR - ${unidadeName.toUpperCase()}`, margin + 35, 18);
+        doc.text(`${branding.shortName} - ${unidadeName.toUpperCase()}`, margin + 35, 18);
 
         // Subtitle
         doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);

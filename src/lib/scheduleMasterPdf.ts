@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
 import { jsDayToPopDay } from "@/lib/popConventions";
 import { fetchScheduleData, type ScheduleDataResult } from "@/lib/scheduleMasterExport";
@@ -52,21 +52,25 @@ function addPageFooter(doc: jsPDF, pageNum: number, totalPages: number) {
   doc.setLineWidth(0.3);
   doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
 
+  const branding = getExportBranding();
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...PDF_COLORS.gray400);
   doc.text(format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR }), margin, pageHeight - 10);
-  doc.text("CajuPAR — Escala Operacional", pageWidth / 2, pageHeight - 10, { align: "center" });
+  doc.text(`${branding.fullName} — Escala Operacional`, pageWidth / 2, pageHeight - 10, { align: "center" });
   doc.text(`Página ${pageNum} / ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: "right" });
 }
 
 function addSectorHeader(doc: jsPDF, sectorName: string) {
   const margin = PDF_LAYOUT.margin;
   const pageWidth = doc.internal.pageSize.getWidth();
+  const branding = getExportBranding();
 
-  try {
-    doc.addImage(LOGO_BASE64, "JPEG", margin, margin - 5, 22, 15);
-  } catch { /* fallback */ }
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, margin, margin - 5, 22, 15);
+    } catch { /* fallback */ }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
@@ -90,9 +94,13 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   const centerX = pageWidth / 2;
 
   // ── PAGE 1: Cover ──
-  try {
-    doc.addImage(LOGO_BASE64, "JPEG", centerX - 25, 30, 50, 35);
-  } catch { /* fallback */ }
+  const branding = getExportBranding();
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, centerX - 25, 30, 50, 35);
+    } catch { /* fallback */ }
+  }
+
 
   doc.setDrawColor(...PDF_COLORS.institutional);
   doc.setLineWidth(1.2);
@@ -129,7 +137,8 @@ export async function exportMasterSchedulePdf({ unitId, unitName, weekStart }: P
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 22, { align: "center" });
+  doc.text(`Documento de uso interno • ${branding.fullName}`, centerX, pageHeight - 22, { align: "center" });
+
 
   // ── SECTOR PAGES ──
   for (const sector of sectors) {

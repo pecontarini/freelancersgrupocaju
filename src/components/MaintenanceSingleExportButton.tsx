@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/tooltip";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 
-// Brand colors (CajuPAR)
+// Brand accents used in this PDF (tenant-agnostic)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
 const HEADER_BG: [number, number, number] = [245, 245, 245]; // Light gray background
@@ -63,10 +63,13 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
       doc.roundedRect(margin, 8, pageWidth - margin * 2, 38, 3, 3, "F");
 
       // Logo
-      try {
-        doc.addImage(LOGO_BASE64, "JPEG", margin + 4, 12, 36, 22);
-      } catch (e) {
-        console.error("Error adding logo:", e);
+      const branding = getExportBranding();
+      if (branding.logoDataUrl) {
+        try {
+          doc.addImage(branding.logoDataUrl, branding.logoFormat, margin + 4, 12, 36, 22);
+        } catch (e) {
+          console.error("Error adding logo:", e);
+        }
       }
 
       // Title
@@ -431,7 +434,7 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Documento gerado automaticamente pelo Sistema CajuPAR", margin, pageHeight - 12);
+        doc.text(`Documento gerado automaticamente pelo Sistema ${branding.fullName}`, margin, pageHeight - 12);
         doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: "right" });
       }
 

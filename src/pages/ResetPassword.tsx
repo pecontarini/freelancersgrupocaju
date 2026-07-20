@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { useBrandLogo } from "@/lib/brand";
 
 export default function ResetPassword() {
-  const { src: brandLogo } = useBrandLogo();
+  const { src: brandLogo, alt: brandAlt } = useBrandLogo();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
@@ -78,7 +78,7 @@ export default function ResetPassword() {
           <CardHeader className="space-y-4 pb-2">
             <div className="flex justify-center">
               <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-                <img src={brandLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
+                <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
               </div>
             </div>
             <CardDescription className="text-base">
@@ -101,7 +101,7 @@ export default function ResetPassword() {
         <CardHeader className="text-center space-y-4 pb-2">
           <div className="flex justify-center">
             <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
-              <img src={brandLogo} alt="CajuPAR" className="h-auto w-full object-contain" />
+              <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
             </div>
           </div>
           <CardDescription className="text-base">Defina sua nova senha</CardDescription>

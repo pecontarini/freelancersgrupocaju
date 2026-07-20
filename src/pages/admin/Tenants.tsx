@@ -479,6 +479,7 @@ function TenantMembersDialog({
   const [isDefault, setIsDefault] = useState(false);
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [generatingLinkFor, setGeneratingLinkFor] = useState<string | null>(null);
   const [linkDialog, setLinkDialog] = useState<{ email: string; link: string; kind: "invite" | "recovery" } | null>(null);
 
   const load = async () => {
@@ -505,7 +506,6 @@ function TenantMembersDialog({
         tenant_id: tenant.id,
         is_default: isDefault,
         full_name: fullName.trim() || undefined,
-        redirect_to: `${window.location.origin}/auth?invite=1`,
       },
     });
     setInviting(false);
@@ -523,14 +523,16 @@ function TenantMembersDialog({
   };
 
   const generateLinkFor = async (memberEmail: string) => {
+    if (generatingLinkFor) return;
+    setGeneratingLinkFor(memberEmail);
     const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
       body: {
         email: memberEmail,
         link_only: true,
         tenant_id: tenant?.id,
-        redirect_to: `${window.location.origin}/auth?invite=1`,
       },
     });
+    setGeneratingLinkFor(null);
     if (error) return toast.error(error.message);
     const d = data as any;
     if (d?.error) return toast.error(d.error);
@@ -611,10 +613,15 @@ function TenantMembersDialog({
                   variant="ghost"
                   size="icon"
                   onClick={() => generateLinkFor(m.email)}
+                  disabled={generatingLinkFor !== null}
                   className="h-8 w-8"
                   title="Gerar link de acesso/redefinir senha"
                 >
-                  <Link2 className="h-4 w-4" />
+                  {generatingLinkFor === m.email ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
                 </Button>
                 <Button
                   variant="ghost"
@@ -657,7 +664,7 @@ function TenantMembersDialog({
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  O link expira em ~1 hora. Se expirar, clique no ícone de link ao lado do usuário para gerar um novo.
+                  Use somente este link mais recente. Ele expira em ~1 hora e um novo link invalida o anterior.
                 </p>
               </div>
             </DialogContent>

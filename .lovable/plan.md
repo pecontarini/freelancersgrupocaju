@@ -1,55 +1,35 @@
-## Objetivo
-Nenhum PDF/Excel gerado por um usuário Stutz pode conter a palavra "CajuPAR"/"Grupo Caju" ou a logo do Caju. Mesmo para outros tenants (2Sell, futuros), o output deve refletir a marca correta. Caju continua vendo Caju.
 
 ## Diagnóstico
-Achei referências hardcoded em:
 
-**PDFs (usam `LOGO_BASE64` = logo Caju e strings "CAJUPAR"/"CajuPAR"):**
-- `src/lib/logoBase64.ts` — logo Caju embutida em base64
-- `src/lib/pdf/grupoCajuPdfTheme.ts` — footer "Documento de uso interno • CajuPAR", "CajuPAR • Auditoria Operacional", "sistema de gestão de qualidade do CajuPAR"
-- `src/lib/pdf/checklistPdfHelpers.ts` — footer "Documento de uso interno • CajuPAR"
-- `src/lib/pdf/pdfImageUtils.ts` — comentário/uso
-- `src/lib/scheduleMasterPdf.ts` — "CajuPAR — Escala Operacional", "Documento de uso interno • CajuPAR"
-- `src/lib/scheduleDailyControlPdf.ts` — "CajuPAR — Folha de Controle de Intervalos"
-- `src/components/ExportReportButton.tsx` — header PDF "CAJUPAR - {loja}"
-- `src/components/MaintenanceExportButton.tsx` — header "CAJUPAR - {loja}" + footer "Sistema CajuPAR"
-- `src/components/MaintenanceSingleExportButton.tsx` — footer "Sistema CajuPAR"
+O link que abriu (`.../verify?token=...&type=invite&redirect_to=https://53a5f1f8-...lovableproject.com/auth`) tem dois problemas:
 
-**Templates WhatsApp / edge functions (fora do escopo desta rodada, mas listados para transparência):** `messageTemplates.ts`, `generate-magic-pix-link`, prompts de IA. Estes rodam server-side ou são strings de negócio Caju-específicas — mantidos como estão salvo pedido explícito.
+1. **`redirect_to` aponta para a URL de preview do Lovable** (`lovableproject.com`), não para a URL pública (`board2.lovable.app`). Esse host tende a não estar na allow-list de Auth, então o Supabase joga o usuário para o Site URL default, resultando naquela "página de dev".
+2. **Mesmo se o redirect estivesse certo**, a página `/auth` não trata convites. O Supabase verifica o token, cria a sessão do usuário (que ainda não tem senha) e devolve ao `/auth` com o access_token no hash. Hoje o `Auth.tsx` ignora esse estado, então o usuário só vê a tela de login normal — sem nenhum caminho para definir a senha.
 
-## Estratégia
+## O que fazer
 
-### 1. Novo helper de branding para exports (`src/lib/pdf/exportBranding.ts`)
-- Função `getExportBranding()` que lê `document.documentElement.getAttribute("data-tenant")` (já setado pelo `TenantContext`) e retorna:
-  - `name`: nome curto para header ("STUTZ", "CAJUPAR", "2SELL")
-  - `fullName`: nome longo para footer ("Stutz", "Grupo CajuPAR", "2Sell")
-  - `logoDataUrl`: base64 pronto para jsPDF (Caju continua usando `LOGO_BASE64` atual; Stutz usa novo asset base64; fallback = null → não desenha logo)
-  - `footerLine`: "Documento de uso interno • {fullName}"
-- Registry interno por slug. `caju` → dados atuais. `stutz` → nome Stutz + logo Stutz. Fallback (outros tenants) → usa `appName` do registry + sem logo (ou logo default 2Sell).
+### 1. Edge Function `admin-invite-tenant-user`
+- Passar a montar um `redirectTo` padrão apontando para `/auth?invite=1` da URL do admin que chamou (recebida no body como hoje) e, quando ausente, cair num `PUBLIC_SITE_URL` (secret) ou origem passada pelo caller — nunca deixar o Supabase escolher.
+- Fazer o mesmo para o link de `recovery`.
 
-### 2. Logo Stutz em base64
-- Converter `user-uploads://stutz_s-tagline4.png` (versão preta, funciona em fundo branco do PDF) para base64 e salvar em `src/lib/brandLogos/stutzLogoBase64.ts`.
-- Manter `src/lib/logoBase64.ts` (Caju) inalterado — apenas deixa de ser importada diretamente.
+### 2. `src/pages/admin/Tenants.tsx`
+- Ao invocar a função, mandar sempre `redirect_to: ${window.location.origin}/auth?invite=1` (o admin hoje já está no domínio publicado quando faz o convite, então o link nascerá correto).
+- Mesmo tratamento ao gerar o link via o botão 🔗 de "regenerar link".
 
-### 3. Refatorar cada arquivo de export
-Substituir imports diretos de `LOGO_BASE64` e strings hardcoded por chamada a `getExportBranding()`:
+### 3. `src/pages/Auth.tsx` — detectar convite/recovery e pedir senha
+- No mount, usar `supabase.auth.onAuthStateChange`. Quando o evento for `PASSWORD_RECOVERY` **ou** houver sessão + `?invite=1` na query (ou `type=invite` no hash), trocar a UI para um formulário "Defina sua senha" (`Nova senha` + `Confirmar senha`).
+- No submit chamar `supabase.auth.updateUser({ password })`. Ao sucesso: toast, limpar query/hash e `navigate("/")`.
+- Manter o fluxo de login normal para quem chega sem token.
 
-- `grupoCajuPdfTheme.ts`, `checklistPdfHelpers.ts`, `pdfImageUtils.ts`, `scheduleMasterPdf.ts`, `scheduleDailyControlPdf.ts`:
-  - Trocar `LOGO_BASE64` por `branding.logoDataUrl` (skip `addImage` se null).
-  - Trocar literais "CajuPAR"/"CAJUPAR" por `branding.fullName` / `branding.name`.
-- `ExportReportButton.tsx`, `MaintenanceExportButton.tsx`, `MaintenanceSingleExportButton.tsx`:
-  - Chamar `getExportBranding()` no início do handler; usar em header/footer.
-  - Comentário "Brand colors (CajuPAR)" atualizado para "Brand colors (tenant)".
+### 4. Verificação
+- Gerar um novo link de convite via `/admin/tenants` (Stutz → Thaylla) e abrir no navegador logado limpo.
+- Esperado: link abre em `board2.lovable.app/auth?invite=1#access_token=...`, aparece o formulário "Defina sua senha", após salvar cai no dashboard já autenticado.
 
-Nota: os arquivos PDF do `pdf/` são módulos puros (sem hooks). Ler o tenant via `document.documentElement.dataset.tenant` é seguro porque a geração de PDF sempre parte de uma ação do usuário no browser, com o `TenantContext` já montado (o próprio `applyThemeToDocument` seta esse atributo).
+## Observação sobre links já enviados
 
-### 4. Validação
-- Build (typecheck automático).
-- Visual: gerar 1 PDF autenticado como Stutz e conferir header/footer/logo — nenhuma menção a Caju.
-- Regressão Caju: gerar mesmo PDF autenticado como Caju — continua idêntico ao atual.
+Links de convite antigos (como o que você abriu) ficarão inúteis porque o `redirect_to` deles está gravado no token. Depois do fix é preciso **regenerar** o link da Thaylla pelo botão 🔗 e reenviar — o link novo já sairá com o redirect certo.
 
-## Fora de escopo (avisar o usuário)
-- Templates de WhatsApp/PIX em `messageTemplates.ts` e edge functions (`generate-magic-pix-link`, `send-shift-reminders`, prompts de IA `plano-acao-ia`, `agenda-lider-chat`, `cmv-ai-assistant`, `analyze-audit-patterns`, `pop-wizard-chat`) — hoje são específicos Caju. Se quiser tornar multi-tenant também, é um segundo bloco (precisa ler `tenant_id` no server e escolher template).
-- URLs `freelancersgrupocaju.lovable.app` em edge functions — Caju-específicas, fora deste escopo de "output visual".
+## Fora do escopo
 
-Confirma esse recorte (PDFs + Excel do frontend agora, WhatsApp/edge functions depois)?
+- Não vou mexer em Site URL / Redirect URLs do Supabase (isso é configuração manual em Auth Settings — só é necessário se `board2.lovable.app` ainda não estiver lá; posso listar depois).
+- Não vou trocar SMTP / provedor de e-mail; o botão 🔗 continua sendo o caminho oficial de compartilhar.

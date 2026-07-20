@@ -74,8 +74,10 @@ Deno.serve(async (req) => {
     let linkKind: "invite" | "recovery" | null = null;
     let emailSent = false;
 
-    // Se redirect_to não vier no body, deixamos undefined para o Supabase usar o Site URL padrão do projeto (allow-list já aceita).
-    const redirectTo = redirectToBody || undefined;
+    // redirect_to é obrigatório para o link cair no /auth correto do domínio publicado.
+    // Fallback para PUBLIC_SITE_URL (secret) se o client não passar.
+    const publicSite = Deno.env.get("PUBLIC_SITE_URL") ?? "";
+    const redirectTo = redirectToBody || (publicSite ? `${publicSite.replace(/\/$/, "")}/auth?invite=1` : undefined);
 
     if (!targetUserId) {
       if (linkOnly) return json({ error: "usuário não encontrado" }, 404);

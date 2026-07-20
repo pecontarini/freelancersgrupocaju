@@ -21,6 +21,26 @@ export default function Auth() {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [setPasswordMode, setSetPasswordMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Detect invite / password recovery flow (session created via magic link)
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const hasInviteHint =
+      hash.includes("type=invite") ||
+      hash.includes("type=recovery") ||
+      new URLSearchParams(search).get("invite") === "1";
+    if (hasInviteHint) setSetPasswordMode(true);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setSetPasswordMode(true);
+      if (event === "SIGNED_IN" && hasInviteHint) setSetPasswordMode(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -30,6 +50,28 @@ export default function Auth() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("As senhas não conferem.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Senha definida! Bem-vindo(a).");
+    window.history.replaceState(null, "", window.location.pathname);
+    navigate("/");
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +145,70 @@ export default function Auth() {
     }
     setLoading(false);
   };
+
+  if (setPasswordMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/50 p-4">
+        <Card className="w-full max-w-md rounded-2xl shadow-card">
+          <CardHeader className="text-center space-y-4 pb-2">
+            <div className="flex justify-center">
+              <div className="w-64 overflow-hidden rounded-2xl shadow-lg">
+                <img src={brandLogo} alt={brandAlt} className="h-auto w-full object-contain" />
+              </div>
+            </div>
+            <CardTitle className="text-xl">Defina sua senha</CardTitle>
+            <CardDescription>Crie uma senha para acessar sua conta.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSetPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="new-password"
+                    type="password"
+                    placeholder="Mínimo 6 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pl-9"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirmar senha</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    placeholder="Repita a senha"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pl-9"
+                    required
+                    minLength={6}
+                  />
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar e entrar"
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (forgotPassword) {
     return (

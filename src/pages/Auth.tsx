@@ -21,6 +21,26 @@ export default function Auth() {
   const [forgotPassword, setForgotPassword] = useState(false);
   const [recoveryEmailSent, setRecoveryEmailSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [setPasswordMode, setSetPasswordMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Detect invite / password recovery flow (session created via magic link)
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const hasInviteHint =
+      hash.includes("type=invite") ||
+      hash.includes("type=recovery") ||
+      new URLSearchParams(search).get("invite") === "1";
+    if (hasInviteHint) setSetPasswordMode(true);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setSetPasswordMode(true);
+      if (event === "SIGNED_IN" && hasInviteHint) setSetPasswordMode(true);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -30,6 +50,28 @@ export default function Auth() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error("A senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("As senhas não conferem.");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Senha definida! Bem-vindo(a).");
+    window.history.replaceState(null, "", window.location.pathname);
+    navigate("/");
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();

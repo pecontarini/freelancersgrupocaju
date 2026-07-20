@@ -11,9 +11,9 @@ import {
 } from "@/components/ui/tooltip";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 
-// Brand colors (CajuPAR)
+// Brand accents used in this PDF (tenant-agnostic)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
 const HEADER_BG: [number, number, number] = [245, 245, 245]; // Light gray background

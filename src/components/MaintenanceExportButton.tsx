@@ -5,9 +5,9 @@ import autoTable from "jspdf-autotable";
 import { MaintenanceSelectionModal } from "@/components/MaintenanceSelectionModal";
 import { MaintenanceEntry } from "@/types/maintenance";
 import { formatCurrency } from "@/lib/formatters";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 
-// Brand colors (CajuPAR)
+// Brand colors (tenant-agnostic accents used in this PDF)
 const PRIMARY_COLOR: [number, number, number] = [208, 89, 55]; // Coral/Terracotta
 const SECONDARY_COLOR: [number, number, number] = [100, 100, 100]; // Gray
 const HEADER_BG: [number, number, number] = [245, 245, 245]; // Light gray background
@@ -42,6 +42,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
     setIsGenerating(true);
 
     try {
+      const branding = getExportBranding();
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -62,7 +63,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
-        doc.text("Documento gerado automaticamente pelo Sistema CajuPAR", margin, pageHeight - 12);
+        doc.text(`Documento gerado automaticamente pelo Sistema ${branding.fullName}`, margin, pageHeight - 12);
         doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - margin, pageHeight - 12, { align: "right" });
       };
 
@@ -74,10 +75,12 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.roundedRect(margin, 8, pageWidth - margin * 2, 38, 3, 3, "F");
 
       // Logo
-      try {
-        doc.addImage(LOGO_BASE64, "JPEG", margin + 4, 12, 36, 22);
-      } catch (e) {
-        console.error("Error adding logo:", e);
+      if (branding.logoDataUrl) {
+        try {
+          doc.addImage(branding.logoDataUrl, branding.logoFormat, margin + 4, 12, 36, 22);
+        } catch (e) {
+          console.error("Error adding logo:", e);
+        }
       }
 
       // Title and info
@@ -92,7 +95,7 @@ export function MaintenanceExportButton({ entries, lojaNome }: MaintenanceExport
       doc.setTextColor(60, 60, 60);
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text(`CAJUPAR - ${displayLoja.toUpperCase()}`, margin + 48, 26);
+      doc.text(`${branding.shortName} - ${displayLoja.toUpperCase()}`, margin + 48, 26);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");

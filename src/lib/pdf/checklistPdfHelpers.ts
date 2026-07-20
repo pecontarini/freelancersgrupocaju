@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 import { PDF_COLORS, PDF_LAYOUT, getScoreColor, addPageFooter, addContinuationHeader, addSignaturePage } from "@/lib/pdf/grupoCajuPdfTheme";
 import { addImageFromUrl } from "@/lib/pdf/pdfImageUtils";
 
@@ -38,9 +38,12 @@ export function addChecklistCover(doc: jsPDF, params: ChecklistCoverParams): voi
   const scoreColor = getScoreColor(score);
 
   // Logo centered at top
-  try {
-    doc.addImage(LOGO_BASE64, "JPEG", centerX - 20, 25, 40, 28);
-  } catch { /* fallback */ }
+  const branding = getExportBranding();
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, centerX - 20, 25, 40, 28);
+    } catch { /* fallback */ }
+  }
 
   // Institutional line under logo
   doc.setDrawColor(...PDF_COLORS.institutional);
@@ -192,7 +195,7 @@ export function addChecklistCover(doc: jsPDF, params: ChecklistCoverParams): voi
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...PDF_COLORS.gray400);
-  doc.text("Documento de uso interno • CajuPAR", centerX, pageHeight - 30, { align: "center" });
+  doc.text(`Documento de uso interno • ${branding.fullName}`, centerX, pageHeight - 30, { align: "center" });
 }
 
 // ============================================================

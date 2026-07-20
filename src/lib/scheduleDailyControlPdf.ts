@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { LOGO_BASE64 } from "@/lib/logoBase64";
+import { getExportBranding } from "@/lib/pdf/exportBranding";
 import { PDF_COLORS, PDF_LAYOUT } from "@/lib/pdf/grupoCajuPdfTheme";
 import type { DailyRosterRow } from "@/hooks/useDailyRoster";
 
@@ -34,10 +34,13 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
   const margin = PDF_LAYOUT.margin;
 
   // ---------- Header ----------
-  try {
-    doc.addImage(LOGO_BASE64, "PNG", margin, 8, 22, 14);
-  } catch {
-    /* logo opcional */
+  const branding = getExportBranding();
+  if (branding.logoDataUrl) {
+    try {
+      doc.addImage(branding.logoDataUrl, branding.logoFormat, margin, 8, 22, 14);
+    } catch {
+      /* logo opcional */
+    }
   }
 
   doc.setFont("helvetica", "bold");
@@ -166,7 +169,7 @@ export async function exportDailyBreakControl({ unitName, date, rows }: DailyCon
       margin,
       pageHeight - 10,
     );
-    doc.text("CajuPAR — Folha de Controle de Intervalos", pageWidth / 2, pageHeight - 10, {
+    doc.text(`${branding.fullName} — Folha de Controle de Intervalos`, pageWidth / 2, pageHeight - 10, {
       align: "center",
     });
     doc.text(`Página ${i} / ${totalPages}`, pageWidth - margin, pageHeight - 10, {

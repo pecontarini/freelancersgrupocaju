@@ -39,7 +39,6 @@ Deno.serve(async (req) => {
     const isDefault = Boolean(body.is_default ?? false);
     const fullName = body.full_name ? String(body.full_name) : undefined;
     const linkOnly = Boolean(body.link_only ?? false);
-    const redirectToBody = body.redirect_to ? String(body.redirect_to) : "";
 
     if (!email) {
       return json({ error: "email é obrigatório" }, 400);
@@ -72,12 +71,10 @@ Deno.serve(async (req) => {
     let invited = false;
     let inviteLink: string | null = null;
     let linkKind: "invite" | "recovery" | null = null;
-    let emailSent = false;
-
-    // redirect_to é obrigatório para o link cair no /auth correto do domínio publicado.
-    // Fallback para PUBLIC_SITE_URL (secret) se o client não passar.
-    const publicSite = Deno.env.get("PUBLIC_SITE_URL") ?? "";
-    const redirectTo = redirectToBody || (publicSite ? `${publicSite.replace(/\/$/, "")}/auth?invite=1` : undefined);
+    // Links de acesso sempre abrem o app publicado. Nunca use o origin do preview,
+    // pois ele exige acesso ao editor e não é acessível ao usuário convidado.
+    const publicSite = (Deno.env.get("PUBLIC_SITE_URL") || "https://board2.lovable.app").replace(/\/$/, "");
+    const redirectTo = `${publicSite}/auth?invite=1`;
 
     if (!targetUserId) {
       if (linkOnly) return json({ error: "usuário não encontrado" }, 404);
@@ -108,15 +105,6 @@ Deno.serve(async (req) => {
       inviteLink = linkData?.properties?.action_link ?? null;
     }
 
-    // Best-effort: dispara e-mail via inviteUserByEmail apenas em criação
-    if (invited) {
-      const { error: mailErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo,
-        data: fullName ? { full_name: fullName } : undefined,
-      });
-      emailSent = !mailErr;
-    }
-
     // Vincular ao tenant (a não ser que seja link_only)
     if (!linkOnly && tenantId) {
       if (isDefault) {
@@ -137,7 +125,7 @@ Deno.serve(async (req) => {
       invited,
       invite_link: inviteLink,
       link_kind: linkKind,
-      email_sent: emailSent,
+      email_sent: false,
     });
   } catch (e: any) {
     return json({ error: e?.message ?? "erro inesperado" }, 500);

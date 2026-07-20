@@ -24,6 +24,8 @@ export default function Auth() {
   const [setPasswordMode, setSetPasswordMode] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [checkingInvite, setCheckingInvite] = useState(false);
+  const [inviteSessionReady, setInviteSessionReady] = useState(false);
 
   // Detect invite / password recovery flow (session created via magic link)
   useEffect(() => {
@@ -33,11 +35,21 @@ export default function Auth() {
       hash.includes("type=invite") ||
       hash.includes("type=recovery") ||
       new URLSearchParams(search).get("invite") === "1";
-    if (hasInviteHint) setSetPasswordMode(true);
+    if (hasInviteHint) {
+      setSetPasswordMode(true);
+      setCheckingInvite(true);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setInviteSessionReady(Boolean(session));
+        setCheckingInvite(false);
+      });
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") setSetPasswordMode(true);
-      if (event === "SIGNED_IN" && hasInviteHint) setSetPasswordMode(true);
+      if ((event === "SIGNED_IN" && hasInviteHint) || event === "PASSWORD_RECOVERY") {
+        setInviteSessionReady(Boolean(session));
+        setCheckingInvite(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -53,6 +65,10 @@ export default function Auth() {
 
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inviteSessionReady) {
+      toast.error("Este link é inválido, expirou ou já foi substituído. Solicite um novo link.");
+      return;
+    }
     if (newPassword.length < 6) {
       toast.error("A senha deve ter pelo menos 6 caracteres.");
       return;
@@ -160,6 +176,20 @@ export default function Auth() {
             <CardDescription>Crie uma senha para acessar sua conta.</CardDescription>
           </CardHeader>
           <CardContent>
+            {checkingInvite ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !inviteSessionReady ? (
+              <div className="space-y-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Este link é inválido, expirou ou foi substituído por um link mais recente.
+                </p>
+                <Button type="button" className="w-full" onClick={() => window.location.assign("/auth")}>
+                  Voltar ao login
+                </Button>
+              </div>
+            ) : (
             <form onSubmit={handleSetPassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="new-password">Nova senha</Label>
@@ -204,6 +234,7 @@ export default function Auth() {
                 )}
               </Button>
             </form>
+            )}
           </CardContent>
         </Card>
       </div>

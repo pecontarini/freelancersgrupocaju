@@ -63,10 +63,13 @@ export function MaintenanceSingleExportButton({ entry }: MaintenanceSingleExport
       doc.roundedRect(margin, 8, pageWidth - margin * 2, 38, 3, 3, "F");
 
       // Logo
-      try {
-        doc.addImage(LOGO_BASE64, "JPEG", margin + 4, 12, 36, 22);
-      } catch (e) {
-        console.error("Error adding logo:", e);
+      const branding = getExportBranding();
+      if (branding.logoDataUrl) {
+        try {
+          doc.addImage(branding.logoDataUrl, branding.logoFormat, margin + 4, 12, 36, 22);
+        } catch (e) {
+          console.error("Error adding logo:", e);
+        }
       }
 
       // Title

@@ -1,35 +1,40 @@
 
-## Diagnóstico
+## Objetivo
 
-O link que abriu (`.../verify?token=...&type=invite&redirect_to=https://53a5f1f8-...lovableproject.com/auth`) tem dois problemas:
+Cadastrar, para o tenant **Stutz**, os setores e cargos listados, replicados nas duas unidades ativas:
+- **SANTA LUCIA NORTE**
+- **SANTA LUZIA ASA SUL**
 
-1. **`redirect_to` aponta para a URL de preview do Lovable** (`lovableproject.com`), não para a URL pública (`board2.lovable.app`). Esse host tende a não estar na allow-list de Auth, então o Supabase joga o usuário para o Site URL default, resultando naquela "página de dev".
-2. **Mesmo se o redirect estivesse certo**, a página `/auth` não trata convites. O Supabase verifica o token, cria a sessão do usuário (que ainda não tem senha) e devolve ao `/auth` com o access_token no hash. Hoje o `Auth.tsx` ignora esse estado, então o usuário só vê a tela de login normal — sem nenhum caminho para definir a senha.
+Todos ligados via `sector_job_titles` para já ficarem utilizáveis nos módulos (Escalas, Freelancers, POP, etc.).
 
-## O que fazer
+## Setores (7) — replicados nas 2 unidades
 
-### 1. Edge Function `admin-invite-tenant-user`
-- Passar a montar um `redirectTo` padrão apontando para `/auth?invite=1` da URL do admin que chamou (recebida no body como hoje) e, quando ausente, cair num `PUBLIC_SITE_URL` (secret) ou origem passada pelo caller — nunca deixar o Supabase escolher.
-- Fazer o mesmo para o link de `recovery`.
+1. COPEIRAS
+2. ASG
+3. COZINHA
+4. TÉC NUTRIÇÃO
+5. ESTOQUE
+6. ADM
+7. NUTRICIONISTA
 
-### 2. `src/pages/admin/Tenants.tsx`
-- Ao invocar a função, mandar sempre `redirect_to: ${window.location.origin}/auth?invite=1` (o admin hoje já está no domínio publicado quando faz o convite, então o link nascerá correto).
-- Mesmo tratamento ao gerar o link via o botão 🔗 de "regenerar link".
+## Cargos por setor (22 distintos)
 
-### 3. `src/pages/Auth.tsx` — detectar convite/recovery e pedir senha
-- No mount, usar `supabase.auth.onAuthStateChange`. Quando o evento for `PASSWORD_RECOVERY` **ou** houver sessão + `?invite=1` na query (ou `type=invite` no hash), trocar a UI para um formulário "Defina sua senha" (`Nova senha` + `Confirmar senha`).
-- No submit chamar `supabase.auth.updateUser({ password })`. Ao sucesso: toast, limpar query/hash e `navigate("/")`.
-- Manter o fluxo de login normal para quem chega sem token.
+- **COPEIRAS** (11): LACTARISTA · UTI TERREA + EMERGENCIA · UTI ONCO + TMO · CLINICA MEDICA E UCCA · MATERNIDADE E ESTAR MEDICO · UTI ADULTO E CIRURGICA · UTI PED · TERREO E 2º ANDAR - HCBR · 1º ANDAR - HCBR · COPEIRA (AVIÃO) · DAY CLINIC
+- **ASG** (2): PANELAS · LIMPEZA GERAL
+- **COZINHA** (4): COLAÇÃO · AUXILIAR DO COZINHEIRO · SALADEIRA · AUXILIAR DE COZINHA - DIETÉTICA
+- **TÉC NUTRIÇÃO** (2): COZINHA · LÁCTARIO
+- **ESTOQUE** (1): ESTOQUE
+- **ADM** (2): TASY · QR CODE
+- **NUTRICIONISTA** (1): NUTRIÇÃO
 
-### 4. Verificação
-- Gerar um novo link de convite via `/admin/tenants` (Stutz → Thaylla) e abrir no navegador logado limpo.
-- Esperado: link abre em `board2.lovable.app/auth?invite=1#access_token=...`, aparece o formulário "Defina sua senha", após salvar cai no dashboard já autenticado.
+## Como será feito (técnico)
 
-## Observação sobre links já enviados
+Um único bloco SQL idempotente via ferramenta `insert`, usando CTEs sobre as 2 unidades Stutz:
 
-Links de convite antigos (como o que você abriu) ficarão inúteis porque o `redirect_to` deles está gravado no token. Depois do fix é preciso **regenerar** o link da Thaylla pelo botão 🔗 e reenviar — o link novo já sairá com o redirect certo.
+1. `INSERT ... ON CONFLICT DO NOTHING` em `public.sectors` (unit_id, name, tenant_id).
+2. `INSERT ... ON CONFLICT DO NOTHING` em `public.job_titles` (unit_id, name, tenant_id).
+3. `INSERT ... ON CONFLICT DO NOTHING` em `public.sector_job_titles` juntando cada cargo ao seu setor, dentro da mesma unidade.
 
-## Fora do escopo
+Total: 14 setores (7 × 2 unidades), 44 cargos (22 × 2), e 44 vínculos setor↔cargo.
 
-- Não vou mexer em Site URL / Redirect URLs do Supabase (isso é configuração manual em Auth Settings — só é necessário se `board2.lovable.app` ainda não estiver lá; posso listar depois).
-- Não vou trocar SMTP / provedor de e-mail; o botão 🔗 continua sendo o caminho oficial de compartilhar.
+Nada de mexer em schema/RLS — só dados. Depois de rodar, os setores e cargos aparecem em Escalas/POP/Freelancer normalmente para usuários Stutz.

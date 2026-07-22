@@ -6904,6 +6904,10 @@ export type Database = {
         Args: { p_draft_id: string; p_override_pin?: string }
         Returns: Json
       }
+      verify_loja_pin: {
+        Args: { _loja_id: string; _pin: string }
+        Returns: boolean
+      }
       verify_user_pin: {
         Args: { p_pin: string; p_user_id: string }
         Returns: Json

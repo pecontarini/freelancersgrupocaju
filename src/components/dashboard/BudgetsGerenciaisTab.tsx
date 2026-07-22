@@ -31,6 +31,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { FreelancerForm } from "@/components/FreelancerForm";
+import { SolicitacoesPendentes } from "@/components/freelancer/SolicitacoesPendentes";
 import { ExportFreelancerProfilesButton } from "@/components/ExportFreelancerProfilesButton";
 import { UnifiedExpenseForm } from "@/components/UnifiedExpenseForm";
 import { ExportReportButton } from "@/components/ExportReportButton";
@@ -494,6 +495,9 @@ export function BudgetsGerenciaisTab({
         <ExportFreelancerProfilesButton />
         <UnifiedExpenseForm storeId={effectiveStoreId} />
       </div>
+
+      <SolicitacoesPendentes selectedUnidadeId={effectiveStoreId || null} />
+
 
 
 

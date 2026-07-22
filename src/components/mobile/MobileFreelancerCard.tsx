@@ -35,7 +35,7 @@ export function MobileFreelancerCard({ entry, onDelete }: MobileFreelancerCardPr
           <div className="min-w-0">
             <p className="font-semibold truncate">{entry.nome_completo}</p>
             <p className="text-sm text-muted-foreground truncate">
-              {entry.funcao}
+              {entry.funcao || "-"}
             </p>
           </div>
         </div>
@@ -56,11 +56,11 @@ export function MobileFreelancerCard({ entry, onDelete }: MobileFreelancerCardPr
           <Calendar className="h-3 w-3" />
           {`${day}/${month}`}
         </Badge>
-        <Badge
-          variant={entry.gerencia === "FRONT" ? "default" : "outline"}
-        >
-          {entry.gerencia}
-        </Badge>
+        {(entry.setor || entry.gerencia) && (
+          <Badge variant="outline">
+            {entry.setor || entry.gerencia}
+          </Badge>
+        )}
       </div>
       
       {/* Actions */}

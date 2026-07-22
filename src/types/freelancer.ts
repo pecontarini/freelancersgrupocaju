@@ -1,21 +1,24 @@
 export interface FreelancerEntry {
   id: string;
   loja: string;
-  nome_completo: string;
+  nome_completo: string | null;
   funcao: string | null;
   setor: string | null;
   gerencia: string | null;
   data_pop: string;
-  valor: number;
-  cpf: string;
-  chave_pix: string;
+  valor: number | null;
+  cpf: string | null;
+  chave_pix: string | null;
   substitui: string | null;
   motivo: string | null;
   created_at: string;
   created_by: string | null;
   loja_id: string | null;
   schedule_id?: string | null;
-  origem?: 'manual' | 'escala' | 'checkin';
+  origem?: 'manual' | 'escala' | 'checkin' | 'publico';
+  status?: 'pendente' | 'confirmado' | null;
+  solicitante_nome?: string | null;
+  solicitante_telefone?: string | null;
 }
 
 export interface FreelancerFormData {

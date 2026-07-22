@@ -2679,8 +2679,8 @@ export type Database = {
       }
       freelancer_entries: {
         Row: {
-          chave_pix: string
-          cpf: string
+          chave_pix: string | null
+          cpf: string | null
           created_at: string
           created_by: string | null
           data_pop: string
@@ -2690,17 +2690,20 @@ export type Database = {
           loja: string
           loja_id: string | null
           motivo: string | null
-          nome_completo: string
+          nome_completo: string | null
           origem: string
           schedule_id: string | null
           setor: string | null
+          solicitante_nome: string | null
+          solicitante_telefone: string | null
+          status: string
           substitui: string | null
           tenant_id: string
-          valor: number
+          valor: number | null
         }
         Insert: {
-          chave_pix: string
-          cpf: string
+          chave_pix?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_pop: string
@@ -2710,17 +2713,20 @@ export type Database = {
           loja: string
           loja_id?: string | null
           motivo?: string | null
-          nome_completo: string
+          nome_completo?: string | null
           origem?: string
           schedule_id?: string | null
           setor?: string | null
+          solicitante_nome?: string | null
+          solicitante_telefone?: string | null
+          status?: string
           substitui?: string | null
           tenant_id?: string
-          valor: number
+          valor?: number | null
         }
         Update: {
-          chave_pix?: string
-          cpf?: string
+          chave_pix?: string | null
+          cpf?: string | null
           created_at?: string
           created_by?: string | null
           data_pop?: string
@@ -2730,13 +2736,16 @@ export type Database = {
           loja?: string
           loja_id?: string | null
           motivo?: string | null
-          nome_completo?: string
+          nome_completo?: string | null
           origem?: string
           schedule_id?: string | null
           setor?: string | null
+          solicitante_nome?: string | null
+          solicitante_telefone?: string | null
+          status?: string
           substitui?: string | null
           tenant_id?: string
-          valor?: number
+          valor?: number | null
         }
         Relationships: [
           {
@@ -6556,6 +6565,20 @@ export type Database = {
         }
         Returns: Json
       }
+      create_public_freelancer_request: {
+        Args: {
+          _data_pop: string
+          _funcao: string
+          _loja_id: string
+          _motivo: string
+          _setor: string
+          _solicitante_nome: string
+          _solicitante_telefone: string
+          _substitui: string
+          _tenant_slug: string
+        }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       find_employee_by_secullum_id: {
         Args: { p_secullum_id: number }
@@ -6637,11 +6660,27 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      list_public_sectors_and_jobs: {
+        Args: { _loja_id: string }
+        Returns: {
+          job_id: string
+          job_name: string
+          sector_id: string
+          sector_name: string
+        }[]
+      }
       list_public_tenant_slugs: {
         Args: never
         Returns: {
           nome: string
           slug: string
+        }[]
+      }
+      list_public_units: {
+        Args: { _tenant_slug: string }
+        Returns: {
+          id: string
+          nome: string
         }[]
       }
       lookup_freelancer_by_cpf: {

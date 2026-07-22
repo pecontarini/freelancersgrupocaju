@@ -78,6 +78,7 @@ export function BudgetsGerenciaisTab({
     searchTerm: "",
     lojaId: selectedUnidadeId,
     funcoes: [],
+    setores: [],
     motivos: [],
     substituis: [],
     dateStart: null,

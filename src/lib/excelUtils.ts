@@ -331,8 +331,8 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     Data: formatDateFromString(entry.data_pop),
     Loja: entry.loja,
     "Nome Completo": entry.nome_completo,
-    Função: entry.funcao ?? "",
-    Gerência: entry.gerencia ?? "",
+    Setor: entry.setor ?? entry.gerencia ?? "",
+    Cargo: entry.funcao ?? "",
     Substitui: entry.substitui ?? "",
     Motivo: entry.motivo ?? "",
     CPF: entry.cpf,
@@ -348,8 +348,8 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     Data: "",
     Loja: "",
     "Nome Completo": "",
-    Função: "",
-    Gerência: "",
+    Setor: "",
+    Cargo: "",
     Substitui: "",
     Motivo: "",
     CPF: "",
@@ -364,8 +364,8 @@ export function exportToExcel(entries: FreelancerEntry[], filename: string): voi
     { wch: 12 }, // Data
     { wch: 18 }, // Loja
     { wch: 28 }, // Nome Completo
-    { wch: 15 }, // Função
-    { wch: 15 }, // Gerência
+    { wch: 18 }, // Setor
+    { wch: 18 }, // Cargo
     { wch: 22 }, // Substitui
     { wch: 28 }, // Motivo
     { wch: 15 }, // CPF

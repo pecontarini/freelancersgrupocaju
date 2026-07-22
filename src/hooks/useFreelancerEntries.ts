@@ -44,6 +44,7 @@ export function useFreelancerEntries() {
           loja: formData.loja,
           nome_completo: formData.nome_completo,
           funcao: formData.funcao ?? null,
+          setor: formData.setor ?? null,
           gerencia: formData.gerencia || null,
           data_pop: formData.data_pop, // Já é string YYYY-MM-DD
           valor: formData.valor,

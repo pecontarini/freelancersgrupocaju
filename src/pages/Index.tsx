@@ -103,9 +103,10 @@ const Index = () => {
     }
   }, [isLoadingProfile, isInitialized, isChefeSetor]);
 
-  // Filter entries based on selected unidade
+  // Filter entries based on selected unidade — exclude pending public requests
   const filteredEntries = useMemo(() => {
     return entries.filter((entry) => {
+      if (entry.status === "pendente") return false;
       if ((isGerenteUnidade || isOperator) && !isAdmin && unidades.length > 0) {
         if (selectedUnidadeId) {
           if (entry.loja_id !== selectedUnidadeId) return false;

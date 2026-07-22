@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -38,16 +38,20 @@ import {
 
 import { formatCPF, formatCurrencyInput, isValidCPF } from "@/lib/formatters";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
-import { useConfigLojas, useConfigFuncoes, useConfigGerencias } from "@/hooks/useConfigOptions";
+import { useConfigLojas } from "@/hooks/useConfigOptions";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useCpfLookup } from "@/hooks/useCpfLookup";
+import { useSectors } from "@/hooks/useStaffingMatrix";
+import { useJobTitles } from "@/hooks/useJobTitles";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   loja: z.string().min(1, "Loja é obrigatória"),
   loja_id: z.string().min(1, "Loja é obrigatória"),
   nome_completo: z.string().min(2, "Nome é obrigatório"),
-  gerencia: z.string().optional().nullable(),
+  setor: z.string().min(1, "Setor é obrigatório"),
+  funcao: z.string().min(1, "Cargo é obrigatório"),
   data_pop: z.string().min(1, "Data é obrigatória"),
   valor: z.number().min(0.01, "Valor deve ser maior que zero"),
   cpf: z.string().refine((val) => isValidCPF(val), "CPF inválido"),
@@ -66,25 +70,24 @@ export function FreelancerForm() {
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const { createEntry } = useFreelancerEntries();
   const { isAdmin, isOperator, unidades, isGerenteUnidade } = useUserProfile();
-  const { lookupFreelancerByCpf, lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
-  
+  const { lookupUnifiedByCpf, isLookingUp } = useCpfLookup();
+
   // Fetch dynamic options from config tables
   const { options: lojas, isLoading: isLoadingLojas } = useConfigLojas();
-  const { options: funcoes, isLoading: isLoadingFuncoes } = useConfigFuncoes();
-  const { options: gerencias, isLoading: isLoadingGerencias } = useConfigGerencias();
-  
+
   // For gerente with single store, use that store
   const singleUnidade = (isGerenteUnidade || isOperator) && !isAdmin && unidades.length === 1 ? unidades[0] : null;
   // For gerente/operator with multiple stores, they can select from their assigned stores
   const availableLojas = isAdmin ? lojas : ((isGerenteUnidade || isOperator) ? unidades : []);
-  
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       loja: "",
       loja_id: "",
       nome_completo: "",
-      gerencia: "",
+      setor: "",
+      funcao: "",
       data_pop: "",
       cpf: "",
       chave_pix: "",
@@ -93,6 +96,32 @@ export function FreelancerForm() {
       motivo: "",
     },
   });
+
+  const currentLojaId = form.watch("loja_id");
+  const currentSetor = form.watch("setor");
+
+  // Setores da unidade selecionada
+  const { data: sectors = [], isLoading: isLoadingSectors } = useSectors(currentLojaId || null);
+  // Cargos da unidade selecionada
+  const { data: jobTitles = [], isLoading: isLoadingJobTitles } = useJobTitles(currentLojaId || null);
+  // Vínculos setor <-> cargo
+  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
+  const { data: sectorJobLinks = [] } = useSectorJobTitles(sectorIds);
+
+  // Cargos filtrados pelo setor selecionado
+  const selectedSector = useMemo(
+    () => sectors.find((s) => s.name === currentSetor) || null,
+    [sectors, currentSetor],
+  );
+  const filteredJobTitles = useMemo(() => {
+    if (!selectedSector) return [];
+    const allowedJobIds = new Set(
+      sectorJobLinks
+        .filter((l) => l.sector_id === selectedSector.id)
+        .map((l) => l.job_title_id),
+    );
+    return jobTitles.filter((j) => allowedJobIds.has(j.id));
+  }, [selectedSector, sectorJobLinks, jobTitles]);
 
   // Pre-select unidade for gerente_unidade with single store
   useEffect(() => {
@@ -115,7 +144,8 @@ export function FreelancerForm() {
       await createEntry.mutateAsync({
         loja: data.loja,
         nome_completo: data.nome_completo,
-        gerencia: data.gerencia || null,
+        setor: data.setor,
+        funcao: data.funcao,
         data_pop: data.data_pop,
         valor: data.valor,
         cpf: cleanCpf.length === 11 ? cleanCpf : data.cpf,
@@ -159,7 +189,15 @@ export function FreelancerForm() {
     if (selectedLoja) {
       form.setValue("loja", selectedLoja.nome);
       form.setValue("loja_id", selectedLoja.id);
+      // Reset setor/cargo quando muda a loja
+      form.setValue("setor", "");
+      form.setValue("funcao", "");
     }
+  };
+
+  const handleSetorChange = (val: string) => {
+    form.setValue("setor", val);
+    form.setValue("funcao", ""); // reset cargo quando muda o setor
   };
 
   const lastLookupRef = useRef<string>("");
@@ -167,7 +205,7 @@ export function FreelancerForm() {
   const handleCpfLookup = useCallback(async (cpf: string) => {
     const cleanCpf = cpf.replace(/\D/g, "");
     if (cleanCpf.length !== 11) return;
-    if (lastLookupRef.current === cleanCpf) return; // evita re-disparo no mesmo CPF
+    if (lastLookupRef.current === cleanCpf) return;
     lastLookupRef.current = cleanCpf;
 
     const unified = await lookupUnifiedByCpf(cleanCpf);
@@ -181,30 +219,19 @@ export function FreelancerForm() {
       filledFields.add("chave_pix");
     }
 
-    if (unified.gerencia) {
-      const gerenciaExists = gerencias.some(g => g.nome === unified.gerencia);
-      if (gerenciaExists) {
-        form.setValue("gerencia", unified.gerencia);
-        filledFields.add("gerencia");
-      }
-    }
-
-
     setAutoFilledFields(filledFields);
-  }, [lookupUnifiedByCpf, form, funcoes, gerencias]);
+  }, [lookupUnifiedByCpf, form]);
 
   const handleCPFChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatCPF(e.target.value);
     setCpfValue(formatted);
     form.setValue("cpf", formatted);
 
-    // Reset memoization quando CPF muda para algo incompleto
     const cleanCpf = formatted.replace(/\D/g, "");
     if (cleanCpf.length < 11) {
       lastLookupRef.current = "";
     }
 
-    // Auto-lookup assim que tiver 11 dígitos (formatado ou cru)
     if (cleanCpf.length === 11) {
       handleCpfLookup(cleanCpf);
     }
@@ -225,7 +252,6 @@ export function FreelancerForm() {
     form.setValue("valor", isNaN(amount) ? 0 : amount);
   };
 
-  // Clear auto-filled indicator when user manually changes a field
   const handleFieldChange = (fieldName: string) => {
     setAutoFilledFields(prev => {
       const next = new Set(prev);
@@ -273,8 +299,8 @@ export function FreelancerForm() {
                   className="input-focus-ring bg-muted"
                 />
               ) : (
-                <Select 
-                  onValueChange={handleLojaChange} 
+                <Select
+                  onValueChange={handleLojaChange}
                   disabled={isLoadingLojas}
                   value={form.watch("loja_id") || undefined}
                 >
@@ -317,6 +343,72 @@ export function FreelancerForm() {
               )}
             </div>
 
+            {/* Setor */}
+            <div className="space-y-2">
+              <Label htmlFor="setor">Setor</Label>
+              <Select
+                onValueChange={handleSetorChange}
+                disabled={!currentLojaId || isLoadingSectors}
+                value={form.watch("setor") || undefined}
+              >
+                <SelectTrigger className="input-focus-ring">
+                  <SelectValue
+                    placeholder={
+                      !currentLojaId
+                        ? "Selecione a loja primeiro"
+                        : isLoadingSectors
+                          ? "Carregando..."
+                          : sectors.length === 0
+                            ? "Nenhum setor cadastrado"
+                            : "Selecione o setor"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {sectors.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.setor && (
+                <p className="text-sm text-destructive">{form.formState.errors.setor.message}</p>
+              )}
+            </div>
+
+            {/* Cargo */}
+            <div className="space-y-2">
+              <Label htmlFor="funcao">Cargo</Label>
+              <Select
+                onValueChange={(val) => form.setValue("funcao", val)}
+                disabled={!currentSetor || isLoadingJobTitles}
+                value={form.watch("funcao") || undefined}
+              >
+                <SelectTrigger className="input-focus-ring">
+                  <SelectValue
+                    placeholder={
+                      !currentSetor
+                        ? "Selecione o setor primeiro"
+                        : filteredJobTitles.length === 0
+                          ? "Nenhum cargo vinculado"
+                          : "Selecione o cargo"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredJobTitles.map((j) => (
+                    <SelectItem key={j.id} value={j.name}>
+                      {j.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.funcao && (
+                <p className="text-sm text-destructive">{form.formState.errors.funcao.message}</p>
+              )}
+            </div>
+
             {/* Quem substitui */}
             <div className="space-y-2">
               <Label htmlFor="substitui">Quem o freelancer substitui?</Label>
@@ -349,39 +441,6 @@ export function FreelancerForm() {
               )}
             </div>
 
-            {/* Gerência */}
-            <div className="space-y-2">
-              <Label htmlFor="gerencia">Gerência (opcional)</Label>
-              <Select 
-                onValueChange={(val) => {
-                  form.setValue("gerencia", val);
-                  handleFieldChange("gerencia");
-                }} 
-                disabled={isLoadingGerencias}
-                value={form.watch("gerencia") || undefined}
-              >
-                <SelectTrigger className={cn(
-                  "input-focus-ring",
-                  autoFilledFields.has("gerencia") && "border-green-500 bg-green-50 dark:bg-green-950/20"
-                )}>
-                  <SelectValue placeholder={isLoadingGerencias ? "Carregando..." : "Selecione"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {gerencias.map((gerencia) => (
-                    <SelectItem key={gerencia.id} value={gerencia.nome}>
-                      {gerencia.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {autoFilledFields.has("gerencia") && (
-                <p className="text-xs text-green-600">Última gerência — pode alterar se necessário</p>
-              )}
-              {form.formState.errors.gerencia && (
-                <p className="text-sm text-destructive">{form.formState.errors.gerencia.message}</p>
-              )}
-            </div>
-
             {/* Data POP */}
             <div className="space-y-2">
               <Label>Data POP</Label>
@@ -397,7 +456,6 @@ export function FreelancerForm() {
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {form.watch("data_pop") ? (
                       (() => {
-                        // Exibe a data no formato DD/MM/YYYY usando split (sem timezone)
                         const [year, month, day] = form.watch("data_pop").split('-');
                         return `${day}/${month}/${year}`;
                       })()
@@ -412,7 +470,6 @@ export function FreelancerForm() {
                     selected={form.watch("data_pop") ? new Date(form.watch("data_pop") + "T12:00:00") : undefined}
                     onSelect={(date) => {
                       if (date) {
-                        // Converte IMEDIATAMENTE para string YYYY-MM-DD usando data local
                         const dateString = format(date, 'yyyy-MM-dd');
                         form.setValue("data_pop", dateString);
                       }

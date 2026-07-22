@@ -35,16 +35,14 @@ function PinScreen({ lojaId, onSuccess }: { lojaId: string; onSuccess: () => voi
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
-    const { data } = await supabase
-      .from("config_lojas")
-      .select("pin_contagem")
-      .eq("id", lojaId)
-      .single();
+    const { data, error: rpcError } = await supabase.rpc("verify_loja_pin", {
+      _loja_id: lojaId,
+      _pin: pin,
+    });
 
-    const storePin = (data as any)?.pin_contagem;
-    if (!storePin) {
-      onSuccess();
-    } else if (pin === storePin) {
+    if (rpcError) {
+      setError("Erro ao verificar PIN");
+    } else if (data === true) {
       onSuccess();
     } else {
       setError("PIN incorreto");

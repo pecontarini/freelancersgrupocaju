@@ -111,8 +111,8 @@ export function EntriesTable({ entries }: EntriesTableProps) {
                   <SortButton field="nome_completo">Nome</SortButton>
                 </TableHead>
                 <TableHead>Loja</TableHead>
-                <TableHead>Função</TableHead>
-                <TableHead>Gerência</TableHead>
+                <TableHead>Setor</TableHead>
+                <TableHead>Cargo</TableHead>
                 <TableHead>CPF</TableHead>
                 <TableHead>Chave PIX</TableHead>
                 <TableHead className="text-right">
@@ -136,15 +136,10 @@ export function EntriesTable({ entries }: EntriesTableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {entry.funcao}
+                    {entry.setor || entry.gerencia || "-"}
                   </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={entry.gerencia === "FRONT" ? "default" : "outline"}
-                      className="font-normal"
-                    >
-                      {entry.gerencia}
-                    </Badge>
+                  <TableCell className="text-muted-foreground">
+                    {entry.funcao || "-"}
                   </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     {entry.cpf}

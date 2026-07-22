@@ -38,6 +38,7 @@ export interface FreelancerFiltersState {
   searchTerm: string;
   lojaId: string | null;
   funcoes: string[];
+  setores: string[];
   motivos: string[];
   substituis: string[];
   dateStart: Date | null;
@@ -58,7 +59,7 @@ export function FreelancerFilters({
 }: FreelancerFiltersProps) {
   const { options: lojas } = useConfigLojas();
   const { options: funcoes } = useConfigFuncoes();
-  const { uniqueFuncoes: entryFuncoes, uniqueMotivos, uniqueSubstituis } = useFreelancerEntries();
+  const { uniqueFuncoes: entryFuncoes, uniqueSetores, uniqueMotivos, uniqueSubstituis } = useFreelancerEntries();
   const { isAdmin, isGerenteUnidade, unidades } = useUserProfile();
   const isMobile = useIsMobile();
 
@@ -74,6 +75,10 @@ export function FreelancerFilters({
     return merged.map((name) => ({ value: name, label: name }));
   }, [funcoes, entryFuncoes]);
 
+  const allSetores = useMemo(
+    () => uniqueSetores.map((s) => ({ value: s, label: s })),
+    [uniqueSetores],
+  );
   const allMotivos = useMemo(
     () => uniqueMotivos.map((m) => ({ value: m, label: m })),
     [uniqueMotivos],
@@ -87,6 +92,7 @@ export function FreelancerFilters({
     filters.searchTerm,
     filters.lojaId,
     filters.funcoes.length > 0,
+    filters.setores.length > 0,
     filters.motivos.length > 0,
     filters.substituis.length > 0,
     filters.dateStart,
@@ -98,6 +104,7 @@ export function FreelancerFilters({
       searchTerm: "",
       lojaId: null,
       funcoes: [],
+      setores: [],
       motivos: [],
       substituis: [],
       dateStart: null,

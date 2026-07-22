@@ -1,40 +1,39 @@
-
 ## Objetivo
+Tornar o formulário "Novo Lançamento Freela" funcional com **Setor** e **Cargo** (baseados nos setores/cargos já cadastrados por unidade) e **remover o campo Gerência**.
 
-Cadastrar, para o tenant **Stutz**, os setores e cargos listados, replicados nas duas unidades ativas:
-- **SANTA LUCIA NORTE**
-- **SANTA LUZIA ASA SUL**
+## Mudanças
 
-Todos ligados via `sector_job_titles` para já ficarem utilizáveis nos módulos (Escalas, Freelancers, POP, etc.).
+### 1. Banco de dados (migration)
+- Adicionar coluna `setor TEXT` em `public.freelancer_entries` (a coluna `funcao` já existe e será reutilizada para o cargo).
+- Nenhuma alteração em RLS/GRANTs (tabela já configurada).
 
-## Setores (7) — replicados nas 2 unidades
+### 2. Formulário `src/components/FreelancerForm.tsx`
+- **Remover** o campo Gerência (label, Select, validação, auto-fill via CPF).
+- **Adicionar** dois selects encadeados após "Loja":
+  - **Setor** — obrigatório. Lista os setores da unidade selecionada (`sectors` filtrados por `unit_id = loja_id`).
+  - **Cargo** — obrigatório. Lista `job_titles` da unidade filtrados pelos vínculos em `sector_job_titles` para o setor escolhido. Desabilitado até o setor ser selecionado; limpa ao trocar de setor/loja.
+- Persistir em `setor` e `funcao` no insert.
+- Manter auto-preenchimento por CPF apenas para `nome_completo` e `chave_pix` (remover branch de gerência).
 
-1. COPEIRAS
-2. ASG
-3. COZINHA
-4. TÉC NUTRIÇÃO
-5. ESTOQUE
-6. ADM
-7. NUTRICIONISTA
+### 3. Hook `src/hooks/useFreelancerEntries.ts`
+- Adicionar `setor` e `funcao` no tipo e no payload de `createEntry`; incluir na leitura para os listagens/filtros.
 
-## Cargos por setor (22 distintos)
+### 4. Exibição e exports
+- `EntriesTable.tsx` / `MobileFreelancerCard.tsx`: substituir coluna/linha "Gerência" por "Setor" + "Cargo".
+- `EditFreelancerDialog.tsx`: mesmos ajustes (remover Gerência, adicionar Setor/Cargo encadeados).
+- `FreelancerFilters.tsx`: substituir filtro de Gerência por filtros multi-select de Setor e Cargo (mantendo Motivo/Substitui já existentes).
+- `ExportReportButton` (Excel) e o PDF equivalente: trocar coluna Gerência por Setor e Cargo; atualizar aba de Recorrência para incluir "Cargos mais recorrentes" e "Setores mais recorrentes".
+- Dados legados com `gerencia` preenchida continuam no banco (não vamos apagar), apenas deixam de aparecer no fluxo novo.
 
-- **COPEIRAS** (11): LACTARISTA · UTI TERREA + EMERGENCIA · UTI ONCO + TMO · CLINICA MEDICA E UCCA · MATERNIDADE E ESTAR MEDICO · UTI ADULTO E CIRURGICA · UTI PED · TERREO E 2º ANDAR - HCBR · 1º ANDAR - HCBR · COPEIRA (AVIÃO) · DAY CLINIC
-- **ASG** (2): PANELAS · LIMPEZA GERAL
-- **COZINHA** (4): COLAÇÃO · AUXILIAR DO COZINHEIRO · SALADEIRA · AUXILIAR DE COZINHA - DIETÉTICA
-- **TÉC NUTRIÇÃO** (2): COZINHA · LÁCTARIO
-- **ESTOQUE** (1): ESTOQUE
-- **ADM** (2): TASY · QR CODE
-- **NUTRICIONISTA** (1): NUTRIÇÃO
+### 5. Fontes de dados já disponíveis
+- Setores: hook `useSetores` / query direta em `sectors` por `unit_id`.
+- Cargos por setor: `job_titles` + `sector_job_titles` (hook `useSectorJobTitles` já existente).
 
-## Como será feito (técnico)
+## Detalhes técnicos
+- Selects ficam desabilitados enquanto carregam; ao mudar `loja_id`, resetar `setor` e `funcao`; ao mudar `setor`, resetar `funcao`.
+- Validação Zod: `setor: z.string().min(1)`, `funcao: z.string().min(1)`; remover `gerencia`.
+- Nenhuma mudança em auth/RLS.
 
-Um único bloco SQL idempotente via ferramenta `insert`, usando CTEs sobre as 2 unidades Stutz:
-
-1. `INSERT ... ON CONFLICT DO NOTHING` em `public.sectors` (unit_id, name, tenant_id).
-2. `INSERT ... ON CONFLICT DO NOTHING` em `public.job_titles` (unit_id, name, tenant_id).
-3. `INSERT ... ON CONFLICT DO NOTHING` em `public.sector_job_titles` juntando cada cargo ao seu setor, dentro da mesma unidade.
-
-Total: 14 setores (7 × 2 unidades), 44 cargos (22 × 2), e 44 vínculos setor↔cargo.
-
-Nada de mexer em schema/RLS — só dados. Depois de rodar, os setores e cargos aparecem em Escalas/POP/Freelancer normalmente para usuários Stutz.
+## Fora do escopo
+- Migrar dados históricos de `gerencia` para `setor`.
+- Alterar telas de escala, check-in ou outras que consumam `freelancer_entries`.

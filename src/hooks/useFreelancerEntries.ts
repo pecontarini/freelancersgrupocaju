@@ -44,6 +44,7 @@ export function useFreelancerEntries() {
           loja: formData.loja,
           nome_completo: formData.nome_completo,
           funcao: formData.funcao ?? null,
+          setor: formData.setor ?? null,
           gerencia: formData.gerencia || null,
           data_pop: formData.data_pop, // Já é string YYYY-MM-DD
           valor: formData.valor,
@@ -154,6 +155,7 @@ export function useFreelancerEntries() {
 
   // Get unique values for filters
   const uniqueFuncoes = [...new Set(entries.map((e) => e.funcao).filter(Boolean) as string[])].sort();
+  const uniqueSetores = [...new Set(entries.map((e) => e.setor).filter(Boolean) as string[])].sort();
   const uniqueGerencias = [...new Set(entries.map((e) => e.gerencia).filter(Boolean) as string[])].sort();
   const uniqueLojas = [...new Set(entries.map((e) => e.loja).filter(Boolean) as string[])].sort();
   const uniqueMotivos = [...new Set(entries.map((e) => e.motivo).filter(Boolean) as string[])].sort();
@@ -167,6 +169,7 @@ export function useFreelancerEntries() {
     updateEntry,
     deleteEntry,
     uniqueFuncoes,
+    uniqueSetores,
     uniqueGerencias,
     uniqueLojas,
     uniqueMotivos,

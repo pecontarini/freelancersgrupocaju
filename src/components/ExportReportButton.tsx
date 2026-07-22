@@ -352,12 +352,12 @@ export function ExportReportButton({
         doc.setFontSize(11);
         doc.text(entry.nome_completo.toUpperCase(), margin + 18, yPos + 8);
 
-        // Function and Date
+        // Setor / Cargo and Date
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(SECONDARY_COLOR[0], SECONDARY_COLOR[1], SECONDARY_COLOR[2]);
-        doc.text(`Função: ${entry.funcao || "-"}`, margin + 18, yPos + 14);
-        doc.text(`Data: ${formatDate(entry.data_pop)}`, margin + 80, yPos + 14);
+        doc.text(`Setor: ${entry.setor || entry.gerencia || "-"} | Cargo: ${entry.funcao || "-"}`, margin + 18, yPos + 14);
+        doc.text(`Data: ${formatDate(entry.data_pop)}`, margin + 120, yPos + 14);
 
         // CPF and PIX
         doc.text(`CPF: ${entry.cpf}`, margin + 18, yPos + 20);
@@ -411,11 +411,11 @@ export function ExportReportButton({
       doc.text("RESUMO FINANCEIRO", margin + 5, yPos + 8);
       yPos += 18;
 
-      // Summary by function
+      // Summary by cargo
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text("Subtotal por Função:", margin, yPos);
+      doc.text("Subtotal por Cargo:", margin, yPos);
       yPos += 6;
 
       doc.setFont("helvetica", "normal");

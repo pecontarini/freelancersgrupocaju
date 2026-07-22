@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,9 @@ import {
 } from "@/components/ui/select";
 import { FreelancerEntry } from "@/types/freelancer";
 import { useFreelancerEntries } from "@/hooks/useFreelancerEntries";
-import { useConfigFuncoes, useConfigGerencias } from "@/hooks/useConfigOptions";
+import { useSectors } from "@/hooks/useStaffingMatrix";
+import { useJobTitles } from "@/hooks/useJobTitles";
+import { useSectorJobTitles } from "@/hooks/useSectorJobTitles";
 
 interface EditFreelancerDialogProps {
   entry: FreelancerEntry;
@@ -31,20 +33,37 @@ interface EditFreelancerDialogProps {
 export function EditFreelancerDialog({ entry, variant = "icon" }: EditFreelancerDialogProps) {
   const [open, setOpen] = useState(false);
   const { updateEntry } = useFreelancerEntries();
-  const { options: funcoes } = useConfigFuncoes();
-  const { options: gerencias } = useConfigGerencias();
 
   const [valor, setValor] = useState(String(entry.valor));
-  const [funcao, setFuncao] = useState(entry.funcao);
-  const [gerencia, setGerencia] = useState(entry.gerencia);
+  const [setor, setSetor] = useState<string>(entry.setor || "");
+  const [funcao, setFuncao] = useState<string>(entry.funcao || "");
   const [dataPop, setDataPop] = useState(entry.data_pop);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: sectors = [] } = useSectors(entry.loja_id);
+  const { data: jobTitles = [] } = useJobTitles(entry.loja_id);
+  const sectorIds = useMemo(() => sectors.map((s) => s.id), [sectors]);
+  const { data: sectorJobLinks = [] } = useSectorJobTitles(sectorIds);
+
+  const selectedSector = useMemo(
+    () => sectors.find((s) => s.name === setor) || null,
+    [sectors, setor],
+  );
+  const filteredJobTitles = useMemo(() => {
+    if (!selectedSector) return [];
+    const allowed = new Set(
+      sectorJobLinks
+        .filter((l) => l.sector_id === selectedSector.id)
+        .map((l) => l.job_title_id),
+    );
+    return jobTitles.filter((j) => allowed.has(j.id));
+  }, [selectedSector, sectorJobLinks, jobTitles]);
 
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) {
       setValor(String(entry.valor));
-      setFuncao(entry.funcao);
-      setGerencia(entry.gerencia);
+      setSetor(entry.setor || "");
+      setFuncao(entry.funcao || "");
       setDataPop(entry.data_pop);
     }
     setOpen(isOpen);
@@ -59,8 +78,8 @@ export function EditFreelancerDialog({ entry, variant = "icon" }: EditFreelancer
       await updateEntry.mutateAsync({
         id: entry.id,
         valor: amount,
+        setor,
         funcao,
-        gerencia,
         data_pop: dataPop,
       });
       setOpen(false);
@@ -69,7 +88,6 @@ export function EditFreelancerDialog({ entry, variant = "icon" }: EditFreelancer
     }
   };
 
-  // Lançamentos automáticos (origem 'escala' ou 'checkin') não podem ser editados aqui
   const isAutomatic = entry.origem === 'escala' || entry.origem === 'checkin';
   if (isAutomatic) {
     return null;
@@ -103,37 +121,37 @@ export function EditFreelancerDialog({ entry, variant = "icon" }: EditFreelancer
             />
           </div>
           <div className="space-y-2">
-            <Label>Função</Label>
-            <Select value={funcao} onValueChange={setFuncao}>
+            <Label>Setor</Label>
+            <Select value={setor || undefined} onValueChange={(v) => { setSetor(v); setFuncao(""); }}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Selecione o setor" />
               </SelectTrigger>
               <SelectContent>
-                {funcoes.map((f) => (
-                  <SelectItem key={f.id} value={f.nome}>
-                    {f.nome}
+                {sectors.map((s) => (
+                  <SelectItem key={s.id} value={s.name}>
+                    {s.name}
                   </SelectItem>
                 ))}
-                {!funcoes.find((f) => f.nome === funcao) && (
-                  <SelectItem value={funcao}>{funcao}</SelectItem>
+                {setor && !sectors.find((s) => s.name === setor) && (
+                  <SelectItem value={setor}>{setor}</SelectItem>
                 )}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Gerência</Label>
-            <Select value={gerencia} onValueChange={setGerencia}>
+            <Label>Cargo</Label>
+            <Select value={funcao || undefined} onValueChange={setFuncao} disabled={!setor}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder={!setor ? "Selecione o setor primeiro" : "Selecione o cargo"} />
               </SelectTrigger>
               <SelectContent>
-                {gerencias.map((g) => (
-                  <SelectItem key={g.id} value={g.nome}>
-                    {g.nome}
+                {filteredJobTitles.map((j) => (
+                  <SelectItem key={j.id} value={j.name}>
+                    {j.name}
                   </SelectItem>
                 ))}
-                {!gerencias.find((g) => g.nome === gerencia) && (
-                  <SelectItem value={gerencia}>{gerencia}</SelectItem>
+                {funcao && !filteredJobTitles.find((j) => j.name === funcao) && (
+                  <SelectItem value={funcao}>{funcao}</SelectItem>
                 )}
               </SelectContent>
             </Select>

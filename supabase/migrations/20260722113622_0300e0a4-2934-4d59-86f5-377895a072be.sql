@@ -1,0 +1,1 @@
+ALTER TABLE public.freelancer_entries ADD COLUMN IF NOT EXISTS setor TEXT;

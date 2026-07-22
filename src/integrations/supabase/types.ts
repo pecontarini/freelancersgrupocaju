@@ -2693,6 +2693,7 @@ export type Database = {
           nome_completo: string
           origem: string
           schedule_id: string | null
+          setor: string | null
           substitui: string | null
           tenant_id: string
           valor: number
@@ -2712,6 +2713,7 @@ export type Database = {
           nome_completo: string
           origem?: string
           schedule_id?: string | null
+          setor?: string | null
           substitui?: string | null
           tenant_id?: string
           valor: number
@@ -2731,6 +2733,7 @@ export type Database = {
           nome_completo?: string
           origem?: string
           schedule_id?: string | null
+          setor?: string | null
           substitui?: string | null
           tenant_id?: string
           valor?: number

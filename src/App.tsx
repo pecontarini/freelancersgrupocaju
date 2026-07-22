@@ -21,6 +21,7 @@ import Agenda from "./pages/Agenda";
 import EstacaoCheckin from "./pages/EstacaoCheckin";
 import AprovarEscala from "./pages/AprovarEscala";
 import AtualizarPix from "./pages/AtualizarPix";
+import SolicitarFreela from "./pages/SolicitarFreela";
 import CadastrosPendentes from "./pages/CadastrosPendentes";
 import EscalaDraft from "./pages/escalas/EscalaDraft";
 import Seguranca from "./pages/perfil/Seguranca";
@@ -65,6 +66,7 @@ function App() {
                 <Route path="/estacao-checkin" element={<EstacaoCheckin />} />
                 <Route path="/aprovar-escala/:token" element={<AprovarEscala />} />
                 <Route path="/atualizar-pix/:token" element={<AtualizarPix />} />
+                <Route path="/solicitar-freela" element={<SolicitarFreela />} />
                 <Route path="/pessoas/cadastros-pendentes" element={<ProtectedRoute><CadastrosPendentes /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios" element={<ProtectedRoute><ContagemUtensilios /></ProtectedRoute>} />
                 <Route path="/contagem-utensilios/:lojaId" element={<ContagemUtensilios />} />

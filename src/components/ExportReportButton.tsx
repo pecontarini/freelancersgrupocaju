@@ -411,11 +411,11 @@ export function ExportReportButton({
       doc.text("RESUMO FINANCEIRO", margin + 5, yPos + 8);
       yPos += 18;
 
-      // Summary by function
+      // Summary by cargo
       doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      doc.text("Subtotal por Função:", margin, yPos);
+      doc.text("Subtotal por Cargo:", margin, yPos);
       yPos += 6;
 
       doc.setFont("helvetica", "normal");

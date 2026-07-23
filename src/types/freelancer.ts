@@ -19,6 +19,8 @@ export interface FreelancerEntry {
   status?: 'pendente' | 'confirmado' | null;
   solicitante_nome?: string | null;
   solicitante_telefone?: string | null;
+  hora_inicio?: string | null;
+  hora_fim?: string | null;
 }
 
 export interface FreelancerFormData {

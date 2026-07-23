@@ -117,8 +117,12 @@ export default function SolicitarFreela() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lojaId || !dataPop || !setor || !funcao || !motivo || !substitui || !solicitanteNome) {
+    if (!lojaId || !dataPop || !setor || !funcao || !motivo || !substitui || !solicitanteNome || !horaInicio || !horaFim) {
       toast.error("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    if (horaFim <= horaInicio) {
+      toast.error("O horário final deve ser maior que o horário de início.");
       return;
     }
     setSubmitting(true);
@@ -132,6 +136,8 @@ export default function SolicitarFreela() {
       _substitui: substitui,
       _solicitante_nome: solicitanteNome,
       _solicitante_telefone: solicitanteTelefone || null,
+      _hora_inicio: horaInicio,
+      _hora_fim: horaFim,
     });
     setSubmitting(false);
     if (error) {

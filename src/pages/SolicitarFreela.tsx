@@ -200,6 +200,8 @@ export default function SolicitarFreela() {
                 setSubstitui("");
                 setSolicitanteNome("");
                 setSolicitanteTelefone("");
+                setHoraInicio("");
+                setHoraFim("");
               }}
             >
               Nova solicitação

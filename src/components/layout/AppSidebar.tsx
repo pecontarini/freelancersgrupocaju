@@ -12,6 +12,7 @@ import {
   Building2,
 } from "lucide-react";
 import { usePendingConfirmations } from "@/hooks/usePendingConfirmations";
+import { usePendingSolicitacoes } from "@/hooks/usePendingSolicitacoes";
 
 import {
   Sidebar,
@@ -83,7 +84,9 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const tenantSymbol = logoSrc;
   const isCollapsed = state === "collapsed";
   const { data: confirmations } = usePendingConfirmations();
-  const escalaPending = (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0);
+  const { data: solicitacoesPending = 0 } = usePendingSolicitacoes();
+  const escalaPending =
+    (confirmations?.pending ?? 0) + (confirmations?.denied ?? 0) + (solicitacoesPending ?? 0);
 
   const handleTabClick = (tabId: string) => {
     onTabChange(tabId);

@@ -53,6 +53,8 @@ export default function SolicitarFreela() {
   const [substitui, setSubstitui] = useState<string>("");
   const [solicitanteNome, setSolicitanteNome] = useState<string>("");
   const [solicitanteTelefone, setSolicitanteTelefone] = useState<string>("");
+  const [horaInicio, setHoraInicio] = useState<string>("");
+  const [horaFim, setHoraFim] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<null | { lojaNome: string }>(null);

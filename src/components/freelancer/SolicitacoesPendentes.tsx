@@ -68,7 +68,9 @@ export function SolicitacoesPendentes({ selectedUnidadeId, allowedLojaIds }: Pro
                     {p.loja} — {d}/{m}/{y}
                   </div>
                   <div className="text-muted-foreground text-xs">
-                    {p.setor} · {p.funcao} · Cobrindo {p.substitui} · {p.motivo}
+                    {p.setor} · {p.funcao}
+                    {p.hora_inicio && p.hora_fim ? ` · ${p.hora_inicio.slice(0,5)}–${p.hora_fim.slice(0,5)}` : ""}
+                    {" · "}Cobrindo {p.substitui} · {p.motivo}
                   </div>
                   <div className="text-muted-foreground text-xs">
                     Solicitado por {p.solicitante_nome}

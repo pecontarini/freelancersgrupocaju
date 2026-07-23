@@ -53,6 +53,8 @@ export default function SolicitarFreela() {
   const [substitui, setSubstitui] = useState<string>("");
   const [solicitanteNome, setSolicitanteNome] = useState<string>("");
   const [solicitanteTelefone, setSolicitanteTelefone] = useState<string>("");
+  const [horaInicio, setHoraInicio] = useState<string>("");
+  const [horaFim, setHoraFim] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<null | { lojaNome: string }>(null);
@@ -115,8 +117,12 @@ export default function SolicitarFreela() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lojaId || !dataPop || !setor || !funcao || !motivo || !substitui || !solicitanteNome) {
+    if (!lojaId || !dataPop || !setor || !funcao || !motivo || !substitui || !solicitanteNome || !horaInicio || !horaFim) {
       toast.error("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    if (horaFim <= horaInicio) {
+      toast.error("O horário final deve ser maior que o horário de início.");
       return;
     }
     setSubmitting(true);
@@ -130,6 +136,8 @@ export default function SolicitarFreela() {
       _substitui: substitui,
       _solicitante_nome: solicitanteNome,
       _solicitante_telefone: solicitanteTelefone || null,
+      _hora_inicio: horaInicio,
+      _hora_fim: horaFim,
     });
     setSubmitting(false);
     if (error) {
@@ -149,12 +157,13 @@ export default function SolicitarFreela() {
       `Data da cobertura: ${dataFmt}\n` +
       `Setor: ${setor}\n` +
       `Cargo: ${funcao}\n` +
+      `Horário: ${horaInicio} às ${horaFim}\n` +
       `Cobrindo: ${substitui}\n` +
       `Motivo: ${motivo}\n\n` +
       `Solicitante: ${solicitanteNome}` +
       (solicitanteTelefone ? ` (${solicitanteTelefone})` : "")
     );
-  }, [brandName, lojaNome, dataPop, setor, funcao, substitui, motivo, solicitanteNome, solicitanteTelefone]);
+  }, [brandName, lojaNome, dataPop, setor, funcao, substitui, motivo, solicitanteNome, solicitanteTelefone, horaInicio, horaFim]);
 
   if (success) {
     return (
@@ -191,6 +200,8 @@ export default function SolicitarFreela() {
                 setSubstitui("");
                 setSolicitanteNome("");
                 setSolicitanteTelefone("");
+                setHoraInicio("");
+                setHoraFim("");
               }}
             >
               Nova solicitação
@@ -262,6 +273,26 @@ export default function SolicitarFreela() {
                   </PopoverContent>
                 </Popover>
               </div>
+
+              {/* Horário de serviço */}
+              <div className="space-y-2">
+                <Label>Horário de início *</Label>
+                <Input
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Horário final *</Label>
+                <Input
+                  type="time"
+                  value={horaFim}
+                  onChange={(e) => setHoraFim(e.target.value)}
+                />
+              </div>
+
+
 
               {/* Setor */}
               <div className="space-y-2">

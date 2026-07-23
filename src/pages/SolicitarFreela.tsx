@@ -157,12 +157,13 @@ export default function SolicitarFreela() {
       `Data da cobertura: ${dataFmt}\n` +
       `Setor: ${setor}\n` +
       `Cargo: ${funcao}\n` +
+      `Horário: ${horaInicio} às ${horaFim}\n` +
       `Cobrindo: ${substitui}\n` +
       `Motivo: ${motivo}\n\n` +
       `Solicitante: ${solicitanteNome}` +
       (solicitanteTelefone ? ` (${solicitanteTelefone})` : "")
     );
-  }, [brandName, lojaNome, dataPop, setor, funcao, substitui, motivo, solicitanteNome, solicitanteTelefone]);
+  }, [brandName, lojaNome, dataPop, setor, funcao, substitui, motivo, solicitanteNome, solicitanteTelefone, horaInicio, horaFim]);
 
   if (success) {
     return (

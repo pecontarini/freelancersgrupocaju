@@ -274,6 +274,26 @@ export default function SolicitarFreela() {
                 </Popover>
               </div>
 
+              {/* Horário de serviço */}
+              <div className="space-y-2">
+                <Label>Horário de início *</Label>
+                <Input
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Horário final *</Label>
+                <Input
+                  type="time"
+                  value={horaFim}
+                  onChange={(e) => setHoraFim(e.target.value)}
+                />
+              </div>
+
+
+
               {/* Setor */}
               <div className="space-y-2">
                 <Label>Setor *</Label>

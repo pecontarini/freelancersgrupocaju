@@ -117,8 +117,18 @@ export default function SolicitarFreela() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lojaId || !dataPop || !setor || !funcao || !motivo || !substitui || !solicitanteNome || !horaInicio || !horaFim) {
-      toast.error("Preencha todos os campos obrigatórios.");
+    const faltando: string[] = [];
+    if (!lojaId) faltando.push("Unidade");
+    if (!dataPop) faltando.push("Data da cobertura");
+    if (!horaInicio) faltando.push("Horário de início");
+    if (!horaFim) faltando.push("Horário final");
+    if (!setor) faltando.push("Setor");
+    if (!funcao) faltando.push("Cargo");
+    if (!substitui) faltando.push("Cobrindo quem");
+    if (!motivo) faltando.push("Motivo");
+    if (!solicitanteNome) faltando.push("Solicitante");
+    if (faltando.length > 0) {
+      toast.error(`Faltou preencher: ${faltando.join(", ")}.`);
       return;
     }
     if (horaFim <= horaInicio) {

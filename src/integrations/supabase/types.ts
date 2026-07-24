@@ -6042,7 +6042,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_default?: boolean
-          tenant_id: string
+          tenant_id?: string
           user_id: string
         }
         Update: {

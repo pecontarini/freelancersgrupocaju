@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.create_public_freelancer_request(text, uuid, date, text, text, text, text, text, text);

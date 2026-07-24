@@ -1,65 +1,64 @@
+## Objetivo
+Cadastrar todos os funcionários ativos do PDF **CADASTRO_ATIVOS_-_HSL_24.07.2026.PDF** (HOTTI ALIMENTAÇÃO / HSL) diretamente na tabela `employees`, vinculados à unidade **SANTA LUZIA ASA SUL** (Stutz), para aparecerem automaticamente no criador de escalas.
 
-## Diagnóstico
+## O que será feito
 
-Executei uma auditoria no banco e encontrei **a causa-raiz de praticamente todos os erros da Stutz** (e de qualquer tenant que não seja CajuPAR):
+### 1. Parse do PDF (fora do banco)
+Extrair as ~110 linhas do PDF em CSV com as colunas: `nome`, `telefone`, `cargo_texto`, `admissao`, `cpf`.
+Limpezas:
+- CPF: só dígitos (11)
+- Telefone: só dígitos com DDD
+- Nome: Title Case
+- Gênero: heurística por terminação do primeiro nome (`a`/`e` femininos comuns → F; senão M). Como o campo é obrigatório, essa é a melhor aproximação — pode ser corrigida na UI depois.
 
-**98 tabelas do schema `public` têm um `DEFAULT` fixo apontando para o `tenant_id` da CajuPAR (`8d4e0681-3ddd-4054-9034-4c01f596055c`).**
+### 2. Normalização e criação dos cargos
+Os cargos do PDF chegam com muitas variações do mesmo papel. Vou consolidar:
 
-Como o `DEFAULT` da coluna é aplicado antes do trigger `set_tenant_id_from_context()`, a condição `IF NEW.tenant_id IS NULL` do trigger **nunca dispara**. Ou seja: sempre que um usuário Stutz insere uma linha sem passar `tenant_id` explicitamente, a linha entra com o `tenant_id` da Caju → a policy `tenant_isolation_restrictive` bloqueia com o erro exato mostrado no print (`new row violates row-level security policy "tenant_isolation_restrictive" for table "employees"`).
+| Grupo canônico | Variantes do PDF |
+|---|---|
+| COPEIRO(A) HOSPITALAR | COPEIRO HOSPITALAR, COPEIRA HOSPITALAR, COPEIRO(A) HOSPITALAR, COPEIRO(A), COPEIRA, COPEIRO |
+| GARÇOM | GARCOM, GARCONETE |
+| AUXILIAR DE COZINHA | AUX DE COZINHA, AUXILIAR COZINHA, AUXILIAR DE COZINHA |
+| AUXILIAR DE SERVIÇOS GERAIS | AUX DE SERV. GERAIS, AUX DE SERV GERAIS, AUX. DE SERV GERAIS, AUXILIAR DE SERVIÇOS |
+| AUXILIAR DE ESTOQUE | AUXILIAR DE ESTOQUE |
+| CONCIERGE | CONCIERGE, CONCIERGE NIVEL I, SUPERVISOR DE CONCIERGE |
+| TÉCNICO DE NUTRIÇÃO | TEC. EM NUTRICAO, TECNICO DE NUTRICAO, TECNICO EM NUTRICAO, TECNICA DE NUTRIÇÃO, TEC EM NUTRI HOSPITALAR |
+| NUTRICIONISTA | NUTRICIONISTA, NUTRICIONISTA DE |
+| COZINHEIRO(A) HOSPITALAR | COZINHEIRA HOSPITAR, COZINHEIRO HOSPITALAR, COZINHEIRO GERAL |
+| AUXILIAR ADMINISTRATIVO | ASSISTENTE ADMINISTRATIVO, AUXILIAR ADMINISTRATIVO, AUX. ADMINISTRATIVO, ASSIS DE PLANEJAMENTO |
+| SALADEIRA | SALADEIRA |
+| CONFEITEIRA | CONFEITEIRA, AUX DE CONFEITARIA |
+| ENCARREGADO | ENCARREGADO, ENCARREGADA DE |
+| SUPERVISORA DE PRODUÇÃO | SUPERVISORA DE PRODUÇÃO |
 
-Isso explica também por que "vários problemas" aparecem simultaneamente: qualquer módulo que faça `INSERT` do lado do gestor Stutz (freelancer, escala, CMV, checklist, missão, manutenção, utensílios, etc.) esbarra no mesmo bloqueio.
+Cargos que já existem no banco para SLAS (COPEIRO(A), GARÇOM, AUXILIAR DE COZINHA, AUXILIAR DE SERVIÇOS GERAIS, ESTOQUE, ADMINISTRATIVO, TECNICO DE NUTRIÇÃO, NUTRICIONISTA, COZINHA) serão reaproveitados. Os que faltam serão criados em `job_titles` com `unit_id = SLAS` e `tenant_id = Stutz`.
 
-Além disso, a Thaylla no print está tentando criar o freelancer a partir do "Completar cadastro" que abre o `FreelancerForm` → `useAddEmployee` (`INSERT` em `public.employees` sem `tenant_id`) — é exatamente esse caminho que quebra.
+### 3. Inserção em `employees`
+Para cada linha:
+- `unit_id` = `e2ad5403-dcfb-4a70-a9cc-15106bb348f5` (SANTA LUZIA ASA SUL)
+- `tenant_id` resolvido automaticamente pelo trigger a partir do `unit_id`
+- `worker_type = 'clt'`
+- `banco_id` e `secullum_id` fictícios (par único a partir de 900001) — satisfaz o trigger guardião e a unique constraint `employees_banco_secullum_unique`
+- `aguardando_secullum = false` (para o funcionário aparecer no `useSchedulableEmployees`)
+- `active = true`
+- `cpf` (11 dígitos), `phone`, `name`, `gender`, `job_title` (texto), `job_title_id`
 
-Tabelas afetadas incluem: `employees`, `freelancer_entries`, `freelancer_profiles`, `schedules`, `schedule_drafts`, `checklist_*`, `cmv_*`, `daily_budgets`, `daily_sales`, `maintenance_*`, `missoes` e todos seus filhos, `utensilios_*`, `sectors`, `setores`, `sector_job_titles`, `job_titles`, `config_lojas`, `config_funcoes`, `store_budgets`, `staffing_matrix`, `holding_*`, entre outras.
+Duplicidades: se um CPF já existir na unidade, o registro é ignorado (`ON CONFLICT DO NOTHING` via CPF).
 
-## Correção
+### 4. Entregáveis
+- Migração idempotente que cria os cargos faltantes.
+- Insert em massa (via ferramenta de dados) com os ~110 funcionários.
+- Relatório final com: total inseridos, ignorados por CPF duplicado, cargos criados.
 
-### 1. Migração única: remover o DEFAULT hard-coded das 98 tabelas
-
-Trocar `DEFAULT '8d4e0681...'::uuid` por sem default (DROP DEFAULT) em toda coluna `tenant_id` do schema `public`. O trigger `set_tenant_id_from_context` já cobre os dois caminhos válidos:
-
-- **Tabelas com `unit_id`/`loja_id`** → resolve pelo `config_lojas` da loja.
-- **Demais tabelas** → cai no fallback `current_tenant_id()` (retorna o tenant do usuário autenticado via `user_tenants`).
-
-### 2. Estender o trigger para resolver via loja em mais tabelas
-
-Hoje o trigger só resolve por unidade para `employees`. Vou generalizar: quando a tabela tiver uma coluna `unit_id` **ou** `loja_id` populada, buscar o `tenant_id` correspondente em `config_lojas`. Isso cobre `schedules`, `daily_budgets`, `daily_sales`, `freelancer_entries`, `checklist_responses`, `cmv_*`, `maintenance_entries`, `staffing_matrix`, etc.
-
-### 3. Auditar cada RPC `SECURITY DEFINER` público da Stutz
-
-Rodar smoke test em:
-- `create_public_freelancer_request` (formulário `/solicitar-freela?tenant=stutz`) — confirmar que a linha entra com `tenant_id` da Stutz (a RPC hoje já resolve via loja, mas quero validar depois da migração).
-- `list_public_units`, `list_public_sectors_and_jobs`, `verify_loja_pin`, `submit-daily-checklist`, `confirm-shift`, `escala-aprovacao-*`, `checkin-upload-photo`.
-
-### 4. Smoke test end-to-end como usuário Stutz
-
-Simular no banco os principais INSERTs com `SET LOCAL role = authenticated` e `request.jwt.claim.sub` do usuário Thaylla:
-- criar `employees` (freelancer) na Santa Luzia Asa Sul,
-- criar `freelancer_entries` manual,
-- criar `schedules` + `schedule_draft_slots`,
-- criar `daily_budgets` / `daily_sales`,
-- criar `checklist_responses`,
-- criar `maintenance_entries`,
-- criar `missoes`.
-
-Cada teste deve retornar sucesso e a linha inserida deve ter `tenant_id = 72221fb6-...` (Stutz). Se algum caminho falhar, corrijo o trigger ou o payload no frontend.
-
-### 5. Refinar UX do formulário público `/solicitar-freela`
-
-Ajuste rápido de UX pra reduzir o "não consigo avançar":
-- Mensagem de erro específica no submit ("Faltou preencher: horário de início", etc.), em vez do genérico "Preencha todos os campos obrigatórios".
-- Destacar o par `Horário de início` / `Horário final` com um subtítulo "Horário de serviço *" pra deixar claro que são obrigatórios.
+## Riscos e o que fica pendente
+- **IDs Secullum fictícios**: quando o Secullum real for conectado, será preciso rodar um match por CPF (função `find_employee_by_secullum_id` já existe) e substituir os IDs — senão haverá duplicidade. Recomendo manter isso na dívida técnica.
+- **Gênero por heurística**: alguns podem ficar errados; o gestor corrige na tela de funcionários.
+- **Data de admissão**: a tabela `employees` não tem esse campo. O valor do PDF será descartado (fica apenas o `created_at` atual). Se você quiser preservar, precisamos adicionar a coluna antes.
 
 ## Detalhes técnicos
+- Trigger `set_tenant_id_from_context` resolve o `tenant_id` a partir do `unit_id`.
+- Trigger guardião exige `worker_type='clt'` **e** (`banco_id` + `secullum_id` não nulos) **ou** `aguardando_secullum=true`. Vamos pela primeira via.
+- `useSchedulableEmployees` (usado pelo criador de escalas) filtra: `active=true`, `worker_type='clt'`, `banco_id NOT NULL`, `secullum_id NOT NULL`, `aguardando_secullum` nulo/false — todos os inseridos atenderão.
+- Unicidade: `unique_active_employee_no_cpf` protege duplicatas por (unidade, nome, cargo) quando CPF ausente; como todo funcionário do PDF tem CPF, esse índice não bloqueará.
 
-- Uma única migração SQL faz:
-  1. `DO $$ ... EXECUTE format('ALTER TABLE public.%I ALTER COLUMN tenant_id DROP DEFAULT', t) ...` iterando pelas 98 tabelas identificadas.
-  2. `CREATE OR REPLACE FUNCTION public.set_tenant_id_from_context()` generalizado (unit_id / loja_id → `config_lojas` → tenant; fallback `current_tenant_id()`).
-- Garantir que TODAS as tabelas listadas tenham esse trigger `BEFORE INSERT`. Hoje, `set_tenant_id_from_context` provavelmente existe só em algumas — vou anexar o trigger nas tabelas que faltarem.
-- Nenhuma migração de dados é necessária: linhas antigas da Stutz que já foram criadas por super_admin com `tenant_id` correto continuam válidas.
-
-## Fora de escopo
-
-- Correções de estilo/UI que não afetam funcionamento.
-- Findings pré-existentes do security linter não relacionados a tenant isolation.
+Confirma para eu executar?

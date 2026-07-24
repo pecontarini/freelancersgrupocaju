@@ -6571,37 +6571,22 @@ export type Database = {
         }
         Returns: Json
       }
-      create_public_freelancer_request:
-        | {
-            Args: {
-              _data_pop: string
-              _funcao: string
-              _loja_id: string
-              _motivo: string
-              _setor: string
-              _solicitante_nome: string
-              _solicitante_telefone: string
-              _substitui: string
-              _tenant_slug: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              _data_pop: string
-              _funcao: string
-              _hora_fim?: string
-              _hora_inicio?: string
-              _loja_id: string
-              _motivo: string
-              _setor: string
-              _solicitante_nome: string
-              _solicitante_telefone: string
-              _substitui: string
-              _tenant_slug: string
-            }
-            Returns: string
-          }
+      create_public_freelancer_request: {
+        Args: {
+          _data_pop: string
+          _funcao: string
+          _hora_fim?: string
+          _hora_inicio?: string
+          _loja_id: string
+          _motivo: string
+          _setor: string
+          _solicitante_nome: string
+          _solicitante_telefone: string
+          _substitui: string
+          _tenant_slug: string
+        }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       find_employee_by_secullum_id: {
         Args: { p_secullum_id: number }

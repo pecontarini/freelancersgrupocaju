@@ -240,7 +240,10 @@ export function useUpsertSchedule() {
           );
         }
       }
+
+      return { scheduleId };
     },
+
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["manual-schedules"] });
       qc.invalidateQueries({ queryKey: ["freelancer-checkins"] });

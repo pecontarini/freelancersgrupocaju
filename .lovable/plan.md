@@ -1,22 +1,49 @@
 ## Objetivo
-Permitir lançar turnos que viram a noite (ex.: 22:00 → 06:00) no editor de escalas, com indicação visual clara no modal e na grade.
 
-## Diagnóstico
-O salvamento já aceita turnos virados: `useUpsertSchedule` não compara horários, não há constraint de horário no banco e `calculateHours` no modal já soma 24h quando o fim é menor que o início.
+Ao cadastrar previamente um freelancer dentro do Editor de Escalas (modal "Adicionar Freelancer"), permitir enviar para ele — de forma individual e separada — o link de confirmação D-1 (a mesma página pública `/confirm-shift/:id` já usada na Gestão D-1), sem alterar o fluxo atual de cadastro nem a Gestão D-1.
 
-O que atrapalha é o comportamento do botão **"Manter duração"** (`linkDuration`) em `src/components/escalas/ScheduleEditModal.tsx`, ligado por padrão: ao digitar o horário de fim (06:00), o campo de início é reescrito automaticamente para manter a duração anterior — o usuário não consegue fixar 22:00 → 06:00 sem antes desativar o vínculo.
+## O que existe hoje (verificado)
 
-## Mudanças
+- `src/components/escalas/FreelancerAddModal.tsx`: cria o employee (`worker_type: freelancer`), faz upsert do perfil PIX e chama `upsertSchedule` para escalar. Ao terminar, fecha o modal e reseta o formulário.
+- `src/components/escalas/D1ManagementPanel.tsx` (linhas 82–97): já monta o link individual `${window.location.origin}/confirm-shift/${schedule.id}` e a URL `wa.me` com mensagem de confirmação — mas só para a lista D-1 do dia seguinte.
+- `src/pages/ConfirmShift.tsx`: página pública que lê o agendamento pelo id e registra confirmação/negativa.
 
-1. **Modal de edição do turno** (`ScheduleEditModal.tsx`)
-   - Desligar o vínculo de duração automaticamente quando o usuário editar diretamente o campo de fim: o valor digitado é respeitado e o início não é mais reescrito. (Alternativa que também será aplicada: ao detectar turno virado, o vínculo é desativado e o botão passa a exibir "Editar início e fim independentes".)
-   - Exibir, abaixo dos campos de horário, um aviso discreto quando `fim < início`: "Turno vira o dia — termina no dia seguinte", com o total de horas já calculado corretamente (ex.: 22:00 → 06:00 = 8h).
-   - Marcar o campo Fim com o sufixo "+1d" no rótulo quando o turno virar o dia.
+## Mudanças propostas
 
-2. **Grade de escalas** (`ManualScheduleGrid.tsx`)
-   - Na célula do turno, acrescentar o marcador "+1d" ao intervalo exibido quando o fim for menor que o início (ex.: `22:00–06:00 +1d`), para os gerentes lerem corretamente. O cálculo de horas na célula já trata a virada de dia.
+### 1. Helper compartilhado de link D-1
+Criar `src/lib/escalas/d1ConfirmLink.ts` com duas funções puras:
+- `buildConfirmUrl(scheduleId)` → `${window.location.origin}/confirm-shift/${scheduleId}`
+- `buildConfirmWhatsAppLink({ nome, telefone, data, inicio, fim, scheduleId })` → URL `wa.me` com o mesmo texto já usado hoje na Gestão D-1.
 
-3. Sem alterações em exports (PDF/Excel) e no resumo semanal, conforme definido.
+Refatorar `D1ManagementPanel.tsx` para usar o helper (mesma mensagem, sem mudança de comportamento).
+
+### 2. Etapa de sucesso no modal de freelancer
+Em `FreelancerAddModal.tsx`, após o `upsertSchedule` bem-sucedido, em vez de fechar imediatamente, exibir um passo final compacto dentro do próprio modal:
+
+```text
+✔ Freelancer escalado
+[Nome] — [dd/MM] [08:00–16:20]
+
+[ Enviar link D-1 no WhatsApp ]   (desabilitado se sem telefone)
+[ Copiar link ]                    [ Concluir ]
+```
+
+- "Enviar no WhatsApp": abre `wa.me` em nova aba com o link individual.
+- "Copiar link": copia a URL para a área de transferência (toast de confirmação).
+- "Concluir": fecha o modal e reseta o formulário (comportamento atual).
+- Se o freelancer não tiver telefone válido, só o botão de copiar fica ativo, com aviso curto.
+
+Nada muda quando o usuário simplesmente fecha o modal — o cadastro e a escala já foram gravados normalmente.
 
 ## Detalhes técnicos
-Sem migração de banco: `start_time`/`end_time` são do tipo `time` e aceitam qualquer par. Alteração restrita a frontend/apresentação, sem mudança nas regras de aprovação, compliance CLT ou cálculo de custo.
+
+- O passo de sucesso precisa do `id` do registro em `schedules`. Vou confirmar que a mutation `upsertSchedule` (`src/hooks/useManualSchedules.ts`) devolve a linha criada com `id`; se ela hoje não retornar, adiciono `.select("id").single()` no upsert e devolvo o dado na mutation — sem alterar assinatura para os outros consumidores.
+- Envio é manual via `wa.me` (mesmo canal já usado na Gestão D-1). Nenhum disparo automático, nenhuma edge function nova, nenhuma alteração de banco.
+- `onAdded?.(empId)` continua sendo chamado no momento do sucesso, para a grade atualizar imediatamente mesmo antes de fechar o modal.
+- Sem emojis na UI (ícones `lucide-react`: `MessageCircle`, `Copy`, `CheckCircle2`).
+
+## Fora de escopo
+
+- Alterar a mensagem/template do D-1 ou a página `/confirm-shift`.
+- Envio automatizado (n8n) ou lembretes agendados.
+- Qualquer mudança na Gestão D-1 além da refatoração para o helper compartilhado.

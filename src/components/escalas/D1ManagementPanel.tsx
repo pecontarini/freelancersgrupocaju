@@ -32,6 +32,8 @@ import { useD1Schedules, type D1Schedule } from "@/hooks/useD1Schedules";
 import { useUnidade } from "@/contexts/UnidadeContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { D1SectorAccordion, groupBySector } from "./D1SectorAccordion";
+import { buildConfirmWhatsAppLink } from "@/lib/escalas/d1ConfirmLink";
+
 
 const APP_URL = window.location.origin;
 

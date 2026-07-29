@@ -2517,6 +2517,7 @@ function ScheduleCell({
   const startStr = schedule.start_time?.slice(0, 5) || "";
   const endStr = schedule.end_time?.slice(0, 5) || "";
   const hasBreak = schedule.break_duration > 0;
+  const crossesMidnight = !!startStr && !!endStr && endStr < startStr;
 
   // Tooltip detalhado quando há intervalo: mostra T1, intervalo (h/min) e T2
   let tooltip = "";
@@ -2538,6 +2539,9 @@ function ScheduleCell({
   } else if (startStr && endStr) {
     tooltip = `${startStr} – ${endStr}`;
   }
+  if (crossesMidnight && tooltip) {
+    tooltip += "  •  Turno vira o dia (termina no dia seguinte)";
+  }
 
   return (
     <div className="flex flex-col items-center gap-0.5" title={tooltip}>
@@ -2551,6 +2555,9 @@ function ScheduleCell({
         {startStr && endStr ? (
           <span className="flex items-center gap-0.5">
             {startStr} - {endStr}
+            {crossesMidnight && (
+              <sup className="text-[8px] font-bold leading-none opacity-80">+1d</sup>
+            )}
             {hasBreak && <Coffee className="h-2.5 w-2.5 opacity-50" />}
           </span>
         ) : (

@@ -319,7 +319,7 @@ export function FreelancerAddModal({
     }
 
     try {
-      await upsertSchedule.mutateAsync({
+      const result = await upsertSchedule.mutateAsync({
         employee_id: empId,
         schedule_date: date,
         sector_id: targetSectorId,
@@ -331,8 +331,21 @@ export function FreelancerAddModal({
       });
 
       onAdded?.(empId);
-      onClose();
-      resetForm();
+
+      const scheduleId = result?.scheduleId;
+      if (scheduleId) {
+        // Passo final: enviar o link D-1 individual para este freelancer
+        setSuccessInfo({
+          scheduleId,
+          nome: name.trim(),
+          telefone: phone.trim(),
+          inicio: startTime,
+          fim: endTime,
+        });
+      } else {
+        onClose();
+        resetForm();
+      }
     } catch (err: any) {
       const msg = "Erro ao escalar: " + err.message;
       setSubmitError(msg);
@@ -357,7 +370,32 @@ export function FreelancerAddModal({
     setLinkedSourceLabel(null);
     setSearchedCpf("");
     setSubmitError(null);
+    setSuccessInfo(null);
   }
+
+  function handleSendD1WhatsApp() {
+    if (!successInfo) return;
+    const url = buildConfirmWhatsAppLink({
+      nome: successInfo.nome,
+      telefone: successInfo.telefone,
+      data: date,
+      inicio: successInfo.inicio,
+      fim: successInfo.fim,
+      scheduleId: successInfo.scheduleId,
+    });
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  async function handleCopyD1Link() {
+    if (!successInfo) return;
+    try {
+      await navigator.clipboard.writeText(buildConfirmUrl(successInfo.scheduleId));
+      toast.success("Link D-1 copiado!");
+    } catch {
+      toast.error("Não foi possível copiar o link.");
+    }
+  }
+
 
   // Helper text para CPF
   let cpfHelper: { text: string; tone: "muted" | "error" | "success" } = {

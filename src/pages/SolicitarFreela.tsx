@@ -303,6 +303,11 @@ export default function SolicitarFreela() {
                   value={horaFim}
                   onChange={(e) => setHoraFim(e.target.value)}
                 />
+                {viraODia && (
+                  <p className="text-xs text-muted-foreground">
+                    Vira o dia — o turno termina no dia seguinte.
+                  </p>
+                )}
               </div>
 
 

@@ -160,11 +160,13 @@ export function ScheduleEditModal({
     }
   }
   function handleEndChange(v: string) {
+    // Edição direta do fim sempre respeita o valor digitado (turnos que viram a noite)
     setEndTime(v);
-    if (linkDuration && v) {
-      setStartTime(addMinutes(v, -durationMinRef.current));
-    }
+    if (linkDuration) setLinkDuration(false);
+    if (v && startTime) durationMinRef.current = diffMinutes(startTime, v);
   }
+
+  const crossesMidnight = !!startTime && !!endTime && endTime < startTime;
 
   const totalHours = useMemo(
     () => calculateHours(startTime, endTime, breakDuration),

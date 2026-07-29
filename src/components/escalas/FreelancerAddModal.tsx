@@ -31,6 +31,8 @@ import {
   Building2,
   Info,
   AlertCircle,
+  MessageCircle,
+  Copy,
 } from "lucide-react";
 import { useEmployees, friendlyEmployeeError } from "@/hooks/useEmployees";
 import { useUpsertSchedule } from "@/hooks/useManualSchedules";
@@ -40,8 +42,10 @@ import { useCpfLookup } from "@/hooks/useCpfLookup";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { formatCPF } from "@/lib/formatters";
 import { isValidCpf, unmaskCpf } from "@/lib/cpf";
+import { buildConfirmUrl, buildConfirmWhatsAppLink } from "@/lib/escalas/d1ConfirmLink";
 import { toast } from "sonner";
 import { QuickCreateJobTitleDialog } from "./QuickCreateJobTitleDialog";
+
 
 interface FreelancerAddModalProps {
   open: boolean;

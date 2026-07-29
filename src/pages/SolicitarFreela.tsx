@@ -131,8 +131,8 @@ export default function SolicitarFreela() {
       toast.error(`Faltou preencher: ${faltando.join(", ")}.`);
       return;
     }
-    if (horaFim <= horaInicio) {
-      toast.error("O horário final deve ser maior que o horário de início.");
+    if (horaFim === horaInicio) {
+      toast.error("O horário final não pode ser igual ao horário de início.");
       return;
     }
     setSubmitting(true);

@@ -2539,6 +2539,9 @@ function ScheduleCell({
   } else if (startStr && endStr) {
     tooltip = `${startStr} – ${endStr}`;
   }
+  if (crossesMidnight && tooltip) {
+    tooltip += "  •  Turno vira o dia (termina no dia seguinte)";
+  }
 
   return (
     <div className="flex flex-col items-center gap-0.5" title={tooltip}>

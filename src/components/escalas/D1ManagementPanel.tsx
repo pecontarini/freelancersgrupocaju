@@ -82,19 +82,16 @@ export function D1ManagementPanel() {
   }
 
   function buildWhatsAppLink(s: D1Schedule): string {
-    const phone = s.employee_phone?.replace(/\D/g, "") || "";
-    const startStr = s.start_time?.slice(0, 5) || "—";
-    const endStr = s.end_time?.slice(0, 5) || "—";
-    const dateLabel = formatDateLabel(s.schedule_date);
-    const confirmUrl = `${APP_URL}/confirm-shift/${s.id}`;
-
-    const message = encodeURIComponent(
-      `Olá ${s.employee_name}! Você tem turno ${dateLabel} (${startStr} às ${endStr}). ` +
-      `Por favor, confirme sua presença neste link rápido:\n${confirmUrl}`
-    );
-
-    return `https://wa.me/${phone}?text=${message}`;
+    return buildConfirmWhatsAppLink({
+      nome: s.employee_name,
+      telefone: s.employee_phone,
+      data: s.schedule_date,
+      inicio: s.start_time,
+      fim: s.end_time,
+      scheduleId: s.id,
+    });
   }
+
 
   function handleCopyExecutiveSummary() {
     const unitName = lojas.options.find((l) => l.id === selectedUnit)?.nome || "—";

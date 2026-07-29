@@ -436,7 +436,60 @@ export function FreelancerAddModal({
           </p>
         </DialogHeader>
 
+        {successInfo ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                Freelancer escalado
+              </p>
+              <p className="mt-1 text-sm">
+                {successInfo.nome} — {new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}{" "}
+                {successInfo.inicio}–{successInfo.fim}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Envie o link de confirmação D-1 direto para este freelancer.
+            </p>
+
+            {successInfo.telefone.replace(/\D/g, "").length < 10 && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Sem telefone válido cadastrado — use "Copiar link" e envie manualmente.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              className="w-full min-h-11"
+              onClick={handleSendD1WhatsApp}
+              disabled={successInfo.telefone.replace(/\D/g, "").length < 10}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Enviar link D-1 no WhatsApp
+            </Button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={handleCopyD1Link}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copiar link
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onClose();
+                  resetForm();
+                }}
+              >
+                Concluir
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div className="space-y-4">
+
           {submitError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />

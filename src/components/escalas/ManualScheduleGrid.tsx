@@ -2555,6 +2555,9 @@ function ScheduleCell({
         {startStr && endStr ? (
           <span className="flex items-center gap-0.5">
             {startStr} - {endStr}
+            {crossesMidnight && (
+              <sup className="text-[8px] font-bold leading-none opacity-80">+1d</sup>
+            )}
             {hasBreak && <Coffee className="h-2.5 w-2.5 opacity-50" />}
           </span>
         ) : (

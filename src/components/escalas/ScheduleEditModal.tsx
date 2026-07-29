@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   Link as LinkIcon,
   Unlink,
+  Moon,
 } from "lucide-react";
 import { useUpsertSchedule, useCancelSchedule, useBulkVacation, type ManualSchedule } from "@/hooks/useManualSchedules";
 import { PracaSelector } from "./PracaSelector";

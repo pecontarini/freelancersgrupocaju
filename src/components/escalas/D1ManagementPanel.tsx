@@ -35,7 +35,7 @@ import { D1SectorAccordion, groupBySector } from "./D1SectorAccordion";
 import { buildConfirmWhatsAppLink } from "@/lib/escalas/d1ConfirmLink";
 
 
-const APP_URL = window.location.origin;
+
 
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");

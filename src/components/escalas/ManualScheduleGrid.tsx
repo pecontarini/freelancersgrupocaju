@@ -2517,6 +2517,7 @@ function ScheduleCell({
   const startStr = schedule.start_time?.slice(0, 5) || "";
   const endStr = schedule.end_time?.slice(0, 5) || "";
   const hasBreak = schedule.break_duration > 0;
+  const crossesMidnight = !!startStr && !!endStr && endStr < startStr;
 
   // Tooltip detalhado quando há intervalo: mostra T1, intervalo (h/min) e T2
   let tooltip = "";

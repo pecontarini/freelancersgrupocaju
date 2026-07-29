@@ -131,8 +131,8 @@ export default function SolicitarFreela() {
       toast.error(`Faltou preencher: ${faltando.join(", ")}.`);
       return;
     }
-    if (horaFim <= horaInicio) {
-      toast.error("O horário final deve ser maior que o horário de início.");
+    if (horaFim === horaInicio) {
+      toast.error("O horário final não pode ser igual ao horário de início.");
       return;
     }
     setSubmitting(true);
@@ -158,16 +158,19 @@ export default function SolicitarFreela() {
     setSuccess({ lojaNome });
   };
 
+  const viraODia = !!horaInicio && !!horaFim && horaFim < horaInicio;
+
   const waMeText = useMemo(() => {
     const [y, m, d] = dataPop.split("-");
     const dataFmt = dataPop ? `${d}/${m}/${y}` : "";
+    const overnight = horaInicio && horaFim && horaFim < horaInicio;
     return encodeURIComponent(
       `*Nova solicitação de freelancer — ${brandName}*\n\n` +
       `Unidade: ${lojaNome}\n` +
       `Data da cobertura: ${dataFmt}\n` +
       `Setor: ${setor}\n` +
       `Cargo: ${funcao}\n` +
-      `Horário: ${horaInicio} às ${horaFim}\n` +
+      `Horário: ${horaInicio} às ${horaFim}${overnight ? " (dia seguinte)" : ""}\n` +
       `Cobrindo: ${substitui}\n` +
       `Motivo: ${motivo}\n\n` +
       `Solicitante: ${solicitanteNome}` +
@@ -300,6 +303,11 @@ export default function SolicitarFreela() {
                   value={horaFim}
                   onChange={(e) => setHoraFim(e.target.value)}
                 />
+                {viraODia && (
+                  <p className="text-xs text-muted-foreground">
+                    Vira o dia — o turno termina no dia seguinte.
+                  </p>
+                )}
               </div>
 
 

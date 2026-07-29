@@ -291,10 +291,23 @@ export function ScheduleEditModal({
                 <Input type="time" value={startTime} onChange={(e) => handleStartChange(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>Fim</Label>
+                <Label className="flex items-center gap-1">
+                  Fim
+                  {crossesMidnight && (
+                    <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-bold text-primary">
+                      +1d
+                    </span>
+                  )}
+                </Label>
                 <Input type="time" value={endTime} onChange={(e) => handleEndChange(e.target.value)} />
               </div>
             </div>
+            {crossesMidnight && (
+              <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-xs text-primary">
+                <Moon className="h-3.5 w-3.5 shrink-0" />
+                <span>Turno vira o dia — termina no dia seguinte.</span>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setLinkDuration((v) => !v)}
@@ -303,7 +316,7 @@ export function ScheduleEditModal({
                   ? "border-primary/40 bg-primary/5 text-primary"
                   : "border-muted text-muted-foreground hover:bg-muted/50"
               }`}
-              title="Ao mover início ou fim, o outro acompanha mantendo a duração total"
+              title="Ao mover o início, o fim acompanha mantendo a duração total"
             >
               {linkDuration ? <LinkIcon className="h-3.5 w-3.5" /> : <Unlink className="h-3.5 w-3.5" />}
               {linkDuration

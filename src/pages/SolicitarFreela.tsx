@@ -158,16 +158,19 @@ export default function SolicitarFreela() {
     setSuccess({ lojaNome });
   };
 
+  const viraODia = !!horaInicio && !!horaFim && horaFim < horaInicio;
+
   const waMeText = useMemo(() => {
     const [y, m, d] = dataPop.split("-");
     const dataFmt = dataPop ? `${d}/${m}/${y}` : "";
+    const overnight = horaInicio && horaFim && horaFim < horaInicio;
     return encodeURIComponent(
       `*Nova solicitação de freelancer — ${brandName}*\n\n` +
       `Unidade: ${lojaNome}\n` +
       `Data da cobertura: ${dataFmt}\n` +
       `Setor: ${setor}\n` +
       `Cargo: ${funcao}\n` +
-      `Horário: ${horaInicio} às ${horaFim}\n` +
+      `Horário: ${horaInicio} às ${horaFim}${overnight ? " (dia seguinte)" : ""}\n` +
       `Cobrindo: ${substitui}\n` +
       `Motivo: ${motivo}\n\n` +
       `Solicitante: ${solicitanteNome}` +

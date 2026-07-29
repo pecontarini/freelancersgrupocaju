@@ -729,6 +729,8 @@ export function FreelancerAddModal({
             </>
           )}
         </div>
+        )}
+
       </DialogContent>
 
       <QuickCreateJobTitleDialog

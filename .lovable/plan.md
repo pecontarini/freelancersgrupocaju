@@ -1,18 +1,22 @@
 ## Objetivo
-Permitir que o horário final seja menor que o inicial (turno que vira a noite), sem bloquear o envio da solicitação pública de freelancer.
+Permitir lançar turnos que viram a noite (ex.: 22:00 → 06:00) no editor de escalas, com indicação visual clara no modal e na grade.
 
 ## Diagnóstico
-A única trava é no frontend, em `src/pages/SolicitarFreela.tsx` (linha 134): `if (horaFim <= horaInicio)` exibe erro e cancela o envio. A função do banco `create_public_freelancer_request` apenas valida que os campos não sejam nulos — não compara os horários. Não há constraint de horário na tabela.
+O salvamento já aceita turnos virados: `useUpsertSchedule` não compara horários, não há constraint de horário no banco e `calculateHours` no modal já soma 24h quando o fim é menor que o início.
+
+O que atrapalha é o comportamento do botão **"Manter duração"** (`linkDuration`) em `src/components/escalas/ScheduleEditModal.tsx`, ligado por padrão: ao digitar o horário de fim (06:00), o campo de início é reescrito automaticamente para manter a duração anterior — o usuário não consegue fixar 22:00 → 06:00 sem antes desativar o vínculo.
 
 ## Mudanças
 
-1. **Remover a trava de horário** em `SolicitarFreela.tsx`: eliminar a comparação `horaFim <= horaInicio`, mantendo apenas a validação de campos obrigatórios. Bloquear somente o caso de horários exatamente iguais (duração zero).
+1. **Modal de edição do turno** (`ScheduleEditModal.tsx`)
+   - Desligar o vínculo de duração automaticamente quando o usuário editar diretamente o campo de fim: o valor digitado é respeitado e o início não é mais reescrito. (Alternativa que também será aplicada: ao detectar turno virado, o vínculo é desativado e o botão passa a exibir "Editar início e fim independentes".)
+   - Exibir, abaixo dos campos de horário, um aviso discreto quando `fim < início`: "Turno vira o dia — termina no dia seguinte", com o total de horas já calculado corretamente (ex.: 22:00 → 06:00 = 8h).
+   - Marcar o campo Fim com o sufixo "+1d" no rótulo quando o turno virar o dia.
 
-2. **Sinalizar visualmente o turno noturno**: quando `horaFim < horaInicio`, exibir junto ao campo "Horário final" um aviso discreto do tipo "vira o dia — termina no dia seguinte", para o solicitante confirmar que é intencional.
+2. **Grade de escalas** (`ManualScheduleGrid.tsx`)
+   - Na célula do turno, acrescentar o marcador "+1d" ao intervalo exibido quando o fim for menor que o início (ex.: `22:00–06:00 +1d`), para os gerentes lerem corretamente. O cálculo de horas na célula já trata a virada de dia.
 
-3. **Texto do WhatsApp**: no resumo compartilhado, quando o turno virar o dia, o horário aparece como `22:00 às 06:00 (dia seguinte)`.
-
-4. **Exibição no painel**: em `src/components/freelancer/SolicitacoesPendentes.tsx`, acrescentar o marcador "+1d" ao intervalo quando o fim for menor que o início, para os gerentes lerem corretamente.
+3. Sem alterações em exports (PDF/Excel) e no resumo semanal, conforme definido.
 
 ## Detalhes técnicos
-Sem migração de banco: as colunas `hora_inicio`/`hora_fim` são do tipo `time` e aceitam qualquer par de valores. Alteração restrita a frontend/apresentação.
+Sem migração de banco: `start_time`/`end_time` são do tipo `time` e aceitam qualquer par. Alteração restrita a frontend/apresentação, sem mudança nas regras de aprovação, compliance CLT ou cálculo de custo.

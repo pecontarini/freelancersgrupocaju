@@ -117,6 +117,14 @@ export function FreelancerAddModal({
   const [linkedSourceLabel, setLinkedSourceLabel] = useState<string | null>(null);
   const [searchedCpf, setSearchedCpf] = useState<string>("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{
+    scheduleId: string;
+    nome: string;
+    telefone: string;
+    inicio: string;
+    fim: string;
+  } | null>(null);
+
 
   useEffect(() => {
     if (open) {

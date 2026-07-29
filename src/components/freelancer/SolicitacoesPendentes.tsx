@@ -69,7 +69,9 @@ export function SolicitacoesPendentes({ selectedUnidadeId, allowedLojaIds }: Pro
                   </div>
                   <div className="text-muted-foreground text-xs">
                     {p.setor} · {p.funcao}
-                    {p.hora_inicio && p.hora_fim ? ` · ${p.hora_inicio.slice(0,5)}–${p.hora_fim.slice(0,5)}` : ""}
+                    {p.hora_inicio && p.hora_fim
+                      ? ` · ${p.hora_inicio.slice(0,5)}–${p.hora_fim.slice(0,5)}${p.hora_fim.slice(0,5) < p.hora_inicio.slice(0,5) ? " (+1d)" : ""}`
+                      : ""}
                     {" · "}Cobrindo {p.substitui} · {p.motivo}
                   </div>
                   <div className="text-muted-foreground text-xs">

@@ -644,6 +644,17 @@ function TenantMembersDialog({
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={() => setPasswordFor(m.email)}
+                  disabled={generatingLinkFor !== null}
+                  className="h-8 w-8"
+                  title="Definir senha manualmente"
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeMember(m.user_id)}
                   className="h-8 w-8"
                 >

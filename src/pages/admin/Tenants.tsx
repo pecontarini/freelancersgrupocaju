@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy, KeyRound } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 

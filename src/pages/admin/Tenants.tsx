@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy, KeyRound } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 
@@ -522,6 +522,23 @@ function TenantMembersDialog({
     load();
   };
 
+  const setPasswordFor = async (memberEmail: string) => {
+    const pwd = window.prompt(
+      `Definir senha para ${memberEmail}\n\nMínimo 8 caracteres. Evite senhas comuns (ex: 123456, senha123).`
+    );
+    if (!pwd) return;
+    if (pwd.length < 8) return toast.error("A senha precisa ter ao menos 8 caracteres");
+    setGeneratingLinkFor(memberEmail);
+    const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
+      body: { email: memberEmail, action: "set_password", password: pwd },
+    });
+    setGeneratingLinkFor(null);
+    if (error) return toast.error(error.message);
+    const d = data as any;
+    if (d?.error) return toast.error(d.error);
+    toast.success("Senha definida e e-mail confirmado. Já pode entrar.");
+  };
+
   const generateLinkFor = async (memberEmail: string) => {
     if (generatingLinkFor) return;
     setGeneratingLinkFor(memberEmail);
@@ -542,6 +559,7 @@ function TenantMembersDialog({
       toast.error("Não foi possível gerar o link");
     }
   };
+
 
   const removeMember = async (userId: string) => {
     if (!tenant) return;
@@ -623,6 +641,17 @@ function TenantMembersDialog({
                     <Link2 className="h-4 w-4" />
                   )}
                 </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setPasswordFor(m.email)}
+                  disabled={generatingLinkFor !== null}
+                  className="h-8 w-8"
+                  title="Definir senha manualmente"
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+
                 <Button
                   variant="ghost"
                   size="icon"

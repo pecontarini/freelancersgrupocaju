@@ -17,7 +17,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy, KeyRound } from "lucide-react";
+import { Building2, Plus, Users, Pencil, Trash2, Star, ExternalLink, Sparkles, Upload, Loader2, Link2, Copy, KeyRound, Eye, EyeOff } from "lucide-react";
 import { BrandSplash } from "@/components/motion";
 import { buildTenantUrl } from "@/lib/tenantResolver";
 
@@ -481,6 +481,11 @@ function TenantMembersDialog({
   const [inviting, setInviting] = useState(false);
   const [generatingLinkFor, setGeneratingLinkFor] = useState<string | null>(null);
   const [linkDialog, setLinkDialog] = useState<{ email: string; link: string; kind: "invite" | "recovery" } | null>(null);
+  const [passwordDialogEmail, setPasswordDialogEmail] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [settingPassword, setSettingPassword] = useState(false);
 
   const load = async () => {
     if (!tenant) return;
@@ -522,20 +527,47 @@ function TenantMembersDialog({
     load();
   };
 
-  const setPasswordFor = async (memberEmail: string) => {
-    const pwd = window.prompt(
-      `Definir senha para ${memberEmail}\n\nMínimo 8 caracteres. Evite senhas comuns (ex: 123456, senha123).`
-    );
-    if (!pwd) return;
-    if (pwd.length < 8) return toast.error("A senha precisa ter ao menos 8 caracteres");
-    setGeneratingLinkFor(memberEmail);
+  const closePasswordDialog = () => {
+    if (settingPassword) return;
+    setPasswordDialogEmail(null);
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+  };
+
+  const openPasswordDialog = (memberEmail: string) => {
+    setNewPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+    setPasswordDialogEmail(memberEmail);
+  };
+
+  const setPasswordFor = async () => {
+    if (!passwordDialogEmail || settingPassword) return;
+    if (newPassword.length < 8) return toast.error("A senha precisa ter ao menos 8 caracteres");
+    if (newPassword !== confirmPassword) return toast.error("As senhas não coincidem");
+
+    setSettingPassword(true);
     const { data, error } = await supabase.functions.invoke("admin-invite-tenant-user", {
-      body: { email: memberEmail, action: "set_password", password: pwd },
+      body: { email: passwordDialogEmail, action: "set_password", password: newPassword },
     });
-    setGeneratingLinkFor(null);
-    if (error) return toast.error(error.message);
+    setSettingPassword(false);
+    if (error) {
+      let message = error.message;
+      const context = (error as { context?: Response }).context;
+      if (context) {
+        try {
+          const payload = await context.clone().json();
+          if (payload?.error) message = String(payload.error);
+        } catch {
+          // Mantém a mensagem original quando a resposta não for JSON.
+        }
+      }
+      return toast.error(message);
+    }
     const d = data as any;
     if (d?.error) return toast.error(d.error);
+    closePasswordDialog();
     toast.success("Senha definida e e-mail confirmado. Já pode entrar.");
   };
 
@@ -644,8 +676,8 @@ function TenantMembersDialog({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => setPasswordFor(m.email)}
-                  disabled={generatingLinkFor !== null}
+                  onClick={() => openPasswordDialog(m.email)}
+                  disabled={generatingLinkFor !== null || settingPassword}
                   className="h-8 w-8"
                   title="Definir senha manualmente"
                 >
@@ -696,6 +728,78 @@ function TenantMembersDialog({
                   Use somente este link mais recente. Ele expira em ~1 hora e um novo link invalida o anterior.
                 </p>
               </div>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {passwordDialogEmail && (
+          <Dialog open={!!passwordDialogEmail} onOpenChange={(open) => !open && closePasswordDialog()}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Definir senha do usuário</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Defina uma senha temporária para <strong>{passwordDialogEmail}</strong>. O e-mail será confirmado e o acesso ficará disponível imediatamente.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="tenant-member-password">Nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="tenant-member-password"
+                      type={showPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(event) => setNewPassword(event.target.value)}
+                      placeholder="Mínimo de 8 caracteres"
+                      autoComplete="new-password"
+                      disabled={settingPassword}
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 h-8 w-8"
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tenant-member-password-confirm">Confirmar senha</Label>
+                  <Input
+                    id="tenant-member-password-confirm"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") setPasswordFor();
+                    }}
+                    placeholder="Digite a mesma senha novamente"
+                    autoComplete="new-password"
+                    disabled={settingPassword}
+                  />
+                  {confirmPassword && newPassword !== confirmPassword && (
+                    <p className="text-xs text-destructive">As senhas não coincidem.</p>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={closePasswordDialog} disabled={settingPassword}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={setPasswordFor}
+                  disabled={settingPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+                  className="gap-2"
+                >
+                  {settingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {settingPassword ? "Salvando..." : "Definir senha"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         )}

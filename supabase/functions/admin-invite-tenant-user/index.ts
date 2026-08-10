@@ -43,9 +43,31 @@ Deno.serve(async (req) => {
     if (!email) {
       return json({ error: "email é obrigatório" }, 400);
     }
+
+    const action = String(body.action ?? "");
+
+    // Definir senha diretamente (super admin) — resolve casos de convite/SMTP
+    if (action === "set_password") {
+      const password = String(body.password ?? "");
+      if (password.length < 8) {
+        return json({ error: "senha deve ter ao menos 8 caracteres" }, 400);
+      }
+      const { data: listedU, error: listUErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (listUErr) return json({ error: listUErr.message }, 500);
+      const target = listedU.users.find((u) => (u.email ?? "").toLowerCase() === email);
+      if (!target) return json({ error: "usuário não encontrado" }, 404);
+      const { error: updErr } = await admin.auth.admin.updateUserById(target.id, {
+        password,
+        email_confirm: true,
+      });
+      if (updErr) return json({ error: updErr.message }, 400);
+      return json({ ok: true, user_id: target.id, password_set: true });
+    }
+
     if (!linkOnly && !tenantId) {
       return json({ error: "tenant_id é obrigatório" }, 400);
     }
+
 
     let tenant: { slug: string; nome: string } | null = null;
     if (tenantId) {

@@ -66,16 +66,25 @@ export function useManualSchedules(unitId: string | null, weekStart: string, wee
 
 async function resolveShiftId(shiftType?: string): Promise<string> {
   if (shiftType) {
-    const { data: matched } = await supabase
+    const { data: matched, error: matchError } = await supabase
       .from("shifts")
       .select("id")
       .eq("type", shiftType)
       .limit(1);
+    if (matchError) throw matchError;
     if (matched && matched.length > 0) return matched[0].id;
   }
-  const { data: any } = await supabase.from("shifts").select("id").limit(1);
-  if (!any || any.length === 0) throw new Error("Nenhum turno cadastrado.");
-  return any[0].id;
+
+  const { data: available, error } = await supabase
+    .from("shifts")
+    .select("id")
+    .order("type", { ascending: true })
+    .limit(1);
+  if (error) throw error;
+  if (!available || available.length === 0) {
+    throw new Error("A empresa ainda não possui turnos-base configurados. Solicite ao administrador a configuração de Almoço e Jantar.");
+  }
+  return available[0].id;
 }
 
 async function autoCreatePendingCheckin(

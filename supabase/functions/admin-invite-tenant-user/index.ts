@@ -64,6 +64,30 @@ Deno.serve(async (req) => {
       return json({ ok: true, user_id: target.id, password_set: true });
     }
 
+    // Corrigir/alterar e-mail de um usuário existente (super admin)
+    if (action === "update_email") {
+      const newEmail = String(body.new_email ?? "").trim().toLowerCase();
+      if (!newEmail || !newEmail.includes("@")) {
+        return json({ error: "new_email inválido" }, 400);
+      }
+      const { data: listedU, error: listUErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (listUErr) return json({ error: listUErr.message }, 500);
+      const target = listedU.users.find((u) => (u.email ?? "").toLowerCase() === email);
+      if (!target) return json({ error: "usuário não encontrado" }, 404);
+      const clash = listedU.users.find((u) => (u.email ?? "").toLowerCase() === newEmail);
+      if (clash && clash.id !== target.id) {
+        return json({ error: "já existe um usuário com o novo e-mail" }, 409);
+      }
+      const { error: updErr } = await admin.auth.admin.updateUserById(target.id, {
+        email: newEmail,
+        email_confirm: true,
+      });
+      if (updErr) return json({ error: updErr.message }, 400);
+      await admin.from("profiles").update({ email: newEmail }).eq("id", target.id);
+      return json({ ok: true, user_id: target.id, email: newEmail });
+    }
+
+
     if (!linkOnly && !tenantId) {
       return json({ error: "tenant_id é obrigatório" }, 400);
     }

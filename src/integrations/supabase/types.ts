@@ -2180,7 +2180,9 @@ export type Database = {
           banco_id: number | null
           cpf: string | null
           created_at: string
+          default_end_time: string | null
           default_rate: number | null
+          default_start_time: string | null
           gender: string
           id: string
           job_title: string | null
@@ -2200,7 +2202,9 @@ export type Database = {
           banco_id?: number | null
           cpf?: string | null
           created_at?: string
+          default_end_time?: string | null
           default_rate?: number | null
+          default_start_time?: string | null
           gender?: string
           id?: string
           job_title?: string | null
@@ -2220,7 +2224,9 @@ export type Database = {
           banco_id?: number | null
           cpf?: string | null
           created_at?: string
+          default_end_time?: string | null
           default_rate?: number | null
+          default_start_time?: string | null
           gender?: string
           id?: string
           job_title?: string | null
